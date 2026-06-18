@@ -36,6 +36,17 @@ export async function authenticateWithAvailableSource(
       include: {
         role: true,
         defaultCompany: true,
+        companies: {
+          where: {
+            canAccess: true,
+            company: {
+              isActive: true,
+            },
+          },
+          include: {
+            company: true,
+          },
+        },
       },
     });
 
@@ -91,11 +102,13 @@ export async function authenticateWithAvailableSource(
   }
 
   await createDemoSession({
+    userId: demoUser.id,
     fullName: demoUser.fullName,
     email: demoUser.email,
     username: demoUser.username,
     role: demoUser.role,
-    defaultCompany: demoUser.companyScope,
+    companies: demoUser.companies,
+    activeCompanyId: demoUser.defaultCompanyId,
   });
 
   return {

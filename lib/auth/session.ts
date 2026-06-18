@@ -1,25 +1,34 @@
 import { cookies } from "next/headers";
+import {
+  canSeeConsolidated,
+  getFallbackActiveCompanyId,
+  type SessionCompanyOption,
+} from "@/lib/auth/company-access";
 import { prisma } from "@/lib/db/prisma";
 
 const SESSION_COOKIE_NAME =
   process.env.AUTH_SESSION_NAME || "sumi_session";
 const SESSION_DURATION_HOURS = 12;
 
-type SessionUserSnapshot = {
+export type SessionUserSnapshot = {
+  userId: string;
   fullName: string;
   email: string;
   username: string;
   role: string;
-  defaultCompany: string | null;
+  companies: SessionCompanyOption[];
+  activeCompanyId: string | null;
   source: "database" | "demo";
 };
 
 type DemoSessionPayload = {
+  userId: string;
   fullName: string;
   email: string;
   username: string;
   role: string;
-  defaultCompany: string | null;
+  companies: SessionCompanyOption[];
+  activeCompanyId: string | null;
 };
 
 function getSessionExpiryDate() {
@@ -39,6 +48,18 @@ function decodeDemoSession(value: string): DemoSessionPayload | null {
   } catch {
     return null;
   }
+}
+
+function normalizeActiveCompanyId(
+  role: string,
+  companies: SessionCompanyOption[],
+  preferredCompanyId: string | null,
+) {
+  if (preferredCompanyId === null && canSeeConsolidated(role)) {
+    return null;
+  }
+
+  return getFallbackActiveCompanyId(companies, preferredCompanyId);
 }
 
 async function writeSessionCookie(value: string, expiresAt: Date) {
@@ -85,6 +106,36 @@ export async function createDemoSession(payload: DemoSessionPayload) {
   return expiresAt;
 }
 
+export async function persistActiveCompanySelection(
+  session: SessionUserSnapshot,
+  companyId: string | null,
+) {
+  if (session.source === "database") {
+    if (!prisma) {
+      throw new Error("Prisma no esta disponible para guardar empresa activa.");
+    }
+
+    await prisma.user.update({
+      where: { id: session.userId },
+      data: {
+        defaultCompanyId: companyId,
+      },
+    });
+
+    return;
+  }
+
+  await createDemoSession({
+    userId: session.userId,
+    fullName: session.fullName,
+    email: session.email,
+    username: session.username,
+    role: session.role,
+    companies: session.companies,
+    activeCompanyId: companyId,
+  });
+}
+
 export async function clearSession() {
   const cookieStore = await cookies();
   const cookieValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -117,6 +168,11 @@ export async function getCurrentSessionUser(): Promise<SessionUserSnapshot | nul
 
     return {
       ...payload,
+      activeCompanyId: normalizeActiveCompanyId(
+        payload.role,
+        payload.companies,
+        payload.activeCompanyId,
+      ),
       source: "demo",
     };
   }
@@ -130,6 +186,17 @@ export async function getCurrentSessionUser(): Promise<SessionUserSnapshot | nul
           include: {
             role: true,
             defaultCompany: true,
+            companies: {
+              where: {
+                canAccess: true,
+                company: {
+                  isActive: true,
+                },
+              },
+              include: {
+                company: true,
+              },
+            },
           },
         },
       },
@@ -139,12 +206,26 @@ export async function getCurrentSessionUser(): Promise<SessionUserSnapshot | nul
       return null;
     }
 
+    const companies = session.user.companies
+      .map(({ company }) => ({
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+
     return {
+      userId: session.user.id,
       fullName: session.user.fullName,
       email: session.user.email,
       username: session.user.username,
       role: session.user.role.key,
-      defaultCompany: session.user.defaultCompany?.name ?? null,
+      companies,
+      activeCompanyId: normalizeActiveCompanyId(
+        session.user.role.key,
+        companies,
+        session.user.defaultCompanyId,
+      ),
       source: "database",
     };
   }

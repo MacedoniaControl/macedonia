@@ -10,6 +10,9 @@ export default async function LoginPage() {
   const currentPermissionLabels = currentSession
     ? getPermissionLabels(currentSession.role)
     : [];
+  const activeCompany = currentSession?.companies.find((company) => {
+    return company.id === currentSession.activeCompanyId;
+  });
 
   return (
     <main className="min-h-screen px-6 py-10 sm:px-10 lg:px-16">
@@ -51,13 +54,28 @@ export default async function LoginPage() {
               </p>
               <p className="mt-3 text-sm leading-7 text-slate-100/85">
                 {currentSession.fullName} · {currentSession.role} ·{" "}
-                {currentSession.defaultCompany ?? "Sin empresa por defecto"}.
+                {activeCompany?.name ??
+                  (currentSession.activeCompanyId === null
+                    ? "Consolidado"
+                    : "Sin empresa activa")}
+                .
               </p>
               <p className="mt-2 text-sm text-slate-300/80">
                 {canViewPasswords(currentSession.role)
                   ? "Este rol puede ver contrasenas visibles con auditoria."
                   : "Este rol no puede ver contrasenas visibles."}
               </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {currentSession.companies.map((company) => (
+                  <span
+                    key={company.id}
+                    className="rounded-full border border-cyan-300/20 bg-cyan-950/50 px-3 py-1 text-xs text-cyan-100/85"
+                  >
+                    {company.name}
+                    {company.id === currentSession.activeCompanyId ? " · activa" : ""}
+                  </span>
+                ))}
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {currentPermissionLabels.map((permission) => (
                   <span
@@ -83,7 +101,8 @@ export default async function LoginPage() {
               >
                 <p className="text-sm font-semibold text-white">{user.fullName}</p>
                 <p className="mt-1 text-sm text-slate-300/75">
-                  {roleLabels[user.role]} · {user.companyScope}
+                  {roleLabels[user.role]} ·{" "}
+                  {user.companies.map((company) => company.name).join(" + ")}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300/75">
                   <span className="rounded-full bg-slate-900/80 px-3 py-1">
