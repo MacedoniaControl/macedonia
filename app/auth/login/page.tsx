@@ -1,6 +1,9 @@
+import { CompanySwitcher } from "@/app/auth/company/company-switcher";
 import { demoAuthUsers } from "@/lib/auth/demo-users";
 import { canViewPasswords, getPermissionLabels } from "@/lib/auth/guards";
 import { roleLabels } from "@/lib/auth/roles";
+import { canSeeConsolidated } from "@/lib/auth/company-access";
+import { getActiveCompany } from "@/lib/auth/company-scope";
 import { getCurrentSessionUser } from "@/lib/auth/session";
 import { LoginForm } from "@/app/auth/login/login-form";
 import { LogoutForm } from "@/app/auth/login/logout-form";
@@ -10,6 +13,9 @@ export default async function LoginPage() {
   const currentPermissionLabels = currentSession
     ? getPermissionLabels(currentSession.role)
     : [];
+  const resolvedActiveCompany = currentSession
+    ? await getActiveCompany(currentSession)
+    : null;
   const activeCompany = currentSession?.companies.find((company) => {
     return company.id === currentSession.activeCompanyId;
   });
@@ -65,6 +71,26 @@ export default async function LoginPage() {
                   ? "Este rol puede ver contrasenas visibles con auditoria."
                   : "Este rol no puede ver contrasenas visibles."}
               </p>
+              <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                  Prueba temporal de company selector
+                </p>
+                <p className="mt-2 text-sm leading-7 text-slate-200/80">
+                  Scope server resuelto:{" "}
+                  {resolvedActiveCompany?.name ??
+                    (currentSession.activeCompanyId === null
+                      ? "Consolidado"
+                      : "Sin empresa valida")}
+                  .
+                </p>
+                <div className="mt-4">
+                  <CompanySwitcher
+                    companies={currentSession.companies}
+                    activeCompanyId={currentSession.activeCompanyId}
+                    canSeeConsolidated={canSeeConsolidated(currentSession.role)}
+                  />
+                </div>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {currentSession.companies.map((company) => (
                   <span

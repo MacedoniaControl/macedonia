@@ -15,6 +15,7 @@ En progreso.
 - Se agregaron helpers `getActiveCompany()` y `assertCompanyAccess()` en `lib/auth/company-scope.ts`.
 - Se agregó la server action `setActiveCompany()` en `app/auth/company/actions.ts`.
 - El login demo ya refleja empresa activa y empresas accesibles para verificar el contrato sin tocar aún el layout de Salem.
+- Se agregó un selector temporal de prueba en `/auth/login` para cambiar empresa activa y validar el contrato de punta a punta mientras Salem conecta el header definitivo.
 
 ## Archivos tocados
 
@@ -28,6 +29,7 @@ En progreso.
 - lib/auth/demo-users.ts
 - lib/audit/events.ts
 - app/auth/company/actions.ts
+- app/auth/company/company-switcher.tsx
 - app/auth/login/page.tsx
 
 ## Qué falta
@@ -36,6 +38,7 @@ En progreso.
 - Consumir `getActiveCompany()` desde `/admin` y módulos futuros para filtrar queries por empresa.
 - Decidir si la vista consolidada queda activa en MVP o se deja solo preparada.
 - Definir redirect post-login por rol usando este mismo `activeCompanyId`.
+- Retirar el selector temporal de `/auth/login` cuando `/admin` quede consumiendo el componente final.
 
 ## Dependencias
 
@@ -46,8 +49,8 @@ En progreso.
 ## Errores conocidos
 
 - Aún no se consumen estos helpers desde rutas `/admin`, así que el scoping real de módulos sigue pendiente.
-- La vista consolidada está soportada server-side, pero no existe aún UI conectada para activarla.
+- La vista consolidada está soportada server-side, pero aún no existe UI conectada dentro del layout real de `/admin`.
 
 ## Siguiente paso
 
-- Conectar el `CompanySelector` publicado por Salem contra `setActiveCompany()` y montar el primer consumo real en `/admin`.
+- Conectar el `CompanySelector` publicado por Salem contra `setActiveCompany()` y reemplazar esta prueba temporal por el consumo real en `/admin`.
