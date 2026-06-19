@@ -9,7 +9,11 @@ const initialLoginFormState: LoginFormState = {
   message: "",
 };
 
-export function LoginForm() {
+type LoginFormProps = {
+  returnTo?: string | null;
+};
+
+export function LoginForm({ returnTo }: LoginFormProps) {
   const [state, formAction, isPending] = useActionState(
     authenticateUser,
     initialLoginFormState,
@@ -17,6 +21,7 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="space-y-5">
+      <input name="returnTo" type="hidden" value={returnTo ?? ""} />
       <div className="space-y-2">
         <label
           className="text-sm font-medium tracking-wide text-slate-200/80"

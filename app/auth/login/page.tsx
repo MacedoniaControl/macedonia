@@ -1,24 +1,17 @@
-import { CompanySwitcher } from "@/app/auth/company/company-switcher";
+import { redirect } from "next/navigation";
 import { demoAuthUsers } from "@/lib/auth/demo-users";
-import { canViewPasswords, getPermissionLabels } from "@/lib/auth/guards";
 import { roleLabels } from "@/lib/auth/roles";
-import { canSeeConsolidated } from "@/lib/auth/company-access";
-import { getActiveCompany } from "@/lib/auth/company-scope";
+import { getPostLoginRoute } from "@/lib/auth/post-login-route";
 import { getCurrentSessionUser } from "@/lib/auth/session";
 import { LoginForm } from "@/app/auth/login/login-form";
-import { LogoutForm } from "@/app/auth/login/logout-form";
 
 export default async function LoginPage() {
   const currentSession = await getCurrentSessionUser();
-  const currentPermissionLabels = currentSession
-    ? getPermissionLabels(currentSession.role)
-    : [];
-  const resolvedActiveCompany = currentSession
-    ? await getActiveCompany(currentSession)
-    : null;
-  const activeCompany = currentSession?.companies.find((company) => {
-    return company.id === currentSession.activeCompanyId;
-  });
+
+  if (currentSession) {
+    const destination = getPostLoginRoute(currentSession);
+    redirect(destination.route);
+  }
 
   return (
     <main className="min-h-screen px-6 py-10 sm:px-10 lg:px-16">
@@ -52,72 +45,6 @@ export default async function LoginPage() {
               </li>
             </ul>
           </div>
-
-          {currentSession ? (
-            <div className="mt-8 rounded-[1.5rem] border border-cyan-300/15 bg-cyan-300/10 p-5">
-              <p className="text-sm font-medium uppercase tracking-[0.22em] text-cyan-100/75">
-                Sesion detectada
-              </p>
-              <p className="mt-3 text-sm leading-7 text-slate-100/85">
-                {currentSession.fullName} · {currentSession.role} ·{" "}
-                {activeCompany?.name ??
-                  (currentSession.activeCompanyId === null
-                    ? "Consolidado"
-                    : "Sin empresa activa")}
-                .
-              </p>
-              <p className="mt-2 text-sm text-slate-300/80">
-                {canViewPasswords(currentSession.role)
-                  ? "Este rol puede ver contrasenas visibles con auditoria."
-                  : "Este rol no puede ver contrasenas visibles."}
-              </p>
-              <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                  Prueba temporal de company selector
-                </p>
-                <p className="mt-2 text-sm leading-7 text-slate-200/80">
-                  Scope server resuelto:{" "}
-                  {resolvedActiveCompany?.name ??
-                    (currentSession.activeCompanyId === null
-                      ? "Consolidado"
-                      : "Sin empresa valida")}
-                  .
-                </p>
-                <div className="mt-4">
-                  <CompanySwitcher
-                    companies={currentSession.companies}
-                    activeCompanyId={currentSession.activeCompanyId}
-                    canSeeConsolidated={canSeeConsolidated(currentSession.role)}
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {currentSession.companies.map((company) => (
-                  <span
-                    key={company.id}
-                    className="rounded-full border border-cyan-300/20 bg-cyan-950/50 px-3 py-1 text-xs text-cyan-100/85"
-                  >
-                    {company.name}
-                    {company.id === currentSession.activeCompanyId ? " · activa" : ""}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {currentPermissionLabels.map((permission) => (
-                  <span
-                    key={permission.key}
-                    className="rounded-full bg-slate-950/70 px-3 py-1 text-xs text-slate-200/85"
-                  >
-                    {permission.label}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-300/60">
-                fuente: {currentSession.source}
-              </p>
-              <LogoutForm />
-            </div>
-          ) : null}
 
           <div className="mt-8 grid gap-4">
             {demoAuthUsers.map((user) => (
@@ -157,7 +84,7 @@ export default async function LoginPage() {
             </p>
           </div>
 
-          <LoginForm />
+          <LoginForm returnTo={null} />
         </section>
       </div>
     </main>

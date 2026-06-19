@@ -41,6 +41,7 @@ export async function setActiveCompany(
     }
 
     revalidatePath("/auth/login");
+    revalidatePath("/auth/session");
     revalidatePath("/admin");
 
     return {
