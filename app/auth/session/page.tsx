@@ -1,15 +1,13 @@
 import { CompanySwitcher } from "@/app/auth/company/company-switcher";
 import { LogoutForm } from "@/app/auth/login/logout-form";
-import { canSeeConsolidated } from "@/lib/auth/company-access";
-import { getActiveCompany } from "@/lib/auth/company-scope";
+import { getCompanySelectorState } from "@/lib/auth/company-selector-state";
 import { canViewPasswords, getPermissionLabels } from "@/lib/auth/guards";
 import { roleLabels } from "@/lib/auth/roles";
-import { requireAuthenticatedSession } from "@/lib/auth/server-guards";
 
 export default async function AuthSessionPage() {
-  const currentSession = await requireAuthenticatedSession();
+  const companySelectorState = await getCompanySelectorState();
+  const currentSession = companySelectorState.session;
   const currentPermissionLabels = getPermissionLabels(currentSession.role);
-  const resolvedActiveCompany = await getActiveCompany(currentSession);
 
   return (
     <main className="min-h-screen px-6 py-10 sm:px-10 lg:px-16">
@@ -38,11 +36,7 @@ export default async function AuthSessionPage() {
                 </p>
                 <p>Email: {currentSession.email}</p>
                 <p>
-                  Empresa activa:{" "}
-                  {resolvedActiveCompany?.name ??
-                    (currentSession.activeCompanyId === null
-                      ? "Consolidado"
-                      : "Sin empresa valida")}
+                  Empresa activa: {companySelectorState.activeCompanyLabel}
                 </p>
                 <p>Fuente: {currentSession.source}</p>
               </div>
@@ -59,9 +53,9 @@ export default async function AuthSessionPage() {
               </p>
               <div className="mt-4">
                 <CompanySwitcher
-                  companies={currentSession.companies}
-                  activeCompanyId={currentSession.activeCompanyId}
-                  canSeeConsolidated={canSeeConsolidated(currentSession.role)}
+                  companies={companySelectorState.companies}
+                  activeCompanyId={companySelectorState.activeCompanyId}
+                  canSeeConsolidated={companySelectorState.canSeeConsolidated}
                 />
               </div>
             </article>

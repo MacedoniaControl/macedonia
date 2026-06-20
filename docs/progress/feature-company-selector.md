@@ -19,6 +19,7 @@ En progreso.
 - Se implementó `lib/auth/post-login-route.ts` como resolver único del redirect post-login.
 - Se agregó `/auth/session` como landing temporal segura para sesiones activas mientras `app/admin` no exista en esta rama.
 - `/auth/login` ahora redirige automáticamente a la ruta resuelta cuando ya hay sesión activa o cuando el login termina bien.
+- Se agregó `lib/auth/company-selector-state.ts` como adapter server-side reutilizable para entregar al UI el estado ya normalizado del selector.
 
 ## Archivos tocados
 
@@ -38,6 +39,7 @@ En progreso.
 - app/auth/login/actions.ts
 - app/auth/login/login-form.tsx
 - lib/auth/post-login-route.ts
+- lib/auth/company-selector-state.ts
 
 ## Qué falta
 
@@ -46,6 +48,7 @@ En progreso.
 - Decidir si la vista consolidada queda activa en MVP o se deja solo preparada.
 - Retirar el selector temporal de `/auth/login` cuando `/admin` quede consumiendo el componente final.
 - Reemplazar la degradación temporal a `/auth/session` por rutas `/admin/*` reales cuando esa rama se integre aquí.
+- Hacer que `/admin` consuma `getCompanySelectorState()` para reemplazar estado local demo del header.
 
 ## Dependencias
 
@@ -58,7 +61,8 @@ En progreso.
 - Aún no se consumen estos helpers desde rutas `/admin`, así que el scoping real de módulos sigue pendiente.
 - La vista consolidada está soportada server-side, pero aún no existe UI conectada dentro del layout real de `/admin`.
 - El resolver post-login hoy degrada a `/auth/session` porque esta rama todavía no trae `app/admin`.
+- Salem todavía mantiene `activeCompanyId` local en su shell remoto; falta conectar ese punto a este adapter.
 
 ## Siguiente paso
 
-- Conectar el `CompanySelector` publicado por Salem contra `setActiveCompany()` y reemplazar `/auth/session` por el consumo real en `/admin`.
+- Conectar el `CompanySelector` publicado por Salem contra `setActiveCompany()` y `getCompanySelectorState()` para reemplazar `/auth/session` por el consumo real en `/admin`.
