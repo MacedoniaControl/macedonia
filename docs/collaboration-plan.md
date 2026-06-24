@@ -24,6 +24,17 @@ Este documento define como trabajaran las sesiones activas sin pisarse, con inte
 - ~~`Codex-Greeg`~~: **retirada (2026-06-23)**. Su planning lo asume `Claude-Greeg`; el codigo que
   dejo (auth-roles, company-selector) queda para reasignar a una sesion que implemente.
 
+## Accesos y cuentas
+
+- **GitHub repo** `Pantera95/Sumi`:
+  - `Pantera95` (Greeg): owner.
+  - `salemtawil` (Salem, https://github.com/salemtawil): colaborador con permiso **Write**
+    (puede pushear ramas `feature/*`; no toca `main` ni `dev` directo).
+- **Vercel** (`pantera95s-projects`): plan **Hobby** → **no admite miembros de equipo**. Salem NO
+  tiene acceso al dashboard de Vercel. Colabora vía GitHub: su `push` genera un **preview público**
+  automático; producción se promueve con `vercel promote` (Greeg o Claude-Greeg como coordinador).
+  Para acceso real al dashboard de Vercel haría falta upgrade a **Pro Team**.
+
 ## Ramas oficiales
 
 ```text
