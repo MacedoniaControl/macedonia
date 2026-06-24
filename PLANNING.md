@@ -1,189 +1,51 @@
 # SumiControl
 
-SumiControl es una plataforma SaaS operativa interna para Sumigases Oriente C.A. y Sudematin. No es un e-commerce ni una tienda pública. El objetivo es reemplazar ek2Store y centralizar control administrativo, inventario, ventas internas, cotizaciones, notas de entrega, cilindros, recargas, caja, cuentas por cobrar/pagar, compras, ROI/rentabilidad, reportes e importaciones desde Valery, Profit y matrices Excel.
+Plataforma SaaS **interna** para Sumigases Oriente C.A. y Sudematin: control administrativo,
+inventario, ventas internas, cotizaciones, notas de entrega, cilindros y recargas, caja, compras,
+cuentas por cobrar/pagar, ROI, reportes e importaciones (Excel / Valery / Profit). **No** es
+e-commerce ni tienda pública.
 
-## Entrega objetivo
+> **Higiene 2026-06-23:** este archivo es solo la puerta de entrada. El detalle vive en sus docs
+> canónicos (ver "Fuente de verdad"). Regla del proyecto: **una sola fuente de verdad por tema.**
 
-**Viernes 19:** demo avanzada usable parcialmente.
+## Objetivo
 
-La demo debe ser funcional en los flujos críticos, usando data real cuando esté disponible y data simulada solo donde falte información. No se presenta como ERP terminado, sino como primera versión funcional avanzada.
+Demo avanzada usable parcialmente: flujos críticos funcionales, con data real donde exista y
+simulada donde falte. No se presenta como ERP terminado.
 
-## Stack confirmado
+## Stack
 
-- Next.js
-- TypeScript
-- Tailwind CSS
-- Prisma
-- PostgreSQL / Supabase
-- Supabase Storage
-- Vercel
-- Login propio con usuario + contraseña
+Next.js · TypeScript · Tailwind CSS · Prisma · PostgreSQL/Supabase · Supabase Storage · Vercel ·
+login propio (sin NextAuth en esta fase).
 
-No usar NextAuth en esta fase.
-
-## Repositorios relacionados
+## Repositorios
 
 - SumiControl: `https://github.com/Pantera95/Sumi`
-- Alice, producto neutral futuro: `https://github.com/Pantera95/Alice.git`
-- Vercel panel objetivo: `https://vercel.com/pantera95s-projects`
+- Alice (neutral, futuro, postergado): `https://github.com/Pantera95/Alice.git`
+- Vercel: `https://vercel.com/pantera95s-projects`
 
-Alice queda postergado. La prioridad actual es SumiControl.
+## Fuente de verdad
 
-## Deploy
+| Necesitas… | Mira… |
+|---|---|
+| Visión, alcance, prioridades e índice completo | `docs/planning/sumicontrol-planning.md` |
+| Reglas de negocio (inventario, cilindros, caja, moneda, documentos, ROI, roles, contraseñas) | `docs/decisions/` |
+| Colaboración, ramas, candados, accesos | `docs/collaboration-plan.md` |
+| Protocolo de avisos | `docs/communication/update-protocol.md` |
+| Deploy / Vercel | `docs/deployment/vercel-workflow.md` · `docs/deployment/deploy-log.md` |
+| Modelo de datos | `prisma/schema.prisma` |
+| Avance por módulo | `docs/progress/feature-*.md` |
 
-- Hosting objetivo: Vercel
-- Owner del deploy y variables: Greeg
-- Flujo documentado en `docs/deployment/vercel-workflow.md`
-- `feature/*` = preview opcional
-- `dev` = staging compartido
-- `main` = producción
-
-## Reglas de colaboración
-
-No trabajar directo sobre `main`.
-
-Flujo recomendado:
-
-```text
-feature/* -> dev -> main
-```
-
-Cada rama debe actualizar su archivo de progreso en `/docs/progress`.
-
-Regla obligatoria de comunicacion:
-
-- Cada cambio relevante debe avisarse al resto.
-- El aviso no es opcional cuando se toca una feature, un archivo con candado, `dev`, `main` o Vercel.
-- Todo aviso debe reflejarse primero en `docs/progress/feature-*.md`.
-- El protocolo oficial vive en `docs/communication/update-protocol.md`.
-- Las plantillas oficiales para copiar y pegar viven en:
-  - `docs/communication/update-message-template.txt`
-  - `docs/communication/handoff-template.txt`
-- Mensajes ya preparados para uso inmediato:
-  - `docs/communication/message-to-salem.txt`
-  - `docs/communication/message-to-claude-greeg.txt`
-  - `docs/communication/message-general-project-chat.txt`
-
-Minimo que debe incluir cada aviso:
-
-- rama o modulo
-- que se hizo
-- archivos o zonas afectadas
-- siguiente paso
-- bloqueo, si existe
-
-Nadie debe saltarse este paso.
-
-## Candados duros del proyecto
-
-Estas zonas no se tocan sin permiso explicito del owner:
-
-- Core Greeg: `prisma/`, `lib/auth/`, `lib/permissions/`, `lib/audit/`, `app/auth/`, `package.json`, `package-lock.json`
-- UI Salem: `app/admin/`, `app/globals.css`, `components/ui/`, `components/layout/`, `components/dashboard/`, `components/charts/`
-- Coordinacion solo Greeg: `main`, `dev`, Vercel, variables de entorno, `vercel.json`, `PLANNING.md`, `docs/planning/sumicontrol-planning.md`, `docs/collaboration-plan.md`
-
-Reglas obligatorias:
-
-- No modificar un candado duro de otro owner sin aviso previo y confirmacion.
-- No hacer refactors amplios, renombres masivos ni formateo global dentro de una zona bloqueada.
-- No cambiar dependencias, lockfiles o configuracion de deploy fuera de una tarea explicita.
-- No tocar la misma zona bloqueada desde dos sesiones al mismo tiempo.
-- Todo acceso excepcional a una zona bloqueada debe quedar anotado en `docs/progress/feature-*.md`.
-
-Si una sesion necesita tocar algo bloqueado:
-
-1. avisa antes
-2. dice archivo exacto y motivo
-3. espera confirmacion o handoff
-4. hace el cambio minimo
-5. avisa cuando libera el candado
-
-## Ramas sugeridas
-
-```text
-main
-dev
-feature/auth-roles
-feature/company-selector
-feature/ui-system
-feature/dashboard
-feature/products-catalog
-feature/inventory
-feature/cylinders
-feature/quotes-delivery-notes
-feature/pos-sales
-feature/imports-valery-profit
-feature/cash-payments
-feature/receivables-payables
-feature/purchases
-feature/reports
-feature/settings
-feature/audit-logs
-```
-
-## Módulos prioritarios para demo
-
-- Login y roles
-- Selector Sumigases/Sudematin
-- Dashboard KPIs
-- Productos/catálogo básico
-- Categorías/subcategorías
-- Inventario por almacén
-- POS paralelo
-- Cotizaciones
-- Notas de entrega
-- Ventas internas
-- Caja/movimientos
-- Cuentas por cobrar básicas
-- Cuentas por pagar básicas
-- Compras básicas
-- Cilindros
-- Recargas
-- Reportes básicos
-- ROI / Rentabilidad básico
-- Importaciones Excel/Valery/Profit básicas
-- Monedas/tasa BCV
-- Configuración básica
-- Auditoría/logs mínimos
-
-## Primer setup sugerido
+## Primer setup
 
 ```bash
 git clone https://github.com/Pantera95/Sumi.git
 cd Sumi
-
-git checkout -b dev
-
-# Solo si el repo esta vacio:
-npx create-next-app@latest . --typescript --tailwind --eslint --app
-
-npm install prisma @prisma/client
-npm install zod
-npm install lucide-react
-npm install recharts
-npm install xlsx
-npm install clsx tailwind-merge
-
-npx prisma init
+# Si el repo ya tiene contenido, revisar antes de instalar/scaffolding.
+npm install
+npx prisma generate
+npm run dev
 ```
 
-Si el repo ya tiene contenido, revisar antes de correr `create-next-app`.
-
-
-## ROI / Rentabilidad
-
-SumiControl debe mostrar ROI en el dashboard owner/admin, en reportes, productos/inventario, compras, clientes y cilindros/recargas.
-
-Ubicaciones mínimas:
-
-- Dashboard: bloque `Rentabilidad / ROI`.
-- Reportes: sección `ROI / Rentabilidad`.
-- Productos: ROI por producto, categoría y rotación.
-- Compras: ROI por orden de compra y proveedor.
-- Cilindros/recargas: impacto de cilindros pendientes, recargas y pérdidas por no retorno.
-
-Fórmula base:
-
-```text
-ROI = (Utilidad neta / Inversión o costo) x 100
-```
+Dependencias base ya en el proyecto: `prisma`, `@prisma/client`, `zod`, `recharts`. Añadir
+`xlsx`/`lucide-react`/`clsx`/`tailwind-merge` solo cuando un módulo las requiera.

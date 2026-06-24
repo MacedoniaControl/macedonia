@@ -1,6 +1,8 @@
 # Propuesta — Higiene del planning (quitar lo innecesario)
 
-> Estado: **PROPUESTA para revisión de Greeg.** No ejecuta cambios todavía; solo documenta el plan.
+> Estado: **EJECUTADA (2026-06-23).** `docs/planning/sumicontrol-planning.md` (1533→~80 líneas) y
+> `PLANNING.md` quedaron adelgazados a visión + índice de fuente de verdad. El detalle previo está
+> en el historial de git. Pendiente menor: archivar §32 (plan por días) si se quiere conservar fuera de git.
 > Autor: Claude-Greeg.
 
 ## Problema
