@@ -1,6 +1,11 @@
 # Plan de colaboracion
 
-Este documento define como trabajaran Greeg y Salem con 2 sesiones de Codex y 1 sesion de Claude Code sin pisarse, con integracion rapida y ownership claro.
+Este documento define como trabajaran las sesiones activas sin pisarse, con integracion rapida y ownership claro.
+
+> **Actualizacion 2026-06-23:** la cuenta `Codex-Greeg` se retira (no se renueva). `Claude-Greeg`
+> **asume el planning y la coordinacion general** del repo (ramas, integracion a `dev`, avisos,
+> docs/decisions, docs/progress, higiene del planning). `Claude-Greeg` no escribe codigo de
+> implementacion; coordina y prepara el trabajo para las sesiones que sí implementan.
 
 ## Objetivo
 
@@ -11,11 +16,13 @@ Este documento define como trabajaran Greeg y Salem con 2 sesiones de Codex y 1 
 
 ## Sesiones activas
 
-- `Greeg`: owner principal de Core y reglas base
-- `Codex-Greeg`: implementacion tecnica junto a Greeg
-- `Claude-Greeg`: checklist, decisiones, criterios de aceptacion y revision
+- `Greeg`: owner del producto y decisiones finales
+- `Claude-Greeg`: **planning + coordinacion general** (decisiones, checklists, criterios de
+  aceptacion, revision, ramas, integracion a `dev`, avisos). No escribe codigo de implementacion.
 - `Salem`: owner principal de UI y dashboard
 - `Codex-Salem`: implementacion tecnica junto a Salem
+- ~~`Codex-Greeg`~~: **retirada (2026-06-23)**. Su planning lo asume `Claude-Greeg`; el codigo que
+  dejo (auth-roles, company-selector) queda para reasignar a una sesion que implemente.
 
 ## Ramas oficiales
 
@@ -33,7 +40,10 @@ Regla principal:
 
 ## Reparto recomendado
 
-### Greeg + Codex-Greeg
+### Core / auth (coordina Claude-Greeg; implementa Greeg o sesion asignada)
+
+> Antes a cargo de `Codex-Greeg` (retirada). El planning/coordinacion lo lleva `Claude-Greeg`;
+> la implementacion de estas ramas debe reasignarse.
 
 Ramas:
 
