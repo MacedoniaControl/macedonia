@@ -1,8 +1,13 @@
 # Checklist de implementación — feature/dashboard
 
 > Owner técnico: Salem + Codex-Salem. Preparado por Claude-Greeg.
-> Demo objetivo: **viernes 19** (hoy es 2026-06-16 ⇒ ~3 días). Es la pantalla protagonista (§13).
 > Lee primero: `docs/decisions/company-scope.md` (la empresa activa filtra todo el dashboard).
+>
+> **Estado (2026-06-23):** la **UI del dashboard ya está implementada** en `patch/greeg-ux-ui` y en
+> vivo (https://sumicontrol.vercel.app/admin/dashboard): 8 KPIs, bloque ROI, gráficas dinámicas
+> (Recharts) y bloques secundarios, con data real 2024 (mock). **Pendiente:** (1) conectar
+> `getActiveCompany()` para datos por empresa reales; (2) reconciliar este patch con
+> `feature/ui-system`/`feature/dashboard` de Salem; (3) filtros funcionales más allá de empresa/rango.
 
 ## Objetivo en una línea
 

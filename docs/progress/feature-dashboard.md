@@ -2,10 +2,13 @@
 
 ## Estado
 
-Definición lista. Implementación pendiente (owner: Salem/Codex-Salem).
+UI implementada y en vivo (patch UX). Falta integración de datos por empresa.
 
 ## Qué se hizo
 
+- **UI del dashboard implementada** en `patch/greeg-ux-ui` y desplegada:
+  https://sumicontrol.vercel.app/admin/dashboard — 8 KPIs, bloque ROI, gráficas dinámicas
+  (Recharts) y bloques secundarios, con data real 2024 (mock).
 - Checklist de implementación accionable: `docs/checklists/feature-dashboard.md`.
 - Contrato de data tipado `DashboardData` + loader `getDashboardData(companyId, range)` para
   construir la UI con mock y reemplazar por data real luego (no bloquea a Salem).
