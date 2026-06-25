@@ -2,6 +2,7 @@
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTableShell } from "@/components/ui/DataTableShell";
+import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -60,6 +61,34 @@ export default function UsersPage() {
           </tbody>
         </table>
       </DataTableShell>
+
+      <div className="mt-6">
+        <SectionCard
+          title="Roles y permisos"
+          description="Resumen por rol (ver docs/decisions/roles-permissions.md)."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {roles.map((r) => (
+              <div key={r.rol} className="rounded-xl border border-border bg-surface-2 p-3">
+                <div className="mb-2"><StatusBadge tone={r.tone}>{r.rol}</StatusBadge></div>
+                <p className="text-sm text-muted">{r.resumen}</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
     </>
   );
 }
+
+const roles = [
+  { rol: "OWNER", tone: "brand" as const, resumen: "Control total: usuarios, contraseñas, config crítica, aprobaciones y reportes." },
+  { rol: "ADMIN", tone: "info" as const, resumen: "Operación completa + aprobaciones + gestión de usuarios. Ve contraseñas." },
+  { rol: "AUDITOR", tone: "muted" as const, resumen: "Solo lectura amplia. No ve contraseñas ni opera." },
+  { rol: "CAJERO", tone: "ok" as const, resumen: "POS, caja, pagos y cobros. Sin costo/margen." },
+  { rol: "VENDEDOR", tone: "ok" as const, resumen: "Cotizaciones y POS. Descuentos requieren aprobación." },
+  { rol: "ALMACEN", tone: "warn" as const, resumen: "Inventario, movimientos, despacho y cilindros físicos." },
+  { rol: "COMPRAS", tone: "warn" as const, resumen: "Órdenes de compra, proveedores y cuentas por pagar. Ve costo." },
+  { rol: "TECNICO_RECARGA", tone: "info" as const, resumen: "Cilindros y recargas (operativo)." },
+  { rol: "DISTRIBUIDOR", tone: "navy" as const, resumen: "Portal acotado a lo propio. Fase 2." },
+];
