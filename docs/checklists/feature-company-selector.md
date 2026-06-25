@@ -19,28 +19,32 @@ empresa activa** sin fuga entre empresas.
 ## Checklist
 
 ### 1. Datos / seed
-- [ ] `Company` con al menos: `id`, `name`, `slug`, `isActive`. Seed: Sumigases, Sudematin.
-- [ ] `UserCompanyAccess` (userId ↔ companyId) para acotar roles no-admin.
-- [ ] Campo `activeCompanyId` (o `lastCompanyId`) en `User` si se persiste la última elegida.
-- [ ] Seed de prueba: 1 OWNER (acceso a ambas), 1 VENDEDOR (solo Sumigases), 1 CAJERO (solo Sudematin).
+> **Estado (2026-06-23):** backend y scoping **implementados** por la sesión de auth (ver
+> `docs/progress/feature-company-selector.md`). Falta la UI de Salem y conectar `/admin`.
+
+- [x] `Company` con `id`, `name`, `slug`, `isActive`. Seed: Sumigases, Sudematin.
+- [x] `UserCompany` (userId ↔ companyId) para acotar roles no-admin.
+- [x] Sesión expone `companies[]` + `activeCompanyId`.
+- [x] Seed/demo de usuarios con empresas accesibles distintas.
 
 ### 2. Backend / scoping (lo más crítico)
-- [ ] Helper único `getActiveCompany(session)` server-side.
-- [ ] Helper `assertCompanyAccess(session, companyId)` que lanza 403 si no pertenece.
-- [ ] Endpoint `POST` del selector: valida `companyId ∈ session.companies[]` y fija la empresa activa.
-- [ ] Soporte de empresa activa = `null` ⇒ vista consolidada (solo OWNER/ADMIN).
-- [ ] El `companyId` SIEMPRE sale del helper, NUNCA del body del cliente.
+- [x] Helper único `getActiveCompany()` server-side (`lib/auth/company-scope.ts`).
+- [x] Helper `assertCompanyAccess()` que rechaza si no pertenece.
+- [x] Server action `setActiveCompany()` que valida `companyId ∈ companies[]` (`app/auth/company/actions.ts`).
+- [x] Soporte de empresa activa = `null` ⇒ consolidada (server-side; falta UI).
+- [x] El `companyId` sale del helper, NUNCA del body del cliente.
+- [x] Adapter `getCompanySelectorState()` para entregar el estado normalizado al UI.
 
-### 3. UI del selector
+### 3. UI del selector — PENDIENTE (Salem)
 - [ ] Componente selector en el header (consume `components/layout/*` — coordinar con Salem).
 - [ ] Visible solo si `session.companies.length > 1` (OWNER/ADMIN); oculto/estático para mono-empresa.
 - [ ] Muestra empresa activa y permite cambiar; al cambiar refresca data del módulo actual.
 - [ ] Opción "Consolidado" visible solo para OWNER/ADMIN (deshabilitada con tooltip si no entra al MVP).
 
 ### 4. Permisos
-- [ ] Roles no-admin no ven el selector y quedan forzados a su empresa.
-- [ ] Intento de acceder a empresa sin acceso ⇒ 403 + AuditLog.
-- [ ] (Opcional MVP) registrar cambio de empresa en AuditLog.
+- [x] Roles no-admin quedan forzados a su empresa (scope server-side).
+- [x] Acceso a empresa sin permiso ⇒ rechazado por `assertCompanyAccess()`.
+- [ ] Registrar cambio de empresa en AuditLog (pendiente).
 
 ## Criterios de aceptación
 
