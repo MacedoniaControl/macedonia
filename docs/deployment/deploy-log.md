@@ -41,3 +41,13 @@
 - Abrir PR a `dev`: https://github.com/Pantera95/Sumi/pull/new/patch/greeg-ux-ui (gh no instalado).
 - Reconciliar merge con `feature/ui-system` (Salem).
 - Reactivar Deployment Protection cuando haya datos/login reales.
+
+## 2026-06-23 — ENTREGA: panel completo funcional
+
+- Todos los módulos del sidebar funcionales client-side y en producción (19 rutas, HTTP 200):
+  dashboard (BI Recharts), POS, cotizaciones→NE, notas de entrega (stock/anulación), ventas
+  internas, caja y pagos (verificación), CxC y CxP (abonos/vencimientos), compras (recepción→CxP),
+  cilindros (movimientos/pendientes), productos (crear+SKU auto), inventario, importaciones
+  (asistente 8 pasos), reportes, ROI, matrices, configuración, usuarios/roles, auditoría.
+- Data basada en cifras reales 2024; lógica demo client-side (sin DB). Backend real = fase siguiente.
+- Deploy: vercel deploy --prod desde este worktree (link .vercel debe apuntar a `sumicontrol`).
