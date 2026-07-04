@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
@@ -34,8 +35,8 @@ const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-
 const labelCls = "mb-1 block text-xs font-medium text-muted";
 
 export default function CylindersPage() {
-  const [estados, setEstados] = useState<Estados>({ lleno: 62, vacio: 38, enCliente: 14, pendiente: 9 });
-  const [movs, setMovs] = useState<Mov[]>([]);
+  const [estados, setEstados] = usePersistedState<Estados>("cyl:estados", { lleno: 62, vacio: 38, enCliente: 14, pendiente: 9 });
+  const [movs, setMovs] = usePersistedState<Mov[]>("cyl:movs", []);
   const [op, setOp] = useState("intercambio");
   const [gas, setGas] = useState(GASES[0]);
   const [cap, setCap] = useState(CAPS[0]);

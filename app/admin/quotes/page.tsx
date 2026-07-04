@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
@@ -31,8 +32,8 @@ const toneOf: Record<Estado, Tone> = {
 const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
 
 export default function QuotesPage() {
-  const [cots, setCots] = useState<Cotizacion[]>([]);
-  const [seq, setSeq] = useState(1);
+  const [cots, setCots] = usePersistedState<Cotizacion[]>("cot:lista", []);
+  const [seq, setSeq] = usePersistedState("cot:seq", 1);
   const [cliente, setCliente] = useState(CLIENTES[0]);
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [sel, setSel] = useState(CATALOGO[0].sku);

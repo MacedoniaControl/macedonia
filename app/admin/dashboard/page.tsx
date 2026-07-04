@@ -1,3 +1,5 @@
+"use client";
+
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -5,9 +7,9 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BiVentasUtilidad, BiVentasCompras, BiCategoriasDonut } from "@/components/ui/BiCharts";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import {
-  kpis,
-  roiCards,
+  RATE_BS,
   productosMayorRetorno,
   categoriasMasRentables,
   cilindrosPorEstado,
@@ -16,64 +18,87 @@ import {
   alertasOperativas,
 } from "@/lib/ux/dashboard-data";
 
-const selectClass =
-  "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
+const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 
-function Filters() {
-  return (
-    <>
-      <label className="sr-only" htmlFor="f-empresa">Empresa</label>
-      <select id="f-empresa" className={selectClass} defaultValue="sumigases">
-        <option value="sumigases">Sumigases</option>
-        <option value="sudematin">Sudematin</option>
-        <option value="all">Consolidado</option>
-      </select>
-      <label className="sr-only" htmlFor="f-rango">Rango</label>
-      <select id="f-rango" className={selectClass} defaultValue="year">
-        <option value="day">Día</option>
-        <option value="week">Semana</option>
-        <option value="month">Mes</option>
-        <option value="year">Año 2024</option>
-      </select>
-      <label className="sr-only" htmlFor="f-moneda">Moneda</label>
-      <select id="f-moneda" className={selectClass} defaultValue="usd">
-        <option value="usd">USD</option>
-        <option value="bs">Bs</option>
-      </select>
-      <label className="sr-only" htmlFor="f-almacen">Almacén</label>
-      <select id="f-almacen" className={selectClass} defaultValue="all">
-        <option value="all">Todos los almacenes</option>
-        <option value="lecheria">Lechería</option>
-        <option value="cumana">Cumaná</option>
-      </select>
-    </>
-  );
-}
+// Factores demo por empresa (Sudematin sin data propia → 0,35× etiquetado)
+const FACTORES: Record<string, number> = { sumigases: 1, sudematin: 0.35, all: 1.35 };
+const RANGOS: Record<string, number> = { year: 12, sem: 6, tri: 3, mes: 1 };
+
+type Filtros = { empresa: string; rango: string; moneda: string };
 
 export default function DashboardPage() {
+  const [f, setF] = usePersistedState<Filtros>("dash:filtros", { empresa: "sumigases", rango: "year", moneda: "usd" });
+  const factor = FACTORES[f.empresa] ?? 1;
+  const count = RANGOS[f.rango] ?? 12;
+  const bs = f.moneda === "bs";
+  const frac = count / 12; // proporción del año para KPIs monetarios acumulados
+
+  const money = (usd: number) => {
+    const v = usd * factor;
+    const n = bs ? v * RATE_BS : v;
+    return (bs ? "" : "$") + Math.round(n).toLocaleString("es-VE") + (bs ? " Bs" : "");
+  };
+  const cnt = (n: number) => String(Math.max(0, Math.round(n * factor)));
+
+  const kpis = [
+    { key: "vh", label: "Ventas hoy", value: money(1036), sub: bs ? undefined : `≈ ${Math.round(1036 * factor * RATE_BS).toLocaleString("es-VE")} Bs`, tone: "brand" as const, demo: true },
+    { key: "cxc", label: "Cuentas por cobrar", value: money(18500), sub: `${cnt(12)} documentos`, tone: "warn" as const, demo: true },
+    { key: "cxp", label: "Cuentas por pagar", value: money(9200), sub: `${cnt(5)} proveedores`, tone: "danger" as const, demo: true },
+    { key: "sc", label: "Stock crítico", value: cnt(7), sub: "productos bajo mínimo", tone: "warn" as const, demo: true },
+    { key: "cp", label: "Cilindros pendientes", value: cnt(9), sub: "por retorno", tone: "info" as const, demo: true },
+    { key: "rp", label: "Recargas pendientes", value: cnt(5), sub: "en cola", tone: "info" as const, demo: true },
+    { key: "pp", label: "Pedidos pendientes", value: cnt(3), sub: "por despachar", tone: "navy" as const, demo: true },
+    { key: "bg", label: "Balance del período", value: money(106826 * frac), sub: "utilidad neta 2024", tone: "ok" as const },
+  ];
+
+  const roiCards = [
+    { label: "ROI del período", value: "53,3%", sub: "utilidad / inversión", accent: true },
+    { label: "Utilidad estimada", value: money(106826 * frac), sub: `acumulado ${count} mes(es)` },
+    { label: "Margen bruto", value: "48,0%", sub: "sobre ventas" },
+    { label: "Ventas vs compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: "ratio 3,5x" },
+  ];
+
+  const empresaLabel = f.empresa === "sumigases" ? "Sumigases" : f.empresa === "sudematin" ? "Sudematin (demo 0,35×)" : "Consolidado";
+
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description="Visión ejecutiva de ventas, finanzas, inventario y cilindros. Cifras 2024 reales de Sumigases."
+        description={`Visión ejecutiva · ${empresaLabel} · cifras 2024 reales de Sumigases. Los filtros recalculan KPIs y gráficas.`}
         breadcrumbs={[{ label: "Resumen" }, { label: "Dashboard" }]}
-        filters={<Filters />}
+        filters={
+          <>
+            <label className="sr-only" htmlFor="f-empresa">Empresa</label>
+            <select id="f-empresa" className={selectClass} value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}>
+              <option value="sumigases">Sumigases</option>
+              <option value="sudematin">Sudematin</option>
+              <option value="all">Consolidado</option>
+            </select>
+            <label className="sr-only" htmlFor="f-rango">Rango</label>
+            <select id="f-rango" className={selectClass} value={f.rango} onChange={(e) => setF({ ...f, rango: e.target.value })}>
+              <option value="year">Año 2024</option>
+              <option value="sem">Últimos 6 meses</option>
+              <option value="tri">Último trimestre</option>
+              <option value="mes">Último mes</option>
+            </select>
+            <label className="sr-only" htmlFor="f-moneda">Moneda</label>
+            <select id="f-moneda" className={selectClass} value={f.moneda} onChange={(e) => setF({ ...f, moneda: e.target.value })}>
+              <option value="usd">USD</option>
+              <option value="bs">Bs (tasa {RATE_BS})</option>
+            </select>
+          </>
+        }
       />
 
-      {/* 8 tarjetas KPI */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {kpis.map((k) => (
           <KpiCard key={k.key} label={k.label} value={k.value} sub={k.sub} tone={k.tone} demo={k.demo} />
         ))}
       </div>
 
-      {/* Bloque Rentabilidad / ROI */}
       <div className="mt-6">
-        <SectionCard
-          title="Rentabilidad / ROI"
-          description="Indicadores de retorno del período. Base real 2024."
-          action={<StatusBadge tone="brand">Métrica clave</StatusBadge>}
-        >
+        <SectionCard title="Rentabilidad / ROI" description={`Indicadores del período (${count} mes(es)). Base real 2024.`}
+          action={<StatusBadge tone="brand">Métrica clave</StatusBadge>}>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {roiCards.map((c) => (
               <StatCard key={c.label} label={c.label} value={c.value} sub={c.sub} accent={c.accent} />
@@ -106,17 +131,15 @@ export default function DashboardPage() {
         </SectionCard>
       </div>
 
-      {/* Gráfico protagonista */}
       <div className="mt-6">
-        <SectionCard title="Ventas vs utilidad" description="Comparativo mensual 2024 (USD). Interactivo.">
-          <BiVentasUtilidad />
+        <SectionCard title="Ventas vs utilidad" description={`${empresaLabel} · ${count} mes(es) · ${bs ? "Bs" : "USD"}. Interactivo.`}>
+          <BiVentasUtilidad factor={factor} bs={bs} count={count} />
         </SectionCard>
       </div>
 
-      {/* Bloques secundarios */}
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <SectionCard title="Ventas vs compras" description="Mensual 2024 (USD). Interactivo.">
-          <BiVentasCompras />
+        <SectionCard title="Ventas vs compras" description="Responde a los filtros. Interactivo.">
+          <BiVentasCompras factor={factor} bs={bs} count={count} />
         </SectionCard>
         <SectionCard title="Categorías más rentables" description="Margen por categoría.">
           <BiCategoriasDonut />
@@ -133,7 +156,7 @@ export default function DashboardPage() {
                 <li key={c.estado}>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <StatusBadge tone={c.tone}>{c.estado}</StatusBadge>
-                    <span className="font-medium text-text">{c.cantidad}</span>
+                    <span className="font-medium text-text">{Math.round(c.cantidad * factor)}</span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
                     <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
@@ -143,13 +166,12 @@ export default function DashboardPage() {
             })}
           </ul>
         </SectionCard>
-
         <SectionCard title="Stock crítico por almacén" description="Productos bajo el mínimo definido.">
           <ul className="divide-y divide-border">
             {stockCriticoPorAlmacen.map((s) => (
               <li key={s.almacen} className="flex items-center justify-between py-3 text-sm">
                 <span className="text-text">{s.almacen}</span>
-                <StatusBadge tone={s.criticos > 3 ? "danger" : "warn"}>{s.criticos} críticos</StatusBadge>
+                <StatusBadge tone={s.criticos > 3 ? "danger" : "warn"}>{Math.max(1, Math.round(s.criticos * factor))} críticos</StatusBadge>
               </li>
             ))}
           </ul>
@@ -174,16 +196,13 @@ export default function DashboardPage() {
                     <td className="max-w-[14rem] truncate py-2.5 pr-3 text-text">{imp.archivo}</td>
                     <td className="py-2.5 pr-3 text-muted">{imp.fecha}</td>
                     <td className="py-2.5 pr-3 text-muted">{imp.filas}</td>
-                    <td className="py-2.5">
-                      <StatusBadge tone="ok">{imp.estado}</StatusBadge>
-                    </td>
+                    <td className="py-2.5"><StatusBadge tone="ok">{imp.estado}</StatusBadge></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </SectionCard>
-
         <SectionCard title="Alertas operativas" description="Atención requerida.">
           <div className="space-y-3">
             {alertasOperativas.map((a) => (

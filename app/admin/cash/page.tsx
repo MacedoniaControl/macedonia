@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -25,7 +26,7 @@ const CLIENTES = ["Taller Lago C.A.", "Metalúrgica T.", "Tigasco Gas", "Náutic
 const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
 
 export default function CashPage() {
-  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [pagos, setPagos] = usePersistedState<Pago[]>("caja:pagos", []);
   const [metodo, setMetodo] = useState(METODOS[0].v);
   const [monto, setMonto] = useState(0);
   const [cliente, setCliente] = useState(CLIENTES[0]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -34,7 +35,7 @@ export default function PosPage() {
   const [cliente, setCliente] = useState(CLIENTES[0]);
   const [descuento, setDescuento] = useState(0);
   const [ok, setOk] = useState("");
-  const [ventas, setVentas] = useState(0);
+  const [ventas, setVentas] = usePersistedState("pos:ventas", 0);
 
   const filtrados = useMemo(() => {
     const t = q.trim().toLowerCase();

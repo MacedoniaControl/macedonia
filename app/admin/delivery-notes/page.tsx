@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -21,9 +22,9 @@ const STOCK_INICIAL: Record<string, number> = { "GAS-0001": 18, "GAS-0003": 12, 
 const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
 
 export default function DeliveryNotesPage() {
-  const [notas, setNotas] = useState<Nota[]>([]);
-  const [stock, setStock] = useState<Record<string, number>>(STOCK_INICIAL);
-  const [seq, setSeq] = useState(111);
+  const [notas, setNotas] = usePersistedState<Nota[]>("ne:lista", []);
+  const [stock, setStock] = usePersistedState<Record<string, number>>("ne:stock", STOCK_INICIAL);
+  const [seq, setSeq] = usePersistedState("ne:seq", 111);
   const [cliente, setCliente] = useState(CLIENTES[0]);
   const [prodSku, setProdSku] = useState(PRODUCTOS[0].sku);
   const [qty, setQty] = useState(1);

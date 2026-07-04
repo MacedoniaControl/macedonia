@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -33,7 +34,7 @@ function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
 const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
 
 export default function ReceivablesPage() {
-  const [cuentas, setCuentas] = useState<Cuenta[]>(SEED);
+  const [cuentas, setCuentas] = usePersistedState<Cuenta[]>("cxc:cuentas", SEED);
   const [docSel, setDocSel] = useState(SEED[0].doc);
   const [abono, setAbono] = useState(0);
   const [msg, setMsg] = useState("");
