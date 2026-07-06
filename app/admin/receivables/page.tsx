@@ -9,6 +9,7 @@ import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { Button } from "@/components/ui/Button";
 import { fmtUsd } from "@/lib/ux/format";
+import { downloadCsv } from "@/lib/ux/export-csv";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
 
@@ -63,7 +64,7 @@ export default function ReceivablesPage() {
         title="Cuentas por cobrar"
         description="Saldos por cliente, vencimientos, abonos parciales y alertas. Demo funcional."
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por cobrar" }]}
-        actions={<Button variant="secondary" icon="report">Exportar</Button>}
+        actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-cobrar", [["Cliente", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.cliente, c.doc, c.monto, c.abonado, c.saldo, c.venc])])}>Exportar CSV</Button>}
       />
 
       <SectionCard title="Resumen de cartera">

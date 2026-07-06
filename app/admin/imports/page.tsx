@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -31,6 +31,8 @@ const resumen = [
 
 export default function ImportsPage() {
   const [paso, setPaso] = useState(1);
+  const [archivo, setArchivo] = useState("MATRIZ DE VENTAS ABRIL 2024.xlsx");
+  const fileRef = useRef<HTMLInputElement>(null);
   const done = paso > PASOS.length;
 
   return (
@@ -48,10 +50,17 @@ export default function ImportsPage() {
 
       <SectionCard
         title="Asistente de importación"
-        description="MATRIZ DE VENTAS ABRIL 2024.xlsx · hoja “NOTAS DE ENTREGA”"
+        description={`${archivo} · hoja “NOTAS DE ENTREGA”`}
         action={
           <div className="flex gap-2">
-            {!done && <Button icon={paso === 1 ? "upload" : "check"} onClick={() => setPaso((p) => p + 1)}>{paso === 1 ? "Subir archivo" : `Completar paso ${paso}`}</Button>}
+            {!done && paso === 1 && (
+              <>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.txt" className="hidden" aria-label="Subir archivo"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) { setArchivo(f.name); setPaso(2); } }} />
+                <Button icon="upload" onClick={() => fileRef.current?.click()}>Subir archivo</Button>
+              </>
+            )}
+            {!done && paso > 1 && <Button icon="check" onClick={() => setPaso((p) => p + 1)}>{`Completar paso ${paso}`}</Button>}
             {paso > 1 && <Button variant="secondary" onClick={() => setPaso(1)}>Reiniciar</Button>}
           </div>
         }

@@ -9,6 +9,7 @@ import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { Button } from "@/components/ui/Button";
 import { fmtUsd } from "@/lib/ux/format";
+import { downloadCsv } from "@/lib/ux/export-csv";
 
 type Cta = { id: number; proveedor: string; doc: string; monto: number; abonado: number; venc: string };
 const HOY = new Date("2026-06-23");
@@ -55,7 +56,7 @@ export default function PayablesPage() {
         title="Cuentas por pagar"
         description="Saldos por proveedor, abonos y alertas desde 7 días. Visible para owner/admin (§24)."
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por pagar" }]}
-        actions={<Button variant="secondary" icon="report">Exportar</Button>}
+        actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.proveedor, c.doc, c.monto, c.abonado, c.saldo, c.venc])])}>Exportar CSV</Button>}
       />
       <SectionCard title="Resumen">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

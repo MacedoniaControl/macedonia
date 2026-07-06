@@ -26,17 +26,17 @@
 }
 
 :root {
-  --bg: #eef2f7;
+  --bg: #f4f6fa;
   --surface: #ffffff;
-  --surface-2: #f7f9fc;
+  --surface-2: #f8fafd;
   --border: #e2e8f0;
   --text: #0f1b2d;
   --muted: #5b6b82;
 }
 
 .dark {
-  --bg: #07111e;
-  --surface: #0f1d33;
+  --bg: #060d18;
+  --surface: #0d1a2e;
   --surface-2: #0b1626;
   --border: #1e304d;
   --text: #e8eef6;
@@ -56,7 +56,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-body), "Segoe UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -75,4 +75,9 @@ a {
 
 .sumi-scroll {
   scrollbar-width: thin;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  letter-spacing: -0.01em;
 }

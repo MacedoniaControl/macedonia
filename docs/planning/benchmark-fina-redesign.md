@@ -48,3 +48,11 @@
 - Conectar backend real (Prisma/Supabase) — auth y scoping ya avanzados en `feature/company-selector`.
 - Exportación real a Excel/PDF de reportes.
 - Tasa BCV automática (hoy manual 49,5 demo).
+
+## 6. Rediseño visual + auditoría de botones (2026-06-23, 2ª iteración)
+
+| # | Cambio | Detalle |
+|---|---|---|
+| M9 | Tipografías | **Combo activo: Sora (títulos) + Inter (cuerpo/UI)** vía next/font — moderno, elegante, alta legibilidad. Alternativo documentado: Space Grotesk + IBM Plex Sans. |
+| M10 | Refresh visual | Paleta refinada (claro más limpio, navy profundo en oscuro), home rediseñada (hero elegante + métricas reales + pilares del negocio). |
+| M11 | Auditoría de botones — TODOS activos | Reports/CxC/CxP/Inventario: **Exportar CSV real** (descarga). Importaciones e Inventario: **subida real de archivo** (file picker). Inventario: búsqueda y filtros en vivo + "Nuevo producto" enlaza al creador. Configuración: **Guardar** persiste valores. Usuarios: **Crear usuario** funcional (formulario + validación + persistencia). |
