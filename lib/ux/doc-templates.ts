@@ -25,6 +25,11 @@ export type NEDoc = {
   vendedor?: string; deposito?: string; tipoPrecio?: string; divisa?: string; notas?: string;
 };
 export type DevLinea = { codigo: string; descripcion: string; cantidad: number; precio: number; descuento: number };
+export type PresupuestoDoc = {
+  correlativo: string; fechaEmision: string; fechaVenc: string;
+  razonSocial: string; rif: string; direccion: string; telefonos: string;
+  lineas: DevLinea[]; moneda: string; nota: string;
+};
 export type DevDoc = {
   correlativo: string; fechaEmision: string; fechaVenc: string; referencia: string;
   razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; nota: string; formaPago: string;
@@ -126,6 +131,48 @@ export function devolucionHtml(d: DevDoc) {
   return wrap(`<div class="sheet">${body}</div>`, `Nota de Crédito ${d.correlativo}`);
 }
 
+export function presupuestoHtml(d: PresupuestoDoc) {
+  const sub = d.lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
+  const iva = sub * 0.16;
+  const total = sub + iva;
+  const filas = d.lineas.map((l) =>
+    `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %&nbsp;&nbsp;${m(l.cantidad * l.precio * l.descuento / 100)}</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");
+  const body = `<div class="copy dev">
+    <div class="devhead">${LOGO}<div class="empresa"><b>${EMPRESA.rif}</b><br>${EMPRESA.dir}</div></div>
+    <div class="devbox">
+      <div class="left">
+        <table class="cli"><tr><td class="k">Razón Social</td><td>${d.razonSocial}</td></tr>
+          <tr><td class="k">RIF</td><td>${d.rif}</td></tr>
+          <tr><td class="k">Dirección</td><td>${d.direccion}</td></tr>
+          <tr><td class="k">Teléfonos</td><td>${d.telefonos}</td></tr></table>
+      </div>
+      <div class="right">
+        <div class="nctit">Presupuesto Nro.<br><b>${d.correlativo}</b></div>
+        <table class="fechas"><tr><td class="k">Fecha Emisión</td><td class="r">${d.fechaEmision}</td></tr>
+          <tr><td class="k">Fecha Vencimiento</td><td class="r">${d.fechaVenc}</td></tr></table>
+      </div>
+    </div>
+    <table class="items"><thead><tr><th>Código Producto</th><th class="l">Descripción</th><th>Cantidad</th><th>Precio Unitario</th><th>Descuento</th><th>Total</th></tr></thead>
+      <tbody>${filas}</tbody></table>
+    <div class="totdev">
+      <table class="l"><tr><td class="k">Sub-Total</td><td class="r">${m(sub)}</td></tr>
+        <tr><td class="k">Descuento 1</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
+        <tr><td class="k">Descuento 2</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
+        <tr><td class="k">Flete</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr></table>
+      <table class="r"><tr><td class="k">Total Exento</td><td class="r">0,00</td></tr>
+        <tr><td class="k">Total Base Imponible</td><td class="r">${m(sub)}</td></tr>
+        <tr><td class="k">Total Impuesto &nbsp;16,00 %</td><td class="r">${m(iva)}</td></tr>
+        <tr><td class="k">Total IGTF &nbsp;0,00 %</td><td class="r">0,00</td></tr>
+        <tr><td class="k">Total Operación</td><td class="r"><b>${m(total)}</b></td></tr></table>
+    </div>
+    <p class="nota">Nota: ${d.nota || ""}</p>
+    <hr class="foot">
+    <p class="nota">Presupuesto expresado en: ${d.moneda}</p>
+    <p class="nota">COTIZACIÓN #: ${d.correlativo}. SIN DERECHO A CRÉDITO FISCAL</p>
+  </div>`;
+  return wrap(`<div class="sheet">${body}</div>`, `Presupuesto ${d.correlativo}`);
+}
+
 function wrap(inner: string, title: string) {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${title}</title><style>
     *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
@@ -154,6 +201,7 @@ function wrap(inner: string, title: string) {
     .fechas td,.ref td{border:0;font-size:9px;padding:1px 2px}.ref{border:1px solid #111;margin-top:4px}
     .totdev{display:flex;gap:10px;margin-top:8px}.totdev table{width:50%}.totdev td{border:0;font-size:9px}.totdev .k{font-weight:normal}
     .nota{font-size:9px;margin:6px 0 0}
+    .foot{border:0;border-top:1px solid #111;margin:8px 0 4px}
     @media print{body{padding:0}}
   </style></head><body>${inner}
   <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
