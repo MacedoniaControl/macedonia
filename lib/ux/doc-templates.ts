@@ -16,11 +16,13 @@ const EMPRESA = {
 const RUBROS = "ELECTRODOS - GASES INDUSTRIALES/MEDICINALES - ROLINERAS - CORREAS - CADENAS ACOPLES - POLEAS";
 const GASES_CIL = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"]; // orden fijo del formato
 
-export type NELinea = { cantidad: number; unidad: string; descripcion: string; precio: number };
+export type NELinea = { cantidad: number; unidad: string; descripcion: string; precio: number; codigo?: string; descuento?: number };
 export type NECil = { gas: string; llenos: number; vacios: number };
 export type NEDoc = {
   correlativo: string; fecha: string; cliente: string; rif: string; tlf: string; direccion: string; ordenCompra: string;
   lineas: NELinea[]; cilindros: NECil[];
+  // Campos que Valery captura (no todos se imprimen en la constancia física):
+  vendedor?: string; deposito?: string; tipoPrecio?: string; divisa?: string; notas?: string;
 };
 export type DevLinea = { codigo: string; descripcion: string; cantidad: number; precio: number; descuento: number };
 export type DevDoc = {
@@ -31,8 +33,10 @@ export type DevDoc = {
 const m = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const LOGO = `<img src="${SUMIGASES_LOGO}" alt="Sumigases Oriente" class="logo">`;
 
+const lineaTotal = (l: NELinea) => l.cantidad * l.precio * (1 - (l.descuento || 0) / 100);
+
 export function neTotals(d: NEDoc) {
-  const base = d.lineas.reduce((a, l) => a + l.cantidad * l.precio, 0);
+  const base = d.lineas.reduce((a, l) => a + lineaTotal(l), 0);
   const iva = base * 0.16;
   return { base, iva, total: base + iva };
 }
@@ -45,7 +49,7 @@ function cilData(cils: NECil[]) {
 function neCopy(d: NEDoc) {
   const t = neTotals(d);
   const filas = d.lineas.map((l) =>
-    `<tr><td>${m(l.cantidad)}</td><td>${l.unidad}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.precio)}</td><td class="r">${m(l.cantidad * l.precio)}</td></tr>`).join("");
+    `<tr><td>${m(l.cantidad)}</td><td>${l.unidad}</td><td class="l">${l.codigo ? l.codigo + " - " : ""}${l.descripcion}</td><td class="r">${m(l.precio)}</td><td class="r">${m(lineaTotal(l))}</td></tr>`).join("");
   const c = cilData(d.cilindros);
   const cilRow = (a: NECil, b: NECil) =>
     `<tr><td class="l">${a.gas}</td><td>${a.llenos || ""}</td><td>${a.vacios || ""}</td><td class="l">${b.gas}</td><td>${b.llenos || ""}</td><td>${b.vacios || ""}</td></tr>`;

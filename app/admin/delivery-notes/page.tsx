@@ -150,26 +150,44 @@ export default function DeliveryNotesPage() {
   );
 }
 
-// ---- Generar Nota de Entrega ----
+// ---- Generar Nota de Entrega (campos alineados con la pantalla de captura de Valery) ----
+const DEPOSITOS = ["Lechería", "Cumaná"];
+const TIPOS_PRECIO = ["Precio Máximo", "Precio Mínimo", "Precio Especial"];
+const DIVISAS = ["Bolívar", "Dólar"];
+const UNIDADES = ["CILINDRO", "UNIDAD", "KG", "MT", "PAR", "CAJA"];
+
 function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number }) {
-  const [f, setF] = useState({ cliente: "", rif: "", tlf: "", direccion: "", ordenCompra: "" });
+  const [f, setF] = useState({
+    cliente: "", rif: "", tlf: "", direccion: "", ordenCompra: "", notas: "",
+    vendedor: "01 - GERENTE", deposito: DEPOSITOS[0], tipoPrecio: TIPOS_PRECIO[0], divisa: DIVISAS[0],
+  });
   const [lineas, setLineas] = useState<NELinea[]>([]);
-  const [ln, setLn] = useState<NELinea>({ cantidad: 1, unidad: "CILINDRO", descripcion: "", precio: 0 });
+  const [ln, setLn] = useState<NELinea>({ codigo: "", cantidad: 1, unidad: "CILINDRO", descripcion: "", precio: 0, descuento: 0 });
   const [cil, setCil] = useState<NECil[]>(GASES.map((g) => ({ gas: g, llenos: 0, vacios: 0 })));
   const [msg, setMsg] = useState("");
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+  const t = neTotals({ ...f, correlativo: "", fecha: "", lineas, cilindros: cil } as NEDoc);
+  const enBs = f.divisa === "Bolívar";
+  const RATE = 49.5;
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <SectionCard title="Datos de la nota de entrega">
+      <SectionCard title="Datos de la nota de entrega" description={`N° ${String(seq).padStart(10, "0")}`}>
         <div className="space-y-3">
-          <div><label className={label}>Cliente</label><input className={inputClass} value={f.cliente} onChange={set("cliente")} /></div>
+          <div><label className={label}>Cliente</label><input className={inputClass} value={f.cliente} onChange={set("cliente")} placeholder="Nombre / Razón social" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={label}>RIF / C.I.</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
-            <div><label className={label}>Teléfono</label><input className={inputClass} value={f.tlf} onChange={set("tlf")} /></div>
+            <div><label className={label}>Cédula / R.I.F.</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
+            <div><label className={label}>Teléfonos</label><input className={inputClass} value={f.tlf} onChange={set("tlf")} /></div>
           </div>
           <div><label className={label}>Dirección</label><input className={inputClass} value={f.direccion} onChange={set("direccion")} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={label}>Vendedor</label><input className={inputClass} value={f.vendedor} onChange={set("vendedor")} /></div>
+            <div><label className={label}>Depósito</label><select className={inputClass} value={f.deposito} onChange={set("deposito")}>{DEPOSITOS.map((d) => <option key={d}>{d}</option>)}</select></div>
+            <div><label className={label}>Tipo de precio</label><select className={inputClass} value={f.tipoPrecio} onChange={set("tipoPrecio")}>{TIPOS_PRECIO.map((p) => <option key={p}>{p}</option>)}</select></div>
+            <div><label className={label}>Divisa</label><select className={inputClass} value={f.divisa} onChange={set("divisa")}>{DIVISAS.map((d) => <option key={d}>{d}</option>)}</select></div>
+          </div>
           <div><label className={label}>Orden de compra</label><input className={inputClass} value={f.ordenCompra} onChange={set("ordenCompra")} /></div>
+          <div><label className={label}>Notas</label><input className={inputClass} value={f.notas} onChange={set("notas")} /></div>
           <p className="text-xs font-medium text-muted">Cilindros (llenos / vacíos)</p>
           {cil.map((c, i) => (
             <div key={c.gas} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
@@ -181,26 +199,34 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
         </div>
       </SectionCard>
 
-      <SectionCard title="Productos / líneas" description={`N° ${String(seq).padStart(10, "0")}`}>
-        <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2">
-          <div><label className={label}>Cant.</label><input type="number" min={1} className="h-10 w-16 rounded-xl border border-border bg-surface-2 px-2 text-center text-sm text-text" value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>
-          <div><label className={label}>Descripción</label><input className={inputClass} value={ln.descripcion} onChange={(e) => setLn({ ...ln, descripcion: e.target.value })} /></div>
-          <div><label className={label}>Precio</label><input type="number" min={0} step="0.01" className="h-10 w-24 rounded-xl border border-border bg-surface-2 px-2 text-right text-sm text-text" value={ln.precio} onChange={(e) => setLn({ ...ln, precio: Number(e.target.value) })} /></div>
+      <SectionCard title="Renglones" description="Código · Nombre · Cantidad · Und · Precio · Dcto (como en Valery).">
+        <div className="grid grid-cols-2 gap-2">
+          <div><label className={label}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} placeholder="ARG6" /></div>
+          <div><label className={label}>Unidad</label><select className={inputClass} value={ln.unidad} onChange={(e) => setLn({ ...ln, unidad: e.target.value })}>{UNIDADES.map((u) => <option key={u}>{u}</option>)}</select></div>
+          <div className="col-span-2"><label className={label}>Nombre / Descripción</label><input className={inputClass} value={ln.descripcion} onChange={(e) => setLn({ ...ln, descripcion: e.target.value })} placeholder="ARGON CIL 6 M3" /></div>
+          <div><label className={label}>Cantidad</label><input type="number" min={1} className={inputClass} value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>
+          <div><label className={label}>Precio</label><input type="number" min={0} step="0.01" className={inputClass} value={ln.precio} onChange={(e) => setLn({ ...ln, precio: Number(e.target.value) })} /></div>
+          <div><label className={label}>Dcto %</label><input type="number" min={0} max={50} className={inputClass} value={ln.descuento} onChange={(e) => setLn({ ...ln, descuento: Number(e.target.value) })} /></div>
         </div>
-        <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ ...ln, descripcion: "", precio: 0 }); } }}>Agregar línea</Button>
+        <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", cantidad: 1, unidad: ln.unidad, descripcion: "", precio: 0, descuento: 0 }); } }}>Agregar renglón</Button>
         {lineas.length > 0 && (
           <ul className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
-            {lineas.map((l, i) => <li key={i} className="flex justify-between"><span className="truncate text-text">{l.cantidad} × {l.descripcion}</span><span className="text-muted">{fmtUsd(l.cantidad * l.precio)}</span></li>)}
-            <li className="flex justify-between border-t border-border pt-1 font-semibold"><span>Total operación (IVA incl.)</span><span>{fmtUsd(neTotals({ ...f, correlativo: "", fecha: "", lineas, cilindros: cil } as NEDoc).total)}</span></li>
+            {lineas.map((l, i) => <li key={i} className="flex justify-between gap-2"><span className="min-w-0 truncate text-text">{l.cantidad} × {l.codigo ? l.codigo + " " : ""}{l.descripcion}{l.descuento ? ` (-${l.descuento}%)` : ""}</span><span className="text-muted">{fmtUsd(l.cantidad * l.precio * (1 - (l.descuento || 0) / 100))}</span></li>)}
           </ul>
         )}
+        <dl className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
+          <div className="flex justify-between"><dt className="text-muted">Base imponible</dt><dd className="text-text">{enBs ? `${(t.base * RATE).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.base)}</dd></div>
+          <div className="flex justify-between"><dt className="text-muted">I.V.A. 16%</dt><dd className="text-text">{enBs ? `${(t.iva * RATE).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.iva)}</dd></div>
+          <div className="flex justify-between font-semibold"><dt>{enBs ? "Total Bs." : "Total $"}</dt><dd>{enBs ? `${(t.total * RATE).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.total)}</dd></div>
+          {enBs && <div className="flex justify-between"><dt className="text-muted">Dólar $</dt><dd className="text-muted">{fmtUsd(t.total)}</dd></div>}
+        </dl>
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
         <Button icon="delivery" className="mt-3 w-full" onClick={() => {
           setMsg("");
           if (!f.cliente.trim()) return setMsg("El cliente es obligatorio.");
-          if (lineas.length === 0) return setMsg("Agrega al menos una línea.");
+          if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
           onSave({ ...f, correlativo: String(seq).padStart(10, "0"), fecha: hoyISO(), lineas, cilindros: cil });
-        }}>Generar y guardar (PDF)</Button>
+        }}>Registrar y generar (PDF)</Button>
       </SectionCard>
     </div>
   );
