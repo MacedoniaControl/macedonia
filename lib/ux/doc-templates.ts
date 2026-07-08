@@ -1,41 +1,35 @@
 "use client";
 
-/** Plantillas HTML que replican los formatos de Valery (Nota de Entrega y Nota de Crédito/Devolución)
- *  para imprimir o guardar como PDF desde SumiControl. */
+import { SUMIGASES_LOGO } from "@/lib/ux/sumigases-logo";
+
+/** Réplica fiel de los formatos de Valery (Sumigases Oriente): Nota de Entrega y Nota de Crédito.
+ *  FIJO = logo, RIF/dirección de la empresa, rubros, cabeceras, etiquetas y gases de cilindros.
+ *  VARIABLE = cliente, artículos, fechas, montos y N° correlativo.
+ *  Para Sudematin: ver docs/planning/documentos-sumigases-valery.md. */
+
+// ---- Datos FIJOS de la empresa (Sumigases Oriente) ----
+const EMPRESA = {
+  rif: "J-502789510",
+  dir: "AV BOLIVAR LOCAL NRO SN SECTOR BELLA VISTA PUERTO LA CRUZ ANZOATEGUI",
+  subBloque: "AV MIRANDA, EDIF SUDEMATIN, PISO 1 URB PARCELAMIENTO MIRANDA, SECTOR LA COPITA CUMANA · J316971414",
+};
+const RUBROS = "ELECTRODOS - GASES INDUSTRIALES/MEDICINALES - ROLINERAS - CORREAS - CADENAS ACOPLES - POLEAS";
+const GASES_CIL = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"]; // orden fijo del formato
 
 export type NELinea = { cantidad: number; unidad: string; descripcion: string; precio: number };
 export type NECil = { gas: string; llenos: number; vacios: number };
 export type NEDoc = {
-  correlativo: string;
-  fecha: string;
-  cliente: string;
-  rif: string;
-  tlf: string;
-  direccion: string;
-  ordenCompra: string;
-  lineas: NELinea[];
-  cilindros: NECil[];
+  correlativo: string; fecha: string; cliente: string; rif: string; tlf: string; direccion: string; ordenCompra: string;
+  lineas: NELinea[]; cilindros: NECil[];
 };
-
 export type DevLinea = { codigo: string; descripcion: string; cantidad: number; precio: number; descuento: number };
 export type DevDoc = {
-  correlativo: string;
-  fechaEmision: string;
-  fechaVenc: string;
-  referencia: string;
-  razonSocial: string;
-  rif: string;
-  direccion: string;
-  telefonos: string;
-  lineas: DevLinea[];
-  nota: string;
-  formaPago: string;
+  correlativo: string; fechaEmision: string; fechaVenc: string; referencia: string;
+  razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; nota: string; formaPago: string;
 };
 
 const m = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const HEAD = `<div class="logo">SUMIGASES<span> ORIENTE</span></div>`;
-const RUBROS = "ELECTRODOS - GASES INDUSTRIALES/MEDICINALES - ROLINERAS - CORREAS - CADENAS ACOPLES - POLEAS";
+const LOGO = `<img src="${SUMIGASES_LOGO}" alt="Sumigases Oriente" class="logo">`;
 
 export function neTotals(d: NEDoc) {
   const base = d.lineas.reduce((a, l) => a + l.cantidad * l.precio, 0);
@@ -43,34 +37,40 @@ export function neTotals(d: NEDoc) {
   return { base, iva, total: base + iva };
 }
 
+function cilData(cils: NECil[]) {
+  const g = (name: string) => cils.find((c) => c.gas.toUpperCase() === name) ?? { gas: name, llenos: 0, vacios: 0 };
+  return GASES_CIL.map(g);
+}
+
 function neCopy(d: NEDoc) {
   const t = neTotals(d);
-  const filas = d.lineas
-    .map(
-      (l) => `<tr><td>${m(l.cantidad)}</td><td>${l.unidad}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.precio)}</td><td class="r">${m(l.cantidad * l.precio)}</td></tr>`,
-    )
-    .join("");
-  const cil = d.cilindros
-    .map((c) => `<tr><td class="l">${c.gas}</td><td>${c.llenos || ""}</td><td>${c.vacios || ""}</td></tr>`)
-    .join("");
-  return `
-  <div class="copy">
-    <div class="top">${HEAD}
-      <div class="box num"><b>CONSTANCIA DE<br>RECEPCION DE MATERIALES</b><div>N° &nbsp; ${d.correlativo}</div></div>
+  const filas = d.lineas.map((l) =>
+    `<tr><td>${m(l.cantidad)}</td><td>${l.unidad}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.precio)}</td><td class="r">${m(l.cantidad * l.precio)}</td></tr>`).join("");
+  const c = cilData(d.cilindros);
+  const cilRow = (a: NECil, b: NECil) =>
+    `<tr><td class="l">${a.gas}</td><td>${a.llenos || ""}</td><td>${a.vacios || ""}</td><td class="l">${b.gas}</td><td>${b.llenos || ""}</td><td>${b.vacios || ""}</td></tr>`;
+  return `<div class="copy">
+    <div class="top">${LOGO}
+      <div class="box num"><div class="tit">CONSTANCIA DE<br>RECEPCION DE MATERIALES</div><div class="n">N° &nbsp;&nbsp; ${d.correlativo}</div></div>
     </div>
     <div class="rubros">${RUBROS}</div>
-    <table class="cli"><tr><td class="k">CLIENTE</td><td>${d.cliente}</td><td class="k">TLF</td><td>${d.tlf}</td></tr>
+    <table class="cli">
+      <tr><td class="k">CLIENTE</td><td>${d.cliente}</td><td class="k">TLF</td><td>${d.tlf}</td></tr>
       <tr><td class="k">RIF</td><td>${d.rif}</td><td></td><td></td></tr>
       <tr><td class="k">DIRECCION</td><td colspan="3">${d.direccion}</td></tr>
       <tr><td class="k">FECHA</td><td>${d.fecha}</td><td class="k" colspan="2">ORDEN DE COMPRA &nbsp; ${d.ordenCompra}</td></tr>
     </table>
-    <table class="items"><thead><tr><th>CANTIDAD</th><th>UNIDAD</th><th class="l">DESCRIPCION</th><th>PRECIO UNIT.</th><th>TOTAL</th></tr></thead><tbody>${filas}</tbody></table>
-    <table class="tot"><tr><td class="k">BASE IMPONIBLE</td><td class="r">${m(t.base)}</td></tr>
-      <tr><td class="k">IVA 16,00 %</td><td class="r">${m(t.iva)}</td></tr>
-      <tr><td class="k">TOTAL OPERACION</td><td class="r">${m(t.total)}</td></tr></table>
-    <table class="cilt"><thead><tr><th class="l">PRODUCTO</th><th>LLENOS</th><th>VACIOS</th></tr></thead><tbody>${cil}</tbody></table>
+    <table class="items"><thead><tr><th>CANTIDAD</th><th>UNIDAD</th><th class="l">DESCRIPCION</th><th>PRECIO<br>UNITARIO</th><th>TOTAL</th></tr></thead>
+      <tbody>${filas}${"<tr class='sp'><td></td><td></td><td></td><td></td><td></td></tr>".repeat(Math.max(0, 6 - d.lineas.length))}</tbody></table>
+    <table class="tot">
+      <tr><td class="k">BASE IMPONIBLE</td><td class="r">${m(t.base)}</td></tr>
+      <tr><td class="k">IVA &nbsp; 16,00 %</td><td class="r">${m(t.iva)}</td></tr>
+      <tr><td class="k">TOTAL OPERACION</td><td class="r">${m(t.total)}</td></tr>
+    </table>
+    <table class="cilt"><thead><tr><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACIOS</th><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACIOS</th></tr></thead>
+      <tbody>${cilRow(c[0], c[1])}${cilRow(c[2], c[3])}</tbody></table>
     <table class="firmas"><tr><td>ENTREGADO</td><td>RECIBIDO CONFORME</td><td>PROCESADO</td></tr>
-      <tr class="sign"><td>FECHA ${d.fecha}</td><td></td><td></td></tr></table>
+      <tr class="sign"><td>FECHA &nbsp; ${d.fecha}</td><td></td><td></td></tr></table>
   </div>`;
 }
 
@@ -82,62 +82,82 @@ export function devolucionHtml(d: DevDoc) {
   const sub = d.lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
   const iva = sub * 0.16;
   const total = sub + iva;
-  const filas = d.lineas
-    .map(
-      (l) => `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`,
-    )
-    .join("");
-  const body = `
-  <div class="copy dev">
-    <div class="top">${HEAD}
-      <div class="box num"><b>Nota de Crédito Nro.</b><div>${d.correlativo}</div></div>
+  const filas = d.lineas.map((l) =>
+    `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">0,00</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");
+  const body = `<div class="copy dev">
+    <div class="devhead">${LOGO}<div class="empresa"><b>${EMPRESA.rif}</b><br>${EMPRESA.dir}</div></div>
+    <div class="devbox">
+      <div class="left">
+        <div class="sub">${EMPRESA.subBloque}</div>
+        <table class="cli"><tr><td class="k">Razón Social</td><td>${d.razonSocial}</td></tr>
+          <tr><td class="k">RIF</td><td>${d.rif}</td></tr>
+          <tr><td class="k">Dirección</td><td>${d.direccion}</td></tr>
+          <tr><td class="k">Teléfonos</td><td>${d.telefonos}</td></tr></table>
+      </div>
+      <div class="right">
+        <div class="nctit">Nota de Crédito Nro.<br><b>${d.correlativo}</b></div>
+        <table class="fechas"><tr><td class="k">Fecha Emisión</td><td class="r">${d.fechaEmision}</td></tr>
+          <tr><td class="k">Fecha Vencimiento</td><td class="r">${d.fechaVenc}</td></tr></table>
+        <table class="ref"><tr><td class="k">Referencia</td><td>${d.referencia}</td></tr>
+          <tr><td class="k">Fecha Emisión</td><td>${d.fechaEmision}</td></tr>
+          <tr><td class="k">Total</td><td class="r">${m(total)}</td></tr></table>
+      </div>
     </div>
-    <div class="rif">J-502789510 · AV BOLIVAR, PUERTO LA CRUZ, ANZOÁTEGUI</div>
-    <table class="cli"><tr><td class="k">Razón Social</td><td>${d.razonSocial}</td>
-        <td class="k">Fecha Emisión</td><td>${d.fechaEmision}</td></tr>
-      <tr><td class="k">RIF</td><td>${d.rif}</td><td class="k">Fecha Vencimiento</td><td>${d.fechaVenc}</td></tr>
-      <tr><td class="k">Dirección</td><td>${d.direccion}</td><td class="k">Referencia</td><td>${d.referencia}</td></tr>
-      <tr><td class="k">Teléfonos</td><td>${d.telefonos}</td><td></td><td></td></tr></table>
-    <table class="items"><thead><tr><th>Código</th><th class="l">Descripción</th><th>Cantidad</th><th>Precio Unit.</th><th>Descuento</th><th>Total</th></tr></thead><tbody>${filas}</tbody></table>
-    <table class="tot dev"><tr><td class="k">Sub-Total</td><td class="r">${m(sub)}</td><td class="k">Total Base Imponible</td><td class="r">${m(sub)}</td></tr>
-      <tr><td class="k">Flete</td><td class="r">0,00</td><td class="k">Total Impuesto 16,00 %</td><td class="r">${m(iva)}</td></tr>
-      <tr><td class="k">Total IGTF</td><td class="r">0,00</td><td class="k">Total Operación</td><td class="r"><b>${m(total)}</b></td></tr></table>
+    <table class="items"><thead><tr><th>Código Producto</th><th class="l">Descripción</th><th>Cantidad</th><th>Cant. Bon</th><th>Precio Unitario</th><th>Descuento</th><th>Total</th></tr></thead>
+      <tbody>${filas}</tbody></table>
+    <div class="totdev">
+      <table class="l"><tr><td class="k">Sub-Total</td><td class="r">${m(sub)}</td></tr>
+        <tr><td class="k">Descuento 1</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
+        <tr><td class="k">Descuento 2</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
+        <tr><td class="k">Flete</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr></table>
+      <table class="r"><tr><td class="k">Total Exento</td><td class="r">0,00</td></tr>
+        <tr><td class="k">Total Base Imponible</td><td class="r">${m(sub)}</td></tr>
+        <tr><td class="k">Total Impuesto &nbsp;16,00 %</td><td class="r">${m(iva)}</td></tr>
+        <tr><td class="k">Total IGTF &nbsp;0,00 %</td><td class="r">0,00</td></tr>
+        <tr><td class="k">Total Operación</td><td class="r"><b>${m(total)}</b></td></tr></table>
+    </div>
     <p class="nota">Nota: ${d.nota || ""}</p>
-    <p class="nota">Forma de Pago: ${d.formaPago || ""}</p>
+    <p class="nota">Forma de Pago: ${d.formaPago ? d.formaPago : "[]"}</p>
   </div>`;
   return wrap(`<div class="sheet">${body}</div>`, `Nota de Crédito ${d.correlativo}`);
 }
 
 function wrap(inner: string, title: string) {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${title}</title>
-  <style>
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${title}</title><style>
     *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
-    body{margin:0;padding:14px;color:#111;font-size:11px}
-    .logo{font-weight:800;color:#1e5bb8;font-size:22px;letter-spacing:.5px}
-    .logo span{color:#e08a2b;font-size:9px;letter-spacing:3px;display:block;margin-top:-4px}
+    body{margin:0;padding:12px;color:#111;font-size:11px}
+    .logo{width:150px;height:auto;image-rendering:auto}
     .sheet{display:flex;gap:10px}.sheet.ne .copy{width:50%}.sheet .copy{width:100%}
-    .copy{border:0}
     .top{display:flex;justify-content:space-between;align-items:flex-start}
-    .box.num{border:1px solid #111;padding:3px 6px;text-align:center;font-size:10px;min-width:150px}
-    .box.num div{margin-top:2px}
-    .rubros{font-size:6.5px;margin:6px 0;border-bottom:1px solid #111;padding-bottom:2px}
-    .rif{font-size:8px;margin:4px 0}
-    table{border-collapse:collapse;width:100%;margin-top:4px}
-    td,th{border:1px solid #333;padding:2px 4px;text-align:center;font-size:9px}
-    .cli td{border:1px solid #333}.cli .k{font-weight:bold;background:#f2f2f2;white-space:nowrap}
-    .items th{background:#f2f2f2}.l{text-align:left}.r{text-align:right}
-    .tot{width:60%;margin-left:auto}.tot.dev{width:100%}
-    .cilt{margin-top:6px}.firmas{margin-top:6px}.firmas .sign td{height:44px;vertical-align:top}
-    .nota{font-size:9px;margin:6px 0}
+    .box.num{border:1px solid #111;padding:3px 8px;text-align:center;font-size:10px;min-width:160px}
+    .box.num .tit{font-weight:bold;line-height:1.15}.box.num .n{margin-top:3px}
+    .rubros{font-size:6px;margin:6px 0 2px;border-bottom:1px solid #111;padding-bottom:2px}
+    table{border-collapse:collapse;width:100%;margin-top:3px}
+    td,th{border:1px solid #333;padding:2px 4px;text-align:center;font-size:8.5px;vertical-align:top}
+    .cli td{border:1px solid #333}.cli .k{font-weight:bold;background:#f4f4f4;white-space:nowrap}
+    .items th{background:#f4f4f4}.items .sp td{height:15px;border-left:1px solid #333;border-right:1px solid #333;border-top:0;border-bottom:0}
+    .l{text-align:left}.r{text-align:right}
+    .tot{width:58%;margin-left:auto}.tot .k{font-weight:bold}
+    .cilt{margin-top:6px}.cilt th{background:#f4f4f4;font-size:7.5px}
+    .firmas{margin-top:0}.firmas .sign td{height:46px;vertical-align:top;text-align:left}
+    /* Nota de crédito */
+    .devhead{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:4px}
+    .empresa{font-size:8px;text-align:right;max-width:55%}
+    .devbox{display:flex;gap:8px;border:1px solid #111;margin-top:6px;padding:6px}
+    .devbox .left{flex:1.3}.devbox .right{flex:1}
+    .sub{font-size:7px;margin-bottom:4px}
+    .nctit{text-align:right;font-size:13px;line-height:1.2;margin-bottom:4px}
+    .fechas td,.ref td{border:0;font-size:9px;padding:1px 2px}.ref{border:1px solid #111;margin-top:4px}
+    .totdev{display:flex;gap:10px;margin-top:8px}.totdev table{width:50%}.totdev td{border:0;font-size:9px}.totdev .k{font-weight:normal}
+    .nota{font-size:9px;margin:6px 0 0}
     @media print{body{padding:0}}
   </style></head><body>${inner}
-  <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
-  </body></html>`;
+  <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
 }
 
 export function printDoc(html: string) {
-  const w = window.open("", "_blank", "width=1000,height=700");
-  if (!w) return alert("Permite las ventanas emergentes para imprimir/guardar el PDF.");
+  const w = window.open("", "_blank", "width=1024,height=720");
+  if (!w) { alert("Permite las ventanas emergentes para imprimir/guardar el PDF."); return; }
   w.document.write(html);
   w.document.close();
 }
