@@ -19,7 +19,6 @@ export const navGroups: NavGroup[] = [
   {
     title: "Operación",
     items: [
-      { label: "POS interno", href: "/admin/pos", icon: "pos" },
       { label: "Cotizaciones", href: "/admin/quotes", icon: "quote" },
       { label: "Notas de entrega", href: "/admin/delivery-notes", icon: "delivery" },
       { label: "Ventas internas", href: "/admin/sales", icon: "sales" },
@@ -37,7 +36,6 @@ export const navGroups: NavGroup[] = [
   {
     title: "Finanzas",
     items: [
-      { label: "Caja y pagos", href: "/admin/cash", icon: "cash" },
       { label: "Cuentas por cobrar", href: "/admin/receivables", icon: "receivable" },
       { label: "Cuentas por pagar", href: "/admin/payables", icon: "payable" },
       { label: "Compras", href: "/admin/purchases", icon: "purchase" },

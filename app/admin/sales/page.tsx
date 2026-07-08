@@ -38,7 +38,7 @@ export default function SalesPage() {
     const correlativo = `NV-2026-${String(seq).padStart(6, "0")}`;
     setVentas((prev) => [{ id: Date.now(), correlativo, cliente, producto: p.n, qty: q, total: q * p.p, tipo }, ...prev]);
     setSeq((s) => s + 1);
-    setMsg(`${correlativo} registrada (${tipo}). ${tipo === "Crédito" ? "Genera cuenta por cobrar." : "Cobra en Caja y pagos."}`);
+    setMsg(`${correlativo} registrada (${tipo}). ${tipo === "Crédito" ? "Genera cuenta por cobrar." : "Registra el cobro contado."}`);
     setQty(1);
   }
 
@@ -50,7 +50,7 @@ export default function SalesPage() {
     <>
       <PageHeader
         title="Ventas internas"
-        description="Registro operativo de ventas; se relaciona con caja (contado) y cuentas por cobrar (crédito)."
+        description="Registro operativo de ventas; se relaciona con el cobro contado y las cuentas por cobrar (crédito)."
         breadcrumbs={[{ label: "Operación" }, { label: "Ventas internas" }]}
         actions={<StatusBadge tone="brand">{ventas.length} venta(s)</StatusBadge>}
       />
@@ -112,7 +112,7 @@ export default function SalesPage() {
           )}
         </SectionCard>
       </div>
-      <p className="mt-4 text-xs text-muted">Demo client-side. Crédito alimenta CxC; contado se cobra en Caja y pagos.</p>
+      <p className="mt-4 text-xs text-muted">Demo client-side. Crédito alimenta CxC; contado se cobra al registrar la venta.</p>
     </>
   );
 }
