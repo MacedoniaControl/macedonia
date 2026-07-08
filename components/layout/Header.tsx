@@ -8,11 +8,20 @@ import { CompanySelector } from "@/components/ui/CompanySelector";
 import { findNavItem } from "@/lib/ux/nav";
 import { alertasOperativas } from "@/lib/ux/dashboard-data";
 import { useNotifications, updateNotif } from "@/lib/ux/notifications";
+import { fetchBcvRate } from "@/lib/ux/bcv-rate";
 
 export function Header({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
   const current = findNavItem(pathname);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [bcvLoading, setBcvLoading] = useState(false);
+
+  async function dolarPrice() {
+    setBcvLoading(true);
+    const r = await fetchBcvRate();
+    setBcvLoading(false);
+    if (!r.ok) alert(`No se pudo obtener el dólar del BCV.\n${r.error ?? ""}`);
+  }
 
   const notifs = useNotifications();
   const pendientes = notifs.filter((n) => n.estado === "pendiente");
@@ -30,6 +39,17 @@ export function Header({ onMenu }: { onMenu: () => void }) {
       </button>
 
       <p className="truncate text-sm font-medium text-text">{current?.label ?? "SumiControl"}</p>
+
+      <button
+        type="button"
+        onClick={dolarPrice}
+        disabled={bcvLoading}
+        aria-label="Actualizar precio del dólar BCV"
+        className="ml-3 inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand px-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-60"
+      >
+        <Icon name="dollar" size={16} />
+        {bcvLoading ? "Consultando…" : "Dolar Price"}
+      </button>
 
       <div className="ml-auto flex items-center gap-2">
         <div className="hidden sm:block">

@@ -33,7 +33,8 @@ export type IconName =
   | "check"
   | "alert"
   | "upload"
-  | "eye";
+  | "eye"
+  | "dollar";
 
 const paths: Record<IconName, JSX.Element> = {
   dashboard: (
@@ -208,6 +209,12 @@ const paths: Record<IconName, JSX.Element> = {
     <>
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
       <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  dollar: (
+    <>
+      <path d="M12 2v20" />
+      <path d="M16.5 6.5c0-1.7-2-2.6-4.5-2.6S7.5 4.8 7.5 6.7 9.6 9.3 12 9.6s4.5 1 4.5 2.9-2 2.6-4.5 2.6-4.5-.9-4.5-2.6" />
     </>
   ),
 };

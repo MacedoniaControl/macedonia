@@ -8,6 +8,8 @@ import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BiVentasUtilidad, BiVentasCompras, BiCategoriasDonut } from "@/components/ui/BiCharts";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { useBcvRate } from "@/lib/ux/bcv-rate";
+import { Icon } from "@/components/ui/Icon";
 import {
   RATE_BS,
   productosMayorRetorno,
@@ -60,6 +62,8 @@ export default function DashboardPage() {
 
   const empresaLabel = f.empresa === "sumigases" ? "Sumigases" : f.empresa === "sudematin" ? "Sudematin (demo 0,35×)" : "Consolidado";
 
+  const bcv = useBcvRate();
+
   return (
     <>
       <PageHeader
@@ -89,6 +93,29 @@ export default function DashboardPage() {
           </>
         }
       />
+
+      {/* Precio del dólar BCV (se actualiza con el botón "Dolar Price" del header) */}
+      <div className="mb-4 flex justify-end">
+        <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-sm sm:max-w-sm">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand"><Icon name="dollar" size={18} /></span>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Precio del dólar · BCV</p>
+          </div>
+          {bcv ? (
+            <>
+              <p className="mt-2 text-2xl font-semibold text-text">{bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs</p>
+              <p className="mt-1 text-xs text-muted">
+                {bcv.fecha ? `Fecha valor BCV: ${bcv.fecha} · ` : ""}Consultado: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-2xl font-semibold text-muted">— Bs</p>
+              <p className="mt-1 text-xs text-muted">Sin consulta. Pulsa “Dolar Price” en la barra superior.</p>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {kpis.map((k) => (
