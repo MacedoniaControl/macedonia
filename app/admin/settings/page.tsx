@@ -53,6 +53,22 @@ export default function SettingsPage() {
     setMsg("Configuración guardada. Los valores persisten en este navegador.");
   }
 
+  const [bcv, setBcv] = useState<{ loading: boolean; msg: string; err: boolean }>({ loading: false, msg: "", err: false });
+  async function actualizarBCV() {
+    setBcv({ loading: true, msg: "Consultando bcv.org.ve…", err: false });
+    try {
+      const r = await fetch("/api/bcv", { cache: "no-store" });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || "No disponible");
+      const next = { ...form, tasa: String(d.tasa) };
+      setForm(next);
+      setSaved(next);
+      setBcv({ loading: false, err: false, msg: `Tasa BCV actualizada a ${d.tasa} Bs/USD${d.fecha ? ` · ${d.fecha}` : ""}.` });
+    } catch (e) {
+      setBcv({ loading: false, err: true, msg: `No se pudo actualizar desde el BCV (${String(e)}). Ingrésala manual.` });
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -88,6 +104,13 @@ export default function SettingsPage() {
             <Field label="IVA (%)"><input className={inputClass} value={form.iva} onChange={set("iva")} /></Field>
             <Field label="Tasa especial sin aprobación (±%)" hint="Fuera de rango: aprueba OWNER/ADMIN."><input className={inputClass} value={form.rangoTasa} onChange={set("rangoTasa")} /></Field>
             <Field label="Moneda base"><input className={inputClass} value="USD" readOnly /></Field>
+          </div>
+          <div className="mt-3">
+            <Button variant="secondary" icon="roi" onClick={actualizarBCV} disabled={bcv.loading}>
+              {bcv.loading ? "Consultando BCV…" : "Actualizar desde BCV"}
+            </Button>
+            {bcv.msg && <p className={`mt-2 rounded-xl px-3 py-2 text-sm ${bcv.err ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>{bcv.msg}</p>}
+            <p className="mt-1 text-[11px] text-muted">Trae el precio oficial del dólar de bcv.org.ve y actualiza la tasa.</p>
           </div>
         </SectionCard>
 
