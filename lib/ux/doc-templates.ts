@@ -24,7 +24,7 @@ export type NEDoc = {
   // Campos que Valery captura (no todos se imprimen en la constancia física):
   vendedor?: string; deposito?: string; tipoPrecio?: string; divisa?: string; notas?: string;
 };
-export type DevLinea = { codigo: string; descripcion: string; cantidad: number; precio: number; descuento: number };
+export type DevLinea = { codigo: string; descripcion: string; cantidad: number; precio: number; descuento: number; unidad?: string };
 export type PresupuestoDoc = {
   correlativo: string; fechaEmision: string; fechaVenc: string;
   razonSocial: string; rif: string; direccion: string; telefonos: string;

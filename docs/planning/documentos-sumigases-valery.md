@@ -41,3 +41,24 @@ montos y los datos del cliente (nombre, RIF, teléfono, dirección, orden de com
   descarga directa sin diálogo de impresión.
 - La subida de PDF de Valery detecta el tipo por el nombre del archivo (NET→entrega, NC/crédito→
   devolución) y lo organiza por fecha en el registro. Parseo del contenido del PDF = fase siguiente.
+
+## Cotizaciones / Presupuestos (2026 — mapeo pantalla de captura de Valery)
+
+Modelos analizados: `Modelo Cotizacion.PDF`, `Presupuesto Modelo(.PDF/2/3)` y la pantalla de captura
+"Presupuesto de Venta" de Valery. El **PDF de salida** (`presupuestoHtml`) ya replica el formato oficial
+(logo, RIF/dirección, columnas Código/Descripción/Cantidad/Precio/Descuento/Total, bloque de totales,
+pie "COTIZACIÓN #: … SIN DERECHO A CRÉDITO FISCAL"). Este apartado documenta el **formulario de captura**
+en `app/admin/quotes/page.tsx` → "Generar presupuesto", alineado con la pantalla de Valery:
+
+Campos que captura Valery y ahora también SumiControl:
+- Cliente / Razón Social, Cédula-R.I.F., Dirección, Teléfonos, **Notas**.
+- **Vendedor**.
+- **Tipo de Precio** (Precio Máximo / Mínimo / Oferta / Mayor).
+- **Divisa** (Dólar / Bolívar) + "Caduca en (días)" = fecha de vencimiento.
+- Renglones: **Código · Nombre/Descripción · Cantidad · Und. · Precio · Dcto** (los cómputos
+  Precio+IVA / SubTotal / SubTotal C-IVA de la pantalla de Valery se resuelven en los totales).
+- N° correlativo automático (10 dígitos).
+
+Nota: `Und.` y los campos Vendedor/Tipo de precio se **capturan** (paridad con Valery) aunque la
+constancia física del presupuesto no imprime esas columnas. Con esto, las cotizaciones se generan
+íntegramente desde SumiControl sin depender de Valery.

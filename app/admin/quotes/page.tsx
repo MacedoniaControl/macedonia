@@ -26,6 +26,8 @@ const CATALOGO = [
   { codigo: "2001105", descripcion: "REGULADOR DE ARGON C/ FLUJOMETRO", precio: 63.87 },
 ];
 const MONEDAS = ["Dolar", "Bolívar"];
+const TIPOS_PRECIO = ["Precio Máximo", "Precio Mínimo", "Precio Oferta", "Precio Mayor"];
+const UNIDADES = ["UNIDAD", "CILINDRO", "KG", "MT", "PAR", "CAJA"];
 const toneOf: Record<Estado, Tone> = { Borrador: "muted", Aprobada: "info", Rechazada: "danger", "Nota de entrega": "ok" };
 const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -152,9 +154,9 @@ export default function QuotesPage() {
 type GenDoc = { correlativo: string; fechaEmision: string; fechaVenc: string; razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; moneda: string; nota: string; total: number };
 
 function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) => void }) {
-  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", moneda: "Dolar", nota: "", venceDias: 5 });
+  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "01 - GERENTE", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5 });
   const [lineas, setLineas] = useState<DevLinea[]>([]);
-  const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0 });
+  const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0, unidad: "UNIDAD" });
   const [msg, setMsg] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   const pick = (codigo: string) => { const p = CATALOGO.find((c) => c.codigo === codigo); if (p) setLn({ ...ln, codigo: p.codigo, descripcion: p.descripcion, precio: p.precio }); };
@@ -172,8 +174,10 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
           </div>
           <div><label className={lbl}>Dirección</label><input className={inputClass} value={f.direccion} onChange={set("direccion")} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={lbl}>Expresado en</label><select className={inputClass} value={f.moneda} onChange={set("moneda")}>{MONEDAS.map((mo) => <option key={mo}>{mo}</option>)}</select></div>
-            <div><label className={lbl}>Vence en (días)</label><input type="number" min={1} className={inputClass} value={f.venceDias} onChange={set("venceDias")} /></div>
+            <div><label className={lbl}>Vendedor</label><input className={inputClass} value={f.vendedor} onChange={set("vendedor")} /></div>
+            <div><label className={lbl}>Tipo de precio</label><select className={inputClass} value={f.tipoPrecio} onChange={set("tipoPrecio")}>{TIPOS_PRECIO.map((tp) => <option key={tp}>{tp}</option>)}</select></div>
+            <div><label className={lbl}>Divisa / Expresado en</label><select className={inputClass} value={f.moneda} onChange={set("moneda")}>{MONEDAS.map((mo) => <option key={mo}>{mo}</option>)}</select></div>
+            <div><label className={lbl}>Caduca en (días)</label><input type="number" min={1} className={inputClass} value={f.venceDias} onChange={set("venceDias")} /></div>
           </div>
           <div><label className={lbl}>Nota</label><input className={inputClass} value={f.nota} onChange={set("nota")} /></div>
         </div>
@@ -185,10 +189,11 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
           <div><label className={lbl}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} /></div>
           <div className="col-span-2"><label className={lbl}>Descripción</label><input className={inputClass} value={ln.descripcion} onChange={(e) => setLn({ ...ln, descripcion: e.target.value })} /></div>
           <div><label className={lbl}>Cantidad</label><input type="number" min={1} className={inputClass} value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>
+          <div><label className={lbl}>Und.</label><select className={inputClass} value={ln.unidad} onChange={(e) => setLn({ ...ln, unidad: e.target.value })}>{UNIDADES.map((u) => <option key={u}>{u}</option>)}</select></div>
           <div><label className={lbl}>Precio</label><input type="number" min={0} step="0.01" className={inputClass} value={ln.precio} onChange={(e) => setLn({ ...ln, precio: Number(e.target.value) })} /></div>
-          <div><label className={lbl}>Descuento %</label><input type="number" min={0} max={100} className={inputClass} value={ln.descuento} onChange={(e) => setLn({ ...ln, descuento: Number(e.target.value) })} /></div>
+          <div><label className={lbl}>Dcto %</label><input type="number" min={0} max={100} className={inputClass} value={ln.descuento} onChange={(e) => setLn({ ...ln, descuento: Number(e.target.value) })} /></div>
         </div>
-        <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0 }); } }}>Agregar renglón</Button>
+        <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0, unidad: ln.unidad }); } }}>Agregar renglón</Button>
         {lineas.length > 0 && (
           <ul className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
             {lineas.map((l, i) => <li key={i} className="flex justify-between gap-2"><span className="min-w-0 truncate text-text">{l.cantidad} × {l.codigo} {l.descripcion}</span><span className="text-muted">{fmtUsd(l.cantidad * l.precio * (1 - l.descuento / 100))}</span></li>)}
