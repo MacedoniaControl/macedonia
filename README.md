@@ -4,6 +4,7 @@ SumiControl es una plataforma SaaS interna para Sumigases Oriente C.A. y Sudemat
 
 ## Documentacion base
 
+- **⭐ Estado del proyecto / handoff: [docs/planning/project_state.md](./docs/planning/project_state.md)** — leer primero para retomar (deploy, ramas, módulos, tarea en curso). Mantener actualizado ante cada evento/cambio significativo.
 - Planning general: [PLANNING.md](./PLANNING.md)
 - Planning detallado: [docs/planning/sumicontrol-planning.md](./docs/planning/sumicontrol-planning.md)
 - Plan de colaboracion: [docs/collaboration-plan.md](./docs/collaboration-plan.md)
