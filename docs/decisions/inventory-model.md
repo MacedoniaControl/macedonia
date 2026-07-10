@@ -71,8 +71,33 @@ Master = vista/consulta: `Fisico.existencia + S.existencia` agrupado por (empres
 - Botón **Importar Físico (Valery)**: sube el export y reemplaza el Físico del lote/empresa/almacén.
 - Búsqueda y filtros por categoría; export CSV.
 
-## 9. Pendiente antes de codear el importador del Físico
+## 9. Formato real del export de Valery (confirmado 2026-07-10)
 
-- **Muestra del export de inventario de Valery** (Excel/CSV) para mapear columnas reales
-  (código, descripción, existencia, costo, precio, almacén). El resto (Inventario S, Master, duplicados,
-  aprobación sin stock) se puede construir ya con el código como clave.
+Archivo `Inventario sin cilindros.xls` (BIFF, hoja "Listado de Existencia a la Fecha"), **1703 productos**,
+6 columnas. **No incluye cilindros de gases** (esos van aparte, fase posterior; sí incluye ~21 cilindros
+de acero vacíos que son productos normales).
+
+| Col | Campo | Ejemplo |
+|---|---|---|
+| A | **Código** (clave Valery) | `00001002`, `TAWG12`, `0-290-631` |
+| B | **Nombre** | `VARILLA DE PLATA PLANA 0%` |
+| C | Und. Ppal. (código de unidad Valery) | `01`, `78`, `9`, `BLIS`, `UN` |
+| D | **Existencia Und. Ppal.** | `1`, `-50`, `6` |
+| E | Und. Alt. (código de unidad) | `00`, `71` |
+| F | Existencia Und. Alt. | `19`, `147` |
+
+Notas:
+- El **export NO trae costo ni precio** → el Físico solo aporta **existencia**; costo/precio se toman del
+  catálogo de Productos de SumiControl cuando exista, o quedan en 0.
+- **Existencia = columna D** (unidad principal). La columna F es una medida alterna (informativa).
+- Valery **permite existencias negativas** (43 filas negativas en este export) — se respetan tal cual.
+- Los **códigos de unidad** son IDs internos de Valery (`01`, `78`…); mapa legible = fase posterior.
+- Sin duplicados dentro del propio export.
+
+**Seed:** `lib/ux/inventory-fisico-seed.json` (generado del .xls). El importador de la UI reemplaza este
+Físico subiendo un nuevo export con estas mismas 6 columnas.
+
+### Alcance de esta fase
+Primero **productos** (este archivo). Los **cilindros de gases** se integran después (más complejo:
+estados lleno/vacío/en cliente). Ya están seedeados como parte del Físico solo los cilindros de acero
+vacíos que Valery lista como productos.

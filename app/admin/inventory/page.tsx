@@ -1,122 +1,268 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { downloadCsv } from "@/lib/ux/export-csv";
-
-const products = [
-  { sku: "GAS-0001", nombre: "Oxígeno gaseoso cil 6M³", cat: "Gases", alm: "Lechería", precio: 16.01, costo: 8.98, stock: 18, min: 10, roi: 78 },
-  { sku: "GAS-0002", nombre: "Nitrógeno gaseoso cil 6M³", cat: "Gases", alm: "Lechería", precio: 38.04, costo: 17.52, stock: 9, min: 8, roi: 316 },
-  { sku: "ANT-0001", nombre: "Antorcha TIG 200A flex", cat: "Antorchas", alm: "Lechería", precio: 172.65, costo: 122.69, stock: 6, min: 3, roi: 41 },
-  { sku: "REG-0001", nombre: "Regulador de argón c/ flujómetro", cat: "Reguladores", alm: "Cumaná", precio: 63.87, costo: 25.81, stock: 7, min: 5, roi: 147 },
-  { sku: "ELE-0001", nombre: "Electrodo 6010 5/32 Linconl", cat: "Electrodos", alm: "Lechería", precio: 6.24, costo: 4.05, stock: 120, min: 50, roi: 54 },
-  { sku: "ELE-0003", nombre: "Electrodo 7018 5/32 Linconl", cat: "Electrodos", alm: "Cumaná", precio: 5.86, costo: 1.47, stock: 90, min: 50, roi: 298 },
-  { sku: "ANT-0002", nombre: 'Soplete 36" Victor Weldtech', cat: "Antorchas", alm: "Lechería", precio: 311.38, costo: 105.0, stock: 2, min: 2, roi: 197 },
-  { sku: "REP-0001", nombre: "Manguera morocha 1/4 GNC", cat: "Repuestos", alm: "Cumaná", precio: 5.78, costo: 3.3, stock: 80, min: 40, roi: 75 },
-];
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { addNotif } from "@/lib/ux/notifications";
+import {
+  FISICO,
+  FISICO_META,
+  buildMaster,
+  duplicadosBloqueados,
+  inFisico,
+  type SItem,
+} from "@/lib/ux/inventory-data";
 
 const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3 text-sm text-text";
+const fieldClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const LIMIT = 100;
+
+type Tab = "master" | "fisico" | "s";
 
 export default function InventoryPage() {
+  const [tab, setTab] = useState<Tab>("master");
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState("all");
-  const [alm, setAlm] = useState("all");
-  const [msg, setMsg] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
 
-  const filtrados = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return products.filter(
-      (p) =>
-        (cat === "all" || p.cat === cat) &&
-        (alm === "all" || p.alm === alm) &&
-        (!t || p.nombre.toLowerCase().includes(t) || p.sku.toLowerCase().includes(t)),
-    );
-  }, [q, cat, alm]);
+  const conflictos = useMemo(() => duplicadosBloqueados(sItems), [sItems]);
+  const master = useMemo(() => buildMaster(sItems), [sItems]);
+
+  const t = q.trim().toLowerCase();
+  const match = (codigo: string, nombre: string) =>
+    !t || codigo.toLowerCase().includes(t) || nombre.toLowerCase().includes(t);
+
+  const fisicoF = useMemo(() => FISICO.filter((f) => match(f.codigo, f.nombre)), [t]);
+  const masterF = useMemo(() => master.filter((m) => match(m.codigo, m.nombre)), [master, t]);
+  const sF = useMemo(() => sItems.filter((s) => match(s.codigo, s.nombre)), [sItems, t]);
+
+  // --- Inventario S: alta / ajuste / duplicados ---
+  const [form, setForm] = useState({ codigo: "", nombre: "", existencia: "", costo: "", precio: "" });
+  function addS() {
+    const codigo = form.codigo.trim();
+    if (!codigo || !form.nombre.trim()) return;
+    const nuevo: SItem = {
+      codigo,
+      nombre: form.nombre.trim(),
+      existencia: Number(form.existencia) || 0,
+      costo: Number(form.costo) || 0,
+      precio: Number(form.precio) || 0,
+      empresa: "Sumigases",
+      almacen: "Lechería",
+    };
+    setSItems([nuevo, ...sItems.filter((s) => s.codigo !== codigo)]);
+    if (inFisico(codigo)) {
+      addNotif({
+        id: `dup-${codigo}-${Date.now()}`,
+        tipo: "inventario",
+        titulo: "Código duplicado en ambos inventarios",
+        mensaje: `El código ${codigo} existe en el Inventario Físico (Valery) y en el Inventario S. Requiere revisión OWNER/ADMIN antes de modificarse.`,
+        para: "OWNER/ADMIN",
+        estado: "pendiente",
+        hora: new Date().toLocaleString("es-VE"),
+        payload: { codigo },
+      });
+    }
+    setForm({ codigo: "", nombre: "", existencia: "", costo: "", precio: "" });
+  }
+  function aprobarDuplicado(codigo: string) {
+    setSItems(sItems.map((s) => (s.codigo === codigo ? { ...s, tagDuplicado: true } : s)));
+  }
+  function ajustar(codigo: string, delta: number) {
+    setSItems(sItems.map((s) => (s.codigo === codigo ? { ...s, existencia: s.existencia + delta } : s)));
+  }
+  function eliminar(codigo: string) {
+    setSItems(sItems.filter((s) => s.codigo !== codigo));
+  }
 
   return (
     <>
       <PageHeader
         title="Inventario"
-        description="Stock por empresa y almacén, con costo, margen y ROI por producto."
+        description="Físico (Valery) + Inventario S (SumiControl) = Master. La existencia total real de la empresa."
         breadcrumbs={[{ label: "Inventario" }, { label: "Inventario" }]}
         actions={
-          <>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" aria-label="Importar inventario"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) setMsg(`Archivo "${f.name}" recibido. Continúa el mapeo en Importaciones.`); }} />
-            <Button variant="secondary" icon="import" onClick={() => fileRef.current?.click()}>Importar</Button>
-            <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario", [["SKU", "Producto", "Categoría", "Almacén", "Precio", "Costo", "Stock", "Mínimo", "ROI %"], ...filtrados.map((p) => [p.sku, p.nombre, p.cat, p.alm, p.precio, p.costo, p.stock, p.min, p.roi])])}>Exportar CSV</Button>
-            <Link href="/admin/products"><Button icon="plus">Nuevo producto</Button></Link>
-          </>
+          <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-master",
+            [["Código", "Nombre", "Físico", "S", "Master"], ...masterF.map((m) => [m.codigo, m.nombre, m.fisico, m.s, m.master])])}>
+            Exportar CSV
+          </Button>
         }
       />
 
-      {msg && (
-        <p className="mb-4 rounded-xl bg-ok/10 px-3 py-2 text-sm text-ok">
-          {msg} <Link href="/admin/imports" className="font-medium underline">Ir a Importaciones</Link>
-        </p>
+      {conflictos.length > 0 && (
+        <div className="mb-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm">
+          <p className="font-medium text-danger">
+            {conflictos.length} código(s) duplicado(s) en Físico y S — modificación bloqueada hasta aprobación OWNER/ADMIN.
+          </p>
+          <p className="mt-1 text-muted">
+            {conflictos.slice(0, 8).map((c) => c.codigo).join(", ")}
+            {conflictos.length > 8 ? "…" : ""} · Revísalos en la pestaña <strong>Inventario S</strong>.
+          </p>
+        </div>
       )}
 
-      <SectionCard
-        title="Productos en stock"
-        description={`${filtrados.length} de ${products.length} productos (data real 2024).`}
-      >
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <label className="relative flex min-w-[12rem] flex-1 items-center sm:max-w-xs">
-            <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
-            <input type="search" placeholder="Buscar por SKU o nombre…" aria-label="Buscar" className={inputClass}
-              value={q} onChange={(e) => setQ(e.target.value)} />
-          </label>
-          <select className={selectClass} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoría">
-            <option value="all">Todas las categorías</option>
-            {["Gases", "Electrodos", "Antorchas", "Reguladores", "Repuestos"].map((c) => <option key={c}>{c}</option>)}
-          </select>
-          <select className={selectClass} value={alm} onChange={(e) => setAlm(e.target.value)} aria-label="Almacén">
-            <option value="all">Todos los almacenes</option>
-            {["Lechería", "Cumaná"].map((a) => <option key={a}>{a}</option>)}
-          </select>
-        </div>
+      <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-border bg-surface p-1">
+        {([
+          ["master", `Master (${master.length})`],
+          ["fisico", `Físico · Valery (${FISICO.length})`],
+          ["s", `Inventario S (${sItems.length})`],
+        ] as [Tab, string][]).map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-primary text-white" : "text-muted hover:bg-surface-2"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-        <div className="sumi-scroll max-w-full overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-b border-border">
-                <th className="py-2.5 pr-3 font-medium">SKU</th>
-                <th className="py-2.5 pr-3 font-medium">Producto</th>
-                <th className="py-2.5 pr-3 font-medium">Almacén</th>
-                <th className="py-2.5 pr-3 text-right font-medium">Precio</th>
-                <th className="py-2.5 pr-3 text-right font-medium">Stock</th>
-                <th className="py-2.5 pr-3 text-right font-medium">ROI</th>
-                <th className="py-2.5 font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtrados.length === 0 && (
-                <tr><td colSpan={7} className="py-8 text-center text-muted">Sin resultados para la búsqueda/filtros.</td></tr>
-              )}
-              {filtrados.map((p) => (
-                <tr key={p.sku} className="hover:bg-surface-2">
-                  <td className="py-2.5 pr-3 font-mono text-xs text-muted">{p.sku}</td>
-                  <td className="py-2.5 pr-3 text-text">{p.nombre}</td>
-                  <td className="py-2.5 pr-3 text-muted">{p.alm}</td>
-                  <td className="py-2.5 pr-3 text-right text-text">${p.precio.toFixed(2)}</td>
-                  <td className="py-2.5 pr-3 text-right text-text">{p.stock}</td>
-                  <td className="py-2.5 pr-3 text-right"><span className="font-medium text-ok">{p.roi}%</span></td>
-                  <td className="py-2.5">
-                    {p.stock <= p.min ? <StatusBadge tone="danger">Stock crítico</StatusBadge> : <StatusBadge tone="ok">Disponible</StatusBadge>}
-                  </td>
+      <div className="mb-3">
+        <label className="relative flex max-w-md items-center">
+          <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
+          <input type="search" placeholder="Buscar por código o nombre…" aria-label="Buscar" className={inputClass}
+            value={q} onChange={(e) => setQ(e.target.value)} />
+        </label>
+      </div>
+
+      {/* -------- MASTER -------- */}
+      {tab === "master" && (
+        <SectionCard title="Inventario Master" description={`Físico + S por código. Mostrando ${Math.min(masterF.length, LIMIT)} de ${masterF.length}.`}>
+          <div className="sumi-scroll max-w-full overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-muted">
+                <tr className="border-b border-border">
+                  <th className="py-2.5 pr-3 font-medium">Código</th>
+                  <th className="py-2.5 pr-3 font-medium">Nombre</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">Físico</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">S</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">Master</th>
+                  <th className="py-2.5 font-medium">Estado</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {masterF.slice(0, LIMIT).map((m) => (
+                  <tr key={m.codigo} className={m.bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
+                    <td className="py-2.5 pr-3 font-mono text-xs text-muted">{m.codigo}</td>
+                    <td className="py-2.5 pr-3 text-text">{m.nombre}</td>
+                    <td className="py-2.5 pr-3 text-right text-muted">{m.enFisico ? m.fisico : "—"}</td>
+                    <td className="py-2.5 pr-3 text-right text-muted">{m.enS ? m.s : "—"}</td>
+                    <td className="py-2.5 pr-3 text-right font-medium text-text">{m.master}</td>
+                    <td className="py-2.5">
+                      {m.bloqueado ? <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
+                        : m.duplicado ? <StatusBadge tone="warn">Documento Duplicado</StatusBadge>
+                        : m.master <= 0 ? <StatusBadge tone="warn">Sin existencia</StatusBadge>
+                        : <StatusBadge tone="ok">Disponible</StatusBadge>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* -------- FÍSICO -------- */}
+      {tab === "fisico" && (
+        <SectionCard title="Inventario Físico (Valery)"
+          description={`Solo lectura · fuente: ${FISICO_META.fuente} (${FISICO_META.fecha}). Mostrando ${Math.min(fisicoF.length, LIMIT)} de ${fisicoF.length}.`}>
+          <div className="sumi-scroll max-w-full overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-muted">
+                <tr className="border-b border-border">
+                  <th className="py-2.5 pr-3 font-medium">Código</th>
+                  <th className="py-2.5 pr-3 font-medium">Nombre</th>
+                  <th className="py-2.5 pr-3 font-medium">Und.</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">Existencia</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">Exist. alt.</th>
+                  <th className="py-2.5 font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {fisicoF.slice(0, LIMIT).map((f) => (
+                  <tr key={f.codigo} className="hover:bg-surface-2">
+                    <td className="py-2.5 pr-3 font-mono text-xs text-muted">{f.codigo}</td>
+                    <td className="py-2.5 pr-3 text-text">{f.nombre}</td>
+                    <td className="py-2.5 pr-3 text-muted">{f.undPpal}</td>
+                    <td className={`py-2.5 pr-3 text-right ${f.existPpal < 0 ? "text-danger" : "text-text"}`}>{f.existPpal}</td>
+                    <td className="py-2.5 pr-3 text-right text-muted">{f.existAlt || "—"}</td>
+                    <td className="py-2.5">
+                      {f.existPpal < 0 ? <StatusBadge tone="danger">Negativa</StatusBadge>
+                        : f.existPpal === 0 ? <StatusBadge tone="warn">En cero</StatusBadge>
+                        : <StatusBadge tone="ok">Disponible</StatusBadge>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* -------- INVENTARIO S -------- */}
+      {tab === "s" && (
+        <>
+          <SectionCard title="Agregar a Inventario S" description="Stock propio de SumiControl. Si el código ya existe en el Físico, se marca duplicado y se bloquea hasta aprobación OWNER/ADMIN.">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+              <input className={`${fieldClass} lg:col-span-1`} placeholder="Código" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
+              <input className={`${fieldClass} lg:col-span-2`} placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+              <input className={fieldClass} type="number" placeholder="Existencia" value={form.existencia} onChange={(e) => setForm({ ...form, existencia: e.target.value })} />
+              <input className={fieldClass} type="number" placeholder="Precio $" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} />
+              <Button icon="plus" onClick={addS}>Agregar</Button>
+            </div>
+          </SectionCard>
+
+          <div className="h-4" />
+
+          <SectionCard title="Inventario S" description={`${sItems.length} ítem(s) propios. Mostrando ${Math.min(sF.length, LIMIT)}.`}>
+            <div className="sumi-scroll max-w-full overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-muted">
+                  <tr className="border-b border-border">
+                    <th className="py-2.5 pr-3 font-medium">Código</th>
+                    <th className="py-2.5 pr-3 font-medium">Nombre</th>
+                    <th className="py-2.5 pr-3 text-right font-medium">Precio</th>
+                    <th className="py-2.5 pr-3 text-right font-medium">Existencia</th>
+                    <th className="py-2.5 font-medium">Estado / Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {sF.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted">Sin ítems en Inventario S.</td></tr>}
+                  {sF.slice(0, LIMIT).map((s) => {
+                    const dup = inFisico(s.codigo);
+                    const bloqueado = dup && !s.tagDuplicado;
+                    return (
+                      <tr key={s.codigo} className={bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
+                        <td className="py-2.5 pr-3 font-mono text-xs text-muted">{s.codigo}</td>
+                        <td className="py-2.5 pr-3 text-text">{s.nombre}</td>
+                        <td className="py-2.5 pr-3 text-right text-text">${s.precio.toFixed(2)}</td>
+                        <td className="py-2.5 pr-3 text-right text-text">{s.existencia}</td>
+                        <td className="py-2.5">
+                          {bloqueado ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
+                              <Button variant="secondary" onClick={() => aprobarDuplicado(s.codigo)}>Aprobar duplicado (OWNER/ADMIN)</Button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {dup && <StatusBadge tone="warn">Documento Duplicado</StatusBadge>}
+                              <Button variant="secondary" onClick={() => ajustar(s.codigo, 1)}>+1</Button>
+                              <Button variant="secondary" onClick={() => ajustar(s.codigo, -1)}>−1</Button>
+                              <Button variant="ghost" icon="close" onClick={() => eliminar(s.codigo)}>Quitar</Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        </>
+      )}
     </>
   );
 }
