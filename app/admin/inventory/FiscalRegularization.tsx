@@ -32,7 +32,7 @@ export function FiscalRegularization() {
   function onDone(factura: string) {
     setDirecta(null);
     setWizard(null);
-    setFlash(`Factura fiscal ${factura} emitida en Valery. Maestro (M) intacto · balance S saldado.`);
+    setFlash(`Factura ${factura} de Valery registrada · alerta enviada a OWNER/ADMIN. Maestro (M) intacto · balance S saldado.`);
     setTimeout(() => setFlash(""), 6000);
   }
 
@@ -172,6 +172,8 @@ function ImpactoLinea({ codigo, cantidad, ledger }: { codigo: string; cantidad: 
 
 // ---------------------------------------------------------------- Flujo A · confirmación directa
 function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; ledger: FiscalTx[]; onClose: () => void; onDone: (f: string) => void }) {
+  const [facturaValery, setFacturaValery] = useState("");
+  const ok = facturaValery.trim().length > 0;
   return (
     <Overlay label="Convertir a factura fiscal">
       <div className="flex items-center gap-2">
@@ -190,11 +192,21 @@ function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; le
           </li>
         ))}
       </ul>
+
+      {/* Alerta: exige el código de la factura ya subida a Valery */}
+      <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "#f59e0b55", background: "#f59e0b12" }}>
+        <p className="flex items-center gap-2 text-sm font-medium" style={{ color: "#b45309" }}>
+          <Icon name="alert" size={16} /> Emite la factura en Valery y coloca aquí su código.
+        </p>
+        <label className="mt-2 mb-1 block text-xs text-muted">N° de Factura Fiscal (Valery) *</label>
+        <input className={fieldClass} value={facturaValery} onChange={(e) => setFacturaValery(e.target.value)} placeholder="Ej. 00-000123" autoFocus />
+      </div>
+
       <p className="mt-3 text-xs text-muted">Se descuenta de Valery (V) y se salda el balance informal (S). El inventario Maestro (M) no se mueve: la mercancía ya fue entregada.</p>
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        <Button className="bg-ok text-white hover:opacity-90" icon="check"
-          onClick={() => { const { factura } = convertirDirecta(nota.id); onDone(factura); }}>
+        <Button disabled={!ok} className="bg-ok text-white hover:opacity-90 disabled:bg-ok" icon="check"
+          onClick={() => { const { factura } = convertirDirecta(nota.id, facturaValery); onDone(factura); }}>
           Confirmar y facturar
         </Button>
       </div>
@@ -206,8 +218,10 @@ function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; le
 function WizardRegularizacion({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; ledger: FiscalTx[]; onClose: () => void; onDone: (f: string) => void }) {
   const [paso, setPaso] = useState(1);
   const [compra, setCompra] = useState<CompraProveedor>({ facturaProveedor: "", proveedor: "", costo: 0 });
+  const [facturaValery, setFacturaValery] = useState("");
   const faltantes = lineasInsuficientes(nota, ledger);
   const ok = compra.facturaProveedor.trim() && compra.proveedor.trim();
+  const okFactura = facturaValery.trim().length > 0;
 
   return (
     <Overlay label="Regularización asistida">
@@ -272,10 +286,20 @@ function WizardRegularizacion({ nota, ledger, onClose, onDone }: { nota: NotaEnt
           <p className="mt-3 flex items-center gap-2 rounded-xl bg-ok/10 px-3 py-2 text-xs text-ok">
             <Icon name="check" size={14} /> El Inventario Maestro (M) se mantiene intacto — afecta_inventario_real = false.
           </p>
+
+          {/* Alerta: exige el código de la factura de venta subida a Valery */}
+          <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "#f59e0b55", background: "#f59e0b12" }}>
+            <p className="flex items-center gap-2 text-sm font-medium" style={{ color: "#b45309" }}>
+              <Icon name="alert" size={16} /> Emite la factura de venta en Valery y coloca aquí su código.
+            </p>
+            <label className="mt-2 mb-1 block text-xs text-muted">N° de Factura Fiscal de venta (Valery) *</label>
+            <input className={fieldClass} value={facturaValery} onChange={(e) => setFacturaValery(e.target.value)} placeholder="Ej. 00-000123" />
+          </div>
+
           <div className="mt-5 flex justify-between gap-2">
             <Button variant="secondary" onClick={() => setPaso(1)}>Atrás</Button>
-            <Button style={{ background: "#f59e0b" }} className="text-white hover:opacity-90"
-              onClick={() => { const { factura } = regularizarEnBloque(nota.id, compra); onDone(factura); }}>
+            <Button disabled={!okFactura} style={{ background: "#f59e0b" }} className="text-white hover:opacity-90"
+              onClick={() => { const { factura } = regularizarEnBloque(nota.id, compra, facturaValery); onDone(factura); }}>
               Ejecutar Regularización
             </Button>
           </div>

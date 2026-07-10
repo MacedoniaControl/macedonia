@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { fisicoExistencia } from "./inventory-data";
+import { addNotif } from "./notifications";
 
 export type ClienteFiscal = { nombre: string; rif: string; direccion?: string };
 export type NotaLinea = { codigo: string; nombre: string; cantidad: number };
@@ -130,18 +131,29 @@ export function lineasInsuficientes(nota: NotaEntrega, ledger: FiscalTx[]): Nota
   return nota.lineas.filter((l) => !lineaSuficiente(l, ledger));
 }
 
-function nuevaFactura(): string {
-  const n = getLedger().filter((t) => t.tipo === "venta-fiscal").length + 1001;
-  return `F-${String(n).padStart(6, "0")}`;
+// Alerta al bell (OWNER/ADMIN): registra la factura fiscal cargada en Valery.
+function alertaFactura(nota: NotaEntrega, facturaValery: string, flujo: "A" | "B") {
+  addNotif({
+    id: `fact-${nota.id}-${Date.now()}`,
+    tipo: "factura-fiscal",
+    titulo: "Factura fiscal registrada — verificar en Valery",
+    mensaje: `${nota.numero} (${nota.cliente.nombre}) se convirtió con la factura ${facturaValery} de Valery${flujo === "B" ? " (con regularización de compra)" : ""}.`,
+    para: "OWNER/ADMIN",
+    estado: "pendiente",
+    hora: new Date().toLocaleString("es-VE"),
+    payload: { notaId: nota.id, facturaValery, flujo },
+  });
 }
 
 // ---------------------------------------------------------------- CONTROLLER · Flujo A
 // Hay stock fiscal (V >= cantidad). Descuenta V, S se salda (+cant), M intacto.
-export function convertirDirecta(notaId: string): { factura: string; txs: FiscalTx[] } {
+// facturaValery = código de la factura ya subida a Valery (obligatorio).
+export function convertirDirecta(notaId: string, facturaValery: string): { factura: string; txs: FiscalTx[] } {
   const notas = getNotas();
   const nota = notas.find((n) => n.id === notaId);
   if (!nota || nota.estado === "facturada") throw new Error("Nota no disponible");
-  const factura = nuevaFactura();
+  const factura = facturaValery.trim();
+  if (!factura) throw new Error("Falta el código de la factura de Valery");
   const fecha = new Date().toISOString();
   const txs: FiscalTx[] = nota.lineas.map((l) => ({
     id: `tx-${notaId}-${l.codigo}-${Date.now()}`,
@@ -158,17 +170,19 @@ export function convertirDirecta(notaId: string): { factura: string; txs: Fiscal
   }));
   appendLedger(txs);
   saveNotas(notas.map((n) => (n.id === notaId ? { ...n, estado: "facturada", flujo: "A", facturaFiscal: factura } : n)));
+  alertaFactura(nota, factura, "A");
   return { factura, txs };
 }
 
 // ---------------------------------------------------------------- CONTROLLER · Flujo B
 // No hay stock fiscal. Wizard: 1) inyecta Compra (V sube el déficit), 2) emite Venta (V baja cant).
 // M intacto (afectaInventarioReal=false); S se salda (+cant).
-export function regularizarEnBloque(notaId: string, compra: CompraProveedor): { factura: string; txs: FiscalTx[] } {
+export function regularizarEnBloque(notaId: string, compra: CompraProveedor, facturaValery: string): { factura: string; txs: FiscalTx[] } {
   const notas = getNotas();
   const nota = notas.find((n) => n.id === notaId);
   if (!nota || nota.estado === "facturada") throw new Error("Nota no disponible");
-  const factura = nuevaFactura();
+  const factura = facturaValery.trim();
+  if (!factura) throw new Error("Falta el código de la factura de Valery");
   const fecha = new Date().toISOString();
   const ledger = getLedger();
   const txs: FiscalTx[] = [];
@@ -208,6 +222,7 @@ export function regularizarEnBloque(notaId: string, compra: CompraProveedor): { 
   }
   appendLedger(txs);
   saveNotas(notas.map((n) => (n.id === notaId ? { ...n, estado: "facturada", flujo: "B", facturaFiscal: factura, compra } : n)));
+  alertaFactura(nota, factura, "B");
   return { factura, txs };
 }
 
