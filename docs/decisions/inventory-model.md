@@ -101,3 +101,25 @@ Físico subiendo un nuevo export con estas mismas 6 columnas.
 Primero **productos** (este archivo). Los **cilindros de gases** se integran después (más complejo:
 estados lleno/vacío/en cliente). Ya están seedeados como parte del Físico solo los cilindros de acero
 vacíos que Valery lista como productos.
+
+## 10. Conversión y Regularización Fiscal (2026-07-10)
+
+Módulo para legalizar una Nota de Entrega informal (SaaS) → Factura Fiscal (Valery). Vive en la pestaña
+**"Regularización fiscal"** del apartado Inventario. Variables: **V** = stock_valery (Físico),
+**S** = stock_s (informal), **M** = stock_maestro (físico real).
+
+- **Bandeja de NE (SaaS)** con **semáforo**: verde si todas las líneas tienen `V ≥ cantidad`
+  (botón "Convertir a Factura Fiscal"); ámbar ⚠️ si alguna línea `V < cantidad`
+  (botón "Regularizar y facturar").
+- **Flujo A — conversión directa** (`convertirDirecta`): por línea `V -= cant`, `S += cant` (salda),
+  `M` intacto (`mDelta=0`, `afecta_inventario_real=false`). Emite factura fiscal.
+- **Flujo B — wizard en bloque** (`regularizarEnBloque`): Paso 1 captura factura de compra del
+  proveedor; Paso 2 ejecuta **dos transacciones encadenadas**: (1) compra-fiscal `V += déficit`,
+  (2) venta-fiscal `V -= cant`, `S += cant`. `M` intacto, `afecta_inventario_real=false` en ambas.
+- El flag **`afecta_inventario_real`** existe en cada transacción del ledger para evitar duplicar
+  movimientos físicos; en regularizaciones es siempre `false` (el Maestro no se mueve).
+- Backend/controllers en `lib/ux/inventory-fiscal.ts` (ledger append-only, reducers `stockValery/
+  stockS/stockMaestro`, semáforo). UI en `app/admin/inventory/FiscalRegularization.tsx`. La vista
+  **Master** ahora muestra columnas **V · S · M** reflejando el ledger.
+- Verificado end-to-end: Flujo A (000068: V7→4, S0→3, M7 intacto) y Flujo B (0008002: compra +1 /
+  venta −1, S+1, M intacto, factura con datos de proveedor).

@@ -17,18 +17,21 @@ import {
   inFisico,
   type SItem,
 } from "@/lib/ux/inventory-data";
+import { FiscalRegularization } from "./FiscalRegularization";
+import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory-fiscal";
 
 const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3 text-sm text-text";
 const fieldClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
 const LIMIT = 100;
 
-type Tab = "master" | "fisico" | "s";
+type Tab = "master" | "fisico" | "s" | "fiscal";
 
 export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("master");
   const [q, setQ] = useState("");
   const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
+  const { ledger } = useFiscal();
 
   const conflictos = useMemo(() => duplicadosBloqueados(sItems), [sItems]);
   const master = useMemo(() => buildMaster(sItems), [sItems]);
@@ -111,6 +114,7 @@ export default function InventoryPage() {
           ["master", `Master (${master.length})`],
           ["fisico", `Físico · Valery (${FISICO.length})`],
           ["s", `Inventario S (${sItems.length})`],
+          ["fiscal", "Regularización fiscal"],
         ] as [Tab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-primary text-white" : "text-muted hover:bg-surface-2"}`}>
@@ -119,45 +123,55 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      <div className="mb-3">
-        <label className="relative flex max-w-md items-center">
-          <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
-          <input type="search" placeholder="Buscar por código o nombre…" aria-label="Buscar" className={inputClass}
-            value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-      </div>
+      {tab !== "fiscal" && (
+        <div className="mb-3">
+          <label className="relative flex max-w-md items-center">
+            <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
+            <input type="search" placeholder="Buscar por código o nombre…" aria-label="Buscar" className={inputClass}
+              value={q} onChange={(e) => setQ(e.target.value)} />
+          </label>
+        </div>
+      )}
 
-      {/* -------- MASTER -------- */}
+      {tab === "fiscal" && <FiscalRegularization />}
+
+      {/* -------- MASTER (V / S / M) -------- */}
       {tab === "master" && (
-        <SectionCard title="Inventario Master" description={`Físico + S por código. Mostrando ${Math.min(masterF.length, LIMIT)} de ${masterF.length}.`}>
+        <SectionCard title="Inventario Master"
+          description={`V = Valery (fiscal) · S = balance informal · M = maestro (físico real). Mostrando ${Math.min(masterF.length, LIMIT)} de ${masterF.length}.`}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
                   <th className="py-2.5 pr-3 font-medium">Código</th>
                   <th className="py-2.5 pr-3 font-medium">Nombre</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Físico</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">S</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Master</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">V · Valery</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">S · informal</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">M · maestro</th>
                   <th className="py-2.5 font-medium">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {masterF.slice(0, LIMIT).map((m) => (
-                  <tr key={m.codigo} className={m.bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
-                    <td className="py-2.5 pr-3 font-mono text-xs text-muted">{m.codigo}</td>
-                    <td className="py-2.5 pr-3 text-text">{m.nombre}</td>
-                    <td className="py-2.5 pr-3 text-right text-muted">{m.enFisico ? m.fisico : "—"}</td>
-                    <td className="py-2.5 pr-3 text-right text-muted">{m.enS ? m.s : "—"}</td>
-                    <td className="py-2.5 pr-3 text-right font-medium text-text">{m.master}</td>
-                    <td className="py-2.5">
-                      {m.bloqueado ? <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
-                        : m.duplicado ? <StatusBadge tone="warn">Documento Duplicado</StatusBadge>
-                        : m.master <= 0 ? <StatusBadge tone="warn">Sin existencia</StatusBadge>
-                        : <StatusBadge tone="ok">Disponible</StatusBadge>}
-                    </td>
-                  </tr>
-                ))}
+                {masterF.slice(0, LIMIT).map((m) => {
+                  const v = stockValery(m.codigo, ledger);
+                  const s = stockS(m.codigo, ledger, m.s);
+                  const mm = stockMaestro(m.codigo, ledger);
+                  return (
+                    <tr key={m.codigo} className={m.bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
+                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{m.codigo}</td>
+                      <td className="py-2.5 pr-3 text-text">{m.nombre}</td>
+                      <td className={`py-2.5 pr-3 text-right ${v < 0 ? "text-danger" : "text-muted"}`}>{m.enFisico || v !== 0 ? v : "—"}</td>
+                      <td className="py-2.5 pr-3 text-right text-muted">{s !== 0 || m.enS ? s : "—"}</td>
+                      <td className="py-2.5 pr-3 text-right font-medium text-text">{m.enFisico || mm !== 0 ? mm : "—"}</td>
+                      <td className="py-2.5">
+                        {m.bloqueado ? <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
+                          : m.duplicado ? <StatusBadge tone="warn">Documento Duplicado</StatusBadge>
+                          : mm <= 0 ? <StatusBadge tone="warn">Sin existencia</StatusBadge>
+                          : <StatusBadge tone="ok">Disponible</StatusBadge>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
