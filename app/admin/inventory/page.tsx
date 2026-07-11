@@ -35,6 +35,13 @@ export default function InventoryPage() {
   const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
   const { notas, ledger } = useFiscal();
   const [masterView, setMasterView] = useState<MasterView>("fisico");
+  const [placeholder, setPlaceholder] = useState("");
+  function stub(area: string) {
+    setPlaceholder(`Acción pendiente de definir · ${area}`);
+  }
+  const StubBtn = ({ area }: { area: string }) => (
+    <Button variant="secondary" icon="plus" onClick={() => stub(area)}>Acción</Button>
+  );
 
   const conflictos = useMemo(() => duplicadosBloqueados(sItems), [sItems]);
   const master = useMemo(() => buildMaster(sItems), [sItems]);
@@ -138,6 +145,12 @@ export default function InventoryPage() {
         </div>
       )}
 
+      {placeholder && (
+        <p className="mb-3 flex items-center gap-2 rounded-xl bg-info/10 px-3 py-2 text-sm text-info">
+          <Icon name="alert" size={16} /> {placeholder}
+        </p>
+      )}
+
       <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-border bg-surface p-1">
         {([
           ["master", `Master (${master.length})`],
@@ -162,11 +175,21 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {tab === "fiscal" && <FiscalRegularization />}
+      {tab === "fiscal" && (
+        <>
+          <div className="mb-3 flex justify-end"><StubBtn area="Regularización fiscal" /></div>
+          <FiscalRegularization />
+        </>
+      )}
 
       {/* -------- MASTER dividido en 3 apartados -------- */}
       {tab === "master" && (
         <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-text">Inventario Master</h2>
+            <StubBtn area="Master" />
+          </div>
+
           {/* Tiles resumen de los tres apartados */}
           <div className="mb-4 grid gap-3 sm:grid-cols-3">
             {([
@@ -185,7 +208,7 @@ export default function InventoryPage() {
 
           {/* Físico Existente */}
           {masterView === "fisico" && (
-            <SectionCard title="Físico Existente"
+            <SectionCard title="Físico Existente" action={<StubBtn area="Físico Existente" />}
               description={`Lo que realmente está en almacén (Maestro M). Referencia V/S/M. Mostrando ${Math.min(fisicoExistente.length, LIMIT)} de ${fisicoExistente.length}.`}>
               <div className="sumi-scroll max-w-full overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
@@ -226,7 +249,7 @@ export default function InventoryPage() {
 
           {/* En Espera por Nota de Entrega */}
           {masterView === "espera-ne" && (
-            <SectionCard title="En Espera por Nota de Entrega"
+            <SectionCard title="En Espera por Nota de Entrega" action={<StubBtn area="En Espera por Nota de Entrega" />}
               description="Existencia comprometida en pedidos aún sin Nota de Entrega emitida.">
               <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
                 Apartado creado. <strong className="text-text">Lógica pendiente de definir</strong> (mañana): qué origina un compromiso, cómo entra y sale de este estado, y su relación con V/S/M.
@@ -260,7 +283,7 @@ export default function InventoryPage() {
 
           {/* En Espera por Factura */}
           {masterView === "espera-factura" && (
-            <SectionCard title="En Espera por Factura"
+            <SectionCard title="En Espera por Factura" action={<StubBtn area="En Espera por Factura" />}
               description="Notas de Entrega emitidas, pendientes de convertir a Factura Fiscal (Valery).">
               <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
                 Fuente preliminar: bandeja de <strong className="text-text">Regularización fiscal</strong> (NE pendientes). <strong className="text-text">Lógica a afinar</strong> con tus indicaciones.
@@ -298,7 +321,7 @@ export default function InventoryPage() {
 
       {/* -------- FÍSICO -------- */}
       {tab === "fisico" && (
-        <SectionCard title="Inventario Físico (Valery)"
+        <SectionCard title="Inventario Físico (Valery)" action={<StubBtn area="Físico · Valery" />}
           description={`Solo lectura · fuente: ${FISICO_META.fuente} (${FISICO_META.fecha}). Mostrando ${Math.min(fisicoF.length, LIMIT)} de ${fisicoF.length}.`}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
@@ -348,7 +371,7 @@ export default function InventoryPage() {
 
           <div className="h-4" />
 
-          <SectionCard title="Inventario S" description={`${sItems.length} ítem(s) propios. Mostrando ${Math.min(sF.length, LIMIT)}.`}>
+          <SectionCard title="Inventario S" action={<StubBtn area="Inventario S" />} description={`${sItems.length} ítem(s) propios. Mostrando ${Math.min(sF.length, LIMIT)}.`}>
             <div className="sumi-scroll max-w-full overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wide text-muted">
