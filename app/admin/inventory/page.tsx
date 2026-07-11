@@ -6,6 +6,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { downloadCsv } from "@/lib/ux/export-csv";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { addNotif } from "@/lib/ux/notifications";
@@ -26,12 +27,14 @@ const fieldClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-
 const LIMIT = 100;
 
 type Tab = "master" | "fisico" | "s" | "fiscal";
+type MasterView = "fisico" | "espera-ne" | "espera-factura";
 
 export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("master");
   const [q, setQ] = useState("");
   const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
-  const { ledger } = useFiscal();
+  const { notas, ledger } = useFiscal();
+  const [masterView, setMasterView] = useState<MasterView>("fisico");
 
   const conflictos = useMemo(() => duplicadosBloqueados(sItems), [sItems]);
   const master = useMemo(() => buildMaster(sItems), [sItems]);
@@ -43,6 +46,32 @@ export default function InventoryPage() {
   const fisicoF = useMemo(() => FISICO.filter((f) => match(f.codigo, f.nombre)), [t]);
   const masterF = useMemo(() => master.filter((m) => match(m.codigo, m.nombre)), [master, t]);
   const sF = useMemo(() => sItems.filter((s) => match(s.codigo, s.nombre)), [sItems, t]);
+
+  // --- Sub-apartados del Master (lógica preliminar; se afinará con las indicaciones) ---
+  // Físico Existente: lo que realmente está en almacén (Maestro M > 0).
+  const fisicoExistente = useMemo(
+    () => masterF.map((m) => ({ ...m, m: stockMaestro(m.codigo, ledger) })).filter((m) => m.m !== 0),
+    [masterF, ledger],
+  );
+  // En Espera por Factura: notas de entrega ya emitidas, pendientes de convertir a factura fiscal.
+  const esperaFactura = useMemo(() => {
+    const map = new Map<string, { codigo: string; nombre: string; cantidad: number; notas: string[] }>();
+    notas.filter((n) => n.estado === "pendiente").forEach((n) =>
+      n.lineas.forEach((l) => {
+        const e = map.get(l.codigo) ?? { codigo: l.codigo, nombre: l.nombre, cantidad: 0, notas: [] };
+        e.cantidad += l.cantidad;
+        if (!e.notas.includes(n.numero)) e.notas.push(n.numero);
+        map.set(l.codigo, e);
+      }),
+    );
+    return [...map.values()].filter((e) => match(e.codigo, e.nombre));
+  }, [notas, t]);
+  // En Espera por Nota de Entrega: pedidos/compromisos aún sin NE emitida. Lógica a definir.
+  const esperaNE: { codigo: string; nombre: string; cantidad: number }[] = [];
+
+  const totFisico = fisicoExistente.reduce((a, m) => a + m.m, 0);
+  const totFactura = esperaFactura.reduce((a, e) => a + e.cantidad, 0);
+  const totNE = esperaNE.reduce((a, e) => a + e.cantidad, 0);
 
   // --- Inventario S: alta / ajuste / duplicados ---
   const [form, setForm] = useState({ codigo: "", nombre: "", existencia: "", costo: "", precio: "" });
@@ -135,47 +164,136 @@ export default function InventoryPage() {
 
       {tab === "fiscal" && <FiscalRegularization />}
 
-      {/* -------- MASTER (V / S / M) -------- */}
+      {/* -------- MASTER dividido en 3 apartados -------- */}
       {tab === "master" && (
-        <SectionCard title="Inventario Master"
-          description={`V = Valery (fiscal) · S = balance informal · M = maestro (físico real). Mostrando ${Math.min(masterF.length, LIMIT)} de ${masterF.length}.`}>
-          <div className="sumi-scroll max-w-full overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-muted">
-                <tr className="border-b border-border">
-                  <th className="py-2.5 pr-3 font-medium">Código</th>
-                  <th className="py-2.5 pr-3 font-medium">Nombre</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">V · Valery</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">S · informal</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">M · maestro</th>
-                  <th className="py-2.5 font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {masterF.slice(0, LIMIT).map((m) => {
-                  const v = stockValery(m.codigo, ledger);
-                  const s = stockS(m.codigo, ledger, m.s);
-                  const mm = stockMaestro(m.codigo, ledger);
-                  return (
-                    <tr key={m.codigo} className={m.bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
-                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{m.codigo}</td>
-                      <td className="py-2.5 pr-3 text-text">{m.nombre}</td>
-                      <td className={`py-2.5 pr-3 text-right ${v < 0 ? "text-danger" : "text-muted"}`}>{m.enFisico || v !== 0 ? v : "—"}</td>
-                      <td className="py-2.5 pr-3 text-right text-muted">{s !== 0 || m.enS ? s : "—"}</td>
-                      <td className="py-2.5 pr-3 text-right font-medium text-text">{m.enFisico || mm !== 0 ? mm : "—"}</td>
-                      <td className="py-2.5">
-                        {m.bloqueado ? <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
-                          : m.duplicado ? <StatusBadge tone="warn">Documento Duplicado</StatusBadge>
-                          : mm <= 0 ? <StatusBadge tone="warn">Sin existencia</StatusBadge>
-                          : <StatusBadge tone="ok">Disponible</StatusBadge>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Tiles resumen de los tres apartados */}
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            {([
+              ["fisico", "Físico Existente", totFisico, fisicoExistente.length, "En almacén (Maestro M)"],
+              ["espera-ne", "En Espera por Nota de Entrega", totNE, esperaNE.length, "Comprometido sin NE emitida"],
+              ["espera-factura", "En Espera por Factura", totFactura, esperaFactura.length, "NE pendiente de factura fiscal"],
+            ] as [MasterView, string, number, number, string][]).map(([id, label, unidades, skus, hint]) => (
+              <button key={id} onClick={() => setMasterView(id)}
+                className={`rounded-2xl border p-4 text-left transition ${masterView === id ? "border-brand bg-brand/5" : "border-border bg-surface hover:bg-surface-2"}`}>
+                <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
+                <div className="mt-1 text-2xl font-semibold text-text">{Math.round(unidades * 100) / 100}</div>
+                <div className="text-xs text-muted">{skus} SKU · {hint}</div>
+              </button>
+            ))}
           </div>
-        </SectionCard>
+
+          {/* Físico Existente */}
+          {masterView === "fisico" && (
+            <SectionCard title="Físico Existente"
+              description={`Lo que realmente está en almacén (Maestro M). Referencia V/S/M. Mostrando ${Math.min(fisicoExistente.length, LIMIT)} de ${fisicoExistente.length}.`}>
+              <div className="sumi-scroll max-w-full overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wide text-muted">
+                    <tr className="border-b border-border">
+                      <th className="py-2.5 pr-3 font-medium">Código</th>
+                      <th className="py-2.5 pr-3 font-medium">Nombre</th>
+                      <th className="py-2.5 pr-3 text-right font-medium">V · Valery</th>
+                      <th className="py-2.5 pr-3 text-right font-medium">S · informal</th>
+                      <th className="py-2.5 pr-3 text-right font-medium">Físico exist. (M)</th>
+                      <th className="py-2.5 font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {fisicoExistente.slice(0, LIMIT).map((m) => {
+                      const v = stockValery(m.codigo, ledger);
+                      const s = stockS(m.codigo, ledger, m.s);
+                      return (
+                        <tr key={m.codigo} className={m.bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
+                          <td className="py-2.5 pr-3 font-mono text-xs text-muted">{m.codigo}</td>
+                          <td className="py-2.5 pr-3 text-text">{m.nombre}</td>
+                          <td className={`py-2.5 pr-3 text-right ${v < 0 ? "text-danger" : "text-muted"}`}>{v}</td>
+                          <td className="py-2.5 pr-3 text-right text-muted">{s !== 0 || m.enS ? s : "—"}</td>
+                          <td className={`py-2.5 pr-3 text-right font-medium ${m.m < 0 ? "text-danger" : "text-text"}`}>{m.m}</td>
+                          <td className="py-2.5">
+                            {m.bloqueado ? <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
+                              : m.m <= 0 ? <StatusBadge tone="warn">Sin existencia</StatusBadge>
+                              : <StatusBadge tone="ok">Disponible</StatusBadge>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* En Espera por Nota de Entrega */}
+          {masterView === "espera-ne" && (
+            <SectionCard title="En Espera por Nota de Entrega"
+              description="Existencia comprometida en pedidos aún sin Nota de Entrega emitida.">
+              <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
+                Apartado creado. <strong className="text-text">Lógica pendiente de definir</strong> (mañana): qué origina un compromiso, cómo entra y sale de este estado, y su relación con V/S/M.
+              </p>
+              {esperaNE.length === 0 ? (
+                <EmptyState title="Sin existencia en espera por NE" message="Aún no hay compromisos registrados en este apartado." />
+              ) : (
+                <div className="sumi-scroll max-w-full overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-left text-sm">
+                    <thead className="text-xs uppercase tracking-wide text-muted">
+                      <tr className="border-b border-border">
+                        <th className="py-2.5 pr-3 font-medium">Código</th>
+                        <th className="py-2.5 pr-3 font-medium">Nombre</th>
+                        <th className="py-2.5 pr-3 text-right font-medium">Cantidad</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {esperaNE.map((e) => (
+                        <tr key={e.codigo} className="hover:bg-surface-2">
+                          <td className="py-2.5 pr-3 font-mono text-xs text-muted">{e.codigo}</td>
+                          <td className="py-2.5 pr-3 text-text">{e.nombre}</td>
+                          <td className="py-2.5 pr-3 text-right text-text">{e.cantidad}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {/* En Espera por Factura */}
+          {masterView === "espera-factura" && (
+            <SectionCard title="En Espera por Factura"
+              description="Notas de Entrega emitidas, pendientes de convertir a Factura Fiscal (Valery).">
+              <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
+                Fuente preliminar: bandeja de <strong className="text-text">Regularización fiscal</strong> (NE pendientes). <strong className="text-text">Lógica a afinar</strong> con tus indicaciones.
+              </p>
+              {esperaFactura.length === 0 ? (
+                <EmptyState title="Sin existencia en espera por factura" message="No hay notas de entrega pendientes de facturar." />
+              ) : (
+                <div className="sumi-scroll max-w-full overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="text-xs uppercase tracking-wide text-muted">
+                      <tr className="border-b border-border">
+                        <th className="py-2.5 pr-3 font-medium">Código</th>
+                        <th className="py-2.5 pr-3 font-medium">Nombre</th>
+                        <th className="py-2.5 pr-3 text-right font-medium">Cantidad</th>
+                        <th className="py-2.5 font-medium">Notas de entrega</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {esperaFactura.slice(0, LIMIT).map((e) => (
+                        <tr key={e.codigo} className="hover:bg-surface-2">
+                          <td className="py-2.5 pr-3 font-mono text-xs text-muted">{e.codigo}</td>
+                          <td className="py-2.5 pr-3 text-text">{e.nombre}</td>
+                          <td className="py-2.5 pr-3 text-right font-medium text-text">{e.cantidad}</td>
+                          <td className="py-2.5 text-xs text-muted">{e.notas.join(", ")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          )}
+        </>
       )}
 
       {/* -------- FÍSICO -------- */}

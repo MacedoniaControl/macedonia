@@ -123,3 +123,18 @@ Módulo para legalizar una Nota de Entrega informal (SaaS) → Factura Fiscal (V
   **Master** ahora muestra columnas **V · S · M** reflejando el ledger.
 - Verificado end-to-end: Flujo A (000068: V7→4, S0→3, M7 intacto) y Flujo B (0008002: compra +1 /
   venta −1, S+1, M intacto, factura con datos de proveedor).
+- **Requiere código de factura de Valery:** para convertir, el usuario debe ingresar el N° de la
+  factura ya subida a Valery (bloquea si vacío); ese código se guarda como `facturaFiscal` (no se
+  autogenera). Cada conversión **genera una alerta** a OWNER/ADMIN en el bell (`tipo: factura-fiscal`).
+
+## 11. Master dividido en 3 apartados (2026-07-10 · estructura; lógica pendiente de Greeg)
+
+La vista Master se dividió en tres apartados (tiles clicables + tabla por apartado):
+- **Físico Existente** — lo que está en almacén (Maestro M > 0); tabla de referencia V/S/M.
+- **En Espera por Nota de Entrega** — existencia comprometida sin NE emitida. **Lógica a definir**
+  (placeholder con empty state; Greeg dará las indicaciones).
+- **En Espera por Factura** — NE emitidas pendientes de factura fiscal. Fuente **preliminar**: bandeja
+  de Regularización fiscal (notas `estado==="pendiente"` agregadas por código). **Lógica a afinar**.
+
+> Nota: los apartados están creados como estructura visual para revisión. La lógica exacta de entrada/
+> salida de cada estado y su relación con V/S/M la definirá Greeg y luego se implementa.
