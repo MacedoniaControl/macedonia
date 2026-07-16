@@ -12,6 +12,9 @@ import {
   notaEntregaHtml, devolucionHtml, printDoc, neTotals,
   type NEDoc, type DevDoc, type NELinea, type DevLinea, type NECil,
 } from "@/lib/ux/doc-templates";
+import { ScanBar } from "@/components/inventory/ScanBar";
+import { lookupByCodigo } from "@/lib/inventory/catalog";
+import { beep } from "@/lib/inventory/scan-feedback";
 
 type Tipo = "entrega" | "devolucion";
 type Doc = {
@@ -165,7 +168,35 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
   const [ln, setLn] = useState<NELinea>({ codigo: "", cantidad: 1, unidad: "CILINDRO", descripcion: "", precio: 0, descuento: 0 });
   const [cil, setCil] = useState<NECil[]>(GASES.map((g) => ({ gas: g, llenos: 0, vacios: 0 })));
   const [msg, setMsg] = useState("");
+  const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+
+  // Escanear un producto lo agrega como renglón; si ya está, sube la cantidad.
+  // El catálogo de Valery no trae precio, por eso el renglón nace en 0 y se
+  // completa en la lista (ver guard al registrar).
+  function onScan(codigo: string) {
+    setMsg("");
+    const p = lookupByCodigo(codigo);
+    if (!p) {
+      beep(false);
+      setScanMsg({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo de Valery.` });
+      return;
+    }
+    beep(true);
+    const i = lineas.findIndex((l) => l.codigo === p.codigo);
+    if (i >= 0) {
+      const nueva = lineas[i].cantidad + 1;
+      setLineas(lineas.map((l, j) => (j === i ? { ...l, cantidad: nueva } : l)));
+      setScanMsg({ ok: true, text: `${p.nombre} · cantidad ${nueva}` });
+    } else {
+      setLineas([...lineas, { codigo: p.codigo, descripcion: p.nombre, cantidad: 1, unidad: ln.unidad, precio: 0, descuento: 0 }]);
+      setScanMsg({ ok: true, text: `${p.nombre} agregado · falta indicar el precio` });
+    }
+  }
+  const updLinea = (i: number, patch: Partial<NELinea>) => {
+    setMsg(""); // el aviso de "renglones sin precio" quedaría obsoleto al corregirlo
+    setLineas(lineas.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  };
   const t = neTotals({ ...f, correlativo: "", fecha: "", lineas, cilindros: cil } as NEDoc);
   const enBs = f.divisa === "Bolívar";
   const RATE = 49.5;
@@ -199,7 +230,15 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
         </div>
       </SectionCard>
 
-      <SectionCard title="Renglones" description="Código · Nombre · Cantidad · Und · Precio · Dcto (como en Valery).">
+      <SectionCard title="Renglones" description="Escanea para agregar, o cárgalo a mano. Código · Nombre · Cantidad · Und · Precio · Dcto (como en Valery).">
+        <ScanBar onScan={onScan} hint="Dispara el lector: el producto se agrega como renglón." />
+        {scanMsg && (
+          <p className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${scanMsg.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
+            <Icon name={scanMsg.ok ? "check" : "alert"} size={14} /> {scanMsg.text}
+          </p>
+        )}
+
+        <p className="mb-2 mt-4 border-t border-border pt-3 text-xs font-medium text-muted">Carga manual</p>
         <div className="grid grid-cols-2 gap-2">
           <div><label className={label}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} placeholder="ARG6" /></div>
           <div><label className={label}>Unidad</label><select className={inputClass} value={ln.unidad} onChange={(e) => setLn({ ...ln, unidad: e.target.value })}>{UNIDADES.map((u) => <option key={u}>{u}</option>)}</select></div>
@@ -210,9 +249,44 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
         </div>
         <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", cantidad: 1, unidad: ln.unidad, descripcion: "", precio: 0, descuento: 0 }); } }}>Agregar renglón</Button>
         {lineas.length > 0 && (
-          <ul className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
-            {lineas.map((l, i) => <li key={i} className="flex justify-between gap-2"><span className="min-w-0 truncate text-text">{l.cantidad} × {l.codigo ? l.codigo + " " : ""}{l.descripcion}{l.descuento ? ` (-${l.descuento}%)` : ""}</span><span className="text-muted">{fmtUsd(l.cantidad * l.precio * (1 - (l.descuento || 0) / 100))}</span></li>)}
-          </ul>
+          <div className="sumi-scroll mt-3 max-w-full overflow-x-auto border-t border-border pt-2">
+            <table className="w-full min-w-[420px] text-left text-sm">
+              <thead className="text-[11px] uppercase tracking-wide text-muted">
+                <tr>
+                  <th className="pb-1 pr-2 font-medium">Cant.</th>
+                  <th className="pb-1 pr-2 font-medium">Producto</th>
+                  <th className="pb-1 pr-2 text-right font-medium">Precio</th>
+                  <th className="pb-1 pr-2 text-right font-medium">Total</th>
+                  <th className="pb-1" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {lineas.map((l, i) => (
+                  <tr key={`${l.codigo}-${i}`}>
+                    <td className="py-1.5 pr-2">
+                      <input type="number" min={1} aria-label={`Cantidad ${l.descripcion}`}
+                        className="h-8 w-14 rounded-lg border border-border bg-surface-2 px-2 text-center text-sm text-text"
+                        value={l.cantidad} onChange={(e) => updLinea(i, { cantidad: Number(e.target.value) })} />
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      <span className="block truncate text-text">{l.descripcion}</span>
+                      <span className="block font-mono text-[11px] text-muted">{l.codigo}{l.descuento ? ` · -${l.descuento}%` : ""}</span>
+                    </td>
+                    <td className="py-1.5 pr-2 text-right">
+                      <input type="number" min={0} step="0.01" aria-label={`Precio ${l.descripcion}`}
+                        className={`h-8 w-20 rounded-lg border bg-surface-2 px-2 text-right text-sm text-text ${l.precio <= 0 ? "border-danger" : "border-border"}`}
+                        value={l.precio} onChange={(e) => updLinea(i, { precio: Number(e.target.value) })} />
+                    </td>
+                    <td className="py-1.5 pr-2 text-right text-muted">{fmtUsd(l.cantidad * l.precio * (1 - (l.descuento || 0) / 100))}</td>
+                    <td className="py-1.5 text-right">
+                      <button type="button" aria-label={`Quitar ${l.descripcion}`} onClick={() => setLineas(lineas.filter((_, j) => j !== i))}
+                        className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-danger"><Icon name="close" size={14} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         <dl className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
           <div className="flex justify-between"><dt className="text-muted">Base imponible</dt><dd className="text-text">{enBs ? `${(t.base * RATE).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.base)}</dd></div>
@@ -225,6 +299,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
           setMsg("");
           if (!f.cliente.trim()) return setMsg("El cliente es obligatorio.");
           if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
+          if (lineas.some((l) => l.precio <= 0)) return setMsg("Hay renglones sin precio (marcados en rojo). Complétalos antes de generar.");
           onSave({ ...f, correlativo: String(seq).padStart(10, "0"), fecha: hoyISO(), lineas, cilindros: cil });
         }}>Registrar y generar (PDF)</Button>
       </SectionCard>

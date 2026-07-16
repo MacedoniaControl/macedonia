@@ -13,28 +13,9 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { lookupByCodigo, type InventoryProduct } from "@/lib/inventory/catalog";
+import { beep } from "@/lib/inventory/scan-feedback";
 
 type ScanResult = { id: string; codigo: string; producto: InventoryProduct | null; hora: string };
-
-function beep(ok: boolean) {
-  try {
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "square";
-    osc.frequency.value = ok ? 880 : 200;
-    gain.gain.value = 0.05;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + (ok ? 0.07 : 0.22));
-    setTimeout(() => void ctx.close(), 500);
-  } catch {
-    /* sin audio disponible: el feedback visual basta */
-  }
-}
 
 export function ScanCapture() {
   const [activo, setActivo] = useState(true);
