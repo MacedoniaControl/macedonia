@@ -1,0 +1,251 @@
+===============================================================================
+ SUMICONTROL - MANUAL DEL ESCANER DE CODIGOS
+ Modulo: Inventario > pestana "Escaner"
+ https://sumicontrol.vercel.app/admin/inventory
+===============================================================================
+
+ Este manual tiene dos partes:
+
+   PARTE A - CONFIGURACION DEL LECTOR (se hace UNA SOLA VEZ, por el tecnico)
+   PARTE B - USO DIARIO (para el operador)
+   PARTE C - SOLUCION DE PROBLEMAS
+   PARTE D - NOTAS IMPORTANTES
+
+ Ultima actualizacion: 2026-07-10
+
+
+===============================================================================
+ PARTE A - CONFIGURACION DEL LECTOR  (una sola vez)
+===============================================================================
+
+ A.1) QUE LECTOR SIRVE
+ ---------------------
+ Cualquier lector de codigo de barras USB que funcione en modo "HID" o
+ "emulacion de teclado" (keyboard wedge). Es el tipo mas comun y el mas barato.
+ El lector "teclea" el codigo como si fuera un teclado y al final manda un ENTER.
+
+ NO necesitas instalar ningun driver ni programa. NO necesitas configurar nada
+ dentro de SumiControl.
+
+ Si tu lector es de otro tipo (puerto serial/COM, punto de venta, o de camara),
+ avisa al equipo tecnico ANTES: requiere otra configuracion.
+
+
+ A.2) CONECTAR
+ -------------
+ 1. Enchufa el lector a un puerto USB de la computadora.
+ 2. Espera unos segundos. El sistema lo reconoce solo, como un teclado.
+ 3. El lector suele emitir un pitido al encender.
+
+
+ A.3) LOS 3 AJUSTES QUE IMPORTAN
+ -------------------------------
+ Los lectores se configuran escaneando codigos de barras especiales que vienen
+ en SU PROPIO MANUAL (el folleto de papel de la caja). Busca en ese folleto:
+
+   AJUSTE 1 - SUFIJO ENTER   *** EL MAS IMPORTANTE ***
+     Busca el codigo de configuracion llamado:
+         "Add CR suffix" / "Enter suffix" / "Sufijo CR" / "Terminator: CR"
+     Escanealo una vez.
+
+     Para que sirve: hace que el lector mande ENTER al terminar cada lectura.
+     SIN ESTO EL ESCANER NO FUNCIONA: el codigo aparecera en el campo pero
+     nunca se buscara.
+
+   AJUSTE 2 - SIN PREFIJOS
+     Asegurate de que NO tenga activado ningun prefijo o sufijo extra
+     (busca "Clear all prefix/suffix" o "Restore defaults" y luego aplica
+     solo el AJUSTE 1).
+
+     Para que sirve: si el lector agrega caracteres extra, el codigo no se
+     encuentra.
+
+   AJUSTE 3 - DISTRIBUCION DE TECLADO
+     Busca "Keyboard country" / "Keyboard layout".
+     Debe coincidir con el teclado de la computadora:
+         - Teclado en espanol  -> Spanish / Latin America
+         - Teclado en ingles   -> USA / English
+
+     Para que sirve: los codigos de Valery llevan guiones y letras
+     (ejemplo: 0-290-631, TAWG12). Si la distribucion no coincide, los
+     guiones y simbolos salen cambiados y el codigo no se encuentra.
+
+
+ A.4) PROBAR ANTES DE USAR
+ -------------------------
+ 1. Abre el Bloc de notas (o cualquier editor de texto).
+ 2. Haz clic dentro para que el cursor parpadee.
+ 3. Escanea cualquier producto.
+
+ DEBE PASAR ESTO:
+   - Aparece el codigo completo (ej: 00001002)
+   - El cursor SALTA A LA LINEA SIGUIENTE por si solo
+
+ Si el cursor NO salta de linea  -> falta el AJUSTE 1 (sufijo Enter).
+ Si salen caracteres raros       -> revisa el AJUSTE 3 (teclado).
+ Si no aparece nada              -> prueba otro puerto USB / otro cable.
+
+ Cuando el Bloc de notas funcione bien, el escaner funcionara en SumiControl.
+
+
+===============================================================================
+ PARTE B - USO DIARIO  (operador)
+===============================================================================
+
+ B.1) ABRIR EL ESCANER
+ ---------------------
+ 1. Entra a SumiControl:  https://sumicontrol.vercel.app
+ 2. En el menu de la izquierda, haz clic en  INVENTARIO
+ 3. Arriba, haz clic en la pestana  ESCANER
+
+
+ B.2) LOS 3 ESTADOS - MIRA SIEMPRE EL LETRERO GRANDE
+ ---------------------------------------------------
+ Antes de disparar el lector, mira el letrero grande de arriba:
+
+   +---------------------------------------------------------------+
+   |  (o) ESCANEO ACTIVO                          [VERDE, parpadea] |
+   |      Listo para leer. Dispara el lector sobre el codigo.       |
+   +---------------------------------------------------------------+
+     -> TODO BIEN. Puedes escanear.
+
+   +---------------------------------------------------------------+
+   |  (o) PAUSADO - haz clic aqui para reanudar        [NARANJA]    |
+   |      El campo perdio el foco: los escaneos NO se registran.    |
+   +---------------------------------------------------------------+
+     -> ATENCION: si disparas asi, LA LECTURA SE PIERDE.
+        Haz clic sobre el letrero naranja y volvera a ACTIVO.
+        Esto pasa si hiciste clic en otra parte de la pantalla.
+
+   +---------------------------------------------------------------+
+   |  (o) ESCANER APAGADO                               [GRIS]      |
+   +---------------------------------------------------------------+
+     -> Esta apagado a proposito. Pulsa el boton "Activar escaner"
+        (arriba a la derecha del recuadro).
+
+ REGLA DE ORO: si el letrero no esta VERDE, no escanees.
+
+
+ B.3) ESCANEAR
+ -------------
+ 1. Verifica que el letrero diga ESCANEO ACTIVO (verde).
+ 2. Apunta el lector al codigo de barras y dispara.
+ 3. El resultado aparece de inmediato, con un pitido.
+
+ El campo se limpia solo y queda listo para el siguiente. Puedes escanear
+ uno tras otro sin tocar nada.
+
+
+ B.4) ENTENDER EL RESULTADO
+ --------------------------
+ PRODUCTO ENCONTRADO  (recuadro VERDE + pitido agudo)
+   Muestra:
+     - Nombre del producto     (ej: VARILLA DE PLATA PLANA 0%)
+     - Codigo                  (ej: 00001002)
+     - Existencia + unidad     (ej: 1 (9))
+   Si la existencia es 0 o menos, sale la etiqueta roja "Sin existencia".
+
+ CODIGO NO ENCONTRADO  (recuadro ROJO + pitido grave)
+   Ese codigo no existe en el catalogo de Valery.
+   Que hacer:
+     1. Vuelve a escanear (pudo ser una lectura parcial).
+     2. Revisa que el codigo del producto sea el de Valery.
+     3. Si insiste, anotalo y reportalo al supervisor.
+
+
+ B.5) ESCRIBIR EL CODIGO A MANO
+ ------------------------------
+ Si el codigo esta borrado o el lector no lo lee:
+   1. Haz clic en el campo "Codigo escaneado".
+   2. Escribe el codigo.
+   3. Pulsa ENTER (o el boton "Buscar").
+
+
+ B.6) HISTORIAL DE LA SESION
+ ---------------------------
+ Abajo aparece "Lecturas de esta sesion" con las ultimas 25 lecturas:
+ hora, codigo, producto, existencia y si se encontro o no.
+ Arriba se resume: "X lectura(s) - Y encontrada(s) - Z sin resultado".
+
+ El boton "Limpiar" borra la lista.
+
+ OJO: el historial es solo de esta sesion. Si cierras o recargas la pagina,
+ se pierde. No es un registro oficial.
+
+
+===============================================================================
+ PARTE C - SOLUCION DE PROBLEMAS
+===============================================================================
+
+ PROBLEMA: Escaneo y no pasa absolutamente nada.
+   1. Mira el letrero: si esta NARANJA (PAUSADO), haz clic en el y reintenta.
+   2. Si esta GRIS, pulsa "Activar escaner".
+   3. Si esta VERDE y aun asi nada -> prueba el lector en el Bloc de notas
+      (ver A.4). Si ahi tampoco escribe, es el lector/cable/USB.
+
+ PROBLEMA: El codigo aparece en el campo pero no se busca solo.
+   -> Al lector le falta el sufijo ENTER. Ver AJUSTE 1 (A.3).
+      Mientras tanto puedes pulsar ENTER a mano.
+
+ PROBLEMA: Salen letras o simbolos raros, o el guion sale mal.
+   -> Distribucion de teclado incorrecta. Ver AJUSTE 3 (A.3).
+
+ PROBLEMA: Dice "Codigo no encontrado" pero el producto existe.
+   1. Reintenta la lectura.
+   2. Verifica que sea un codigo de Valery.
+   3. Ojo con las MAYUSCULAS (ver Parte D).
+
+ PROBLEMA: La existencia sale en negativo (ej: -1).
+   -> No es un error del escaner. Asi esta en Valery. Reportalo al supervisor.
+
+ PROBLEMA: No suena el pitido.
+   -> El sonido puede estar bloqueado por el navegador. No afecta: guiate por
+      el color del recuadro (verde = encontrado, rojo = no encontrado).
+
+
+===============================================================================
+ PARTE D - NOTAS IMPORTANTES
+===============================================================================
+
+ D.1) HOY EL ESCANER SOLO CONSULTA
+ ---------------------------------
+ Escanear NO modifica el inventario. No suma, no resta, no crea documentos.
+ Sirve para consultar rapido que es un producto y cuanta existencia tiene.
+ (Las acciones sobre el inventario se definiran mas adelante.)
+
+ D.2) LAS MAYUSCULAS PUEDEN IMPORTAR
+ -----------------------------------
+ Normalmente da igual escribir "arg6" o "ARG6": el sistema lo resuelve.
+
+ PERO hay un caso real en Valery donde dos productos DISTINTOS se diferencian
+ solo por mayusculas:
+
+     6X8AT  ->  ENCERADO 6X8 AT    (45, MT2)
+     6x8AT  ->  ENCERADOS 6X8 AT   (48, 01)
+
+ Por seguridad, el sistema NO adivina: si escribes "6x8at" te dira
+ "no encontrado" en vez de mostrarte el producto equivocado.
+ En estos casos escribe el codigo EXACTO, respetando mayusculas y minusculas.
+ Escaneando con el lector esto no da problema, porque lee el codigo tal cual.
+
+ D.3) NO HAY QUE INSTALAR NADA
+ -----------------------------
+ SumiControl funciona en el navegador. El lector se comporta como un teclado.
+ No hay drivers, ni programas, ni configuracion dentro de SumiControl.
+
+ D.4) QUE CODIGOS RECONOCE
+ -------------------------
+ Los codigos del catalogo de Valery (1703 productos). Son alfanumericos y
+ pueden llevar guiones. Ejemplos reales:
+     00001002        VARILLA DE PLATA PLANA 0%
+     ARG6            ARGON CIL 6 M3
+     0-290-631       ESMERIL 4" 1/2 BOSCH 850W
+     TAWG12          TERMINALES TIPO PIN P/CABLE 12AWG
+
+ NOTA: no son codigos EAN/UPC de fabrica. Son los codigos internos de Valery.
+ Si un producto tiene pegada una etiqueta con codigo de barras que NO es el
+ codigo de Valery, no se encontrara.
+
+===============================================================================
+ FIN DEL MANUAL
+===============================================================================
