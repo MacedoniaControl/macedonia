@@ -10,15 +10,59 @@ import {
   productosMayorRetorno,
   categoriasMasRentables,
 } from "@/lib/ux/dashboard-data";
+import {
+  HistoryKpis,
+  HistoryTrend,
+  HistoryYearly,
+  HistoryTopProductos,
+  HistoryTopClientes,
+  HistoryTopProveedores,
+} from "@/components/ui/HistoryStats";
+import { histTotals, histMeta } from "@/lib/ux/history-data";
 
 export default function RoiPage() {
   return (
     <>
       <PageHeader
         title="ROI / Rentabilidad"
-        description="ROI como métrica transversal: producto, categoría, compras, cilindros y clientes. Base real 2024."
+        description="ROI como métrica transversal, sobre el histórico real de ventas y compras (Valery)."
         breadcrumbs={[{ label: "Inteligencia" }, { label: "ROI / Rentabilidad" }]}
       />
+
+      {/* ---- Histórico real (Valery) ---- */}
+      <SectionCard
+        title="ROI histórico real"
+        description={`Todo el histórico de operaciones (${histMeta.desde} → ${histMeta.hasta}).`}
+        action={<StatusBadge tone="ok">ROI {histTotals.roi}%</StatusBadge>}
+      >
+        <HistoryKpis />
+        <div className="mt-5 border-t border-border pt-4">
+          <HistoryTrend />
+        </div>
+      </SectionCard>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <SectionCard title="ROI por año" description="Ventas, compras, utilidad, margen y ROI anual.">
+          <HistoryYearly />
+        </SectionCard>
+        <SectionCard title="Productos de mayor utilidad" description="Ganancia acumulada real por producto (histórico).">
+          <HistoryTopProductos />
+        </SectionCard>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <SectionCard title="Clientes de mayor facturación" description="Ventas acumuladas por cliente (histórico).">
+          <HistoryTopClientes />
+        </SectionCard>
+        <SectionCard title="Proveedores de mayor compra" description="Compras acumuladas por proveedor (histórico).">
+          <HistoryTopProveedores />
+        </SectionCard>
+      </div>
+
+      <div className="mb-6 mt-8 flex items-center gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Indicadores demo (proyección 2024)</h2>
+        <span className="h-px flex-1 bg-border" />
+      </div>
 
       <SectionCard title="Indicadores del período" action={<StatusBadge tone="brand">2024</StatusBadge>}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

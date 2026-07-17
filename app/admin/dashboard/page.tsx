@@ -7,6 +7,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BiVentasUtilidad, BiVentasCompras, BiCategoriasDonut } from "@/components/ui/BiCharts";
+import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useBcvRate } from "@/lib/ux/bcv-rate";
 import { Icon } from "@/components/ui/Icon";
@@ -121,6 +122,20 @@ export default function DashboardPage() {
         {kpis.map((k) => (
           <KpiCard key={k.key} label={k.label} value={k.value} sub={k.sub} tone={k.tone} demo={k.demo} />
         ))}
+      </div>
+
+      {/* Histórico real de ventas y compras (Valery) */}
+      <div className="mt-6">
+        <SectionCard
+          title="Histórico de ventas y compras"
+          description="Datos reales de Valery desde el inicio de operaciones (USD)."
+          action={<StatusBadge tone="brand">Real 2023–2026</StatusBadge>}
+        >
+          <HistoryKpis />
+          <div className="mt-5 border-t border-border pt-4">
+            <HistoryTrend />
+          </div>
+        </SectionCard>
       </div>
 
       <div className="mt-6">
