@@ -33,7 +33,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         type="button"
         onClick={onMenu}
         aria-label="Abrir menú"
-        className="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-text hover:bg-surface-2 lg:hidden"
+        className="flex h-11 w-11 items-center justify-center rounded-xl border border-border text-text hover:bg-surface-2 lg:hidden"
       >
         <Icon name="menu" />
       </button>
@@ -45,7 +45,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         onClick={dolarPrice}
         disabled={bcvLoading}
         aria-label="Actualizar precio del dólar BCV"
-        className="ml-3 inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand px-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-60"
+        className="ml-3 inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-strong px-3 text-sm font-semibold text-white transition hover:brightness-90 disabled:opacity-60"
       >
         <Icon name="dollar" size={16} />
         {bcvLoading ? "Consultando…" : "Dolar Price"}
@@ -62,7 +62,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
             aria-label={`Notificaciones (${totalBadge})`}
             aria-expanded={alertsOpen}
             onClick={() => setAlertsOpen((v) => !v)}
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-text hover:bg-surface-2"
+            className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface text-text hover:bg-surface-2"
           >
             <Icon name="bell" />
             {totalBadge > 0 && (
@@ -88,7 +88,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
                           <p className="mt-0.5 text-[11px] text-muted">Autoriza: {n.para} · {n.hora}</p>
                           <div className="mt-2 flex gap-2">
                             <button type="button" onClick={() => updateNotif(n.id, { estado: "aprobada" })}
-                              className="rounded-lg bg-ok px-2.5 py-1 text-xs font-medium text-white hover:opacity-90">Aprobar</button>
+                              className="rounded-lg bg-ok-strong px-2.5 py-1 text-xs font-medium text-white hover:brightness-90">Aprobar</button>
                             <button type="button" onClick={() => updateNotif(n.id, { estado: "rechazada" })}
                               className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text hover:bg-surface-2">Rechazar</button>
                           </div>

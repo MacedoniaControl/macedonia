@@ -43,7 +43,7 @@ const ESTADOS: { key: keyof EstadosGas; label: string; tone: Tone }[] = [
   { key: "pendiente", label: "Pendiente", tone: "warn" },
 ];
 
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 const labelCls = "mb-1 block text-xs font-medium text-muted";
 const empty: EstadosGas = { lleno: 0, vacio: 0, enCliente: 0, pendiente: 0 };
 
@@ -170,7 +170,7 @@ export default function CylindersPage() {
               action={e.pendiente > 0 ? <StatusBadge tone="warn">{e.pendiente} pend.</StatusBadge> : <StatusBadge tone="ok">al día</StatusBadge>}>
               <div className="grid grid-cols-4 gap-2">
                 {ESTADOS.map((s) => (
-                  <div key={s.key} className="rounded-lg border border-border bg-surface-2 p-2 text-center">
+                  <div key={s.key} className="rounded-lg border border-border-strong bg-surface-2 p-2 text-center">
                     <p className="text-xl font-semibold text-text">{e[s.key]}</p>
                     <p className={`mt-0.5 text-[10px] font-medium ${s.tone === "ok" ? "text-ok" : s.tone === "warn" ? "text-warn" : s.tone === "info" ? "text-info" : "text-muted"}`}>{s.label}</p>
                   </div>
@@ -199,7 +199,7 @@ export default function CylindersPage() {
             action={<StatusBadge tone="warn">{pendientesAutorizacion.length}</StatusBadge>}>
             <ul className="space-y-2">
               {pendientesAutorizacion.map((n) => (
-                <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-2 p-3">
+                <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-strong bg-surface-2 p-3">
                   <span className="min-w-0">
                     <span className="block text-sm text-text">{n.mensaje}</span>
                     <span className="block text-xs text-muted">Autoriza: {n.para} · {n.hora}</span>
@@ -265,7 +265,7 @@ export default function CylindersPage() {
           ) : (
             <ul className="space-y-2">
               {movs.map((m) => (
-                <li key={m.id} className="rounded-xl border border-border bg-surface-2 p-3">
+                <li key={m.id} className="rounded-xl border border-border-strong bg-surface-2 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <StatusBadge tone={m.tone}>{m.gas} · {m.op}</StatusBadge>
                     <span className="font-mono text-[11px] text-muted">{m.hora}</span>

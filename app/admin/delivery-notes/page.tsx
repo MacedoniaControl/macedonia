@@ -24,7 +24,7 @@ type Doc = {
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const GASES = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"];
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 const label = "mb-1 block text-xs font-medium text-muted";
 
 const SEED: Doc[] = [
@@ -223,8 +223,8 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
           {cil.map((c, i) => (
             <div key={c.gas} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
               <span className="text-sm text-text">{c.gas}</span>
-              <input type="number" min={0} className="h-9 w-16 rounded-lg border border-border bg-surface-2 px-2 text-center text-sm text-text" value={c.llenos} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, llenos: Number(e.target.value) } : x))} placeholder="Ll" />
-              <input type="number" min={0} className="h-9 w-16 rounded-lg border border-border bg-surface-2 px-2 text-center text-sm text-text" value={c.vacios} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, vacios: Number(e.target.value) } : x))} placeholder="Va" />
+              <input type="number" min={0} className="h-9 w-16 rounded-lg border border-border-strong bg-surface-2 px-2 text-center text-sm text-text" value={c.llenos} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, llenos: Number(e.target.value) } : x))} placeholder="Ll" />
+              <input type="number" min={0} className="h-9 w-16 rounded-lg border border-border-strong bg-surface-2 px-2 text-center text-sm text-text" value={c.vacios} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, vacios: Number(e.target.value) } : x))} placeholder="Va" />
             </div>
           ))}
         </div>
@@ -265,7 +265,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
                   <tr key={`${l.codigo}-${i}`}>
                     <td className="py-1.5 pr-2">
                       <input type="number" min={1} aria-label={`Cantidad ${l.descripcion}`}
-                        className="h-8 w-14 rounded-lg border border-border bg-surface-2 px-2 text-center text-sm text-text"
+                        className="h-8 w-14 rounded-lg border border-border-strong bg-surface-2 px-2 text-center text-sm text-text"
                         value={l.cantidad} onChange={(e) => updLinea(i, { cantidad: Number(e.target.value) })} />
                     </td>
                     <td className="py-1.5 pr-2">

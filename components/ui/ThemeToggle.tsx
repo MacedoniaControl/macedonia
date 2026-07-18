@@ -31,7 +31,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label={dark ? "Activar modo claro" : "Activar modo oscuro"}
-      className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-text hover:bg-surface-2"
+      className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface text-text hover:bg-surface-2"
     >
       {/* Hasta montar, ícono estable para evitar desajuste de hidratación */}
       <Icon name={mounted && dark ? "sun" : "moon"} />

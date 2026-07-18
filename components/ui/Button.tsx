@@ -3,11 +3,13 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
+// Los fondos con texto blanco usan las variantes "strong" (>=4.5:1 AA).
+// hover:brightness-90 oscurece, así que el contraste sube, nunca baja.
 const variants: Record<Variant, string> = {
-  primary: "bg-brand text-white hover:bg-brand-600",
+  primary: "bg-brand-strong text-white hover:brightness-90",
   secondary: "border border-border bg-surface text-text hover:bg-surface-2",
   ghost: "text-text hover:bg-surface-2",
-  danger: "bg-danger text-white hover:opacity-90",
+  danger: "bg-danger text-white hover:brightness-90",
 };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

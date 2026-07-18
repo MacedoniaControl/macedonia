@@ -19,7 +19,7 @@ const PRODUCTOS = [
   { n: "Electrodo 7018 5/32 Linconl", p: 5.86 },
   { n: "Manguera morocha 1/4 GNC", p: 5.78 },
 ];
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function SalesPage() {
   const [ventas, setVentas] = usePersistedState<Venta[]>("nv:lista", []);
@@ -100,7 +100,7 @@ export default function SalesPage() {
           ) : (
             <ul className="space-y-2">
               {ventas.map((v) => (
-                <li key={v.id} className="rounded-xl border border-border bg-surface-2 p-3">
+                <li key={v.id} className="rounded-xl border border-border-strong bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-xs text-muted">{v.correlativo}</span>
                     <StatusBadge tone={v.tipo === "Contado" ? "ok" : "warn"}>{v.tipo}</StatusBadge>

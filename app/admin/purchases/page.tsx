@@ -20,7 +20,7 @@ const PRODUCTOS = [
   { n: "Manguera morocha 1/4 GNC", c: 3.3 },
 ];
 const toneOf: Record<Estado, Tone> = { Abierta: "info", "Recibida parcial": "warn", Recibida: "ok" };
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function PurchasesPage() {
   const [ordenes, setOrdenes] = usePersistedState<Orden[]>("oc:lista", []);
@@ -89,7 +89,7 @@ export default function PurchasesPage() {
           ) : (
             <ul className="space-y-2">
               {ordenes.map((o) => (
-                <li key={o.id} className="rounded-xl border border-border bg-surface-2 p-3">
+                <li key={o.id} className="rounded-xl border border-border-strong bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-xs text-muted">{o.correlativo}</span>
                     <StatusBadge tone={toneOf[o.estado]}>{o.estado}</StatusBadge>

@@ -44,7 +44,7 @@ export function DataTableShell({
               type="search"
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
-              className="h-10 w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3 text-sm text-text placeholder:text-muted"
+              className="h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text placeholder:text-muted"
             />
           </label>
           {filters}

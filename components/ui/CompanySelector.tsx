@@ -22,7 +22,7 @@ export function CompanySelector() {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Empresa activa"
-        className="flex h-10 items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface-2"
+        className="flex h-11 items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface-2"
       >
         <Icon name="building" size={18} />
         <span className="max-w-[8rem] truncate">{active?.name}</span>

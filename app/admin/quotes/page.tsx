@@ -29,7 +29,7 @@ const MONEDAS = ["Dolar", "Bolívar"];
 const TIPOS_PRECIO = ["Precio Máximo", "Precio Mínimo", "Precio Oferta", "Precio Mayor"];
 const UNIDADES = ["UNIDAD", "CILINDRO", "KG", "MT", "PAR", "CAJA"];
 const toneOf: Record<Estado, Tone> = { Borrador: "muted", Aprobada: "info", Rechazada: "danger", "Nota de entrega": "ok" };
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const dmy = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;

@@ -33,7 +33,7 @@ const SEED: Prod[] = [
   { sku: "REP-0001", nombre: "Manguera morocha 1/4 GNC", cat: "Accesorios y repuestos", precio: 5.78, costo: 3.3 },
 ];
 
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function ProductsPage() {
   const [prods, setProds] = usePersistedState<Prod[]>("prod:lista", SEED);

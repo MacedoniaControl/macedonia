@@ -18,7 +18,7 @@ const SEED: Usuario[] = [
 
 const ROLES = ["OWNER", "ADMIN", "AUDITOR", "CAJERO", "VENDEDOR", "ALMACEN", "COMPRAS", "TECNICO_RECARGA", "DISTRIBUIDOR"];
 const toneRol: Record<string, Tone> = { OWNER: "brand", ADMIN: "info", AUDITOR: "muted", CAJERO: "ok", VENDEDOR: "ok", ALMACEN: "warn", COMPRAS: "warn", TECNICO_RECARGA: "info", DISTRIBUIDOR: "navy" };
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 const rolesInfo = [
   { rol: "OWNER", resumen: "Control total: usuarios, contraseñas, config crítica, aprobaciones y reportes." },
@@ -132,7 +132,7 @@ export default function UsersPage() {
         <SectionCard title="Roles y permisos" description="Resumen por rol (docs/decisions/roles-permissions.md).">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {rolesInfo.map((r) => (
-              <div key={r.rol} className="rounded-xl border border-border bg-surface-2 p-3">
+              <div key={r.rol} className="rounded-xl border border-border-strong bg-surface-2 p-3">
                 <div className="mb-2"><StatusBadge tone={toneRol[r.rol] ?? "muted"}>{r.rol}</StatusBadge></div>
                 <p className="text-sm text-muted">{r.resumen}</p>
               </div>

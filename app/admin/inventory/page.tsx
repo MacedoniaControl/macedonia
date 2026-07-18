@@ -23,8 +23,8 @@ import { ScanCapture } from "./ScanCapture";
 import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory-fiscal";
 
 const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3 text-sm text-text";
-const fieldClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
+const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 const LIMIT = 100;
 
 type Tab = "master" | "fisico" | "s" | "fiscal" | "escaner";
@@ -161,7 +161,7 @@ export default function InventoryPage() {
           ["escaner", "Escáner"],
         ] as [Tab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-primary text-white" : "text-muted hover:bg-surface-2"}`}>
+            className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>
             {label}
           </button>
         ))}
@@ -255,7 +255,7 @@ export default function InventoryPage() {
           {masterView === "espera-ne" && (
             <SectionCard title="En Espera por Nota de Entrega" action={<StubBtn area="En Espera por Nota de Entrega" />}
               description="Existencia comprometida en pedidos aún sin Nota de Entrega emitida.">
-              <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
+              <p className="mb-3 rounded-xl border border-border-strong bg-surface-2 px-3 py-2 text-xs text-muted">
                 Apartado creado. <strong className="text-text">Lógica pendiente de definir</strong> (mañana): qué origina un compromiso, cómo entra y sale de este estado, y su relación con V/S/M.
               </p>
               {esperaNE.length === 0 ? (
@@ -289,7 +289,7 @@ export default function InventoryPage() {
           {masterView === "espera-factura" && (
             <SectionCard title="En Espera por Factura" action={<StubBtn area="En Espera por Factura" />}
               description="Notas de Entrega emitidas, pendientes de convertir a Factura Fiscal (Valery).">
-              <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
+              <p className="mb-3 rounded-xl border border-border-strong bg-surface-2 px-3 py-2 text-xs text-muted">
                 Fuente preliminar: bandeja de <strong className="text-text">Regularización fiscal</strong> (NE pendientes). <strong className="text-text">Lógica a afinar</strong> con tus indicaciones.
               </p>
               {esperaFactura.length === 0 ? (

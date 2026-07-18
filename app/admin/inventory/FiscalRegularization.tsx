@@ -18,7 +18,7 @@ import {
   type CompraProveedor,
 } from "@/lib/ux/inventory-fiscal";
 
-const fieldClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export function FiscalRegularization() {
   const { notas, ledger } = useFiscal();
@@ -89,13 +89,12 @@ export function FiscalRegularization() {
                     </td>
                     <td className="py-3 text-right">
                       {sem === "verde" ? (
-                        <Button className="bg-ok text-white hover:opacity-90" icon="check" onClick={() => setDirecta(n)}>
+                        <Button className="bg-ok-strong text-white hover:brightness-90" icon="check" onClick={() => setDirecta(n)}>
                           Convertir a Factura Fiscal
                         </Button>
                       ) : (
                         <Button
-                          className="text-white hover:opacity-90"
-                          style={{ background: "#f59e0b" }}
+                          className="bg-warn-strong text-white hover:brightness-90"
                           icon="alert"
                           onClick={() => setWizard(n)}
                         >
@@ -180,7 +179,7 @@ function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; le
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ok/15 text-ok"><Icon name="check" size={18} /></span>
         <h2 className="text-base font-semibold text-text">Convertir a Factura Fiscal</h2>
       </div>
-      <div className="mt-4 rounded-xl border border-border bg-surface-2 p-3 text-sm">
+      <div className="mt-4 rounded-xl border border-border-strong bg-surface-2 p-3 text-sm">
         <div className="font-medium text-text">{nota.cliente.nombre}</div>
         <div className="text-xs text-muted">{nota.cliente.rif}{nota.cliente.direccion ? ` · ${nota.cliente.direccion}` : ""}</div>
       </div>
@@ -205,7 +204,7 @@ function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; le
       <p className="mt-3 text-xs text-muted">Se descuenta de Valery (V) y se salda el balance informal (S). El inventario Maestro (M) no se mueve: la mercancía ya fue entregada.</p>
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        <Button disabled={!ok} className="bg-ok text-white hover:opacity-90 disabled:bg-ok" icon="check"
+        <Button disabled={!ok} className="bg-ok-strong text-white hover:brightness-90 disabled:bg-ok-strong" icon="check"
           onClick={() => { const { factura } = convertirDirecta(nota.id, facturaValery); onDone(factura); }}>
           Confirmar y facturar
         </Button>
@@ -276,10 +275,10 @@ function WizardRegularizacion({ nota, ledger, onClose, onDone }: { nota: NotaEnt
         <div className="mt-4">
           <p className="text-sm text-muted">Al ejecutar, se procesan <strong className="text-text">dos transacciones encadenadas</strong> en Valery:</p>
           <ol className="mt-3 space-y-2 text-sm">
-            <li className="rounded-xl border border-border bg-surface-2 p-3">
+            <li className="rounded-xl border border-border-strong bg-surface-2 p-3">
               <span className="font-medium text-text">1. Compra fiscal</span> — inyecta el inventario en Valery (V sube). Factura {compra.facturaProveedor} · {compra.proveedor}
             </li>
-            <li className="rounded-xl border border-border bg-surface-2 p-3">
+            <li className="rounded-xl border border-border-strong bg-surface-2 p-3">
               <span className="font-medium text-text">2. Venta fiscal</span> — emite la factura de venta (V baja) y salda el balance S.
             </li>
           </ol>
@@ -298,7 +297,7 @@ function WizardRegularizacion({ nota, ledger, onClose, onDone }: { nota: NotaEnt
 
           <div className="mt-5 flex justify-between gap-2">
             <Button variant="secondary" onClick={() => setPaso(1)}>Atrás</Button>
-            <Button disabled={!okFactura} style={{ background: "#f59e0b" }} className="text-white hover:opacity-90"
+            <Button disabled={!okFactura} className="bg-warn-strong text-white hover:brightness-90"
               onClick={() => { const { factura } = regularizarEnBloque(nota.id, compra, facturaValery); onDone(factura); }}>
               Ejecutar Regularización
             </Button>

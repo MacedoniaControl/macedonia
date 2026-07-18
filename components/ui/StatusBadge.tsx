@@ -3,13 +3,13 @@ import type { ReactNode } from "react";
 export type Tone = "ok" | "warn" | "danger" | "info" | "brand" | "navy" | "muted";
 
 const toneClasses: Record<Tone, string> = {
-  ok: "bg-ok/12 text-ok ring-ok/30",
-  warn: "bg-warn/12 text-warn ring-warn/30",
-  danger: "bg-danger/12 text-danger ring-danger/30",
-  info: "bg-info/12 text-info ring-info/30",
-  brand: "bg-brand/12 text-brand ring-brand/30",
-  navy: "bg-navy/12 text-navy ring-navy/30 dark:text-accent",
-  muted: "bg-muted/12 text-muted ring-muted/30",
+  ok: "bg-ok/10 text-ok ring-ok/30",
+  warn: "bg-warn/10 text-warn ring-warn/30",
+  danger: "bg-danger/10 text-danger ring-danger/30",
+  info: "bg-info/10 text-info ring-info/30",
+  brand: "bg-brand/10 text-brand ring-brand/30",
+  navy: "bg-navy/10 text-navy ring-navy/30 dark:text-accent",
+  muted: "bg-muted/10 text-muted ring-muted/30",
 };
 
 export function StatusBadge({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {

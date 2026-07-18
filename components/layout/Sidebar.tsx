@@ -37,7 +37,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             type="button"
             onClick={onClose}
             aria-label="Cerrar menú"
-            className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
+            className="ml-auto flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
           >
             <Icon name="close" size={18} />
           </button>
@@ -58,7 +58,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                         href={item.href}
                         onClick={onClose}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-[40px] items-center gap-2.5 rounded-xl px-2.5 text-sm transition ${
+                        className={`flex min-h-11 items-center gap-2.5 rounded-xl px-2.5 text-sm transition ${
                           active
                             ? "bg-brand-soft font-medium text-brand"
                             : "text-text hover:bg-surface-2"

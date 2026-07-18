@@ -32,7 +32,7 @@ function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
   return { label: "Al día", tone: "info" };
 }
 
-const inputClass = "h-10 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm text-text";
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function ReceivablesPage() {
   const [cuentas, setCuentas] = usePersistedState<Cuenta[]>("cxc:cuentas", SEED);

@@ -5,7 +5,8 @@
 
 /* Identidad visual SumiControl: azul marino, naranja Sumigases, blanco, grises, amarillo de acento */
 @theme {
-  --color-brand: #ea6a1e;
+  /* El naranja de marca también cambia por tema: #ea6a1e solo da 3.19:1 sobre blanco. */
+  --color-brand: var(--brand);
   --color-brand-600: #d65f17;
   --color-brand-soft: rgba(234, 106, 30, 0.12);
   --color-navy: #0b2545;
@@ -19,10 +20,22 @@
   --color-text: var(--text);
   --color-muted: var(--muted);
 
-  --color-ok: #16a34a;
-  --color-warn: #d97706;
-  --color-danger: #dc2626;
-  --color-info: #2563eb;
+  /* Los 4 semánticos cambian por tema: un mismo tono no llega a 4.5:1 en ambos fondos.
+     Claro necesita versiones oscuras; oscuro necesita versiones claras. */
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* Variantes "strong": únicas válidas como FONDO con texto blanco (>=4.5:1 AA).
+     Los tonos base de arriba se siguen usando como texto/icono sobre fondo claro. */
+  --color-brand-strong: #bf5618;
+  --color-ok-strong: #12883e;
+  --color-warn-strong: #b16104;
+
+  /* Borde de controles de formulario (WCAG 1.4.11 exige 3:1 en UI no textual).
+     El --color-border suave se reserva para divisores decorativos. */
+  --color-border-strong: var(--border-strong);
 }
 
 :root {
@@ -30,8 +43,14 @@
   --surface: #ffffff;
   --surface-2: #f8fafd;
   --border: #e2e8f0;
+  --border-strong: #8c9095; /* 3.07:1 sobre surface-2, 3.21:1 sobre blanco */
   --text: #0f1b2d;
   --muted: #5b6b82;
+  --brand: #b04e15; /* 5.32:1 plano · 4.63:1 sobre tinte de badge */
+  --ok: #107c38; /* 5.30:1 plano · 4.62:1 sobre tinte */
+  --warn: #a25903; /* 5.29:1 plano · 4.62:1 sobre tinte */
+  --danger: #ce2323; /* 5.40:1 plano · 4.60:1 sobre tinte */
+  --info: #2461e7; /* 5.33:1 plano · 4.63:1 sobre tinte */
 }
 
 .dark {
@@ -39,8 +58,14 @@
   --surface: #0d1a2e;
   --surface-2: #0b1626;
   --border: #1e304d;
+  --border-strong: #5a677d; /* 3.05:1 sobre surface oscuro */
   --text: #e8eef6;
   --muted: #93a4bc;
+  --brand: #ea6a1e; /* 5.46:1 sobre surface oscuro */
+  --ok: #16a34a; /* 5.29:1 sobre surface oscuro */
+  --warn: #d97706; /* 5.47:1 sobre surface oscuro */
+  --danger: #e56161; /* 5.16:1 plano · 4.65:1 sobre tinte */
+  --info: #5c8aef; /* 5.26:1 plano · 4.61:1 sobre tinte */
 }
 
 * {
