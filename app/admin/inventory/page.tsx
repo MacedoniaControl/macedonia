@@ -36,7 +36,7 @@ export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("master");
   const [q, setQ] = useState("");
   const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
-  const { notas, ledger } = useFiscal();
+  const { notas, ledger, ready } = useFiscal();
   const [masterView, setMasterView] = useState<MasterView>("fisico");
   const [placeholder, setPlaceholder] = useState("");
   function stub(area: string) {
@@ -238,7 +238,7 @@ export default function InventoryPage() {
       {tab === "master" && (
         <>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-text">Inventario Master</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-text">Inventario Master</h2>
             <StubBtn area="Master" />
           </div>
 
@@ -252,8 +252,18 @@ export default function InventoryPage() {
               <button key={id} onClick={() => setMasterView(id)}
                 className={`rounded-2xl border p-4 text-left transition ${masterView === id ? "border-brand bg-brand/5" : "border-border bg-surface hover:bg-surface-2"}`}>
                 <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
-                <div className="mt-1 text-2xl font-semibold text-text">{Math.round(unidades * 100) / 100}</div>
-                <div className="text-xs text-muted">{skus} SKU · {hint}</div>
+                {ready ? (
+                  <>
+                    <div className="mt-1 text-2xl font-semibold text-text">{Math.round(unidades * 100) / 100}</div>
+                    <div className="text-xs text-muted">{skus} SKU · {hint}</div>
+                  </>
+                ) : (
+                  // Sin esto se pintaría un 0 que salta al valor real al hidratar.
+                  <div aria-busy="true" aria-label="Cargando">
+                    <div className="sumi-skeleton mt-1 h-8 w-24" />
+                    <div className="sumi-skeleton mt-1.5 h-3 w-40" />
+                  </div>
+                )}
               </button>
             ))}
           </div>

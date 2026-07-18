@@ -90,9 +90,15 @@ export function subscribeFiscal(cb: () => void) {
   };
 }
 export function useFiscal() {
-  const [state, setState] = useState<{ notas: NotaEntrega[]; ledger: FiscalTx[] }>({ notas: [], ledger: [] });
+  // `ready` distingue "aún no hidratado" de "hidratado y vacío": sin esto el
+  // servidor pinta 0 y al hidratar salta al valor real (parpadeo de dato falso).
+  const [state, setState] = useState<{ notas: NotaEntrega[]; ledger: FiscalTx[]; ready: boolean }>({
+    notas: [],
+    ledger: [],
+    ready: false,
+  });
   useEffect(() => {
-    const load = () => setState({ notas: getNotas(), ledger: getLedger() });
+    const load = () => setState({ notas: getNotas(), ledger: getLedger(), ready: true });
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     return subscribeFiscal(load);

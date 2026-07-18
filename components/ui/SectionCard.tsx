@@ -16,7 +16,7 @@ export function SectionCard({ title, description, action, children, className = 
       {(title || action) && (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            {title && <h2 className="text-base font-semibold text-text">{title}</h2>}
+            {title && <h2 className="text-lg font-semibold tracking-tight text-text">{title}</h2>}
             {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
           </div>
           {action && <div className="shrink-0">{action}</div>}

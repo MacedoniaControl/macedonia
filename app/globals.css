@@ -98,6 +98,29 @@ a {
   border-radius: 6px;
 }
 
+/* Respeta la preferencia del sistema de reducir movimiento (vestibular). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Placeholder de carga: evita mostrar un dato incorrecto mientras se hidrata. */
+.sumi-skeleton {
+  border-radius: 0.5rem;
+  background: var(--surface-2);
+  animation: sumi-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sumi-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .sumi-scroll {
   scrollbar-width: thin;
 }

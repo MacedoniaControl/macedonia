@@ -23,7 +23,7 @@ export function SortableTh({
     <th
       scope="col"
       aria-sort={estado}
-      className={`py-2.5 pr-3 font-medium ${align === "right" ? "text-right" : "text-left"}`}
+      className={`py-0 pr-3 font-medium ${align === "right" ? "text-right" : "text-left"}`}
     >
       <button
         type="button"
