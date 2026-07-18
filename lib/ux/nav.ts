@@ -30,7 +30,6 @@ export const navGroups: NavGroup[] = [
       { label: "Productos y catálogo", href: "/admin/products", icon: "products" },
       { label: "Inventario", href: "/admin/inventory", icon: "inventory" },
       { label: "Cilindros y recargas", href: "/admin/cylinders", icon: "cylinder" },
-      { label: "Importaciones", href: "/admin/imports", icon: "import" },
     ],
   },
   {

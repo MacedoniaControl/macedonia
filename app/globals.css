@@ -102,6 +102,29 @@ a {
   scrollbar-width: thin;
 }
 
+/* Cifras de ancho fijo: sin esto las columnas de dinero/existencias
+   "bailan" verticalmente al cambiar de fila. */
+table td,
+table th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tiras de pestañas: en móvil se desplazan en horizontal en vez de
+   partirse en varias filas irregulares. */
+.sumi-tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sumi-tabs::-webkit-scrollbar {
+  display: none;
+}
+.sumi-tabs > * {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 h1, h2, h3 {
   font-family: var(--font-display), var(--font-body), sans-serif;
   letter-spacing: -0.01em;

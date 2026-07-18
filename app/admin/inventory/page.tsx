@@ -20,12 +20,14 @@ import {
 } from "@/lib/ux/inventory-data";
 import { FiscalRegularization } from "./FiscalRegularization";
 import { ScanCapture } from "./ScanCapture";
+import { useTableView } from "@/lib/ux/use-table-view";
+import { TablePager } from "@/components/ui/TablePager";
+import { SortableTh } from "@/components/ui/SortableTh";
 import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory-fiscal";
 
 const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
 const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
-const LIMIT = 100;
 
 type Tab = "master" | "fisico" | "s" | "fiscal" | "escaner";
 type MasterView = "fisico" | "espera-ne" | "espera-factura";
@@ -80,6 +82,52 @@ export default function InventoryPage() {
   const totFisico = fisicoExistente.reduce((a, m) => a + m.m, 0);
   const totFactura = esperaFactura.reduce((a, e) => a + e.cantidad, 0);
   const totNE = esperaNE.reduce((a, e) => a + e.cantidad, 0);
+
+  // --- Orden + paginación por tabla ---
+  const accFisicoExistente = useMemo(
+    () => ({
+      codigo: (r: (typeof fisicoExistente)[number]) => r.codigo,
+      nombre: (r: (typeof fisicoExistente)[number]) => r.nombre,
+      v: (r: (typeof fisicoExistente)[number]) => stockValery(r.codigo, ledger),
+      s: (r: (typeof fisicoExistente)[number]) => stockS(r.codigo, ledger, r.s),
+      m: (r: (typeof fisicoExistente)[number]) => r.m,
+    }),
+    [ledger],
+  );
+  const tFis = useTableView(fisicoExistente, accFisicoExistente);
+
+  const accValery = useMemo(
+    () => ({
+      codigo: (r: (typeof FISICO)[number]) => r.codigo,
+      nombre: (r: (typeof FISICO)[number]) => r.nombre,
+      und: (r: (typeof FISICO)[number]) => r.undPpal,
+      existencia: (r: (typeof FISICO)[number]) => r.existPpal,
+      alt: (r: (typeof FISICO)[number]) => r.existAlt,
+    }),
+    [],
+  );
+  const tVal = useTableView(fisicoF, accValery);
+
+  const accS = useMemo(
+    () => ({
+      codigo: (r: SItem) => r.codigo,
+      nombre: (r: SItem) => r.nombre,
+      precio: (r: SItem) => r.precio,
+      existencia: (r: SItem) => r.existencia,
+    }),
+    [],
+  );
+  const tS = useTableView(sF, accS);
+
+  const accFactura = useMemo(
+    () => ({
+      codigo: (r: (typeof esperaFactura)[number]) => r.codigo,
+      nombre: (r: (typeof esperaFactura)[number]) => r.nombre,
+      cantidad: (r: (typeof esperaFactura)[number]) => r.cantidad,
+    }),
+    [],
+  );
+  const tFac = useTableView(esperaFactura, accFactura);
 
   // --- Inventario S: alta / ajuste / duplicados ---
   const [form, setForm] = useState({ codigo: "", nombre: "", existencia: "", costo: "", precio: "" });
@@ -152,7 +200,7 @@ export default function InventoryPage() {
         </p>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-border bg-surface p-1">
+      <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
         {([
           ["master", `Master (${master.length})`],
           ["fisico", `Físico · Valery (${FISICO.length})`],
@@ -213,21 +261,21 @@ export default function InventoryPage() {
           {/* Físico Existente */}
           {masterView === "fisico" && (
             <SectionCard title="Físico Existente" action={<StubBtn area="Físico Existente" />}
-              description={`Lo que realmente está en almacén (Maestro M). Referencia V/S/M. Mostrando ${Math.min(fisicoExistente.length, LIMIT)} de ${fisicoExistente.length}.`}>
+              description="Lo que realmente está en almacén (Maestro M). Referencia V/S/M. Ordena por cualquier columna.">
               <div className="sumi-scroll max-w-full overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="text-xs uppercase tracking-wide text-muted">
                     <tr className="border-b border-border">
-                      <th className="py-2.5 pr-3 font-medium">Código</th>
-                      <th className="py-2.5 pr-3 font-medium">Nombre</th>
-                      <th className="py-2.5 pr-3 text-right font-medium">V · Valery</th>
-                      <th className="py-2.5 pr-3 text-right font-medium">S · informal</th>
-                      <th className="py-2.5 pr-3 text-right font-medium">Físico exist. (M)</th>
-                      <th className="py-2.5 font-medium">Estado</th>
+                      <SortableTh label="Código" sortKey="codigo" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
+                      <SortableTh label="Nombre" sortKey="nombre" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
+                      <SortableTh label="V · Valery" sortKey="v" align="right" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
+                      <SortableTh label="S · informal" sortKey="s" align="right" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
+                      <SortableTh label="Físico exist. (M)" sortKey="m" align="right" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
+                      <th scope="col" className="py-2.5 font-medium">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {fisicoExistente.slice(0, LIMIT).map((m) => {
+                    {tFis.visible.map((m) => {
                       const v = stockValery(m.codigo, ledger);
                       const s = stockS(m.codigo, ledger, m.s);
                       return (
@@ -248,6 +296,7 @@ export default function InventoryPage() {
                   </tbody>
                 </table>
               </div>
+              <TablePager {...tFis} etiqueta="productos" />
             </SectionCard>
           )}
 
@@ -299,14 +348,14 @@ export default function InventoryPage() {
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead className="text-xs uppercase tracking-wide text-muted">
                       <tr className="border-b border-border">
-                        <th className="py-2.5 pr-3 font-medium">Código</th>
-                        <th className="py-2.5 pr-3 font-medium">Nombre</th>
-                        <th className="py-2.5 pr-3 text-right font-medium">Cantidad</th>
-                        <th className="py-2.5 font-medium">Notas de entrega</th>
+                        <SortableTh label="Código" sortKey="codigo" ariaSort={tFac.ariaSort} onSort={tFac.toggleSort} />
+                        <SortableTh label="Nombre" sortKey="nombre" ariaSort={tFac.ariaSort} onSort={tFac.toggleSort} />
+                        <SortableTh label="Cantidad" sortKey="cantidad" align="right" ariaSort={tFac.ariaSort} onSort={tFac.toggleSort} />
+                        <th scope="col" className="py-2.5 font-medium">Notas de entrega</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {esperaFactura.slice(0, LIMIT).map((e) => (
+                      {tFac.visible.map((e) => (
                         <tr key={e.codigo} className="hover:bg-surface-2">
                           <td className="py-2.5 pr-3 font-mono text-xs text-muted">{e.codigo}</td>
                           <td className="py-2.5 pr-3 text-text">{e.nombre}</td>
@@ -316,6 +365,7 @@ export default function InventoryPage() {
                       ))}
                     </tbody>
                   </table>
+                  <TablePager {...tFac} etiqueta="códigos" />
                 </div>
               )}
             </SectionCard>
@@ -326,21 +376,21 @@ export default function InventoryPage() {
       {/* -------- FÍSICO -------- */}
       {tab === "fisico" && (
         <SectionCard title="Inventario Físico (Valery)" action={<StubBtn area="Físico · Valery" />}
-          description={`Solo lectura · fuente: ${FISICO_META.fuente} (${FISICO_META.fecha}). Mostrando ${Math.min(fisicoF.length, LIMIT)} de ${fisicoF.length}.`}>
+          description={`Solo lectura · fuente: ${FISICO_META.fuente} (${FISICO_META.fecha}).`}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
-                  <th className="py-2.5 pr-3 font-medium">Código</th>
-                  <th className="py-2.5 pr-3 font-medium">Nombre</th>
-                  <th className="py-2.5 pr-3 font-medium">Und.</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Existencia</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Exist. alt.</th>
-                  <th className="py-2.5 font-medium">Estado</th>
+                  <SortableTh label="Código" sortKey="codigo" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
+                  <SortableTh label="Nombre" sortKey="nombre" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
+                  <SortableTh label="Und." sortKey="und" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
+                  <SortableTh label="Existencia" sortKey="existencia" align="right" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
+                  <SortableTh label="Exist. alt." sortKey="alt" align="right" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
+                  <th scope="col" className="py-2.5 font-medium">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {fisicoF.slice(0, LIMIT).map((f) => (
+                {tVal.visible.map((f) => (
                   <tr key={f.codigo} className="hover:bg-surface-2">
                     <td className="py-2.5 pr-3 font-mono text-xs text-muted">{f.codigo}</td>
                     <td className="py-2.5 pr-3 text-text">{f.nombre}</td>
@@ -357,6 +407,7 @@ export default function InventoryPage() {
               </tbody>
             </table>
           </div>
+          <TablePager {...tVal} etiqueta="productos" />
         </SectionCard>
       )}
 
@@ -375,21 +426,21 @@ export default function InventoryPage() {
 
           <div className="h-4" />
 
-          <SectionCard title="Inventario S" action={<StubBtn area="Inventario S" />} description={`${sItems.length} ítem(s) propios. Mostrando ${Math.min(sF.length, LIMIT)}.`}>
+          <SectionCard title="Inventario S" action={<StubBtn area="Inventario S" />} description={`${sItems.length} ítem(s) propios.`}>
             <div className="sumi-scroll max-w-full overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wide text-muted">
                   <tr className="border-b border-border">
-                    <th className="py-2.5 pr-3 font-medium">Código</th>
-                    <th className="py-2.5 pr-3 font-medium">Nombre</th>
-                    <th className="py-2.5 pr-3 text-right font-medium">Precio</th>
-                    <th className="py-2.5 pr-3 text-right font-medium">Existencia</th>
-                    <th className="py-2.5 font-medium">Estado / Acciones</th>
+                    <SortableTh label="Código" sortKey="codigo" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
+                    <SortableTh label="Nombre" sortKey="nombre" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
+                    <SortableTh label="Precio" sortKey="precio" align="right" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
+                    <SortableTh label="Existencia" sortKey="existencia" align="right" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
+                    <th scope="col" className="py-2.5 font-medium">Estado / Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {sF.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted">Sin ítems en Inventario S.</td></tr>}
-                  {sF.slice(0, LIMIT).map((s) => {
+                  {tS.visible.map((s) => {
                     const dup = inFisico(s.codigo);
                     const bloqueado = dup && !s.tagDuplicado;
                     return (
@@ -419,6 +470,7 @@ export default function InventoryPage() {
                 </tbody>
               </table>
             </div>
+            <TablePager {...tS} etiqueta="ítems" />
           </SectionCard>
         </>
       )}

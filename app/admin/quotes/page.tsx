@@ -83,7 +83,7 @@ export default function QuotesPage() {
         actions={<StatusBadge tone="brand">{cots.length} presupuesto(s)</StatusBadge>}
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="sumi-tabs mb-4 gap-2">
         {([["registro", "Registro"], ["gen", "Generar presupuesto"], ["subir", "Subir de Valery"]] as const).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${tab === k ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-text hover:bg-surface-2"}`}>{l}</button>
