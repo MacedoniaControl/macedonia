@@ -11,7 +11,9 @@ type SectionCardProps = {
 export function SectionCard({ title, description, action, children, className = "" }: SectionCardProps) {
   return (
     <section
-      className={`rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5 ${className}`}
+      // min-w-0: permite que la tarjeta encoja como hijo de grid/flex; sin esto,
+      // gráficas Recharts (ResponsiveContainer) desbordan el ancho en móvil.
+      className={`min-w-0 rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5 ${className}`}
     >
       {(title || action) && (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
