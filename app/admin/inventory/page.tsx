@@ -24,6 +24,8 @@ import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory-fiscal";
+import { ventas12m, precioProm, estadoRotacion, rotacionVentana } from "@/lib/ux/inventory-rotation";
+import { fmtUsd } from "@/lib/ux/format";
 
 const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
@@ -38,6 +40,7 @@ export default function InventoryPage() {
   const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
   const { notas, ledger, ready } = useFiscal();
   const [masterView, setMasterView] = useState<MasterView>("fisico");
+  const [fisView, setFisView] = useState<"existencias" | "rotacion">("existencias");
   const [placeholder, setPlaceholder] = useState("");
   function stub(area: string) {
     setPlaceholder(`Acción pendiente de definir · ${area}`);
@@ -95,6 +98,44 @@ export default function InventoryPage() {
     [ledger],
   );
   const tFis = useTableView(fisicoExistente, accFisicoExistente);
+
+  // --- Rotación: existencia (M en vivo) vs velocidad de venta (12m histórico) ---
+  const rotacion = useMemo(
+    () =>
+      masterF
+        .map((m) => {
+          const disponible = stockMaestro(m.codigo, ledger);
+          const v12 = ventas12m(m.codigo);
+          const avg = v12 / 12;
+          return { codigo: m.codigo, nombre: m.nombre, disponible, v12, avg, precio: precioProm(m.codigo), est: estadoRotacion(disponible, avg) };
+        })
+        // se muestra lo que tienes en almacén o lo que se vende (agotados con ventas incluidos)
+        .filter((r) => r.disponible !== 0 || r.v12 > 0),
+    [masterF, ledger],
+  );
+  const resumenRot = useMemo(() => {
+    const c = { reponer: 0, sobrestock: 0, sinRotacion: 0, agotado: 0 };
+    rotacion.forEach((r) => {
+      if (r.est.label === "Reponer pronto") c.reponer++;
+      else if (r.est.label === "Sobrestock") c.sobrestock++;
+      else if (r.est.label === "Sin rotación") c.sinRotacion++;
+      else if (r.est.label === "Agotado") c.agotado++;
+    });
+    return c;
+  }, [rotacion]);
+  const accRot = useMemo(
+    () => ({
+      codigo: (r: (typeof rotacion)[number]) => r.codigo,
+      nombre: (r: (typeof rotacion)[number]) => r.nombre,
+      disponible: (r: (typeof rotacion)[number]) => r.disponible,
+      v12: (r: (typeof rotacion)[number]) => r.v12,
+      avg: (r: (typeof rotacion)[number]) => r.avg,
+      meses: (r: (typeof rotacion)[number]) => (r.est.meses ?? 99999),
+      precio: (r: (typeof rotacion)[number]) => r.precio,
+    }),
+    [],
+  );
+  const tRot = useTableView(rotacion, accRot);
 
   const accValery = useMemo(
     () => ({
@@ -271,7 +312,72 @@ export default function InventoryPage() {
           {/* Físico Existente */}
           {masterView === "fisico" && (
             <SectionCard title="Físico Existente" action={<StubBtn area="Físico Existente" />}
-              description="Lo que realmente está en almacén (Maestro M). Referencia V/S/M. Ordena por cualquier columna.">
+              description={fisView === "existencias"
+                ? "Lo que realmente está en almacén (Maestro M). Referencia V/S/M. Ordena por cualquier columna."
+                : `Estado en tiempo real: existencia (M) vs velocidad de venta. Ventana ${rotacionVentana.desde} → ${rotacionVentana.hasta} (Valery).`}>
+
+              {/* Toggle Existencias / Rotación */}
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-xl border border-border bg-surface-2 p-0.5">
+                  {([["existencias", "Existencias"], ["rotacion", "Rotación / Estado"]] as const).map(([id, lbl]) => (
+                    <button key={id} onClick={() => setFisView(id)}
+                      className={`min-h-11 rounded-lg px-3 text-sm font-medium transition ${fisView === id ? "bg-brand-strong text-white" : "text-muted hover:text-text"}`}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                {fisView === "rotacion" && (
+                  <div className="flex flex-wrap gap-1.5 text-xs">
+                    <StatusBadge tone="warn">{resumenRot.reponer} por reponer</StatusBadge>
+                    <StatusBadge tone="danger">{resumenRot.agotado} agotados</StatusBadge>
+                    <StatusBadge tone="danger">{resumenRot.sobrestock} sobrestock</StatusBadge>
+                    <StatusBadge tone="muted">{resumenRot.sinRotacion} sin rotación</StatusBadge>
+                  </div>
+                )}
+              </div>
+
+              {fisView === "rotacion" ? (
+                <>
+                  <div className="sumi-scroll max-w-full overflow-x-auto">
+                    <table className="w-full min-w-[860px] text-left text-sm">
+                      <thead className="text-xs uppercase tracking-wide text-muted">
+                        <tr className="border-b border-border">
+                          <SortableTh label="Código" sortKey="codigo" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
+                          <SortableTh label="Producto" sortKey="nombre" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
+                          <SortableTh label="Disponible" sortKey="disponible" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
+                          <SortableTh label="Vend. 12m" sortKey="v12" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
+                          <SortableTh label="Prom./mes" sortKey="avg" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
+                          <SortableTh label="Meses stock" sortKey="meses" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
+                          <SortableTh label="Precio" sortKey="precio" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
+                          <th scope="col" className="py-2.5 font-medium">Estado / Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {tRot.visible.map((r) => (
+                          <tr key={r.codigo} className="hover:bg-surface-2">
+                            <td className="py-2.5 pr-3 font-mono text-xs text-muted">{r.codigo}</td>
+                            <td className="py-2.5 pr-3 text-text">{r.nombre}</td>
+                            <td className={`py-2.5 pr-3 text-right font-medium ${r.disponible <= 0 ? "text-danger" : "text-text"}`}>{r.disponible}</td>
+                            <td className="py-2.5 pr-3 text-right text-muted">{r.v12}</td>
+                            <td className="py-2.5 pr-3 text-right text-muted">{r.avg ? r.avg.toFixed(1) : "—"}</td>
+                            <td className="py-2.5 pr-3 text-right font-medium text-text">{r.est.meses === null ? "—" : r.est.meses.toFixed(1)}</td>
+                            <td className="py-2.5 pr-3 text-right text-muted">{r.precio ? fmtUsd(r.precio) : "—"}</td>
+                            <td className="py-2.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <StatusBadge tone={r.est.tono}>{r.est.label}</StatusBadge>
+                                {r.est.accion !== "—" && r.est.accion !== "OK" && (
+                                  <span className="text-xs text-muted">→ {r.est.accion}</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <TablePager {...tRot} etiqueta="productos" />
+                </>
+              ) : (
               <div className="sumi-scroll max-w-full overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="text-xs uppercase tracking-wide text-muted">
@@ -306,7 +412,8 @@ export default function InventoryPage() {
                   </tbody>
                 </table>
               </div>
-              <TablePager {...tFis} etiqueta="productos" />
+              )}
+              {fisView === "existencias" && <TablePager {...tFis} etiqueta="productos" />}
             </SectionCard>
           )}
 

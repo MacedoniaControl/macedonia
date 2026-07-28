@@ -138,3 +138,20 @@ La vista Master se dividió en tres apartados (tiles clicables + tabla por apart
 
 > Nota: los apartados están creados como estructura visual para revisión. La lógica exacta de entrada/
 > salida de cada estado y su relación con V/S/M la definirá Greeg y luego se implementa.
+
+## 12. Rotación / Estado en tiempo real (2026-07-10)
+
+Sub-vista dentro de **Físico Existente** (toggle "Existencias" / "Rotación / Estado"). Cruza existencia
+en vivo con velocidad de venta histórica.
+
+- **Meses de stock = Disponible (M en vivo) ÷ venta mensual promedio (12 meses móviles de Valery).**
+- Fuente de ventas: `lib/ux/inventory-rotation-seed.json`, generado de los exports de ventas de Valery
+  (2023–2026), ventana `2025-08 → 2026-07`, agregado por código (neto de devoluciones) + precio de venta
+  promedio $. Casan **780 códigos** con el físico (764 con ventas > 0); 939 productos sin ventas.
+- **Semáforo (umbrales de negocio):** 🟡 <3m "Reponer pronto" · 🟢 3–24m "Saludable" · 🔴 0/agotado
+  "Reponer urgente", >24m "Sobrestock" (Detener compra), y "Sin rotación" (stock sin ventas → Liquidar).
+- Columnas: Código · Producto · Disponible (M) · Vend. 12m · Prom./mes · Meses stock · Precio · Estado/Acción.
+- Resumen en chips (por reponer / agotados / sobrestock / sin rotación). Todo ordenable + paginado.
+- Es "en vivo" porque **Disponible = stockMaestro** (refleja el ledger fiscal al instante); la velocidad
+  es histórica hasta que haya backend + ventas propias.
+- Lógica en `lib/ux/inventory-rotation.ts` (`estadoRotacion`, umbrales `UMBRAL_BAJO=3`, `UMBRAL_ALTO=24`).
