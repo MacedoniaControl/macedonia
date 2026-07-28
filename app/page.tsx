@@ -24,8 +24,8 @@ export default function Home() {
       <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
         <header className="flex items-center justify-between">
           <span className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-bold text-white">S</span>
-            <span className="font-semibold text-text">SumiControl</span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-bold text-white">M</span>
+            <span className="font-semibold text-text">Macedonia</span>
           </span>
           <span className="hidden rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted sm:block">
             Sumigases Oriente · Sudematin

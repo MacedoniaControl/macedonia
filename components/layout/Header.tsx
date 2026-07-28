@@ -38,7 +38,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <Icon name="menu" />
       </button>
 
-      <p className="truncate text-sm font-medium text-text">{current?.label ?? "SumiControl"}</p>
+      <p className="truncate text-sm font-medium text-text">{current?.label ?? "Macedonia"}</p>
 
       <button
         type="button"

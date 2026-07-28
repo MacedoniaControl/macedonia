@@ -91,7 +91,7 @@ export default function QuotesPage() {
       </div>
 
       {tab === "registro" && (
-        <SectionCard title="Registro de presupuestos" description="Filtra por período. Incluye presupuestos de SumiControl y de Valery."
+        <SectionCard title="Registro de presupuestos" description="Filtra por período. Incluye presupuestos de Macedonia y de Valery."
           action={<select className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text" value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option></select>}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
@@ -109,7 +109,7 @@ export default function QuotesPage() {
                     <td className="py-2.5 pr-3 text-text">{c.razonSocial}</td>
                     <td className="py-2.5 pr-3 text-muted">{c.fechaEmision}</td>
                     <td className="py-2.5 pr-3 text-right text-text">{c.total ? fmtUsd(c.total) : "—"}</td>
-                    <td className="py-2.5 pr-3"><StatusBadge tone={c.origen === "Valery" ? "navy" : "brand"}>{c.origen}</StatusBadge></td>
+                    <td className="py-2.5 pr-3"><StatusBadge tone={c.origen === "Valery" ? "navy" : "brand"}>{c.origen === "Valery" ? "Valery" : "Macedonia"}</StatusBadge></td>
                     <td className="py-2.5 pr-3"><StatusBadge tone={toneOf[c.estado]}>{c.estado}</StatusBadge></td>
                     <td className="py-2.5">
                       <div className="flex flex-wrap gap-2">
@@ -136,7 +136,7 @@ export default function QuotesPage() {
       }} />}
 
       {tab === "subir" && (
-        <SectionCard title="Subir presupuestos de Valery" description="SumiControl los guarda en el registro y los organiza por fecha.">
+        <SectionCard title="Subir presupuestos de Valery" description="Macedonia los guarda en el registro y los organiza por fecha.">
           <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-12 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand"><Icon name="upload" size={24} /></span>

@@ -27,10 +27,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       >
         <div className="flex h-16 items-center gap-2.5 border-b border-border px-4">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white font-bold">
-            S
+            M
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold text-text">SumiControl</p>
+            <p className="text-sm font-semibold text-text">Macedonia</p>
             <p className="text-[11px] text-muted">Sumigases · Sudematin</p>
           </div>
           <button

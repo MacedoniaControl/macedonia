@@ -79,7 +79,7 @@ export default function DeliveryNotesPage() {
     <>
       <PageHeader
         title="Notas de entrega y devoluciones"
-        description="Registro, generación e importación de Notas de Entrega (Valery/SumiControl) y Notas de Crédito (devoluciones)."
+        description="Registro, generación e importación de Notas de Entrega (Valery/Macedonia) y Notas de Crédito (devoluciones)."
         breadcrumbs={[{ label: "Operación" }, { label: "Notas de entrega" }]}
         actions={<StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge>}
       />
@@ -93,7 +93,7 @@ export default function DeliveryNotesPage() {
       </div>
 
       {tab === "registro" && (
-        <SectionCard title="Registro de documentos" description="Filtra por período. Incluye NE y devoluciones, de Valery y de SumiControl."
+        <SectionCard title="Registro de documentos" description="Filtra por período. Incluye NE y devoluciones, de Valery y de Macedonia."
           action={
             <select className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option>
@@ -115,7 +115,7 @@ export default function DeliveryNotesPage() {
                     <td className="py-2.5 pr-3 text-text">{d.cliente}</td>
                     <td className="py-2.5 pr-3 text-muted">{d.fecha}</td>
                     <td className="py-2.5 pr-3 text-right text-text">{d.total ? fmtUsd(d.total) : "—"}</td>
-                    <td className="py-2.5 pr-3"><StatusBadge tone={d.origen === "Valery" ? "navy" : "brand"}>{d.origen}</StatusBadge></td>
+                    <td className="py-2.5 pr-3"><StatusBadge tone={d.origen === "Valery" ? "navy" : "brand"}>{d.origen === "Valery" ? "Valery" : "Macedonia"}</StatusBadge></td>
                     <td className="py-2.5"><button type="button" onClick={() => verDoc(d)} className="text-sm font-medium text-brand hover:underline">Ver / PDF</button></td>
                   </tr>
                 ))}
@@ -139,7 +139,7 @@ export default function DeliveryNotesPage() {
       }} seq={seqDev} />}
 
       {tab === "subir" && (
-        <SectionCard title="Subir documentos de Valery" description="SumiControl detecta el tipo por el nombre del archivo y lo organiza en el registro por fecha.">
+        <SectionCard title="Subir documentos de Valery" description="Macedonia detecta el tipo por el nombre del archivo y lo organiza en el registro por fecha.">
           <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-12 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand"><Icon name="upload" size={24} /></span>

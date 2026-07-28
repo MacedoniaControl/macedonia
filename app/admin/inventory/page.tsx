@@ -213,7 +213,7 @@ export default function InventoryPage() {
     <>
       <PageHeader
         title="Inventario"
-        description="Físico (Valery) + Inventario S (SumiControl) = Master. La existencia total real de la empresa."
+        description="Físico (Valery) + Inventario S (Macedonia) = Master. La existencia total real de la empresa."
         breadcrumbs={[{ label: "Inventario" }, { label: "Inventario" }]}
         actions={
           <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-master",
@@ -531,7 +531,7 @@ export default function InventoryPage() {
       {/* -------- INVENTARIO S -------- */}
       {tab === "s" && (
         <>
-          <SectionCard title="Agregar a Inventario S" description="Stock propio de SumiControl. Si el código ya existe en el Físico, se marca duplicado y se bloquea hasta aprobación OWNER/ADMIN.">
+          <SectionCard title="Agregar a Inventario S" description="Stock propio de Macedonia. Si el código ya existe en el Físico, se marca duplicado y se bloquea hasta aprobación OWNER/ADMIN.">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
               <input className={`${fieldClass} lg:col-span-1`} placeholder="Código" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
               <input className={`${fieldClass} lg:col-span-2`} placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />

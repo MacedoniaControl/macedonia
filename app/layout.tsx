@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-body", display: "swa
 const sora = Sora({ subsets: ["latin"], variable: "--font-display", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "SumiControl",
+  title: "Macedonia",
   description: "Plataforma interna de control administrativo para Sumigases y Sudematin.",
 };
 
