@@ -8,6 +8,8 @@ import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BiVentasUtilidad, BiVentasCompras, BiCategoriasDonut } from "@/components/ui/BiCharts";
 import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
+import { histTotals } from "@/lib/ux/history-data";
+import { fmtUsd } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useBcvRate } from "@/lib/ux/bcv-rate";
 import { Icon } from "@/components/ui/Icon";
@@ -95,9 +97,32 @@ export default function DashboardPage() {
         }
       />
 
-      {/* Precio del dólar BCV (se actualiza con el botón "Dolar Price" del header) */}
-      <div className="mb-4 flex justify-end">
-        <div className="w-full rounded-2xl border border-border bg-surface p-4 shadow-sm sm:max-w-sm">
+      {/* Banda superior: resumen real (histórico) + tipo de cambio BCV */}
+      <div className="mb-4 grid gap-3 lg:grid-cols-2">
+        {/* Resumen real — contrasta con los KPIs demo de abajo */}
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ok/10 text-ok"><Icon name="roi" size={18} /></span>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Resumen real · histórico Sumigases</p>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(histTotals.venta)}</p>
+              <p className="text-xs text-muted">Ventas</p>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(histTotals.util)}</p>
+              <p className="text-xs text-muted">Utilidad</p>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold tabular-nums text-ok sm:text-xl">{histTotals.roi}%</p>
+              <p className="text-xs text-muted">ROI</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Precio del dólar BCV (se actualiza con el botón "Dolar Price" del header) */}
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand"><Icon name="dollar" size={18} /></span>
             <p className="text-xs font-medium uppercase tracking-wide text-muted">Precio del dólar · BCV</p>
