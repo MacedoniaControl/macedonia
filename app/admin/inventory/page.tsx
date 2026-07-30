@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -19,6 +20,7 @@ import {
   type SItem,
 } from "@/lib/ux/inventory-data";
 import { FiscalRegularization } from "./FiscalRegularization";
+import { MovimientosPanel } from "./MovimientosPanel";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
@@ -30,10 +32,13 @@ const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-s
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
 const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
-type Tab = "master" | "fisico" | "s" | "fiscal";
+type Tab = "master" | "movimientos" | "fisico" | "s" | "fiscal";
 type MasterView = "fisico" | "espera-ne" | "espera-factura";
 
 export default function InventoryPage() {
+  // Empresa activa según la ruta /admin/<empresa>/inventory (consolidado -> sumigases).
+  const pathname = usePathname();
+  const empresa = (pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/)?.[1] ?? "sumigases") as string;
   const [tab, setTab] = useState<Tab>("master");
   const [q, setQ] = useState("");
   const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
@@ -245,6 +250,7 @@ export default function InventoryPage() {
           ["master", `Master (${master.length})`],
           ["fisico", `Físico · Valery (${FISICO.length})`],
           ["s", `Inventario S (${sItems.length})`],
+          ["movimientos", "Movimientos"],
           ["fiscal", "Regularización fiscal"],
         ] as [Tab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
@@ -254,7 +260,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {tab !== "fiscal" && (
+      {tab !== "fiscal" && tab !== "movimientos" && (
         <div className="mb-3">
           <label className="relative flex max-w-md items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
@@ -263,6 +269,8 @@ export default function InventoryPage() {
           </label>
         </div>
       )}
+
+      {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 
       {tab === "fiscal" && (
         <>
