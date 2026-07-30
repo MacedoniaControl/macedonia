@@ -15,6 +15,7 @@ import {
 import { ScanBar } from "@/components/inventory/ScanBar";
 import { lookupByCodigo } from "@/lib/inventory/catalog";
 import { beep } from "@/lib/inventory/scan-feedback";
+import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 
 type Tipo = "entrega" | "devolucion";
 type Doc = {
@@ -45,7 +46,10 @@ export default function DeliveryNotesPage() {
   const [docs, setDocs] = usePersistedState<Doc[]>("ne:docs", SEED);
   const [seqNE, setSeqNE] = usePersistedState("ne:seqNE", 8204);
   const [seqDev, setSeqDev] = usePersistedState("ne:seqDev", 604);
-  const [tab, setTab] = useState<"registro" | "ne" | "dev" | "subir">("registro");
+  // "Generar nota de entrega" es el apartado principal; el Registro va de último y es solo OWNER.
+  const [tab, setTab] = useState<"registro" | "ne" | "dev" | "subir">("ne");
+  const { rol } = useRol();
+  const verRegistros = puedeVerRegistros(rol);
   const [period, setPeriod] = useState("mes");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -81,18 +85,23 @@ export default function DeliveryNotesPage() {
         title="Notas de entrega y devoluciones"
         description="Registro, generación e importación de Notas de Entrega (Valery/Macedonia) y Notas de Crédito (devoluciones)."
         breadcrumbs={[{ label: "Operación" }, { label: "Notas de entrega" }]}
-        actions={<StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge>}
+        actions={verRegistros ? <StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge> : undefined}
       />
 
       {/* Tabs */}
       <div className="sumi-tabs mb-4 gap-2">
-        {([["registro", "Registro"], ["ne", "Generar nota de entrega"], ["dev", "Generar devolución"], ["subir", "Subir de Valery"]] as const).map(([k, l]) => (
+        {([
+          ["ne", "Generar nota de entrega"] as const,
+          ["dev", "Generar devolución"] as const,
+          ["subir", "Subir de Valery"] as const,
+          ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
+        ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${tab === k ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-text hover:bg-surface-2"}`}>{l}</button>
         ))}
       </div>
 
-      {tab === "registro" && (
+      {tab === "registro" && verRegistros && (
         <SectionCard title="Registro de documentos" description="Filtra por período. Incluye NE y devoluciones, de Valery y de Macedonia."
           action={
             <select className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text" value={period} onChange={(e) => setPeriod(e.target.value)}>
@@ -125,7 +134,7 @@ export default function DeliveryNotesPage() {
         </SectionCard>
       )}
 
-      {tab === "ne" && <GenerarNE onSave={(ne) => {
+      {(tab === "ne" || (tab === "registro" && !verRegistros)) && <GenerarNE onSave={(ne) => {
         const t = neTotals(ne);
         setDocs((p) => [{ id: `${Date.now()}`, tipo: "entrega", correlativo: ne.correlativo, cliente: ne.cliente, fecha: ne.fecha, total: t.total, origen: "SumiControl", ne }, ...p]);
         setSeqNE((s) => s + 1);

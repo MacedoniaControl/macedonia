@@ -55,7 +55,10 @@ export function useRol(): { rol: Rol; ready: boolean } {
   return { rol, ready };
 }
 
-/** Solo el OWNER ve registros, historiales y logs. */
+/**
+ * Solo el OWNER ve registros, historiales y logs.
+ * Decisión explícita de Greeg: NI SIQUIERA los administradores acceden a los registros.
+ */
 export function puedeVerRegistros(rol: Rol): boolean {
   return rol === "owner";
 }
