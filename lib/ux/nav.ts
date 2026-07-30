@@ -59,9 +59,11 @@ export const navGroups: NavGroup[] = [
 ];
 
 export function findNavItem(pathname: string): NavItem | undefined {
+  // Normaliza /admin/<empresa>/<slug> -> /admin/<slug> para reconocer el módulo.
+  const norm = pathname.replace(/^\/admin\/(sumigases|sudematin)(\/|$)/, "/admin$2");
   for (const group of navGroups) {
     for (const item of group.items) {
-      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+      if (norm === item.href || norm.startsWith(`${item.href}/`)) {
         return item;
       }
     }

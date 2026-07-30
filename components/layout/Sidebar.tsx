@@ -4,9 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { navGroups } from "@/lib/ux/nav";
+import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 
-export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function Sidebar({ empresa, open, onClose }: { empresa?: string | null; open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const emp = empresa && isEmpresaId(empresa) ? EMPRESAS[empresa] : null;
+  // Prefija los links con la empresa activa: /admin/quotes -> /admin/<empresa>/quotes
+  const scoped = (href: string) => (emp ? href.replace(/^\/admin\//, `/admin/${emp.id}/`) : href);
 
   return (
     <>
@@ -26,12 +30,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         aria-label="Navegación principal"
       >
         <div className="flex h-16 items-center gap-2.5 border-b border-border px-4">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white font-bold">
-            M
-          </span>
+          {emp ? (
+            <img src={emp.logo} alt="" className="h-8 w-auto max-w-[36px] object-contain" />
+          ) : (
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white font-bold">M</span>
+          )}
           <div className="leading-tight">
-            <p className="text-sm font-semibold text-text">Macedonia</p>
-            <p className="text-[11px] text-muted">Sumigases · Sudematin</p>
+            <p className="text-sm font-semibold text-text">{emp ? emp.nombreCorto : "Macedonia"}</p>
+            <p className="text-[11px] text-muted">{emp ? "Macedonia" : "Sumigases · Sudematin"}</p>
           </div>
           <button
             type="button"
@@ -51,11 +57,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               </p>
               <ul className="space-y-0.5">
                 {group.items.map((item) => {
-                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const href = scoped(item.href);
+                  const active = pathname === href || pathname.startsWith(`${href}/`);
                   return (
                     <li key={item.href}>
                       <Link
-                        href={item.href}
+                        href={href}
                         onClick={onClose}
                         aria-current={active ? "page" : undefined}
                         className={`flex min-h-11 items-center gap-2.5 rounded-xl px-2.5 text-sm transition ${
