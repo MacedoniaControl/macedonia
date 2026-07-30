@@ -1,7 +1,7 @@
 ===============================================================================
- SUMICONTROL - MANUAL DEL ESCANER DE CODIGOS
- Modulo: Inventario > pestana "Escaner"
- https://sumicontrol.vercel.app/admin/inventory
+ MACEDONIA - MANUAL DEL ESCANER DE CODIGOS
+ Donde se usa: Notas de entrega y Cotizaciones (al cargar renglones)
+ https://sumicontrol.vercel.app
 ===============================================================================
 
  Este manual tiene dos partes:
@@ -25,7 +25,7 @@
  El lector "teclea" el codigo como si fuera un teclado y al final manda un ENTER.
 
  NO necesitas instalar ningun driver ni programa. NO necesitas configurar nada
- dentro de SumiControl.
+ dentro de Macedonia.
 
  Si tu lector es de otro tipo (puerto serial/COM, punto de venta, o de camara),
  avisa al equipo tecnico ANTES: requiere otra configuracion.
@@ -85,22 +85,40 @@
  Si salen caracteres raros       -> revisa el AJUSTE 3 (teclado).
  Si no aparece nada              -> prueba otro puerto USB / otro cable.
 
- Cuando el Bloc de notas funcione bien, el escaner funcionara en SumiControl.
+ Cuando el Bloc de notas funcione bien, el escaner funcionara en Macedonia.
 
 
 ===============================================================================
  PARTE B - USO DIARIO  (operador)
 ===============================================================================
 
- B.1) ABRIR EL ESCANER
- ---------------------
- 1. Entra a SumiControl:  https://sumicontrol.vercel.app
- 2. En el menu de la izquierda, haz clic en  INVENTARIO
- 3. Arriba, haz clic en la pestana  ESCANER
+ B.1) DONDE ESTA EL ESCANER
+ --------------------------
+ El escaner NO es un modulo aparte: esta dentro de los documentos donde
+ realmente se usa, al momento de cargar los productos.
+
+ PARA UNA NOTA DE ENTREGA:
+ 1. Entra a Macedonia:  https://sumicontrol.vercel.app
+ 2. Elige la empresa (Sumigases o Sudematin).
+ 3. Menu izquierdo ->  NOTAS DE ENTREGA
+ 4. Pestana  GENERAR NOTA DE ENTREGA
+ 5. El escaner esta en el panel  RENGLONES  (derecha).
+
+ PARA UNA COTIZACION / PRESUPUESTO:
+ 1. Menu izquierdo ->  COTIZACIONES
+ 2. Pestana  GENERAR PRESUPUESTO  (es la que abre por defecto)
+ 3. El escaner esta en el panel  RENGLONES  (derecha).
+
+ Al escanear, el producto se agrega solo como renglon del documento.
+ Si escaneas el mismo producto otra vez, sube la cantidad.
+
+ NOTA: junto al escaner hay un BUSCADOR de productos. Si la etiqueta esta
+ borrada o el lector no lee, escribe ahi el codigo o el nombre y elige el
+ producto de la lista.
 
 
- B.2) LOS 3 ESTADOS - MIRA SIEMPRE EL LETRERO GRANDE
- ---------------------------------------------------
+ B.2) LOS 2 ESTADOS - MIRA SIEMPRE EL LETRERO
+ --------------------------------------------
  Antes de disparar el lector, mira el letrero grande de arriba:
 
    +---------------------------------------------------------------+
@@ -117,12 +135,6 @@
         Haz clic sobre el letrero naranja y volvera a ACTIVO.
         Esto pasa si hiciste clic en otra parte de la pantalla.
 
-   +---------------------------------------------------------------+
-   |  (o) ESCANER APAGADO                               [GRIS]      |
-   +---------------------------------------------------------------+
-     -> Esta apagado a proposito. Pulsa el boton "Activar escaner"
-        (arriba a la derecha del recuadro).
-
  REGLA DE ORO: si el letrero no esta VERDE, no escanees.
 
 
@@ -138,14 +150,16 @@
 
  B.4) ENTENDER EL RESULTADO
  --------------------------
- PRODUCTO ENCONTRADO  (recuadro VERDE + pitido agudo)
-   Muestra:
-     - Nombre del producto     (ej: VARILLA DE PLATA PLANA 0%)
-     - Codigo                  (ej: 00001002)
-     - Existencia + unidad     (ej: 1 (9))
-   Si la existencia es 0 o menos, sale la etiqueta roja "Sin existencia".
+ PRODUCTO ENCONTRADO  (mensaje VERDE + pitido agudo)
+   El producto se agrega como RENGLON del documento, con cantidad 1.
+   Si escaneas el mismo producto otra vez, la cantidad sube a 2, 3...
+   El mensaje avisa: "<producto> agregado - falta indicar el precio".
 
- CODIGO NO ENCONTRADO  (recuadro ROJO + pitido grave)
+   IMPORTANTE: el catalogo de Valery NO trae precios. El renglon entra con
+   precio 0 y aparece marcado en ROJO. Escribe el precio en la tabla de
+   renglones antes de generar el documento.
+
+ CODIGO NO ENCONTRADO  (mensaje ROJO + pitido grave)
    Ese codigo no existe en el catalogo de Valery.
    Que hacer:
      1. Vuelve a escanear (pudo ser una lectura parcial).
@@ -153,24 +167,28 @@
      3. Si insiste, anotalo y reportalo al supervisor.
 
 
- B.5) ESCRIBIR EL CODIGO A MANO
- ------------------------------
- Si el codigo esta borrado o el lector no lo lee:
-   1. Haz clic en el campo "Codigo escaneado".
-   2. Escribe el codigo.
-   3. Pulsa ENTER (o el boton "Buscar").
+ B.5) SI EL LECTOR NO LEE (BUSCADOR)
+ -----------------------------------
+ Si la etiqueta esta borrada o el lector no lo lee, usa el BUSCADOR que esta
+ justo debajo del escaner:
+   1. Haz clic en "Buscar producto por codigo o nombre".
+   2. Escribe al menos 2 letras del codigo o del nombre
+      (ej: "electrodo 7018" o "E7018").
+   3. Aparece una lista con el nombre, el codigo y la existencia de cada uno.
+   4. Elige el producto con el raton, o con las flechas y ENTER.
+
+ El producto se agrega igual que si lo hubieras escaneado.
 
 
- B.6) HISTORIAL DE LA SESION
- ---------------------------
- Abajo aparece "Lecturas de esta sesion" con las ultimas 25 lecturas:
- hora, codigo, producto, existencia y si se encontro o no.
- Arriba se resume: "X lectura(s) - Y encontrada(s) - Z sin resultado".
+ B.6) REVISAR ANTES DE GENERAR
+ -----------------------------
+ Los productos escaneados se acumulan en la tabla de RENGLONES:
+ cantidad, producto, precio y total. Ahi puedes:
+   - Cambiar la cantidad.
+   - Escribir el precio (obligatorio: los que esten en 0 salen en rojo).
+   - Quitar un renglon con la "x".
 
- El boton "Limpiar" borra la lista.
-
- OJO: el historial es solo de esta sesion. Si cierras o recargas la pagina,
- se pierde. No es un registro oficial.
+ El sistema NO deja generar el documento si algun renglon tiene precio 0.
 
 
 ===============================================================================
@@ -200,18 +218,20 @@
 
  PROBLEMA: No suena el pitido.
    -> El sonido puede estar bloqueado por el navegador. No afecta: guiate por
-      el color del recuadro (verde = encontrado, rojo = no encontrado).
+      el color del mensaje (verde = agregado, rojo = no encontrado).
 
 
 ===============================================================================
  PARTE D - NOTAS IMPORTANTES
 ===============================================================================
 
- D.1) HOY EL ESCANER SOLO CONSULTA
- ---------------------------------
- Escanear NO modifica el inventario. No suma, no resta, no crea documentos.
- Sirve para consultar rapido que es un producto y cuanta existencia tiene.
- (Las acciones sobre el inventario se definiran mas adelante.)
+ D.1) QUE HACE Y QUE NO HACE EL ESCANER
+ --------------------------------------
+ SI hace: agregar el producto como renglon del documento que estas creando
+ (nota de entrega o presupuesto).
+
+ NO hace: modificar el inventario por si solo. El inventario se mueve cuando
+ el documento se registra, no al escanear.
 
  D.2) LAS MAYUSCULAS PUEDEN IMPORTAR
  -----------------------------------
@@ -230,8 +250,8 @@
 
  D.3) NO HAY QUE INSTALAR NADA
  -----------------------------
- SumiControl funciona en el navegador. El lector se comporta como un teclado.
- No hay drivers, ni programas, ni configuracion dentro de SumiControl.
+ Macedonia funciona en el navegador. El lector se comporta como un teclado.
+ No hay drivers, ni programas, ni configuracion dentro de Macedonia.
 
  D.4) QUE CODIGOS RECONOCE
  -------------------------

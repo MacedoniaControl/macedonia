@@ -19,7 +19,6 @@ import {
   type SItem,
 } from "@/lib/ux/inventory-data";
 import { FiscalRegularization } from "./FiscalRegularization";
-import { ScanCapture } from "./ScanCapture";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
@@ -31,7 +30,7 @@ const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-s
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
 const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
-type Tab = "master" | "fisico" | "s" | "fiscal" | "escaner";
+type Tab = "master" | "fisico" | "s" | "fiscal";
 type MasterView = "fisico" | "espera-ne" | "espera-factura";
 
 export default function InventoryPage() {
@@ -247,7 +246,6 @@ export default function InventoryPage() {
           ["fisico", `Físico · Valery (${FISICO.length})`],
           ["s", `Inventario S (${sItems.length})`],
           ["fiscal", "Regularización fiscal"],
-          ["escaner", "Escáner"],
         ] as [Tab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>
@@ -256,7 +254,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {tab !== "fiscal" && tab !== "escaner" && (
+      {tab !== "fiscal" && (
         <div className="mb-3">
           <label className="relative flex max-w-md items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
@@ -265,8 +263,6 @@ export default function InventoryPage() {
           </label>
         </div>
       )}
-
-      {tab === "escaner" && <ScanCapture />}
 
       {tab === "fiscal" && (
         <>
