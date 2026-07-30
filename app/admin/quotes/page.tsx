@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { fmtUsd } from "@/lib/ux/format";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
+import { ScanBar } from "@/components/inventory/ScanBar";
+import { ProductSearch } from "@/components/inventory/ProductSearch";
+import { lookupByCodigo, type InventoryProduct } from "@/lib/inventory/catalog";
+import { beep } from "@/lib/inventory/scan-feedback";
+import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 
 type Estado = "Borrador" | "Aprobada" | "Rechazada" | "Nota de entrega";
 type Cotizacion = {
@@ -49,9 +54,13 @@ const SEED: Cotizacion[] = [
 export default function QuotesPage() {
   const [cots, setCots] = usePersistedState<Cotizacion[]>("cot:docs", SEED);
   const [seq, setSeq] = usePersistedState("cot:seq", 2243);
-  const [tab, setTab] = useState<"registro" | "gen" | "subir">("registro");
+  // "Generar presupuesto" es el apartado principal (lo que más se usa).
+  const [tab, setTab] = useState<"registro" | "gen" | "subir">("gen");
   const [period, setPeriod] = useState("mes");
   const fileRef = useRef<HTMLInputElement>(null);
+  // Los registros/logs son solo del OWNER.
+  const { rol } = useRol();
+  const verRegistros = puedeVerRegistros(rol);
 
   const filtered = cots.filter((c) => inPeriod(c.fechaISO, period));
 
@@ -84,13 +93,17 @@ export default function QuotesPage() {
       />
 
       <div className="sumi-tabs mb-4 gap-2">
-        {([["registro", "Registro"], ["gen", "Generar presupuesto"], ["subir", "Subir de Valery"]] as const).map(([k, l]) => (
+        {([
+          ["gen", "Generar presupuesto"] as const,
+          ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
+          ["subir", "Subir de Valery"] as const,
+        ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${tab === k ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-text hover:bg-surface-2"}`}>{l}</button>
         ))}
       </div>
 
-      {tab === "registro" && (
+      {tab === "registro" && verRegistros && (
         <SectionCard title="Registro de presupuestos" description="Filtra por período. Incluye presupuestos de Macedonia y de Valery."
           action={<select className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text" value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option></select>}>
@@ -129,7 +142,7 @@ export default function QuotesPage() {
         </SectionCard>
       )}
 
-      {tab === "gen" && <GenerarPresupuesto seq={seq} onSave={(c) => {
+      {(tab === "gen" || (tab === "registro" && !verRegistros)) && <GenerarPresupuesto seq={seq} onSave={(c) => {
         setCots((p) => [{ ...c, id: Date.now(), estado: "Borrador", origen: "SumiControl", fechaISO: hoyISO() }, ...p]);
         setSeq((s) => s + 1);
         printDoc(presupuestoHtml(c));
@@ -158,10 +171,40 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
   const [lineas, setLineas] = useState<DevLinea[]>([]);
   const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0, unidad: "UNIDAD" });
   const [msg, setMsg] = useState("");
+  const [aviso, setAviso] = useState<{ ok: boolean; text: string } | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   const pick = (codigo: string) => { const p = CATALOGO.find((c) => c.codigo === codigo); if (p) setLn({ ...ln, codigo: p.codigo, descripcion: p.descripcion, precio: p.precio }); };
   const sub = lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
   const totalOp = sub * 1.16;
+
+  // Agrega un producto del catálogo (escáner o buscador). Si ya está, sube la cantidad.
+  // El catálogo de Valery no trae precio: el renglón nace en 0 y se completa abajo.
+  function agregarProducto(p: InventoryProduct, origen: "escáner" | "buscador") {
+    setMsg("");
+    const i = lineas.findIndex((l) => l.codigo === p.codigo);
+    if (i >= 0) {
+      const nueva = lineas[i].cantidad + 1;
+      setLineas(lineas.map((l, j) => (j === i ? { ...l, cantidad: nueva } : l)));
+      setAviso({ ok: true, text: `${p.nombre} · cantidad ${nueva}` });
+    } else {
+      setLineas([...lineas, { codigo: p.codigo, descripcion: p.nombre, cantidad: 1, precio: 0, descuento: 0, unidad: ln.unidad }]);
+      setAviso({ ok: true, text: `${p.nombre} agregado (${origen}) · falta indicar el precio` });
+    }
+  }
+  function onScan(codigo: string) {
+    const p = lookupByCodigo(codigo);
+    if (!p) {
+      beep(false);
+      setAviso({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo.` });
+      return;
+    }
+    beep(true);
+    agregarProducto(p, "escáner");
+  }
+  const updLinea = (i: number, patch: Partial<DevLinea>) => {
+    setMsg("");
+    setLineas(lineas.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  };
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
@@ -183,7 +226,23 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
         </div>
       </SectionCard>
 
-      <SectionCard title="Renglones">
+      <SectionCard title="Renglones" description="Escanea o busca en el catálogo para agregar; también puedes cargarlo a mano.">
+        {/* Escáner de productos */}
+        <ScanBar onScan={onScan} hint="Dispara el lector: el producto se agrega al presupuesto." />
+
+        {/* Buscador del catálogo (inventario) */}
+        <div className="mt-3">
+          <label className={lbl}>Buscar en productos y catálogo</label>
+          <ProductSearch onPick={(p) => agregarProducto(p, "buscador")} />
+        </div>
+
+        {aviso && (
+          <p className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${aviso.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
+            <Icon name={aviso.ok ? "check" : "alert"} size={14} /> {aviso.text}
+          </p>
+        )}
+
+        <p className="mb-2 mt-4 border-t border-border pt-3 text-xs font-medium text-muted">Carga manual</p>
         <div className="grid grid-cols-2 gap-2">
           <div><label className={lbl}>Del catálogo</label><select className={inputClass} value={ln.codigo} onChange={(e) => pick(e.target.value)}><option value="">— elegir —</option>{CATALOGO.map((p) => <option key={p.codigo} value={p.codigo}>{p.descripcion}</option>)}</select></div>
           <div><label className={lbl}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} /></div>
@@ -195,16 +254,56 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
         </div>
         <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0, unidad: ln.unidad }); } }}>Agregar renglón</Button>
         {lineas.length > 0 && (
-          <ul className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
-            {lineas.map((l, i) => <li key={i} className="flex justify-between gap-2"><span className="min-w-0 truncate text-text">{l.cantidad} × {l.codigo} {l.descripcion}</span><span className="text-muted">{fmtUsd(l.cantidad * l.precio * (1 - l.descuento / 100))}</span></li>)}
-            <li className="flex justify-between border-t border-border pt-1 font-semibold"><span>Total operación (IVA 16%)</span><span>{fmtUsd(totalOp)}</span></li>
-          </ul>
+          <>
+            <div className="sumi-scroll mt-3 max-w-full overflow-x-auto border-t border-border pt-2">
+              <table className="w-full min-w-[420px] text-left text-sm">
+                <thead className="text-[11px] uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="pb-1 pr-2 font-medium">Cant.</th>
+                    <th className="pb-1 pr-2 font-medium">Producto</th>
+                    <th className="pb-1 pr-2 text-right font-medium">Precio</th>
+                    <th className="pb-1 pr-2 text-right font-medium">Total</th>
+                    <th className="pb-1" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {lineas.map((l, i) => (
+                    <tr key={`${l.codigo}-${i}`}>
+                      <td className="py-1.5 pr-2">
+                        <input type="number" min={1} aria-label={`Cantidad ${l.descripcion}`}
+                          className="h-8 w-14 rounded-lg border border-border bg-surface-2 px-2 text-center text-sm text-text"
+                          value={l.cantidad} onChange={(e) => updLinea(i, { cantidad: Number(e.target.value) })} />
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <span className="block truncate text-text">{l.descripcion}</span>
+                        <span className="block font-mono text-[11px] text-muted">{l.codigo}{l.descuento ? ` · -${l.descuento}%` : ""}</span>
+                      </td>
+                      <td className="py-1.5 pr-2 text-right">
+                        <input type="number" min={0} step="0.01" aria-label={`Precio ${l.descripcion}`}
+                          className={`h-8 w-20 rounded-lg border bg-surface-2 px-2 text-right text-sm text-text ${l.precio <= 0 ? "border-danger" : "border-border"}`}
+                          value={l.precio} onChange={(e) => updLinea(i, { precio: Number(e.target.value) })} />
+                      </td>
+                      <td className="py-1.5 pr-2 text-right text-muted">{fmtUsd(l.cantidad * l.precio * (1 - l.descuento / 100))}</td>
+                      <td className="py-1.5 text-right">
+                        <button type="button" aria-label={`Quitar ${l.descripcion}`} onClick={() => setLineas(lineas.filter((_, j) => j !== i))}
+                          className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-danger"><Icon name="close" size={14} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 flex justify-between border-t border-border pt-2 text-sm font-semibold text-text">
+              <span>Total operación (IVA 16%)</span><span className="tabular-nums">{fmtUsd(totalOp)}</span>
+            </p>
+          </>
         )}
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
         <Button icon="quote" className="mt-3 w-full" onClick={() => {
           setMsg("");
           if (!f.razonSocial.trim()) return setMsg("La razón social es obligatoria.");
           if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
+          if (lineas.some((l) => l.precio <= 0)) return setMsg("Hay renglones sin precio (marcados en rojo). Complétalos antes de generar.");
           const emision = new Date(); const venc = new Date(Date.now() + f.venceDias * 86400000);
           onSave({ correlativo: String(seq).padStart(10, "0"), fechaEmision: dmy(emision), fechaVenc: dmy(venc), razonSocial: f.razonSocial, rif: f.rif, direccion: f.direccion, telefonos: f.telefonos, lineas, moneda: f.moneda, nota: f.nota, total: totalOp });
         }}>Registrar y generar (PDF)</Button>

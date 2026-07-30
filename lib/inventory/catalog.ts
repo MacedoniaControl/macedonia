@@ -50,3 +50,28 @@ export function lookupByCodigo(codigo: string): InventoryProduct | null {
   const candidatos = loose.get(c.toUpperCase());
   return candidatos && candidatos.length === 1 ? candidatos[0] : null;
 }
+
+/**
+ * Búsqueda para el buscador de productos (typeahead): por código o por nombre.
+ * Prioriza: código exacto → código que empieza igual → nombre que empieza igual → contiene.
+ */
+export function searchProductos(query: string, limit = 8): InventoryProduct[] {
+  const q = query.trim().toUpperCase();
+  if (q.length < 2) return [];
+  const res: { item: InventoryProduct; score: number }[] = [];
+  for (const item of SEED.items) {
+    const cod = item.codigo.toUpperCase();
+    const nom = item.nombre.toUpperCase();
+    let score = -1;
+    if (cod === q) score = 0;
+    else if (cod.startsWith(q)) score = 1;
+    else if (nom.startsWith(q)) score = 2;
+    else if (cod.includes(q)) score = 3;
+    else if (nom.includes(q)) score = 4;
+    if (score >= 0) res.push({ item, score });
+  }
+  return res
+    .sort((a, b) => a.score - b.score || b.item.existPpal - a.item.existPpal)
+    .slice(0, limit)
+    .map((r) => r.item);
+}
