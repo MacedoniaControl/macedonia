@@ -1,18 +1,9 @@
-// Estadísticas históricas REALES (Valery) de ventas y compras.
-// Datos en lib/ux/history-data.ts. Todo en USD.
+// Estadísticas históricas REALES (Valery) por empresa. Datos en lib/ux/history-data.ts.
+// Todos los montos en USD. Cada componente recibe `empresa`: sumigases | sudematin | all.
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fmtUsd } from "@/lib/ux/format";
-import {
-  histTotals,
-  histYears,
-  histMonths,
-  histMeta,
-  histTopProductos,
-  histTopClientes,
-  histTopProveedores,
-  type HistMonth,
-} from "@/lib/ux/history-data";
+import { getHistory, type HistMonth } from "@/lib/ux/history-data";
 
 const MESES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 function labelMes(ym: string) {
@@ -20,23 +11,29 @@ function labelMes(ym: string) {
   return `${MESES[Number(m)]} ${y.slice(2)}`;
 }
 
-/** KPIs del histórico completo. */
-export function HistoryKpis() {
+type Props = { empresa?: string };
+
+/** KPIs del histórico completo de la empresa. */
+export function HistoryKpis({ empresa = "sumigases" }: Props) {
+  const h = getHistory(empresa);
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-      <StatCard label="Ventas históricas" value={fmtUsd(histTotals.venta)} sub={`${histMeta.desde} → ${histMeta.hasta}`} accent />
-      <StatCard label="Utilidad total" value={fmtUsd(histTotals.util)} sub="ganancia acumulada" />
-      <StatCard label="ROI histórico" value={`${histTotals.roi}%`} sub="utilidad / costo" />
-      <StatCard label="Margen bruto" value={`${histTotals.margen}%`} sub="sobre ventas" />
-      <StatCard label="Compras históricas" value={fmtUsd(histTotals.compra)} sub="inversión total" />
-      <StatCard label="Costo de ventas" value={fmtUsd(histTotals.costo)} sub="costo de lo vendido" />
+      <StatCard label="Ventas históricas" value={fmtUsd(h.totals.venta)} sub={`${h.meta.desde} → ${h.meta.hasta}`} accent />
+      <StatCard label="Utilidad total" value={fmtUsd(h.totals.util)} sub="ganancia acumulada" />
+      <StatCard label="ROI histórico" value={`${h.totals.roi}%`} sub="utilidad / costo" />
+      <StatCard label="Margen bruto" value={`${h.totals.margen}%`} sub="sobre ventas" />
+      <StatCard label="Compras históricas" value={fmtUsd(h.totals.compra)} sub="inversión total" />
+      <StatCard label="Costo de ventas" value={fmtUsd(h.totals.costo)} sub="costo de lo vendido" />
     </div>
   );
 }
 
 /** Tendencia mensual: ventas vs compras vs utilidad (línea, SVG responsive). */
-export function HistoryTrend({ height = 260 }: { height?: number }) {
-  const data: HistMonth[] = histMonths;
+export function HistoryTrend({ empresa = "sumigases", height = 260 }: Props & { height?: number }) {
+  const h = getHistory(empresa);
+  const data: HistMonth[] = h.months;
+  if (data.length === 0) return <p className="text-sm text-muted">Sin datos para esta empresa.</p>;
+
   const W = 760, H = height, padL = 8, padR = 8, padT = 12, padB = 24;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const max = Math.max(1, ...data.map((d) => Math.max(d.venta, d.compra, d.util)));
@@ -46,10 +43,9 @@ export function HistoryTrend({ height = 260 }: { height?: number }) {
   const line = (key: keyof HistMonth) => data.map((d, i) => `${x(i)},${y(d[key] as number)}`).join(" ");
   const series = [
     { name: "Ventas", color: "var(--color-brand)", key: "venta" as const },
-    { name: "Compras", color: "#f59e0b", key: "compra" as const },
+    { name: "Compras", color: "var(--color-warn)", key: "compra" as const },
     { name: "Utilidad", color: "var(--color-ok)", key: "util" as const },
   ];
-  // marcas de inicio de año
   const marcas = data.map((d, i) => ({ i, ym: d.ym })).filter((d) => d.ym.endsWith("-01") || d.i === 0);
 
   return (
@@ -77,31 +73,33 @@ export function HistoryTrend({ height = 260 }: { height?: number }) {
         ))}
       </svg>
       <p className="mt-1 text-xs text-muted">
-        {labelMes(data[0].ym)} – {labelMes(data[n - 1].ym)} · {n} meses · fuente: {histMeta.fuente}
+        {labelMes(data[0].ym)} – {labelMes(data[n - 1].ym)} · {n} meses · fuente: exports de Valery
       </p>
     </div>
   );
 }
 
 /** Tabla comparativa por año con margen y ROI. */
-export function HistoryYearly() {
+export function HistoryYearly({ empresa = "sumigases" }: Props) {
+  const h = getHistory(empresa);
+  const ultimoAnio = h.years.length ? h.years[h.years.length - 1].year : null;
   return (
     <div className="sumi-scroll max-w-full overflow-x-auto">
       <table className="w-full min-w-[560px] text-left text-sm">
         <thead className="text-xs uppercase tracking-wide text-muted">
           <tr className="border-b border-border">
-            <th className="py-2.5 pr-3 font-medium">Año</th>
-            <th className="py-2.5 pr-3 text-right font-medium">Ventas</th>
-            <th className="py-2.5 pr-3 text-right font-medium">Compras</th>
-            <th className="py-2.5 pr-3 text-right font-medium">Utilidad</th>
-            <th className="py-2.5 pr-3 text-right font-medium">Margen</th>
-            <th className="py-2.5 font-medium text-right">ROI</th>
+            <th scope="col" className="py-2.5 pr-3 font-medium">Año</th>
+            <th scope="col" className="py-2.5 pr-3 text-right font-medium">Ventas</th>
+            <th scope="col" className="py-2.5 pr-3 text-right font-medium">Compras</th>
+            <th scope="col" className="py-2.5 pr-3 text-right font-medium">Utilidad</th>
+            <th scope="col" className="py-2.5 pr-3 text-right font-medium">Margen</th>
+            <th scope="col" className="py-2.5 text-right font-medium">ROI</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {histYears.map((y) => (
+          {h.years.map((y) => (
             <tr key={y.year} className="hover:bg-surface-2">
-              <td className="py-2.5 pr-3 font-medium text-text">{y.year}{y.year === 2026 ? " *" : ""}</td>
+              <td className="py-2.5 pr-3 font-medium text-text">{y.year}{y.year === ultimoAnio ? " *" : ""}</td>
               <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(y.venta)}</td>
               <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(y.compra)}</td>
               <td className="py-2.5 pr-3 text-right font-medium text-ok">{fmtUsd(y.util)}</td>
@@ -111,16 +109,17 @@ export function HistoryYearly() {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-muted">* 2026 es parcial (hasta {histMeta.hasta}).</p>
+      <p className="mt-2 text-xs text-muted">* {ultimoAnio} es parcial (hasta {h.meta.hasta}).</p>
     </div>
   );
 }
 
 /** Top productos por utilidad histórica. */
-export function HistoryTopProductos() {
+export function HistoryTopProductos({ empresa = "sumigases" }: Props) {
+  const h = getHistory(empresa);
   return (
     <ul className="divide-y divide-border">
-      {histTopProductos.map((p) => (
+      {h.topProductos.map((p) => (
         <li key={p.codigo + p.nombre} className="flex items-center justify-between gap-3 py-2.5 text-sm">
           <span className="min-w-0">
             <span className="block truncate text-text">{p.nombre}</span>
@@ -136,10 +135,11 @@ export function HistoryTopProductos() {
   );
 }
 
-export function HistoryTopClientes() {
+export function HistoryTopClientes({ empresa = "sumigases" }: Props) {
+  const h = getHistory(empresa);
   return (
     <ul className="divide-y divide-border">
-      {histTopClientes.map((c) => (
+      {h.topClientes.map((c) => (
         <li key={c.nombre} className="flex items-center justify-between gap-3 py-2.5 text-sm">
           <span className="min-w-0 truncate text-text">{c.nombre}</span>
           <span className="shrink-0 font-medium text-text">{fmtUsd(c.venta)}</span>
@@ -149,10 +149,11 @@ export function HistoryTopClientes() {
   );
 }
 
-export function HistoryTopProveedores() {
+export function HistoryTopProveedores({ empresa = "sumigases" }: Props) {
+  const h = getHistory(empresa);
   return (
     <ul className="divide-y divide-border">
-      {histTopProveedores.map((p) => (
+      {h.topProveedores.map((p) => (
         <li key={p.nombre} className="flex items-center justify-between gap-3 py-2.5 text-sm">
           <span className="min-w-0 truncate text-text">{p.nombre}</span>
           <span className="shrink-0 font-medium text-text">{fmtUsd(p.compra)}</span>

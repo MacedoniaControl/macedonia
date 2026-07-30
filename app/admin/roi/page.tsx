@@ -1,3 +1,6 @@
+"use client";
+
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -18,44 +21,63 @@ import {
   HistoryTopClientes,
   HistoryTopProveedores,
 } from "@/components/ui/HistoryStats";
-import { histTotals, histMeta } from "@/lib/ux/history-data";
+import { getHistory } from "@/lib/ux/history-data";
+
+const EMPRESAS = [
+  { id: "sumigases", label: "Sumigases" },
+  { id: "sudematin", label: "Sudematin" },
+  { id: "all", label: "Consolidado" },
+];
 
 export default function RoiPage() {
+  const [empresa, setEmpresa] = usePersistedState("roi:empresa", "sumigases");
+  const h = getHistory(empresa);
+  const label = EMPRESAS.find((e) => e.id === empresa)?.label ?? "Sumigases";
+
   return (
     <>
       <PageHeader
         title="ROI / Rentabilidad"
         description="ROI como métrica transversal, sobre el histórico real de ventas y compras (Valery)."
         breadcrumbs={[{ label: "Inteligencia" }, { label: "ROI / Rentabilidad" }]}
+        filters={
+          <>
+            <label className="sr-only" htmlFor="roi-empresa">Empresa</label>
+            <select id="roi-empresa" className="h-11 rounded-xl border border-border bg-surface px-3 text-sm text-text"
+              value={empresa} onChange={(e) => setEmpresa(e.target.value)}>
+              {EMPRESAS.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
+            </select>
+          </>
+        }
       />
 
       {/* ---- Histórico real (Valery) ---- */}
       <SectionCard
-        title="ROI histórico real"
-        description={`Todo el histórico de operaciones (${histMeta.desde} → ${histMeta.hasta}).`}
-        action={<StatusBadge tone="ok">ROI {histTotals.roi}%</StatusBadge>}
+        title={`ROI histórico real · ${label}`}
+        description={`Todo el histórico de operaciones (${h.meta.desde} → ${h.meta.hasta}).`}
+        action={<StatusBadge tone="ok">ROI {h.totals.roi}%</StatusBadge>}
       >
-        <HistoryKpis />
+        <HistoryKpis empresa={empresa} />
         <div className="mt-5 border-t border-border pt-4">
-          <HistoryTrend />
+          <HistoryTrend empresa={empresa} />
         </div>
       </SectionCard>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <SectionCard title="ROI por año" description="Ventas, compras, utilidad, margen y ROI anual.">
-          <HistoryYearly />
+          <HistoryYearly empresa={empresa} />
         </SectionCard>
         <SectionCard title="Productos de mayor utilidad" description="Ganancia acumulada real por producto (histórico).">
-          <HistoryTopProductos />
+          <HistoryTopProductos empresa={empresa} />
         </SectionCard>
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <SectionCard title="Clientes de mayor facturación" description="Ventas acumuladas por cliente (histórico).">
-          <HistoryTopClientes />
+          <HistoryTopClientes empresa={empresa} />
         </SectionCard>
         <SectionCard title="Proveedores de mayor compra" description="Compras acumuladas por proveedor (histórico).">
-          <HistoryTopProveedores />
+          <HistoryTopProveedores empresa={empresa} />
         </SectionCard>
       </div>
 

@@ -8,7 +8,7 @@ import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BiVentasUtilidad, BiVentasCompras, BiCategoriasDonut } from "@/components/ui/BiCharts";
 import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
-import { histTotals } from "@/lib/ux/history-data";
+import { getHistory } from "@/lib/ux/history-data";
 import { fmtUsd } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useBcvRate } from "@/lib/ux/bcv-rate";
@@ -66,6 +66,9 @@ export default function DashboardPage() {
   const empresaLabel = f.empresa === "sumigases" ? "Sumigases" : f.empresa === "sudematin" ? "Sudematin (demo 0,35×)" : "Consolidado";
 
   const bcv = useBcvRate();
+  // Histórico REAL de la empresa seleccionada (no usa el factor demo).
+  const hist = getHistory(f.empresa);
+  const histLabel = f.empresa === "sumigases" ? "Sumigases" : f.empresa === "sudematin" ? "Sudematin" : "consolidado";
 
   return (
     <>
@@ -103,19 +106,19 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ok/10 text-ok"><Icon name="roi" size={18} /></span>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Resumen real · histórico Sumigases</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Resumen real · histórico {histLabel}</p>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(histTotals.venta)}</p>
+              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.venta)}</p>
               <p className="text-xs text-muted">Ventas</p>
             </div>
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(histTotals.util)}</p>
+              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.util)}</p>
               <p className="text-xs text-muted">Utilidad</p>
             </div>
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold tabular-nums text-ok sm:text-xl">{histTotals.roi}%</p>
+              <p className="truncate text-base font-semibold tabular-nums text-ok sm:text-xl">{hist.totals.roi}%</p>
               <p className="text-xs text-muted">ROI</p>
             </div>
           </div>
@@ -153,12 +156,12 @@ export default function DashboardPage() {
       <div className="mt-6">
         <SectionCard
           title="Histórico de ventas y compras"
-          description="Datos reales de Valery desde el inicio de operaciones (USD)."
-          action={<StatusBadge tone="brand">Real 2023–2026</StatusBadge>}
+          description={`Datos reales de Valery · ${histLabel} (USD).`}
+          action={<StatusBadge tone="brand">Real {hist.meta.desde.slice(0, 4)}–{hist.meta.hasta.slice(0, 4)}</StatusBadge>}
         >
-          <HistoryKpis />
+          <HistoryKpis empresa={f.empresa} />
           <div className="mt-5 border-t border-border pt-4">
-            <HistoryTrend />
+            <HistoryTrend empresa={f.empresa} />
           </div>
         </SectionCard>
       </div>
