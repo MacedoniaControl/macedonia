@@ -68,6 +68,29 @@
   --info: #5c8aef; /* 5.26:1 plano · 4.61:1 sobre tinte */
 }
 
+/* Tema por empresa: se aplica con la clase theme-<id> en un contenedor.
+   Sumigases = naranja (default de la app); Sudematin = azul índigo (su logo). */
+.theme-sumigases {
+  --color-brand: #b04e15;
+  --color-brand-strong: #bf5618;
+  --color-brand-soft: rgba(234, 106, 30, 0.12);
+}
+.dark .theme-sumigases {
+  --color-brand: #ea6a1e;
+  --color-brand-strong: #bf5618;
+  --color-brand-soft: rgba(234, 106, 30, 0.12);
+}
+.theme-sudematin {
+  --color-brand: #2a2a8c;
+  --color-brand-strong: #2a2a8c;
+  --color-brand-soft: rgba(42, 42, 140, 0.1);
+}
+.dark .theme-sudematin {
+  --color-brand: #8f8fe8;
+  --color-brand-strong: #3a3aad;
+  --color-brand-soft: rgba(120, 120, 230, 0.14);
+}
+
 * {
   box-sizing: border-box;
 }

@@ -22,6 +22,7 @@ import {
   importacionesRecientes,
   alertasOperativas,
 } from "@/lib/ux/dashboard-data";
+import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 
 const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 
@@ -31,9 +32,13 @@ const RANGOS: Record<string, number> = { year: 12, sem: 6, tri: 3, mes: 1 };
 
 type Filtros = { empresa: string; rango: string; moneda: string };
 
-export default function DashboardPage() {
+// Vista de dashboard reutilizable. Con `empresaFija` queda bloqueada a una empresa
+// (rutas /admin/[empresa]/dashboard, con su tema). Sin ella, es filtrable (consolidado).
+export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   const [f, setF] = usePersistedState<Filtros>("dash:filtros", { empresa: "sumigases", rango: "year", moneda: "usd" });
-  const factor = FACTORES[f.empresa] ?? 1;
+  const empresa = empresaFija ?? f.empresa;
+  const emp = isEmpresaId(empresa) ? EMPRESAS[empresa] : null;
+  const factor = FACTORES[empresa] ?? 1;
   const count = RANGOS[f.rango] ?? 12;
   const bs = f.moneda === "bs";
   const frac = count / 12; // proporción del año para KPIs monetarios acumulados
@@ -63,27 +68,41 @@ export default function DashboardPage() {
     { label: "Ventas vs compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: "ratio 3,5x" },
   ];
 
-  const empresaLabel = f.empresa === "sumigases" ? "Sumigases" : f.empresa === "sudematin" ? "Sudematin (demo 0,35×)" : "Consolidado";
+  const empresaLabel = empresa === "sumigases" ? "Sumigases" : empresa === "sudematin" ? "Sudematin" : "Consolidado";
 
   const bcv = useBcvRate();
   // Histórico REAL de la empresa seleccionada (no usa el factor demo).
-  const hist = getHistory(f.empresa);
-  const histLabel = f.empresa === "sumigases" ? "Sumigases" : f.empresa === "sudematin" ? "Sudematin" : "consolidado";
+  const hist = getHistory(empresa);
+  const histLabel = empresaLabel;
 
   return (
-    <>
+    <div className={emp ? `theme-${emp.id}` : ""}>
+      {emp && (
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-sm">
+          <img src={emp.logo} alt={emp.nombre} className="h-9 w-auto max-w-[160px] object-contain" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-text">{emp.nombre}</p>
+            <p className="text-xs text-muted">RIF {emp.rif}</p>
+          </div>
+          <StatusBadge tone="brand">Panel {emp.nombreCorto}</StatusBadge>
+        </div>
+      )}
       <PageHeader
         title="Dashboard"
-        description={`Visión ejecutiva · ${empresaLabel} · cifras 2024 reales de Sumigases. Los filtros recalculan KPIs y gráficas.`}
+        description={`Visión ejecutiva · ${empresaLabel}. Los KPIs demo se recalculan con los filtros; el histórico es real.`}
         breadcrumbs={[{ label: "Resumen" }, { label: "Dashboard" }]}
         filters={
           <>
-            <label className="sr-only" htmlFor="f-empresa">Empresa</label>
-            <select id="f-empresa" className={selectClass} value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}>
-              <option value="sumigases">Sumigases</option>
-              <option value="sudematin">Sudematin</option>
-              <option value="all">Consolidado</option>
-            </select>
+            {!empresaFija && (
+              <>
+                <label className="sr-only" htmlFor="f-empresa">Empresa</label>
+                <select id="f-empresa" className={selectClass} value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}>
+                  <option value="sumigases">Sumigases</option>
+                  <option value="sudematin">Sudematin</option>
+                  <option value="all">Consolidado</option>
+                </select>
+              </>
+            )}
             <label className="sr-only" htmlFor="f-rango">Rango</label>
             <select id="f-rango" className={selectClass} value={f.rango} onChange={(e) => setF({ ...f, rango: e.target.value })}>
               <option value="year">Año 2024</option>
@@ -159,9 +178,9 @@ export default function DashboardPage() {
           description={`Datos reales de Valery · ${histLabel} (USD).`}
           action={<StatusBadge tone="brand">Real {hist.meta.desde.slice(0, 4)}–{hist.meta.hasta.slice(0, 4)}</StatusBadge>}
         >
-          <HistoryKpis empresa={f.empresa} />
+          <HistoryKpis empresa={empresa} />
           <div className="mt-5 border-t border-border pt-4">
-            <HistoryTrend empresa={f.empresa} />
+            <HistoryTrend empresa={empresa} />
           </div>
         </SectionCard>
       </div>
@@ -281,6 +300,11 @@ export default function DashboardPage() {
           </div>
         </SectionCard>
       </div>
-    </>
+    </div>
   );
+}
+
+// Entrada por defecto (/admin/dashboard): filtrable, incluye Consolidado (Owner/Admin).
+export default function DashboardPage() {
+  return <DashboardView />;
 }
