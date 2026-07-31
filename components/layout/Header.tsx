@@ -8,7 +8,7 @@ import { CompanySelector } from "@/components/ui/CompanySelector";
 import { findNavItem } from "@/lib/ux/nav";
 import { alertasOperativas } from "@/lib/ux/dashboard-data";
 import { useNotifications, updateNotif } from "@/lib/ux/notifications";
-import { fetchBcvRate } from "@/lib/ux/bcv-rate";
+import { fetchBcvRate, useBcvRate } from "@/lib/ux/bcv-rate";
 
 export function Header({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
@@ -23,6 +23,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
     if (!r.ok) alert(`No se pudo obtener el dólar del BCV.\n${r.error ?? ""}`);
   }
 
+  const bcv = useBcvRate();
   const notifs = useNotifications();
   const pendientes = notifs.filter((n) => n.estado === "pendiente");
   const totalBadge = pendientes.length + alertasOperativas.length;
@@ -50,6 +51,28 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <Icon name="dollar" size={16} />
         {bcvLoading ? "Consultando…" : "Dolar Price"}
       </button>
+
+      {/* Precio del dólar BCV, siempre visible junto al botón */}
+      <div
+        className="ml-2 hidden min-w-[9.5rem] shrink-0 rounded-xl border border-border bg-surface-2 px-3 py-1 leading-tight sm:block"
+        aria-live="polite"
+      >
+        {bcv ? (
+          <>
+            <p className="text-sm font-semibold tabular-nums text-text">
+              {bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs
+            </p>
+            <p className="text-[10px] text-muted">
+              Consultado: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-muted">— Bs</p>
+            <p className="text-[10px] text-muted">Pulsa “Dolar Price”</p>
+          </>
+        )}
+      </div>
 
       <div className="ml-auto flex items-center gap-2">
         <div className="hidden sm:block">

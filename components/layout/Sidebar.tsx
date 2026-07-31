@@ -35,15 +35,27 @@ export function Sidebar({ empresa, open, onClose }: { empresa?: string | null; o
           ) : (
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white font-bold">M</span>
           )}
-          <div className="leading-tight">
-            <p className="text-sm font-semibold text-text">{emp ? emp.nombreCorto : "Macedonia"}</p>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-sm font-semibold text-text">{emp ? emp.nombreCorto : "Macedonia"}</p>
             <p className="text-[11px] text-muted">{emp ? "Macedonia" : "Sumigases · Sudematin"}</p>
           </div>
+
+          {/* Volver al Centro de Control (elegir empresa / salir del panel) */}
+          <Link
+            href="/"
+            onClick={onClose}
+            aria-label="Volver al menú principal de Macedonia"
+            title="Volver al menú principal"
+            className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-brand"
+          >
+            <span className="rotate-180"><Icon name="chevronRight" size={18} /></span>
+          </Link>
+
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar menú"
-            className="ml-auto flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
           >
             <Icon name="close" size={18} />
           </button>
