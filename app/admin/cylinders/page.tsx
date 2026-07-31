@@ -161,61 +161,7 @@ export default function CylindersPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {gases.map((g) => {
-          const e = est(g);
-          const total = e.lleno + e.vacio + e.enCliente + e.pendiente;
-          return (
-            <SectionCard key={g} title={g} description={`${total} cilindros en total`}
-              action={e.pendiente > 0 ? <StatusBadge tone="warn">{e.pendiente} pend.</StatusBadge> : <StatusBadge tone="ok">al día</StatusBadge>}>
-              <div className="grid grid-cols-4 gap-2">
-                {ESTADOS.map((s) => (
-                  <div key={s.key} className="rounded-lg border border-border-strong bg-surface-2 p-2 text-center">
-                    <p className="text-xl font-semibold text-text">{e[s.key]}</p>
-                    <p className={`mt-0.5 text-[10px] font-medium ${s.tone === "ok" ? "text-ok" : s.tone === "warn" ? "text-warn" : s.tone === "info" ? "text-info" : "text-muted"}`}>{s.label}</p>
-                  </div>
-                ))}
-              </div>
-              <button type="button" onClick={() => { setGas(g); document.getElementById("mov-form")?.scrollIntoView({ behavior: "smooth" }); }}
-                className="mt-3 w-full rounded-lg border border-border py-1.5 text-xs font-medium text-brand hover:bg-brand-soft">
-                Registrar movimiento de {g}
-              </button>
-            </SectionCard>
-          );
-        })}
-
-        <SectionCard title="Agregar gas" description="Suma un tipo de gas nuevo al inventario.">
-          <div className="space-y-2">
-            <input className={inputClass} value={nuevoGas} placeholder="Ej: Helio, mezcla especial…" onChange={(e) => setNuevoGas(e.target.value)} />
-            {gasMsg && <p className={`rounded-lg px-2 py-1 text-xs ${gasMsg.startsWith("ERR:") ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>{gasMsg.replace("ERR:", "")}</p>}
-            <Button icon="plus" onClick={agregarGas} className="w-full">Agregar gas</Button>
-          </div>
-        </SectionCard>
-      </div>
-
-      {pendientesAutorizacion.length > 0 && (
-        <div className="mt-6">
-          <SectionCard title="Pendientes de autorización" description="El OWNER/ADMIN asignado aprueba o rechaza; al aprobar se aplica al inventario."
-            action={<StatusBadge tone="warn">{pendientesAutorizacion.length}</StatusBadge>}>
-            <ul className="space-y-2">
-              {pendientesAutorizacion.map((n) => (
-                <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-strong bg-surface-2 p-3">
-                  <span className="min-w-0">
-                    <span className="block text-sm text-text">{n.mensaje}</span>
-                    <span className="block text-xs text-muted">Autoriza: {n.para} · {n.hora}</span>
-                  </span>
-                  <span className="flex gap-2">
-                    <Button variant="secondary" icon="check" onClick={() => updateNotif(n.id, { estado: "aprobada" })}>Aprobar</Button>
-                    <Button variant="ghost" onClick={() => updateNotif(n.id, { estado: "rechazada" })}>Rechazar</Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-        </div>
-      )}
-
-      <div id="mov-form" className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.3fr]">
+      <div id="mov-form" className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
         <SectionCard title="Registrar movimiento" description="Requiere autorización de un OWNER/ADMIN.">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -276,6 +222,60 @@ export default function CylindersPage() {
               ))}
             </ul>
           )}
+        </SectionCard>
+      </div>
+
+      {pendientesAutorizacion.length > 0 && (
+        <div className="mt-6">
+          <SectionCard title="Pendientes de autorización" description="El OWNER/ADMIN asignado aprueba o rechaza; al aprobar se aplica al inventario."
+            action={<StatusBadge tone="warn">{pendientesAutorizacion.length}</StatusBadge>}>
+            <ul className="space-y-2">
+              {pendientesAutorizacion.map((n) => (
+                <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-strong bg-surface-2 p-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm text-text">{n.mensaje}</span>
+                    <span className="block text-xs text-muted">Autoriza: {n.para} · {n.hora}</span>
+                  </span>
+                  <span className="flex gap-2">
+                    <Button variant="secondary" icon="check" onClick={() => updateNotif(n.id, { estado: "aprobada" })}>Aprobar</Button>
+                    <Button variant="ghost" onClick={() => updateNotif(n.id, { estado: "rechazada" })}>Rechazar</Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        </div>
+      )}
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {gases.map((g) => {
+          const e = est(g);
+          const total = e.lleno + e.vacio + e.enCliente + e.pendiente;
+          return (
+            <SectionCard key={g} title={g} description={`${total} cilindros en total`}
+              action={e.pendiente > 0 ? <StatusBadge tone="warn">{e.pendiente} pend.</StatusBadge> : <StatusBadge tone="ok">al día</StatusBadge>}>
+              <div className="grid grid-cols-4 gap-2">
+                {ESTADOS.map((s) => (
+                  <div key={s.key} className="rounded-lg border border-border-strong bg-surface-2 p-2 text-center">
+                    <p className="text-xl font-semibold text-text">{e[s.key]}</p>
+                    <p className={`mt-0.5 text-[10px] font-medium ${s.tone === "ok" ? "text-ok" : s.tone === "warn" ? "text-warn" : s.tone === "info" ? "text-info" : "text-muted"}`}>{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={() => { setGas(g); document.getElementById("mov-form")?.scrollIntoView({ behavior: "smooth" }); }}
+                className="mt-3 w-full rounded-lg border border-border py-1.5 text-xs font-medium text-brand hover:bg-brand-soft">
+                Registrar movimiento de {g}
+              </button>
+            </SectionCard>
+          );
+        })}
+
+        <SectionCard title="Agregar gas" description="Suma un tipo de gas nuevo al inventario.">
+          <div className="space-y-2">
+            <input className={inputClass} value={nuevoGas} placeholder="Ej: Helio, mezcla especial…" onChange={(e) => setNuevoGas(e.target.value)} />
+            {gasMsg && <p className={`rounded-lg px-2 py-1 text-xs ${gasMsg.startsWith("ERR:") ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>{gasMsg.replace("ERR:", "")}</p>}
+            <Button icon="plus" onClick={agregarGas} className="w-full">Agregar gas</Button>
+          </div>
         </SectionCard>
       </div>
       <p className="mt-4 text-xs text-muted">Demo client-side (persistente). Autorización según `docs/decisions/roles-permissions.md`.</p>
