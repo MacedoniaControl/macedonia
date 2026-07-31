@@ -35,6 +35,7 @@ export const navGroups: NavGroup[] = [
   {
     title: "Finanzas",
     items: [
+      { label: "Gastos", href: "/admin/expenses", icon: "cash" },
       { label: "Cuentas por cobrar", href: "/admin/receivables", icon: "receivable" },
       { label: "Cuentas por pagar", href: "/admin/payables", icon: "payable" },
       { label: "Compras", href: "/admin/purchases", icon: "purchase" },

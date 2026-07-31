@@ -62,3 +62,11 @@ export function useRol(): { rol: Rol; ready: boolean } {
 export function puedeVerRegistros(rol: Rol): boolean {
   return rol === "owner";
 }
+
+/**
+ * Gastos, utilidad y Estado de Resultado: OWNER y ADMINISTRADOR.
+ * "Es función de administración saber los números" (Greeg). Vendedores y técnicos no.
+ */
+export function puedeVerFinanzas(rol: Rol): boolean {
+  return rol === "owner" || rol === "admin";
+}
