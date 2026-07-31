@@ -1,5 +1,11 @@
 # Decisión técnica — Cilindros y recargas
 
+> ⚠️ **PROVISIONAL — no refleja el proceso real.** Este documento y el módulo de
+> Cilindros se diseñaron antes de levantar el proceso con el cliente. Antes de rehacerlo hay que
+> responder: ¿se cuentan por serie individual o por cantidad?, ¿de quién son los cilindros
+> (comodato)?, ¿cuáles son los estados reales?, ¿se rellenan o se compran llenos?, ¿cuál es el paso
+> a paso del técnico? Ver `docs/planning/BLUEPRINT.md` §5.5.
+
 ## Control
 
 Los cilindros se controlan por cantidad, no por serial individual en el MVP.

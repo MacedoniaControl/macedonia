@@ -1,96 +1,91 @@
-# Estado del proyecto — SumiControl (handoff / continuidad)
+# Estado del proyecto — Macedonia / SumiControl
 
-> **Documento vivo.** Actualizar aquí cada vez que ocurra un evento o cambio significativo.
-> Última actualización: 2026 (fin de ventana de contexto; sesión Claude-Greeg).
+> **Documento vivo.** Dónde estamos HOY y cómo continuar. Actualizar ante cada cambio significativo.
+> Para **replicar o reconstruir** el sistema desde cero, lee `BLUEPRINT.md`.
+>
+> Última actualización: 2026-07-31
 
 ## 0. TL;DR para retomar
 
-- **App en vivo:** https://sumicontrol.vercel.app (pública, sin login).
-- **Rama de trabajo:** `patch/greeg-ux-ui` — TODO el panel funcional está aquí.
-- **Worktree local:** `/Users/greegvizcaino/Documents/New project/sumi-ux-patch` (Next.js 16 + Tailwind v4 + Recharts).
-- **Repo:** https://github.com/Pantera95/Sumi
-- **Naturaleza:** demo funcional **client-side** (estado en `localStorage` vía `usePersistedState`). **Sin backend/DB todavía** (fase siguiente).
-- **TAREA EN CURSO:** módulo **Inventario (Físico/S/Master)** — spec definida en `docs/decisions/inventory-model.md`, **falta implementar**. Bloqueo: muestra del export de inventario de Valery.
+- **App en vivo:** https://sumicontrol.vercel.app — pública, sin login todavía.
+- **Marca:** **Macedonia** en el front · **SumiControl** interno (código, claves, docs).
+- **Repo:** github.com/Pantera95/Sumi · rama **`patch/greeg-ux-ui`**.
+- **Worktree:** `/Users/greegvizcaino/Documents/New project/sumi-ux-patch`
+- **Naturaleza:** demo funcional **client-side** (`localStorage`). **Sin backend, sin DB, sin auth.**
+- **Prioridad #1 del cliente:** **Cilindros y recargas** (rehacer con el proceso real) + login +
+  que los 6 técnicos registren recargas desde el celular.
 
-## 1. Cómo desplegar (IMPORTANTE)
+## 1. Arquitectura en una imagen
 
-```bash
-cd "/Users/greegvizcaino/Documents/New project/sumi-ux-patch"
-cat .vercel/project.json | grep sumicontrol   # DEBE decir "sumicontrol"
-npm run build                                  # verificar
-vercel deploy --prod --yes                     # despliega a producción
 ```
-- Si el CLI falla con **"Serverless Functions limited to 2048 mb"**: el `.vercel` apunta al proyecto
-  equivocado (ranko). Arreglar: `rm -rf .vercel && vercel link --yes --project sumicontrol`.
-- Vercel plan **Hobby**: sin miembros de equipo, Deployment Protection **desactivada** (previews y prod públicas).
-- Alternativa de deploy: `git push` → esperar build de GitHub → `vercel promote <url-del-deploy>`.
-
-## 2. Cómo pushear a GitHub
-
-El helper de git **no entrega credenciales de forma no interactiva** en este entorno. Se usa un
-**Personal Access Token** de Greeg en la URL:
-```bash
-git push "https://<TOKEN>@github.com/Pantera95/Sumi.git" patch/greeg-ux-ui:patch/greeg-ux-ui
+/                                Centro de Control Estratégico
+├── /admin/sumigases/<módulo>     panel Sumigases (naranja)
+├── /admin/sudematin/<módulo>     panel Sudematin (azul)
+└── /admin/<módulo>               Consolidado (solo OWNER)
 ```
-> El último token que dio Greeg estaba **expuesto en el chat** y debe rotarse; pedir uno nuevo cuando
-> haga falta pushear. `gh` no está instalado.
+Rutas separadas por empresa, **implementación compartida** (cada ruta es un re-export de 1 línea).
+El tema y el menú se aplican solos según la URL. Detalle en `BLUEPRINT.md` §3.
 
-## 3. Estructura del código (worktree)
-
-- `app/admin/*` — cada módulo del panel (client components). Layout admin en `components/layout/*`.
-- `components/ui/*` — KpiCard, StatCard, SectionCard, StatusBadge, AlertCard, Button, Icon, DataTableShell,
-  ConfirmDialog, EmptyState, CompanySelector, ThemeToggle, SeriesChart, **BiCharts** (Recharts).
-- `lib/ux/*` — `use-persisted-state.ts` (localStorage), `notifications.ts` (autorizaciones),
-  `bcv-rate.ts` (tasa BCV compartida), `doc-templates.ts` (**PDFs Valery**), `sumigases-logo.ts`
-  (logo oficial embebido), `dashboard-data.ts` (data real 2024), `nav.ts`, `format.ts`, `export-csv.ts`.
-- `app/api/bcv/route.ts` — API server (node:https) que consulta bcv.org.ve (evita CORS/cert).
-- Fuentes: **Sora** (títulos) + **Inter** (cuerpo) vía next/font.
-
-## 4. Módulos y estado (todos funcionales client-side)
+## 2. Módulos y estado
 
 | Módulo | Estado |
 |---|---|
-| Dashboard | ✅ KPIs + ROI + gráficas Recharts + filtros (empresa/rango/moneda) + textbox dólar BCV |
-| Cilindros y recargas | ✅ inventario **por gas** (7 gases + agregar gas) + movimientos con **autorización OWNER/ADMIN** (notificaciones) |
-| Cotizaciones/Presupuestos | ✅ registro por período + generar **PDF Valery** + subir PDF Valery; form alineado a pantalla de captura |
-| Notas de entrega + Devoluciones | ✅ registro por período + **PDF Valery** (logo real) + subir PDF; form alineado a Valery |
-| Ventas internas | ✅ contado/crédito |
-| Productos, Inventario | ✅ básicos (Inventario se **rehará** con modelo Físico/S/Master) |
-| Importaciones | ✅ asistente 8 pasos + subir archivo |
-| Cuentas por cobrar / pagar | ✅ cartera, abonos, vencimientos, export CSV |
-| Compras | ✅ orden → recepción → CxP |
-| Reportes / ROI / Matrices | ✅ tablas reales 2024 + export CSV |
-| Configuración | ✅ guarda (persistente) + **botón Actualizar desde BCV** |
-| Usuarios y roles / Auditoría | ✅ crear usuario, roles, eventos |
-| **POS interno / Caja y pagos** | ❌ **ELIMINADOS** a pedido del cliente |
+| **Landing / Centro de Control** | ✅ dos puertas por empresa + consolidado (solo Owner) |
+| Dashboard | ✅ por empresa, KPIs demo + **histórico real** + gráficas |
+| Cotizaciones | ✅ "Generar presupuesto" principal · **escáner + buscador de catálogo** · Registro solo Owner |
+| Notas de entrega | ✅ generación principal · escáner · PDF formato Valery · Registro solo Owner |
+| Ventas internas | ✅ básico |
+| Productos y catálogo | ✅ básico |
+| **Inventario** | ✅ Master (Físico Existente / En espera NE / En espera factura) · Físico Valery · Inventario S · **Movimientos (kardex)** · Regularización fiscal · **Rotación** |
+| **Cilindros y recargas** | ⚠️ **diseño provisional** — rehacer con el proceso real |
+| **Gastos** (Finanzas) | ✅ 34 partidas · 5 categorías · Bs/USD · Owner+Admin |
+| **Comisiones y bonos** (Finanzas) | ✅ % sobre ventas propias por documento · bono sobre utilidad |
+| Cuentas por cobrar / pagar | ✅ básico |
+| Compras | ✅ básico |
+| Reportes · ROI · Matrices | ✅ con histórico real por empresa |
+| Configuración · Usuarios · Auditoría | ✅ básico |
+| ~~POS interno~~ · ~~Caja y pagos~~ · ~~Importaciones~~ | ❌ **eliminados** a pedido del cliente |
 
-## 5. Documentos PDF (formato Valery, réplica fiel)
+## 3. Datos reales cargados
 
-`lib/ux/doc-templates.ts`: `notaEntregaHtml` (doble ejemplar), `devolucionHtml` (Nota de Crédito),
-`presupuestoHtml` (cotización). Logo oficial en `lib/ux/sumigases-logo.ts`. Datos fijos empresa
-Sumigases (RIF J-502789510). Para **Sudematin**: ver `docs/planning/documentos-sumigases-valery.md`.
+- **1.703 productos** del inventario de Valery (Sumigases).
+- **Histórico 2022–2026** por empresa: Sumigases $2,37M ventas / ROI 76,9% · Sudematin $2,45M / ROI 162,1%.
+- **Costos y precios** por producto: 1.213 códigos Sumigases · 2.599 Sudematin (del historial de ventas).
+- **Rotación**: 780 códigos con ventas de los últimos 12 meses.
 
-## 6. Coordinación / incidencias
+## 4. Decisiones de negocio ya cerradas
 
-- **Salem** comparte el proyecto Vercel `sumicontrol`. En un evento desplegó su versión básica y
-  sobrescribió producción; se **restauró** redeployando este worktree. Riesgo: cualquiera puede
-  sobrescribir prod. Recomendación: solo una persona despliega a prod, o Salem usa su propio proyecto.
-- Nuestra rama `patch/greeg-ux-ui` en GitHub **nunca fue afectada** por Salem.
-- Rol de esta sesión: **Claude-Greeg** = planning + coordinación + implementación UX (autorizado por Greeg).
+- **Valery es solo fiscal**; Macedonia es la alternativa **no fiscal** con los números reales.
+- **Nunca** se escribe en Valery: solo se **suben sus exports**.
+- **Registros/logs: solo OWNER** (ni siquiera los administradores).
+- **Gastos y utilidad: Owner + Administrador.**
+- **Pared entre empresas**: nadie mezcla datos salvo el Owner.
+- **Comisiones**: Junior 0,5% · Senior 4% (editables), sobre **ventas propias** por código de documento.
+- **Bono**: % editable sobre la utilidad después de gastos, por trabajador.
+- El **Estado de Resultado de administración** es la cifra oficial (aunque difiera 7% de Valery).
 
-## 7. Próximo paso concreto
+## 5. Pendientes (orden sugerido)
 
-Implementar el módulo **Inventario** según `docs/decisions/inventory-model.md`:
-Físico (Valery, read-only) + S (SumiControl) + Master (= Físico+S), por empresa/almacén, clave = código
-Valery, cilindros por existencia, sin-stock-en-S → aprobación OWNER/ADMIN, y control de **código
-duplicado** (alerta owner/admin + bloqueo + tag "Documento Duplicado"). **Falta:** muestra del export
-de inventario de Valery para mapear el importador del Físico.
+1. **Cilindros** con el proceso real — falta responder: ¿serie individual o cantidades?, ¿comodato?,
+   ¿estados?, ¿se rellenan o se compran llenos?, ¿paso a paso del técnico?
+2. **Backend**: Supabase (Postgres + Auth + RLS). Ver `BLUEPRINT.md` §9.
+3. **Importadores diarios** con idempotencia y reversión.
+4. **Estado de Resultado** armado en Matrices.
+5. Conectar documentos al kardex — ⚠️ resolver el **doble descuento** (NE de Macedonia vs export de Valery).
+6. Notas y cotizaciones con logo/RIF por empresa.
+7. Dominio propio (`app.macedonia…`) y tasa BCV compartida cada hora.
 
-## 8. Docs clave
+## 6. Riesgos abiertos
 
-- `docs/decisions/*` — reglas de negocio (inventory-model, inventory-rules, currency-tax-rate,
-  payments-cash, documents-correlativos, roles-permissions, company-scope, cylinder-rules, roi).
-- `docs/planning/benchmark-fina-redesign.md` — benchmark y rediseño.
-- `docs/planning/documentos-sumigases-valery.md` — formatos Valery + guía Sudematin.
-- `docs/data/*` — data real 2024.
-- `docs/deployment/deploy-log.md` — historial y aprendizajes de deploy.
+- **Un solo mantenedor**, deploys manuales, sin control de acceso. Ya ocurrió que un tercero
+  sobrescribió producción. Recomendación: un solo responsable de desplegar.
+- **Sin backups**: al pasar a Supabase, entrar directo al plan Pro ($25/mes) antes de datos reales.
+- **Token de GitHub expuesto** en el chat de trabajo: rotarlo.
+
+## 7. Docs clave
+
+- **`BLUEPRINT.md`** — el plano completo para replicar el sistema. **Empieza aquí.**
+- `docs/decisions/inventory-model.md` — modelo de inventario, regularización fiscal, rotación.
+- `docs/planning/documentos-sumigases-valery.md` — formatos de documentos Valery.
+- `docs/manual-escaner.txt` — manual del operador para el lector de códigos.
+- `docs/deployment/deploy-log.md` — historial y aprendizajes de despliegue.

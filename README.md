@@ -1,11 +1,19 @@
-# SumiControl
+# Macedonia / SumiControl
 
-SumiControl es una plataforma SaaS interna para Sumigases Oriente C.A. y Sudematin. Este repositorio arranca con el planning funcional y tecnico del proyecto para organizar el desarrollo de la primera demo operativa.
+**Macedonia** (marca visible) es el sistema operativo de **Sumigases Oriente C.A.** y **Sudematin & GM**:
+inventario, cilindros, cotizaciones, notas de entrega y rentabilidad, conciliado con Valery
+(el sistema fiscal). Internamente el proyecto se sigue llamando **SumiControl**.
+
+App: https://sumicontrol.vercel.app
 
 ## Documentacion base
 
-- **⭐ Estado del proyecto / handoff: [docs/planning/project_state.md](./docs/planning/project_state.md)** — leer primero para retomar (deploy, ramas, módulos, tarea en curso). Mantener actualizado ante cada evento/cambio significativo.
-- Planning general: [PLANNING.md](./PLANNING.md)
+- **📐 [BLUEPRINT](./docs/planning/BLUEPRINT.md)** — el plano completo del sistema: arquitectura,
+  modelo de dominio, reglas de negocio, sistema de diseño, integración con Valery y cómo migrar a
+  backend. **Empieza aquí para replicar o reconstruir el proyecto.**
+- **⭐ [Estado del proyecto](./docs/planning/project_state.md)** — dónde estamos hoy, módulos,
+  pendientes y riesgos. Mantener actualizado ante cada cambio significativo.
+- Planning original (histórico): [PLANNING.md](./PLANNING.md)
 - Planning detallado: [docs/planning/sumicontrol-planning.md](./docs/planning/sumicontrol-planning.md)
 - Plan de colaboracion: [docs/collaboration-plan.md](./docs/collaboration-plan.md)
 - Prompts de arranque: [docs/prompts](./docs/prompts)
@@ -13,16 +21,13 @@ SumiControl es una plataforma SaaS interna para Sumigases Oriente C.A. y Sudemat
 - Seguimiento por modulo: [docs/progress](./docs/progress)
 - Prompt maestro de coordinacion: [docs/prompts/master-agent-prompt.md](./docs/prompts/master-agent-prompt.md)
 
-## Stack confirmado
+## Stack
 
-- Next.js
-- TypeScript
-- Tailwind CSS
-- Prisma
-- PostgreSQL / Supabase
-- Supabase Storage
-- Vercel
-- Login propio con usuario y contrasena
+**Hoy (demo funcional):** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 ·
+Recharts · Vercel. Estado en `localStorage`, sin backend.
+
+**Siguiente fase:** Supabase (Postgres + Auth + Storage + RLS) con login propio usuario/contraseña.
+Ver [BLUEPRINT §9](./docs/planning/BLUEPRINT.md).
 
 ## Flujo de trabajo
 
