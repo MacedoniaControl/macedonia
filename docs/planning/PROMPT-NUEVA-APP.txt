@@ -1,0 +1,370 @@
+===============================================================================
+ PROMPT PARA CLAUDE CODE — CONSTRUIR UNA WEB APP DE OPERACIONES DE NEGOCIO
+ Blueprint destilado de Macedonia / SumiControl (Sumigases · Sudematin)
+ Versión 1.0
+===============================================================================
+
+CÓMO USAR ESTE ARCHIVO
+----------------------
+1. Rellena el bloque [CONTEXTO DEL NEGOCIO] con los datos de tu proyecto.
+2. Borra lo que no aplique (ej. si no hay multiempresa, elimina esa sección).
+3. Pega TODO el archivo como primer mensaje en Claude Code.
+4. No pidas todo de golpe: sigue el orden de fases del final.
+
+
+===============================================================================
+ [CONTEXTO DEL NEGOCIO]  <<< RELLENAR ANTES DE USAR
+===============================================================================
+
+NOMBRE DEL PRODUCTO (marca visible):  ..........
+NOMBRE INTERNO (código, si difiere):  ..........
+RUBRO / QUÉ HACE LA EMPRESA:          ..........
+EMPRESAS / SUCURSALES:                ..........  (nombre, RIF/ID, ubicación, color de marca)
+USUARIOS Y ROLES:                     ..........  (cuántos de cada uno)
+SISTEMA EXTERNO CON EL QUE CONVIVE:   ..........  (ej. un ERP fiscal que NO se puede tocar)
+CÓMO LLEGAN LOS DATOS DE ESE SISTEMA: ..........  (API / exports Excel / manual)
+MÓDULOS QUE NECESITA:                 ..........
+QUÉ DEBE FUNCIONAR PRIMERO:           ..........
+
+
+===============================================================================
+ 1. QUÉ TIPO DE SISTEMA ES (y qué NO es)
+===============================================================================
+
+Estás construyendo una CAPA DE OPERACIÓN Y CONTROL para un negocio real, no un
+ERP genérico ni un CRUD bonito.
+
+El patrón central: la empresa ya tiene un sistema (contable/fiscal) que NO se
+puede reemplazar ni modificar. Esta app:
+  1. Opera el día a día (lo que el sistema viejo hace mal o no hace).
+  2. CONCILIA esa operación con el sistema oficial.
+  3. Convierte en información las hojas de cálculo que hoy se llevan a mano.
+
+REGLA DURA: la app nunca escribe en el sistema externo. La integración es en un
+solo sentido (se consumen sus exports).
+
+Antes de escribir código, entiende el PROBLEMA REAL. En el caso original era:
+"lo que se mueve físicamente y lo que se documenta fiscalmente no ocurren al
+mismo tiempo, y alguien lleva esa diferencia en la cabeza". Encuentra el
+equivalente en tu negocio. Si no lo encuentras, PREGUNTA antes de construir.
+
+
+===============================================================================
+ 2. STACK OBLIGATORIO
+===============================================================================
+
+  Next.js (App Router) · React · TypeScript (strict) · Tailwind CSS v4
+  Vercel para deploy
+  Fase 1: estado en localStorage (demo funcional, sin backend)
+  Fase 2: Supabase (Postgres + Auth + Storage + RLS)
+
+NO uses shadcn/ui ni librerías de componentes. Construye primitivos propios
+(están especificados en §4). Razón: control total del sistema de diseño y cero
+dependencias que se rompan.
+
+Gráficas: Recharts para las interactivas, SVG propio para las simples.
+
+
+===============================================================================
+ 3. ARQUITECTURA MULTIEMPRESA  (omitir si es una sola empresa)
+===============================================================================
+
+Todo se separa DESDE LA PUERTA DE ENTRADA. Esto simplifica el resto: cada
+usuario entra al mundo de una empresa y de ahí la lógica es "una a la vez".
+
+  /                              Landing: elegir empresa
+  /admin/<empresa>/<modulo>      panel de esa empresa, con su tema
+  /admin/<modulo>                vista consolidada (solo el rol dueño)
+
+REGLA DE ORO: rutas separadas, implementación compartida.
+Cada ruta por empresa es un re-export de UNA línea:
+
+    // app/admin/[empresa]/inventory/page.tsx
+    export { default } from "@/app/admin/inventory/page";
+
+Así hay separación real de URLs SIN duplicar código: editas un archivo y todas
+las empresas quedan consistentes. NO copies páginas por empresa.
+
+Piezas necesarias:
+  - app/admin/[empresa]/layout.tsx   valida la empresa una vez (404 si no existe)
+  - AppShell                          detecta empresa por URL y aplica el tema
+  - Sidebar                           prefija cada enlace con la empresa activa
+  - lib/empresas.ts                   FUENTE ÚNICA: nombre, ID fiscal, logo, color
+
+Los módulos leen la empresa de la ruta:
+    const empresa = usePathname().match(/^\/admin\/(emp1|emp2)(\/|$)/)?.[1] ?? "emp1";
+
+
+===============================================================================
+ 4. SISTEMA DE DISEÑO
+===============================================================================
+
+TOKENS
+------
+Colores SEMÁNTICOS en variables CSS. Nunca hex sueltos en componentes.
+
+PRINCIPIO NO OBVIO Y CRÍTICO:
+  Ningún tono único pasa 4.5:1 sobre fondo claro Y oscuro a la vez.
+  Por eso brand/ok/warn/danger/info DEBEN cambiar de valor según el tema:
+
+    :root { --brand:#b04e15; --ok:#107c38; --warn:#a25903;
+            --danger:#ce2323; --info:#2461e7; }
+    .dark { --brand:#ea6a1e; --ok:#16a34a; --warn:#d97706;
+            --danger:#e56161; --info:#5c8aef; }
+
+  - Tokens "*-strong": los ÚNICOS válidos como FONDO bajo texto blanco (>=4.5:1).
+  - "--border-strong" (3:1): para campos de formulario. El borde suave es solo
+    decorativo (un input que no se distingue del fondo es un bug).
+  - Temas por empresa: clases .theme-<id> que redefinen --color-brand*.
+
+  *** TRAMPA: Tailwind v4 compone la opacidad en espacio OKLAB, no sRGB. ***
+  bg-ok/10 NO da el color que predice la matemática tradicional. Para verificar
+  contraste hay que MEDIR EL PÍXEL COMPUESTO (canvas), no calcularlo.
+
+PRIMITIVOS A CONSTRUIR
+----------------------
+  Button · SectionCard · StatCard · KpiCard · StatusBadge · EmptyState
+  AlertCard · Icon (set SVG propio) · ConfirmDialog · ThemeToggle
+  SortableTh · TablePager · SeriesChart
+
+REGLAS DE UI (aprendidas a golpes — no las repitas)
+---------------------------------------------------
+  - Controles interactivos >= 44px de alto.
+  - Tablas: SIEMPRE con orden + paginación. Nunca muestres un subconjunto sin
+    forma de llegar al resto (error real: "mostrando 100 de 1703" sin paginador).
+  - Orden: aria-sort + FLECHA visible. Nunca indiques estado solo con color.
+  - font-variant-numeric: tabular-nums en celdas numéricas, o las columnas de
+    dinero "bailan" al cambiar de fila.
+  - min-w-0 en las tarjetas contenedoras: sin eso, las gráficas responsivas
+    desbordan horizontalmente en móvil (los hijos de grid/flex no encogen).
+  - Pestañas: scroll horizontal en móvil, NO wrap en varias filas.
+  - Hidratación: nunca pintes "0" mientras cargan datos del cliente. Usa bandera
+    `ready` + skeleton. Un dato falso que salta es peor que un placeholder.
+  - Respeta prefers-reduced-motion globalmente.
+  - Jerarquía tipográfica: los títulos de sección deben estar >=4px por encima
+    del cuerpo, o no se leen como títulos.
+
+
+===============================================================================
+ 5. PATRONES DE DOMINIO REUTILIZABLES
+===============================================================================
+
+5.1 KARDEX (movimientos de inventario)
+--------------------------------------
+El modelo que funciona, simple y auditable:
+
+  MOVIMIENTOS
+    ├── INGRESO   -> Compras · Ingresos manuales
+    └── SALIDA    -> Ventas  · Salidas manuales
+
+Cada movimiento guarda: fecha, empresa, dirección, origen, código, cantidad,
+MOTIVO, documento, usuario. Los manuales EXIGEN motivo (merma, ajuste de conteo,
+traslado, consumo interno). Sin motivo no se puede explicar un descuadre después.
+
+La existencia actual = suma del kardex. No guardes un "stock" suelto que se
+pueda desincronizar.
+
+5.2 CONCILIACIÓN CON EL SISTEMA EXTERNO
+---------------------------------------
+Si la app opera antes de que el sistema oficial registre, necesitas distinguir:
+  - Existencia según el sistema oficial
+  - Existencia real física
+  - La diferencia entre ambas (esto es lo que nadie estaba midiendo)
+
+Usa un flag booleano tipo `afecta_inventario_real` en cada transacción: cuando
+solo regularizas papeles, el inventario físico NO se mueve. Sin ese flag vas a
+descontar dos veces.
+
+5.3 FLUJO CON SEMÁFORO
+----------------------
+Para decisiones operativas repetitivas, un semáforo visual + dos caminos:
+  VERDE  -> se puede hacer directo (un modal de confirmación)
+  ÁMBAR  -> requiere un paso previo (un asistente paso a paso)
+El operador no debería tener que entender la matemática interna.
+
+5.4 ROTACIÓN / COBERTURA
+------------------------
+  meses_de_stock = existencia_actual / venta_mensual_promedio
+  <umbral_bajo  -> reponer        (amarillo)
+  normal        -> saludable      (verde)
+  >umbral_alto  -> sobrestock     (rojo, capital congelado)
+  sin ventas    -> sin rotación   (rojo, candidato a liquidar)
+
+5.5 ROLES Y PERMISOS
+--------------------
+Define roles con reglas DURAS y escríbelas en un solo módulo (lib/session.ts):
+
+  - Un rol "dueño" que ve todo, incluidos los registros/logs.
+  - Roles operativos limitados a SU empresa (pared entre empresas).
+  - Separa explícitamente quién ve DINERO (costos, utilidad) de quién solo ve
+    precios de venta.
+
+Expón funciones tipo `puedeVerRegistros(rol)` / `puedeVerFinanzas(rol)` en vez
+de repartir condicionales por toda la app.
+
+  *** Mientras no haya backend, ESTO ES ESTRUCTURA, NO SEGURIDAD. ***
+  Dilo explícitamente al usuario. La barrera real llega con RLS en la base.
+
+5.6 ESTADO DE RESULTADO
+-----------------------
+  VENTAS − COSTO = UTILIDAD BRUTA − GASTOS = UTILIDAD − BONO = UTILIDAD TOTAL
+
+  - Gastos: catálogo de "partidas" agrupadas en pocas categorías. EXTRAE el
+    catálogo del Excel real del cliente; no lo inventes.
+  - Si el cliente ya tiene el archivo, DEDUCE el mapeo partida->categoría
+    verificando que las partidas sumen exactamente cada categoría. Es más
+    rápido y más fiel que preguntárselo.
+  - Comisiones: % sobre las ventas PROPIAS del vendedor, asignadas por código
+    de documento. Un documento no se puede asignar dos veces (comisión doble).
+
+
+===============================================================================
+ 6. IMPORTAR DATOS DE UN SISTEMA EXTERNO (Excel)
+===============================================================================
+
+REGLAS
+------
+  - Mapea las columnas por NOMBRE normalizado, no por posición fija.
+  - IDEMPOTENCIA OBLIGATORIA: detectar duplicados y SEÑALAR cuál movimiento se
+    repite (no solo "archivo duplicado").
+  - Poder BORRAR un archivo subido por error -> REVERTIR sus movimientos.
+  - Formato fijo: si llega un archivo con estructura distinta, ERROR EXPLÍCITO.
+    No adivines.
+
+TRAMPAS REALES ENCONTRADAS EN DATOS DE PRODUCCIÓN
+-------------------------------------------------
+Estas cosas solo se aprenden mirando los datos. Búscalas siempre:
+
+  1. CÓDIGOS SENSIBLES A MAYÚSCULAS: encontramos "6X8AT" y "6x8AT" como dos
+     productos DISTINTOS. Un índice case-insensitive ingenuo devuelve el
+     equivocado. Solución: match exacto primero; el fallback case-insensitive
+     solo resuelve si hay UN ÚNICO candidato.
+
+  2. OPERACIONES ENTRE SUCURSALES: si dos empresas del grupo se transfieren
+     mercancía, en el sistema fiscal figura como VENTA. En el consolidado se
+     cuenta DOS VECES. Hay que identificarlas y eliminarlas.
+
+  3. UN MISMO TIPO DE DOCUMENTO CON VARIOS SIGNIFICADOS: las notas de entrega
+     eran venta real, consumo interno (a empleados) o traslado. Solo la primera
+     es venta. Si el cliente lo separa a mano en pestañas de Excel, ahí está la
+     regla de clasificación.
+
+  4. DOBLE EFECTO: el consumo interno sale del inventario Y es un gasto. Un
+     movimiento, dos consecuencias.
+
+  5. ARCHIVOS QUE CRUZAN AÑOS: el export de 2026 traía filas de 2025. Filtra por
+     la fecha de CADA FILA, nunca por el nombre del archivo.
+
+  6. MONEDA NO DECLARADA: un export traía montos en moneda local nominal sin
+     columna de tasa. Se detecta porque el ratio contra otra fuente crece año a
+     año (inflación). Verifica antes de asumir la moneda.
+
+  7. EL MISMO DATO EN DOS FORMATOS: pide siempre el export que YA trae la
+     columna en divisa fuerte; convertir a mano introduce error (nosotros nos
+     desviamos 25% en años intermedios).
+
+
+===============================================================================
+ 7. CONVENCIONES DE CÓDIGO
+===============================================================================
+
+  - Estado compartido: patrón store con localStorage + CustomEvent + hook use*.
+    Firma estable: get<X>() / add<X>() / use<X>(). Al migrar a backend cambias
+    el CUERPO, no las firmas.
+  - Prefija las claves de storage (ej. "app:") — equivalen a tablas futuras.
+  - Todo monto interno en UNA moneda (la fuerte). Si se captura en otra, guarda
+    la tasa usada y el monto convertido.
+  - Comentarios en el idioma del cliente, explicando el POR QUÉ (la regla de
+    negocio), no el QUÉ (que ya se ve en el código).
+  - Datos semilla en archivos separados (.json / .ts generados), nunca inline.
+
+
+===============================================================================
+ 8. DISCIPLINA DE TRABAJO (esto importa tanto como el código)
+===============================================================================
+
+VERIFICA, NO ASUMAS
+-------------------
+  - Después de cada cambio: build limpio + levantar la app + EJERCER el flujo en
+    el navegador. No digas "listo" sin haberlo visto funcionar.
+  - Para contraste: mide píxeles reales compuestos, no calcules.
+  - Para responsive: prueba a 375px de ancho y en modo oscuro.
+  - Para datos: valida contra una fuente independiente antes de confiar.
+
+DI LA VERDAD SOBRE EL ESTADO
+----------------------------
+  - Si algo es placeholder, dilo. Si es estructura y no seguridad, dilo.
+  - Si encuentras una discrepancia en los datos del cliente, REPÓRTALA en vez de
+    elegir tú una cifra. (Ejemplo real: el estado de resultado del cliente daba
+    7% menos que el sistema fiscal. Esa decisión es del dueño, no tuya.)
+  - Si te equivocaste, corrígelo explícitamente y sigue.
+
+PREGUNTA ANTES DE CONSTRUIR LO IRREVERSIBLE
+-------------------------------------------
+  Haz rondas de preguntas ANTES de modelar el dominio. Especialmente:
+  qué distingue un registro de otro, quién puede ver qué, y qué pasa cuando
+  alguien se equivoca (¿se puede revertir?).
+
+NO ACUMULES CÓDIGO SOBRE CÓDIGO
+-------------------------------
+  Cuando una decisión estructural cambie (ej. multiempresa), REFACTORIZA antes
+  de seguir agregando funcionalidad encima.
+
+DOCUMENTA MIENTRAS CONSTRUYES
+-----------------------------
+  Mantén docs/decisions/*.md con las reglas de negocio confirmadas y un
+  project_state.md con dónde estás. Marca como PROVISIONAL lo que diseñaste sin
+  confirmar con el cliente.
+
+
+===============================================================================
+ 9. ORDEN DE CONSTRUCCIÓN (por fases — no pidas todo de golpe)
+===============================================================================
+
+FASE 0 — Entender
+  Entrevista al usuario sobre el negocio. Mapea los archivos reales que ya usa.
+  NO escribas código todavía.
+
+FASE 1 — Esqueleto
+  Layout (sidebar + header), sistema de diseño con tokens, tema claro/oscuro,
+  navegación, landing. Multiempresa si aplica.
+
+FASE 2 — Datos reales
+  Carga los datos reales del cliente como semilla. Nada de datos inventados:
+  con datos reales aparecen los problemas reales desde el principio.
+
+FASE 3 — Módulo núcleo
+  El que resuelve el problema principal. Con datos reales ya cargados.
+
+FASE 4 — Módulos de apoyo
+  Documentos, finanzas, reportes.
+
+FASE 5 — Auditoría de diseño
+  Contraste medido, áreas táctiles, tablas con orden/paginación, móvil, modo
+  oscuro, estados de carga.
+
+FASE 6 — Backend
+  Supabase: esquema, RLS por empresa y rol, auth, migrar los stores (mismas
+  firmas), importadores con idempotencia, tareas programadas.
+  IMPORTANTE: plan con backups ANTES de meter datos reales de trabajo.
+
+
+===============================================================================
+ 10. ANTI-PATRONES (no hagas esto)
+===============================================================================
+
+  ✗ Duplicar páginas por empresa/sucursal.
+  ✗ Un solo color de marca para tema claro y oscuro.
+  ✗ Tablas sin paginación cuando hay miles de filas.
+  ✗ Indicar estado solo con color.
+  ✗ Renderizar 0 mientras cargan los datos.
+  ✗ Inventar catálogos que el cliente ya tiene en Excel.
+  ✗ Elegir tú entre dos cifras que no cuadran.
+  ✗ Decir "listo" sin haberlo ejercido en el navegador.
+  ✗ Confiar en permisos de front como si fueran seguridad.
+  ✗ Escribir en el sistema externo del cliente.
+
+
+===============================================================================
+ FIN
+===============================================================================

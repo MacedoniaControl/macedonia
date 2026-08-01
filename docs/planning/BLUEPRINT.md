@@ -3,6 +3,8 @@
 > **Qué es este documento.** El plano completo para **replicar o reconstruir** este sistema.
 > Está escrito para que otra persona —o otra IA— pueda retomarlo sin conocer la historia previa.
 > Si solo quieres saber **en qué punto está el proyecto hoy**, lee `project_state.md`.
+> Si quieres **arrancar una app nueva** con estas lecciones, usa `PROMPT-NUEVA-APP.txt`
+> (este mismo blueprint convertido en prompt para Claude Code).
 >
 > Última actualización: 2026-07-31
 
