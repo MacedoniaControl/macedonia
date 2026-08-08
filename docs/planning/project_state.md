@@ -68,7 +68,8 @@ El tema y el menú se aplican solos según la URL. Detalle en `BLUEPRINT.md` §3
 
 1. **Cilindros** con el proceso real — falta responder: ¿serie individual o cantidades?, ¿comodato?,
    ¿estados?, ¿se rellenan o se compran llenos?, ¿paso a paso del técnico?
-2. **Backend**: Supabase (Postgres + Auth + RLS). Ver `BLUEPRINT.md` §9.
+2. **Backend**: Supabase (Postgres + Auth + RLS). **Código ya preparado** en `supabase/*.sql` +
+   `lib/supabase/*`; receta en `docs/backend/SUPABASE-SETUP.md`. Falta ejecutarlo.
 3. **Importadores diarios** con idempotencia y reversión.
 4. **Estado de Resultado** armado en Matrices.
 5. Conectar documentos al kardex — ⚠️ resolver el **doble descuento** (NE de Macedonia vs export de Valery).
