@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -23,8 +24,9 @@ const toneOf: Record<Estado, Tone> = { Abierta: "info", "Recibida parcial": "war
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function PurchasesPage() {
-  const [ordenes, setOrdenes] = usePersistedState<Orden[]>("oc:lista", []);
-  const [seq, setSeq] = usePersistedState("oc:seq", 17);
+  const empresaKey = useEmpresaActiva();
+  const [ordenes, setOrdenes] = usePersistedState<Orden[]>(`oc:lista:${empresaKey}`, []);
+  const [seq, setSeq] = usePersistedState(`oc:seq:${empresaKey}`, 17);
   const [prov, setProv] = useState(PROVEEDORES[0]);
   const [prod, setProd] = useState(PRODUCTOS[0].n);
   const [qty, setQty] = useState(10);

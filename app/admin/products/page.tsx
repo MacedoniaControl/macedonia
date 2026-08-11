@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -36,7 +37,8 @@ const SEED: Prod[] = [
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function ProductsPage() {
-  const [prods, setProds] = usePersistedState<Prod[]>("prod:lista", SEED);
+  const empresaKey = useEmpresaActiva();
+  const [prods, setProds] = usePersistedState<Prod[]>(`prod:lista:${empresaKey}`, SEED);
   const [q, setQ] = useState("");
   const [nombre, setNombre] = useState("");
   const [cat, setCat] = useState(Object.keys(CATS)[0]);

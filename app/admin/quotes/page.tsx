@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -52,8 +53,9 @@ const SEED: Cotizacion[] = [
 ];
 
 export default function QuotesPage() {
-  const [cots, setCots] = usePersistedState<Cotizacion[]>("cot:docs", SEED);
-  const [seq, setSeq] = usePersistedState("cot:seq", 2243);
+  const empresaKey = useEmpresaActiva();
+  const [cots, setCots] = usePersistedState<Cotizacion[]>(`cot:docs:${empresaKey}`, SEED);
+  const [seq, setSeq] = usePersistedState(`cot:seq:${empresaKey}`, 2243);
   // "Generar presupuesto" es el apartado principal (lo que más se usa).
   const [tab, setTab] = useState<"registro" | "gen" | "subir">("gen");
   const [period, setPeriod] = useState("mes");

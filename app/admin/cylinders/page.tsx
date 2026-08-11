@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useNotifications, addNotif, updateNotif, type Notif } from "@/lib/ux/notifications";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -75,9 +76,10 @@ function aplicar(e: EstadosGas, op: string, q: number): { e: EstadosGas; nota: s
 }
 
 export default function CylindersPage() {
-  const [gases, setGases] = usePersistedState<string[]>("cyl:gases", GASES_BASE);
-  const [inv, setInv] = usePersistedState<Inventario>("cyl:inv", INV_BASE);
-  const [movs, setMovs] = usePersistedState<Mov[]>("cyl:movs", []);
+  const empresaKey = useEmpresaActiva();
+  const [gases, setGases] = usePersistedState<string[]>(`cyl:gases:${empresaKey}`, GASES_BASE);
+  const [inv, setInv] = usePersistedState<Inventario>(`cyl:inv:${empresaKey}`, INV_BASE);
+  const [movs, setMovs] = usePersistedState<Mov[]>(`cyl:movs:${empresaKey}`, []);
   const notifs = useNotifications();
 
   const [gas, setGas] = useState(GASES_BASE[0]);

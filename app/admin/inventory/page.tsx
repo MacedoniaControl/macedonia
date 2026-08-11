@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { downloadCsv } from "@/lib/ux/export-csv";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { addNotif } from "@/lib/ux/notifications";
 import {
@@ -36,13 +36,12 @@ type Tab = "master" | "movimientos" | "fisico" | "s" | "fiscal";
 type MasterView = "fisico" | "espera-ne" | "espera-factura";
 
 export default function InventoryPage() {
-  // Empresa activa según la ruta /admin/<empresa>/inventory (consolidado -> sumigases).
-  const pathname = usePathname();
-  const empresa = (pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/)?.[1] ?? "sumigases") as string;
+  // Empresa activa según la ruta (consolidado -> sumigases).
+  const empresa = useEmpresaActiva();
   const [tab, setTab] = useState<Tab>("master");
   const [q, setQ] = useState("");
-  const [sItems, setSItems] = usePersistedState<SItem[]>("inv-s", []);
-  const { notas, ledger, ready } = useFiscal();
+  const [sItems, setSItems] = usePersistedState<SItem[]>(`inv-s:${empresa}`, []);
+  const { notas, ledger, ready } = useFiscal(empresa);
   const [masterView, setMasterView] = useState<MasterView>("fisico");
   const [fisView, setFisView] = useState<"existencias" | "rotacion">("existencias");
   const [placeholder, setPlaceholder] = useState("");
@@ -275,7 +274,7 @@ export default function InventoryPage() {
       {tab === "fiscal" && (
         <>
           <div className="mb-3 flex justify-end"><StubBtn area="Regularización fiscal" /></div>
-          <FiscalRegularization />
+          <FiscalRegularization empresa={empresa} />
         </>
       )}
 

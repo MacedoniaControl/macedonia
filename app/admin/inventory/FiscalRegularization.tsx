@@ -20,8 +20,8 @@ import {
 
 const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
-export function FiscalRegularization() {
-  const { notas, ledger } = useFiscal();
+export function FiscalRegularization({ empresa = "sumigases" }: { empresa?: string }) {
+  const { notas, ledger } = useFiscal(empresa);
   const [directa, setDirecta] = useState<NotaEntrega | null>(null);
   const [wizard, setWizard] = useState<NotaEntrega | null>(null);
   const [flash, setFlash] = useState("");
@@ -144,8 +144,8 @@ export function FiscalRegularization() {
         </>
       )}
 
-      {directa && <ModalDirecta nota={directa} ledger={ledger} onClose={() => setDirecta(null)} onDone={onDone} />}
-      {wizard && <WizardRegularizacion nota={wizard} ledger={ledger} onClose={() => setWizard(null)} onDone={onDone} />}
+      {directa && <ModalDirecta empresa={empresa} nota={directa} ledger={ledger} onClose={() => setDirecta(null)} onDone={onDone} />}
+      {wizard && <WizardRegularizacion empresa={empresa} nota={wizard} ledger={ledger} onClose={() => setWizard(null)} onDone={onDone} />}
     </>
   );
 }
@@ -170,7 +170,7 @@ function ImpactoLinea({ codigo, cantidad, ledger }: { codigo: string; cantidad: 
 }
 
 // ---------------------------------------------------------------- Flujo A · confirmación directa
-function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; ledger: FiscalTx[]; onClose: () => void; onDone: (f: string) => void }) {
+function ModalDirecta({ empresa, nota, ledger, onClose, onDone }: { empresa: string; nota: NotaEntrega; ledger: FiscalTx[]; onClose: () => void; onDone: (f: string) => void }) {
   const [facturaValery, setFacturaValery] = useState("");
   const ok = facturaValery.trim().length > 0;
   return (
@@ -205,7 +205,7 @@ function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; le
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
         <Button disabled={!ok} className="bg-ok-strong text-white hover:brightness-90 disabled:bg-ok-strong" icon="check"
-          onClick={() => { const { factura } = convertirDirecta(nota.id, facturaValery); onDone(factura); }}>
+          onClick={() => { const { factura } = convertirDirecta(nota.id, facturaValery, empresa); onDone(factura); }}>
           Confirmar y facturar
         </Button>
       </div>
@@ -214,7 +214,7 @@ function ModalDirecta({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; le
 }
 
 // ---------------------------------------------------------------- Flujo B · wizard
-function WizardRegularizacion({ nota, ledger, onClose, onDone }: { nota: NotaEntrega; ledger: FiscalTx[]; onClose: () => void; onDone: (f: string) => void }) {
+function WizardRegularizacion({ empresa, nota, ledger, onClose, onDone }: { empresa: string; nota: NotaEntrega; ledger: FiscalTx[]; onClose: () => void; onDone: (f: string) => void }) {
   const [paso, setPaso] = useState(1);
   const [compra, setCompra] = useState<CompraProveedor>({ facturaProveedor: "", proveedor: "", costo: 0 });
   const [facturaValery, setFacturaValery] = useState("");
@@ -298,7 +298,7 @@ function WizardRegularizacion({ nota, ledger, onClose, onDone }: { nota: NotaEnt
           <div className="mt-5 flex justify-between gap-2">
             <Button variant="secondary" onClick={() => setPaso(1)}>Atrás</Button>
             <Button disabled={!okFactura} className="bg-warn-strong text-white hover:brightness-90"
-              onClick={() => { const { factura } = regularizarEnBloque(nota.id, compra, facturaValery); onDone(factura); }}>
+              onClick={() => { const { factura } = regularizarEnBloque(nota.id, compra, facturaValery, empresa); onDone(factura); }}>
               Ejecutar Regularización
             </Button>
           </div>

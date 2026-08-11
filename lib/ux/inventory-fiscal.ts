@@ -42,8 +42,10 @@ export type FiscalTx = {
 };
 
 // ---------------------------------------------------------------- persistencia (demo)
-const K_NOTAS = "sumi:fiscal-notas";
-const K_LEDGER = "sumi:fiscal-ledger";
+// Claves AISLADAS POR EMPRESA: las notas pendientes y el ledger fiscal de
+// Sumigases y Sudematin nunca deben compartirse.
+const kNotas = (empresa: string) => `sumi:fiscal-notas:${empresa}`;
+const kLedger = (empresa: string) => `sumi:fiscal-ledger:${empresa}`;
 const EV = "sumi:fiscal";
 
 function read<T>(key: string, fallback: T): T {
@@ -64,20 +66,22 @@ function write<T>(key: string, val: T) {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(EV));
 }
 
-export function getNotas(): NotaEntrega[] {
-  const stored = read<NotaEntrega[] | null>(K_NOTAS, null);
+export function getNotas(empresa = "sumigases"): NotaEntrega[] {
+  const stored = read<NotaEntrega[] | null>(kNotas(empresa), null);
   if (stored) return stored;
-  write(K_NOTAS, SEED_NOTAS);
+  // Semilla de demo solo para Sumigases; Sudematin arranca vacío.
+  if (empresa !== "sumigases") return [];
+  write(kNotas(empresa), SEED_NOTAS);
   return SEED_NOTAS;
 }
-export function getLedger(): FiscalTx[] {
-  return read<FiscalTx[]>(K_LEDGER, []);
+export function getLedger(empresa = "sumigases"): FiscalTx[] {
+  return read<FiscalTx[]>(kLedger(empresa), []);
 }
-function saveNotas(list: NotaEntrega[]) {
-  write(K_NOTAS, list);
+function saveNotas(list: NotaEntrega[], empresa: string) {
+  write(kNotas(empresa), list);
 }
-function appendLedger(txs: FiscalTx[]) {
-  write(K_LEDGER, [...txs, ...getLedger()]);
+function appendLedger(txs: FiscalTx[], empresa: string) {
+  write(kLedger(empresa), [...txs, ...getLedger(empresa)]);
 }
 
 export function subscribeFiscal(cb: () => void) {
@@ -89,7 +93,7 @@ export function subscribeFiscal(cb: () => void) {
     window.removeEventListener("storage", h);
   };
 }
-export function useFiscal() {
+export function useFiscal(empresa = "sumigases") {
   // `ready` distingue "aún no hidratado" de "hidratado y vacío": sin esto el
   // servidor pinta 0 y al hidratar salta al valor real (parpadeo de dato falso).
   const [state, setState] = useState<{ notas: NotaEntrega[]; ledger: FiscalTx[]; ready: boolean }>({
@@ -98,11 +102,11 @@ export function useFiscal() {
     ready: false,
   });
   useEffect(() => {
-    const load = () => setState({ notas: getNotas(), ledger: getLedger(), ready: true });
+    const load = () => setState({ notas: getNotas(empresa), ledger: getLedger(empresa), ready: true });
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     return subscribeFiscal(load);
-  }, []);
+  }, [empresa]);
   return state;
 }
 
@@ -154,8 +158,8 @@ function alertaFactura(nota: NotaEntrega, facturaValery: string, flujo: "A" | "B
 // ---------------------------------------------------------------- CONTROLLER · Flujo A
 // Hay stock fiscal (V >= cantidad). Descuenta V, S se salda (+cant), M intacto.
 // facturaValery = código de la factura ya subida a Valery (obligatorio).
-export function convertirDirecta(notaId: string, facturaValery: string): { factura: string; txs: FiscalTx[] } {
-  const notas = getNotas();
+export function convertirDirecta(notaId: string, facturaValery: string, empresa = "sumigases"): { factura: string; txs: FiscalTx[] } {
+  const notas = getNotas(empresa);
   const nota = notas.find((n) => n.id === notaId);
   if (!nota || nota.estado === "facturada") throw new Error("Nota no disponible");
   const factura = facturaValery.trim();
@@ -174,8 +178,8 @@ export function convertirDirecta(notaId: string, facturaValery: string): { factu
     fecha,
     meta: { factura },
   }));
-  appendLedger(txs);
-  saveNotas(notas.map((n) => (n.id === notaId ? { ...n, estado: "facturada", flujo: "A", facturaFiscal: factura } : n)));
+  appendLedger(txs, empresa);
+  saveNotas(notas.map((n) => (n.id === notaId ? { ...n, estado: "facturada", flujo: "A", facturaFiscal: factura } : n)), empresa);
   alertaFactura(nota, factura, "A");
   return { factura, txs };
 }
@@ -183,14 +187,14 @@ export function convertirDirecta(notaId: string, facturaValery: string): { factu
 // ---------------------------------------------------------------- CONTROLLER · Flujo B
 // No hay stock fiscal. Wizard: 1) inyecta Compra (V sube el déficit), 2) emite Venta (V baja cant).
 // M intacto (afectaInventarioReal=false); S se salda (+cant).
-export function regularizarEnBloque(notaId: string, compra: CompraProveedor, facturaValery: string): { factura: string; txs: FiscalTx[] } {
-  const notas = getNotas();
+export function regularizarEnBloque(notaId: string, compra: CompraProveedor, facturaValery: string, empresa = "sumigases"): { factura: string; txs: FiscalTx[] } {
+  const notas = getNotas(empresa);
   const nota = notas.find((n) => n.id === notaId);
   if (!nota || nota.estado === "facturada") throw new Error("Nota no disponible");
   const factura = facturaValery.trim();
   if (!factura) throw new Error("Falta el código de la factura de Valery");
   const fecha = new Date().toISOString();
-  const ledger = getLedger();
+  const ledger = getLedger(empresa);
   const txs: FiscalTx[] = [];
   for (const l of nota.lineas) {
     const vActual = stockValery(l.codigo, ledger);
@@ -226,8 +230,8 @@ export function regularizarEnBloque(notaId: string, compra: CompraProveedor, fac
       meta: { factura },
     });
   }
-  appendLedger(txs);
-  saveNotas(notas.map((n) => (n.id === notaId ? { ...n, estado: "facturada", flujo: "B", facturaFiscal: factura, compra } : n)));
+  appendLedger(txs, empresa);
+  saveNotas(notas.map((n) => (n.id === notaId ? { ...n, estado: "facturada", flujo: "B", facturaFiscal: factura, compra } : n)), empresa);
   alertaFactura(nota, factura, "B");
   return { factura, txs };
 }

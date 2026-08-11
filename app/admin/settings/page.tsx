@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
@@ -40,7 +41,8 @@ const metodos = [
 ];
 
 export default function SettingsPage() {
-  const [saved, setSaved] = usePersistedState<Config>("config", DEFAULTS);
+  const empresaKey = useEmpresaActiva();
+  const [saved, setSaved] = usePersistedState<Config>(`config:${empresaKey}`, DEFAULTS);
   const [form, setForm] = useState<Config>(saved);
   const [msg, setMsg] = useState("");
   const set = (k: keyof Config) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

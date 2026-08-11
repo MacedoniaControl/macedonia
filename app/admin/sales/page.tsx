@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -22,8 +23,9 @@ const PRODUCTOS = [
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function SalesPage() {
-  const [ventas, setVentas] = usePersistedState<Venta[]>("nv:lista", []);
-  const [seq, setSeq] = usePersistedState("nv:seq", 189);
+  const empresaKey = useEmpresaActiva();
+  const [ventas, setVentas] = usePersistedState<Venta[]>(`nv:lista:${empresaKey}`, []);
+  const [seq, setSeq] = usePersistedState(`nv:seq:${empresaKey}`, 189);
   const [cliente, setCliente] = useState(CLIENTES[0]);
   const [prod, setProd] = useState(PRODUCTOS[0].n);
   const [qty, setQty] = useState(1);

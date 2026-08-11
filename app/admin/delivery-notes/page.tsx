@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -43,9 +44,10 @@ function inPeriod(fecha: string, period: string): boolean {
 }
 
 export default function DeliveryNotesPage() {
-  const [docs, setDocs] = usePersistedState<Doc[]>("ne:docs", SEED);
-  const [seqNE, setSeqNE] = usePersistedState("ne:seqNE", 8204);
-  const [seqDev, setSeqDev] = usePersistedState("ne:seqDev", 604);
+  const empresaKey = useEmpresaActiva();
+  const [docs, setDocs] = usePersistedState<Doc[]>(`ne:docs:${empresaKey}`, SEED);
+  const [seqNE, setSeqNE] = usePersistedState(`ne:seqNE:${empresaKey}`, 8204);
+  const [seqDev, setSeqDev] = usePersistedState(`ne:seqDev:${empresaKey}`, 604);
   // "Generar nota de entrega" es el apartado principal; el Registro va de último y es solo OWNER.
   const [tab, setTab] = useState<"registro" | "ne" | "dev" | "subir">("ne");
   const { rol } = useRol();
