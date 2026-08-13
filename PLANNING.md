@@ -8,27 +8,6 @@ SumiControl es una plataforma SaaS operativa interna para Sumigases Oriente C.A.
 
 La demo debe ser funcional en los flujos críticos, usando data real cuando esté disponible y data simulada solo donde falte información. No se presenta como ERP terminado, sino como primera versión funcional avanzada.
 
-## Estado actualizado
-
-Actualizado por Salem/Codex-Salem:
-
-- La base administrativa de UI ya fue montada en `main`.
-- `/admin` y `/admin/dashboard` tienen dashboard operativo con KPIs demo, filtros por empresa/periodo y alertas ejecutivas.
-- `/admin/reports` tiene reportes demo con busqueda, filtros y exportacion CSV.
-- `/admin/alerts` tiene bandeja demo de alertas operativas.
-- El sidebar administrativo ya tiene pantallas base para productos, inventario, POS, cotizaciones, notas de entrega, ventas, caja, cuentas, cilindros, importaciones y configuracion.
-- Existen componentes reutilizables para UI: botones, badges, cards, metric cards, tablas, filtros, formularios, layout admin, placeholders de modulo, charts demo y workspaces de dashboard/reportes.
-- La data demo de admin vive en `lib/demo-data/admin.ts`.
-
-Pendiente para desbloquear integracion funcional:
-
-- Auth/login propio.
-- Roles y permisos.
-- Selector real de empresa.
-- Modelos Prisma/Supabase.
-- Contratos de datos para dashboard, reportes, productos, inventario, caja y ventas.
-- Reemplazar mocks por data real o importada.
-
 ## Stack confirmado
 
 - Next.js
@@ -60,8 +39,6 @@ feature/* -> dev -> main
 ```
 
 Cada rama debe actualizar su archivo de progreso en `/docs/progress`.
-
-Nota actual: Pantera95 autorizo montar directamente `feature/ui-system` en `main` para acelerar la demo. A partir de este punto conviene volver al flujo normal `feature/* -> dev/main` con cambios pequenos y documentados.
 
 ## Ramas sugeridas
 

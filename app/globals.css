@@ -1,23 +1,94 @@
 @import "tailwindcss";
 
+/* Modo oscuro por clase en <html> (Tailwind v4) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Identidad visual SumiControl: azul marino, naranja Sumigases, blanco, grises, amarillo de acento */
+@theme {
+  /* El naranja de marca también cambia por tema: #ea6a1e solo da 3.19:1 sobre blanco. */
+  --color-brand: var(--brand);
+  --color-brand-600: #d65f17;
+  --color-brand-soft: rgba(234, 106, 30, 0.12);
+  --color-navy: #0b2545;
+  --color-navy-700: #123a6b;
+  --color-accent: #f5c542;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+
+  /* Los 4 semánticos cambian por tema: un mismo tono no llega a 4.5:1 en ambos fondos.
+     Claro necesita versiones oscuras; oscuro necesita versiones claras. */
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* Variantes "strong": únicas válidas como FONDO con texto blanco (>=4.5:1 AA).
+     Los tonos base de arriba se siguen usando como texto/icono sobre fondo claro. */
+  --color-brand-strong: #bf5618;
+  --color-ok-strong: #12883e;
+  --color-warn-strong: #b16104;
+
+  /* Borde de controles de formulario (WCAG 1.4.11 exige 3:1 en UI no textual).
+     El --color-border suave se reserva para divisores decorativos. */
+  --color-border-strong: var(--border-strong);
+}
+
 :root {
-  --background: #09111f;
-  --foreground: #edf2f7;
-  --panel: rgba(15, 23, 42, 0.82);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted-foreground: #94a3b8;
-  --color-surface: #101a2b;
-  --color-surface-raised: #142238;
-  --color-sidebar: #06111f;
-  --color-topbar: rgba(9, 17, 31, 0.9);
-  --color-border: rgba(148, 163, 184, 0.18);
-  --color-border-strong: rgba(148, 163, 184, 0.3);
-  --color-brand-navy: #0a2342;
-  --color-brand-orange: #f97316;
-  --color-brand-orange-strong: #ea580c;
-  --color-brand-yellow: #facc15;
-  --color-chart-backdrop: #0d1728;
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #f8fafd;
+  --border: #e2e8f0;
+  --border-strong: #8c9095; /* 3.07:1 sobre surface-2, 3.21:1 sobre blanco */
+  --text: #0f1b2d;
+  --muted: #5b6b82;
+  --brand: #b04e15; /* 5.32:1 plano · 4.63:1 sobre tinte de badge */
+  --ok: #107c38; /* 5.30:1 plano · 4.62:1 sobre tinte */
+  --warn: #a25903; /* 5.29:1 plano · 4.62:1 sobre tinte */
+  --danger: #ce2323; /* 5.40:1 plano · 4.60:1 sobre tinte */
+  --info: #2461e7; /* 5.33:1 plano · 4.63:1 sobre tinte */
+}
+
+.dark {
+  --bg: #060d18;
+  --surface: #0d1a2e;
+  --surface-2: #0b1626;
+  --border: #1e304d;
+  --border-strong: #5a677d; /* 3.05:1 sobre surface oscuro */
+  --text: #e8eef6;
+  --muted: #93a4bc;
+  --brand: #ea6a1e; /* 5.46:1 sobre surface oscuro */
+  --ok: #16a34a; /* 5.29:1 sobre surface oscuro */
+  --warn: #d97706; /* 5.47:1 sobre surface oscuro */
+  --danger: #e56161; /* 5.16:1 plano · 4.65:1 sobre tinte */
+  --info: #5c8aef; /* 5.26:1 plano · 4.61:1 sobre tinte */
+}
+
+/* Tema por empresa: se aplica con la clase theme-<id> en un contenedor.
+   Sumigases = naranja (default de la app); Sudematin = azul índigo (su logo). */
+.theme-sumigases {
+  --color-brand: #b04e15;
+  --color-brand-strong: #bf5618;
+  --color-brand-soft: rgba(234, 106, 30, 0.12);
+}
+.dark .theme-sumigases {
+  --color-brand: #ea6a1e;
+  --color-brand-strong: #bf5618;
+  --color-brand-soft: rgba(234, 106, 30, 0.12);
+}
+.theme-sudematin {
+  --color-brand: #2a2a8c;
+  --color-brand-strong: #2a2a8c;
+  --color-brand-soft: rgba(42, 42, 140, 0.1);
+}
+.dark .theme-sudematin {
+  --color-brand: #8f8fe8;
+  --color-brand-strong: #3a3aad;
+  --color-brand-soft: rgba(120, 120, 230, 0.14);
 }
 
 * {
@@ -31,12 +102,11 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(251, 191, 36, 0.18), transparent 28%),
-    radial-gradient(circle at 85% 18%, rgba(34, 211, 238, 0.16), transparent 24%),
-    linear-gradient(180deg, #08111d 0%, #0b1323 46%, #050914 100%);
-  color: var(--foreground);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body), "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -44,18 +114,64 @@ a {
   text-decoration: none;
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
+/* Foco visible accesible en cualquier control */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
-code {
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.72);
-  padding: 0.15rem 0.5rem;
-  font-family: "SFMono-Regular", "Menlo", monospace;
-  font-size: 0.9em;
+/* Respeta la preferencia del sistema de reducir movimiento (vestibular). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Placeholder de carga: evita mostrar un dato incorrecto mientras se hidrata. */
+.sumi-skeleton {
+  border-radius: 0.5rem;
+  background: var(--surface-2);
+  animation: sumi-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sumi-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.sumi-scroll {
+  scrollbar-width: thin;
+}
+
+/* Cifras de ancho fijo: sin esto las columnas de dinero/existencias
+   "bailan" verticalmente al cambiar de fila. */
+table td,
+table th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tiras de pestañas: en móvil se desplazan en horizontal en vez de
+   partirse en varias filas irregulares. */
+.sumi-tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sumi-tabs::-webkit-scrollbar {
+  display: none;
+}
+.sumi-tabs > * {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  letter-spacing: -0.01em;
 }

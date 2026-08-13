@@ -1,0 +1,271 @@
+===============================================================================
+ MACEDONIA - MANUAL DEL ESCANER DE CODIGOS
+ Donde se usa: Notas de entrega y Cotizaciones (al cargar renglones)
+ https://sumicontrol.vercel.app
+===============================================================================
+
+ Este manual tiene dos partes:
+
+   PARTE A - CONFIGURACION DEL LECTOR (se hace UNA SOLA VEZ, por el tecnico)
+   PARTE B - USO DIARIO (para el operador)
+   PARTE C - SOLUCION DE PROBLEMAS
+   PARTE D - NOTAS IMPORTANTES
+
+ Ultima actualizacion: 2026-07-10
+
+
+===============================================================================
+ PARTE A - CONFIGURACION DEL LECTOR  (una sola vez)
+===============================================================================
+
+ A.1) QUE LECTOR SIRVE
+ ---------------------
+ Cualquier lector de codigo de barras USB que funcione en modo "HID" o
+ "emulacion de teclado" (keyboard wedge). Es el tipo mas comun y el mas barato.
+ El lector "teclea" el codigo como si fuera un teclado y al final manda un ENTER.
+
+ NO necesitas instalar ningun driver ni programa. NO necesitas configurar nada
+ dentro de Macedonia.
+
+ Si tu lector es de otro tipo (puerto serial/COM, punto de venta, o de camara),
+ avisa al equipo tecnico ANTES: requiere otra configuracion.
+
+
+ A.2) CONECTAR
+ -------------
+ 1. Enchufa el lector a un puerto USB de la computadora.
+ 2. Espera unos segundos. El sistema lo reconoce solo, como un teclado.
+ 3. El lector suele emitir un pitido al encender.
+
+
+ A.3) LOS 3 AJUSTES QUE IMPORTAN
+ -------------------------------
+ Los lectores se configuran escaneando codigos de barras especiales que vienen
+ en SU PROPIO MANUAL (el folleto de papel de la caja). Busca en ese folleto:
+
+   AJUSTE 1 - SUFIJO ENTER   *** EL MAS IMPORTANTE ***
+     Busca el codigo de configuracion llamado:
+         "Add CR suffix" / "Enter suffix" / "Sufijo CR" / "Terminator: CR"
+     Escanealo una vez.
+
+     Para que sirve: hace que el lector mande ENTER al terminar cada lectura.
+     SIN ESTO EL ESCANER NO FUNCIONA: el codigo aparecera en el campo pero
+     nunca se buscara.
+
+   AJUSTE 2 - SIN PREFIJOS
+     Asegurate de que NO tenga activado ningun prefijo o sufijo extra
+     (busca "Clear all prefix/suffix" o "Restore defaults" y luego aplica
+     solo el AJUSTE 1).
+
+     Para que sirve: si el lector agrega caracteres extra, el codigo no se
+     encuentra.
+
+   AJUSTE 3 - DISTRIBUCION DE TECLADO
+     Busca "Keyboard country" / "Keyboard layout".
+     Debe coincidir con el teclado de la computadora:
+         - Teclado en espanol  -> Spanish / Latin America
+         - Teclado en ingles   -> USA / English
+
+     Para que sirve: los codigos de Valery llevan guiones y letras
+     (ejemplo: 0-290-631, TAWG12). Si la distribucion no coincide, los
+     guiones y simbolos salen cambiados y el codigo no se encuentra.
+
+
+ A.4) PROBAR ANTES DE USAR
+ -------------------------
+ 1. Abre el Bloc de notas (o cualquier editor de texto).
+ 2. Haz clic dentro para que el cursor parpadee.
+ 3. Escanea cualquier producto.
+
+ DEBE PASAR ESTO:
+   - Aparece el codigo completo (ej: 00001002)
+   - El cursor SALTA A LA LINEA SIGUIENTE por si solo
+
+ Si el cursor NO salta de linea  -> falta el AJUSTE 1 (sufijo Enter).
+ Si salen caracteres raros       -> revisa el AJUSTE 3 (teclado).
+ Si no aparece nada              -> prueba otro puerto USB / otro cable.
+
+ Cuando el Bloc de notas funcione bien, el escaner funcionara en Macedonia.
+
+
+===============================================================================
+ PARTE B - USO DIARIO  (operador)
+===============================================================================
+
+ B.1) DONDE ESTA EL ESCANER
+ --------------------------
+ El escaner NO es un modulo aparte: esta dentro de los documentos donde
+ realmente se usa, al momento de cargar los productos.
+
+ PARA UNA NOTA DE ENTREGA:
+ 1. Entra a Macedonia:  https://sumicontrol.vercel.app
+ 2. Elige la empresa (Sumigases o Sudematin).
+ 3. Menu izquierdo ->  NOTAS DE ENTREGA
+ 4. Pestana  GENERAR NOTA DE ENTREGA
+ 5. El escaner esta en el panel  RENGLONES  (derecha).
+
+ PARA UNA COTIZACION / PRESUPUESTO:
+ 1. Menu izquierdo ->  COTIZACIONES
+ 2. Pestana  GENERAR PRESUPUESTO  (es la que abre por defecto)
+ 3. El escaner esta en el panel  RENGLONES  (derecha).
+
+ Al escanear, el producto se agrega solo como renglon del documento.
+ Si escaneas el mismo producto otra vez, sube la cantidad.
+
+ NOTA: junto al escaner hay un BUSCADOR de productos. Si la etiqueta esta
+ borrada o el lector no lee, escribe ahi el codigo o el nombre y elige el
+ producto de la lista.
+
+
+ B.2) LOS 2 ESTADOS - MIRA SIEMPRE EL LETRERO
+ --------------------------------------------
+ Antes de disparar el lector, mira el letrero grande de arriba:
+
+   +---------------------------------------------------------------+
+   |  (o) ESCANEO ACTIVO                          [VERDE, parpadea] |
+   |      Listo para leer. Dispara el lector sobre el codigo.       |
+   +---------------------------------------------------------------+
+     -> TODO BIEN. Puedes escanear.
+
+   +---------------------------------------------------------------+
+   |  (o) PAUSADO - haz clic aqui para reanudar        [NARANJA]    |
+   |      El campo perdio el foco: los escaneos NO se registran.    |
+   +---------------------------------------------------------------+
+     -> ATENCION: si disparas asi, LA LECTURA SE PIERDE.
+        Haz clic sobre el letrero naranja y volvera a ACTIVO.
+        Esto pasa si hiciste clic en otra parte de la pantalla.
+
+ REGLA DE ORO: si el letrero no esta VERDE, no escanees.
+
+
+ B.3) ESCANEAR
+ -------------
+ 1. Verifica que el letrero diga ESCANEO ACTIVO (verde).
+ 2. Apunta el lector al codigo de barras y dispara.
+ 3. El resultado aparece de inmediato, con un pitido.
+
+ El campo se limpia solo y queda listo para el siguiente. Puedes escanear
+ uno tras otro sin tocar nada.
+
+
+ B.4) ENTENDER EL RESULTADO
+ --------------------------
+ PRODUCTO ENCONTRADO  (mensaje VERDE + pitido agudo)
+   El producto se agrega como RENGLON del documento, con cantidad 1.
+   Si escaneas el mismo producto otra vez, la cantidad sube a 2, 3...
+   El mensaje avisa: "<producto> agregado - falta indicar el precio".
+
+   IMPORTANTE: el catalogo de Valery NO trae precios. El renglon entra con
+   precio 0 y aparece marcado en ROJO. Escribe el precio en la tabla de
+   renglones antes de generar el documento.
+
+ CODIGO NO ENCONTRADO  (mensaje ROJO + pitido grave)
+   Ese codigo no existe en el catalogo de Valery.
+   Que hacer:
+     1. Vuelve a escanear (pudo ser una lectura parcial).
+     2. Revisa que el codigo del producto sea el de Valery.
+     3. Si insiste, anotalo y reportalo al supervisor.
+
+
+ B.5) SI EL LECTOR NO LEE (BUSCADOR)
+ -----------------------------------
+ Si la etiqueta esta borrada o el lector no lo lee, usa el BUSCADOR que esta
+ justo debajo del escaner:
+   1. Haz clic en "Buscar producto por codigo o nombre".
+   2. Escribe al menos 2 letras del codigo o del nombre
+      (ej: "electrodo 7018" o "E7018").
+   3. Aparece una lista con el nombre, el codigo y la existencia de cada uno.
+   4. Elige el producto con el raton, o con las flechas y ENTER.
+
+ El producto se agrega igual que si lo hubieras escaneado.
+
+
+ B.6) REVISAR ANTES DE GENERAR
+ -----------------------------
+ Los productos escaneados se acumulan en la tabla de RENGLONES:
+ cantidad, producto, precio y total. Ahi puedes:
+   - Cambiar la cantidad.
+   - Escribir el precio (obligatorio: los que esten en 0 salen en rojo).
+   - Quitar un renglon con la "x".
+
+ El sistema NO deja generar el documento si algun renglon tiene precio 0.
+
+
+===============================================================================
+ PARTE C - SOLUCION DE PROBLEMAS
+===============================================================================
+
+ PROBLEMA: Escaneo y no pasa absolutamente nada.
+   1. Mira el letrero: si esta NARANJA (PAUSADO), haz clic en el y reintenta.
+   2. Si esta GRIS, pulsa "Activar escaner".
+   3. Si esta VERDE y aun asi nada -> prueba el lector en el Bloc de notas
+      (ver A.4). Si ahi tampoco escribe, es el lector/cable/USB.
+
+ PROBLEMA: El codigo aparece en el campo pero no se busca solo.
+   -> Al lector le falta el sufijo ENTER. Ver AJUSTE 1 (A.3).
+      Mientras tanto puedes pulsar ENTER a mano.
+
+ PROBLEMA: Salen letras o simbolos raros, o el guion sale mal.
+   -> Distribucion de teclado incorrecta. Ver AJUSTE 3 (A.3).
+
+ PROBLEMA: Dice "Codigo no encontrado" pero el producto existe.
+   1. Reintenta la lectura.
+   2. Verifica que sea un codigo de Valery.
+   3. Ojo con las MAYUSCULAS (ver Parte D).
+
+ PROBLEMA: La existencia sale en negativo (ej: -1).
+   -> No es un error del escaner. Asi esta en Valery. Reportalo al supervisor.
+
+ PROBLEMA: No suena el pitido.
+   -> El sonido puede estar bloqueado por el navegador. No afecta: guiate por
+      el color del mensaje (verde = agregado, rojo = no encontrado).
+
+
+===============================================================================
+ PARTE D - NOTAS IMPORTANTES
+===============================================================================
+
+ D.1) QUE HACE Y QUE NO HACE EL ESCANER
+ --------------------------------------
+ SI hace: agregar el producto como renglon del documento que estas creando
+ (nota de entrega o presupuesto).
+
+ NO hace: modificar el inventario por si solo. El inventario se mueve cuando
+ el documento se registra, no al escanear.
+
+ D.2) LAS MAYUSCULAS PUEDEN IMPORTAR
+ -----------------------------------
+ Normalmente da igual escribir "arg6" o "ARG6": el sistema lo resuelve.
+
+ PERO hay un caso real en Valery donde dos productos DISTINTOS se diferencian
+ solo por mayusculas:
+
+     6X8AT  ->  ENCERADO 6X8 AT    (45, MT2)
+     6x8AT  ->  ENCERADOS 6X8 AT   (48, 01)
+
+ Por seguridad, el sistema NO adivina: si escribes "6x8at" te dira
+ "no encontrado" en vez de mostrarte el producto equivocado.
+ En estos casos escribe el codigo EXACTO, respetando mayusculas y minusculas.
+ Escaneando con el lector esto no da problema, porque lee el codigo tal cual.
+
+ D.3) NO HAY QUE INSTALAR NADA
+ -----------------------------
+ Macedonia funciona en el navegador. El lector se comporta como un teclado.
+ No hay drivers, ni programas, ni configuracion dentro de Macedonia.
+
+ D.4) QUE CODIGOS RECONOCE
+ -------------------------
+ Los codigos del catalogo de Valery (1703 productos). Son alfanumericos y
+ pueden llevar guiones. Ejemplos reales:
+     00001002        VARILLA DE PLATA PLANA 0%
+     ARG6            ARGON CIL 6 M3
+     0-290-631       ESMERIL 4" 1/2 BOSCH 850W
+     TAWG12          TERMINALES TIPO PIN P/CABLE 12AWG
+
+ NOTA: no son codigos EAN/UPC de fabrica. Son los codigos internos de Valery.
+ Si un producto tiene pegada una etiqueta con codigo de barras que NO es el
+ codigo de Valery, no se encontrara.
+
+===============================================================================
+ FIN DEL MANUAL
+===============================================================================

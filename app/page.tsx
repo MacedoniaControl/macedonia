@@ -1,132 +1,108 @@
-const priorities = [
-  "Dashboard y KPI administrativos",
-  "Productos, categorias e inventario por almacen",
-  "Cilindros, recargas y trazabilidad",
-  "Cotizaciones, notas de entrega y POS interno",
-  "Caja, cuentas por cobrar/pagar y compras",
-  "ROI, reportes e importaciones desde Excel, Valery y Profit",
-];
+import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
+import { EMPRESAS, EMPRESA_IDS } from "@/lib/ux/empresas";
+import { getHistory } from "@/lib/ux/history-data";
+import { fmtUsd } from "@/lib/ux/format";
 
-const stack = [
-  "Next.js 16",
-  "TypeScript",
-  "Tailwind CSS 4",
-  "Prisma",
-  "PostgreSQL / Supabase",
-  "Supabase Storage",
-];
-
-const milestones = [
-  "Planning inicial ya cargado en el repo.",
-  "Rama dev creada para arrancar la implementacion.",
-  "Base App Router lista para montar auth, dashboard y modulos.",
-];
+const consolidado = getHistory("all").totals;
 
 export default function Home() {
   return (
-    <main className="min-h-screen px-6 py-10 sm:px-10 lg:px-16">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8">
-        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(253,186,116,0.16),rgba(15,23,42,0.96)_58%)] p-8 shadow-2xl shadow-black/20 sm:p-10">
-          <div className="mb-6 flex flex-wrap items-center gap-3 text-sm uppercase tracking-[0.24em] text-amber-200/80">
-            <span className="rounded-full border border-amber-300/30 bg-amber-200/10 px-3 py-1">
-              Sumigases Oriente
-            </span>
-            <span className="rounded-full border border-cyan-300/30 bg-cyan-200/10 px-3 py-1">
-              Sudematin
-            </span>
-          </div>
+    <main className="relative min-h-screen overflow-hidden">
+      {/* Fondo: halo naranja (Sumigases) a la izquierda + azul (Sudematin) a la derecha */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(48rem_26rem_at_-8%_-6%,rgba(234,106,30,0.16),transparent),radial-gradient(48rem_26rem_at_108%_-6%,rgba(42,42,140,0.20),transparent)]" />
 
-          <div className="grid gap-10 lg:grid-cols-[1.25fr_0.75fr]">
-            <div className="space-y-6">
-              <p className="text-sm font-medium uppercase tracking-[0.3em] text-amber-100/70">
-                SumiControl
-              </p>
-              <div className="space-y-4">
-                <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Plataforma operativa interna para ventas, inventario,
-                  cilindros y control administrativo.
-                </h1>
-                <p className="max-w-2xl text-base leading-8 text-slate-200/80 sm:text-lg">
-                  Esta base arranca desde el planning funcional del proyecto y
-                  queda lista para crecer sobre App Router, roles propios,
-                  modulos administrativos y conectores de importacion.
-                </p>
-              </div>
+      <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
+        <header className="flex items-center justify-between">
+          <span className="flex items-center gap-2.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-bold text-white">M</span>
+            <span className="font-semibold text-text">Macedonia</span>
+          </span>
+          <span className="hidden rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted sm:block">
+            Sumigases Oriente · Sudematin
+          </span>
+        </header>
 
-              <div className="flex flex-wrap gap-3">
-                <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white/90">
-                  Demo objetivo: viernes 19
-                </span>
-                <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white/90">
-                  Flujo: feature/* -&gt; dev -&gt; main
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-6 backdrop-blur-sm">
-              <p className="text-sm font-medium uppercase tracking-[0.28em] text-cyan-100/70">
-                Estado actual
-              </p>
-              <ul className="mt-5 space-y-4 text-sm leading-7 text-slate-100/85">
-                {milestones.map((item) => (
-                  <li
-                    key={item}
-                    className="rounded-2xl border border-white/8 bg-white/5 px-4 py-3"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <article className="rounded-[1.75rem] border border-slate-800 bg-slate-950/80 p-7 shadow-xl shadow-slate-950/20">
-            <p className="text-sm font-medium uppercase tracking-[0.26em] text-amber-200/70">
-              Prioridades de la demo
+        <section className="flex flex-1 flex-col justify-center py-12">
+          <div className="text-center">
+            <h1 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-text sm:text-5xl">
+              Centro de Control Estratégico
+            </h1>
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted sm:text-lg">
+              Elige la empresa para entrar a su panel. Cada una opera por separado — inventario,
+              cilindros, ventas, cotizaciones y rentabilidad — con sus propios números.
             </p>
-            <ol className="mt-5 space-y-3 text-sm leading-7 text-slate-200/85 sm:text-base">
-              {priorities.map((item, index) => (
-                <li
-                  key={item}
-                  className="flex items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"
+          </div>
+
+          {/* Dos puertas: una por empresa */}
+          <div className="mt-10 grid gap-5 md:grid-cols-2">
+            {EMPRESA_IDS.map((id) => {
+              const emp = EMPRESAS[id];
+              const t = getHistory(id).totals;
+              return (
+                <Link
+                  key={id}
+                  href={`/admin/${id}/dashboard`}
+                  className={`theme-${id} group flex flex-col rounded-2xl border-2 border-border bg-surface p-6 shadow-sm transition hover:border-brand hover:shadow-md focus-visible:border-brand`}
                 >
-                  <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-300/15 text-xs font-semibold text-amber-200">
-                    {index + 1}
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--color-brand-soft)" }}>
+                      <img src={emp.logo} alt="" className="h-8 w-auto max-w-[40px] object-contain" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-lg font-semibold text-text">{emp.nombreCorto}</p>
+                      <p className="text-xs text-muted">{emp.nombre} · RIF {emp.rif}</p>
+                    </div>
+                  </div>
+
+                  <dl className="mt-5 grid grid-cols-3 gap-3">
+                    <div className="min-w-0">
+                      <dt className="text-[11px] uppercase tracking-wide text-muted">Ventas hist.</dt>
+                      <dd className="truncate text-base font-semibold tabular-nums text-text">{fmtUsd(t.venta)}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-[11px] uppercase tracking-wide text-muted">Margen</dt>
+                      <dd className="text-base font-semibold tabular-nums text-text">{t.margen}%</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-[11px] uppercase tracking-wide text-muted">ROI</dt>
+                      <dd className="text-base font-semibold tabular-nums text-ok">{t.roi}%</dd>
+                    </div>
+                  </dl>
+
+                  <span className="mt-6 inline-flex items-center gap-2 self-start rounded-xl bg-brand-strong px-4 py-2.5 text-sm font-medium text-white transition group-hover:brightness-90">
+                    <Icon name="dashboard" size={16} />
+                    Entrar al Dashboard de {emp.nombreCorto}
+                    <span className="transition group-hover:translate-x-0.5"><Icon name="chevronRight" size={16} /></span>
                   </span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ol>
-          </article>
+                </Link>
+              );
+            })}
+          </div>
 
-          <article className="rounded-[1.75rem] border border-slate-800 bg-[#101826] p-7 shadow-xl shadow-black/20">
-            <p className="text-sm font-medium uppercase tracking-[0.26em] text-cyan-100/70">
-              Stack confirmado
-            </p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {stack.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-cyan-200/10 bg-cyan-100/5 px-4 py-4 text-sm text-slate-100/85"
-                >
-                  {item}
-                </div>
-              ))}
+          {/* Consolidado — solo Owner */}
+          <Link
+            href="/admin/dashboard"
+            className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-4 shadow-sm transition hover:bg-surface-2"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy/10 text-navy dark:text-accent"><Icon name="matrix" size={18} /></span>
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold text-text">
+                  Vista Consolidada
+                  <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">Solo Owner</span>
+                </p>
+                <p className="text-xs text-muted">Ambas empresas sumadas · {fmtUsd(consolidado.venta)} en ventas · ROI {consolidado.roi}%</p>
+              </div>
             </div>
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-brand">
+              Ver consolidado <Icon name="chevronRight" size={16} />
+            </span>
+          </Link>
 
-            <div className="mt-6 rounded-[1.5rem] border border-amber-300/15 bg-amber-200/8 p-5">
-              <p className="text-sm font-medium uppercase tracking-[0.24em] text-amber-100/75">
-                Punto de apoyo
-              </p>
-              <p className="mt-3 text-sm leading-7 text-slate-200/80">
-                El planning maestro vive en <code>PLANNING.md</code> y el
-                detalle funcional en <code>docs/planning</code>. Desde aqui ya
-                podemos pasar a auth, layout administrativo y modelado Prisma.
-              </p>
-            </div>
-          </article>
+          <p className="mt-4 text-center text-xs text-muted">
+            El acceso al consolidado se restringirá a los Owner cuando se active la autenticación.
+          </p>
         </section>
       </div>
     </main>

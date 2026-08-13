@@ -1,68 +1,153 @@
-import { Settings } from "lucide-react";
-import { ModulePlaceholder } from "@/components/layout/module-placeholder";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { SelectField, TextField, TextareaField } from "@/components/ui/form-field";
+"use client";
 
-export default function SettingsAdminPage() {
+import { useState } from "react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { SectionCard } from "@/components/ui/SectionCard";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Button } from "@/components/ui/Button";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
+import { usePersistedState } from "@/lib/ux/use-persisted-state";
+
+const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+
+type Config = {
+  empresaDefecto: string;
+  consolidada: string;
+  tasa: string;
+  iva: string;
+  rangoTasa: string;
+  plantilla: string;
+};
+
+const DEFAULTS: Config = { empresaDefecto: "sumigases", consolidada: "on", tasa: "49.50", iva: "16", rangoTasa: "3", plantilla: "nuevo" };
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <ModulePlaceholder
-      description="Base para configuracion operativa, empresas, moneda, tasa, impuestos, documentos y permisos."
-      eyebrow="Configuracion"
-      items={[
-        "Empresas",
-        "Usuarios y roles",
-        "Moneda y tasa",
-        "Impuestos",
-        "Secuencias",
-        "Plantillas de documentos",
-      ]}
-      primaryAction={
-        <Button>
-          <Settings size={16} />
-          Configurar
-        </Button>
-      }
-      title="Configuracion"
-    >
-      <Card>
-        <CardHeader>
-          <div>
-            <p className="text-sm font-semibold text-[var(--color-foreground)]">
-              Parametros demo
-            </p>
-            <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-              Formulario base para validar estilos de inputs, selects y textos.
-            </p>
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-[11px] text-muted">{hint}</span>}
+    </label>
+  );
+}
+
+const metodos = [
+  { m: "Efectivo USD / Bs", req: "—", verif: "Verificado auto", tone: "ok" as const },
+  { m: "Punto de venta", req: "Comprobante", verif: "Pendiente", tone: "warn" as const },
+  { m: "Transferencia Bs", req: "Referencia", verif: "Pendiente", tone: "warn" as const },
+  { m: "Pago móvil", req: "Referencia", verif: "Pendiente", tone: "warn" as const },
+  { m: "Zelle", req: "Referencia", verif: "Pendiente", tone: "warn" as const },
+  { m: "Binance", req: "Referencia", verif: "Pendiente", tone: "warn" as const },
+];
+
+export default function SettingsPage() {
+  const empresaKey = useEmpresaActiva();
+  const [saved, setSaved] = usePersistedState<Config>(`config:${empresaKey}`, DEFAULTS);
+  const [form, setForm] = useState<Config>(saved);
+  const [msg, setMsg] = useState("");
+  const set = (k: keyof Config) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setMsg("");
+    setForm({ ...form, [k]: e.target.value });
+  };
+
+  function guardar() {
+    setSaved(form);
+    setMsg("Configuración guardada. Los valores persisten en este navegador.");
+  }
+
+  const [bcv, setBcv] = useState<{ loading: boolean; msg: string; err: boolean }>({ loading: false, msg: "", err: false });
+  async function actualizarBCV() {
+    setBcv({ loading: true, msg: "Consultando bcv.org.ve…", err: false });
+    try {
+      const r = await fetch("/api/bcv", { cache: "no-store" });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || "No disponible");
+      const next = { ...form, tasa: String(d.tasa) };
+      setForm(next);
+      setSaved(next);
+      setBcv({ loading: false, err: false, msg: `Tasa BCV actualizada a ${d.tasa} Bs/USD${d.fecha ? ` · ${d.fecha}` : ""}.` });
+    } catch (e) {
+      setBcv({ loading: false, err: true, msg: `No se pudo actualizar desde el BCV (${String(e)}). Ingrésala manual.` });
+    }
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Configuración"
+        description="Parámetros base del sistema. La configuración crítica queda reservada a OWNER."
+        breadcrumbs={[{ label: "Sistema" }, { label: "Configuración" }]}
+        actions={<Button icon="check" onClick={guardar}>Guardar cambios</Button>}
+      />
+
+      {msg && <p className="mb-4 rounded-xl bg-ok/10 px-3 py-2 text-sm text-ok">{msg}</p>}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SectionCard title="Empresas" description="Multiempresa: Sumigases y Sudematin." action={<StatusBadge tone="brand">2 activas</StatusBadge>}>
+          <div className="space-y-3">
+            <Field label="Empresa por defecto">
+              <select className={inputClass} value={form.empresaDefecto} onChange={set("empresaDefecto")}>
+                <option value="sumigases">Sumigases</option>
+                <option value="sudematin">Sudematin</option>
+              </select>
+            </Field>
+            <Field label="Vista consolidada (OWNER/ADMIN)" hint="Si se desactiva, cada empresa se ve por separado.">
+              <select className={inputClass} value={form.consolidada} onChange={set("consolidada")}>
+                <option value="on">Habilitada</option>
+                <option value="off">Solo preparada (no MVP)</option>
+              </select>
+            </Field>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <TextField
-              defaultValue="Sumigases Oriente C.A."
-              hint="Luego vendra desde el selector de empresa."
-              label="Empresa activa"
-            />
-            <SelectField
-              defaultValue="USD + tasa BCV"
-              label="Moneda operativa"
-              options={["USD + tasa BCV", "Bolivares", "Multi-moneda"]}
-            />
-            <TextField defaultValue="16%" label="IVA por defecto" />
-            <SelectField
-              defaultValue="Owner/Admin"
-              label="Aprobacion ajustes"
-              options={["Owner/Admin", "Owner", "Admin"]}
-            />
-            <TextField defaultValue="NE-000001" label="Secuencia nota entrega" />
-            <TextareaField
-              className="xl:col-span-1"
-              defaultValue="Plantilla demo para documentos internos de SumiControl."
-              label="Nota documental"
-            />
+        </SectionCard>
+
+        <SectionCard title="Moneda y tasa" description="USD/Bs, tasa BCV e IVA." action={<StatusBadge tone="warn">tasa demo</StatusBadge>}>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Tasa BCV (Bs/USD)"><input className={inputClass} value={form.tasa} onChange={set("tasa")} /></Field>
+            <Field label="IVA (%)"><input className={inputClass} value={form.iva} onChange={set("iva")} /></Field>
+            <Field label="Tasa especial sin aprobación (±%)" hint="Fuera de rango: aprueba OWNER/ADMIN."><input className={inputClass} value={form.rangoTasa} onChange={set("rangoTasa")} /></Field>
+            <Field label="Moneda base"><input className={inputClass} value="USD" readOnly /></Field>
           </div>
-        </CardContent>
-      </Card>
-    </ModulePlaceholder>
+          <div className="mt-3">
+            <Button variant="secondary" icon="roi" onClick={actualizarBCV} disabled={bcv.loading}>
+              {bcv.loading ? "Consultando BCV…" : "Actualizar desde BCV"}
+            </Button>
+            {bcv.msg && <p className={`mt-2 rounded-xl px-3 py-2 text-sm ${bcv.err ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>{bcv.msg}</p>}
+            <p className="mt-1 text-[11px] text-muted">Trae el precio oficial del dólar de bcv.org.ve y actualiza la tasa.</p>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Documentos" description="Correlativos y plantillas.">
+          <div className="space-y-3">
+            <Field label="Correlativo" hint="Por empresa + tipo, reinicio anual.">
+              <input className={inputClass} value="NE-2026-000123" readOnly />
+            </Field>
+            <Field label="Plantilla activa">
+              <select className={inputClass} value={form.plantilla} onChange={set("plantilla")}>
+                <option value="nuevo">Modelo nuevo</option>
+                <option value="viejo">Modelo viejo</option>
+              </select>
+            </Field>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Métodos de pago" description="Requisito y verificación por método.">
+          <ul className="divide-y divide-border text-sm">
+            {metodos.map((x) => (
+              <li key={x.m} className="flex items-center justify-between gap-2 py-2">
+                <span className="text-text">{x.m}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-muted">{x.req}</span>
+                  <StatusBadge tone={x.tone}>{x.verif}</StatusBadge>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      </div>
+
+      <p className="mt-4 text-xs text-muted">
+        Los valores guardados persisten localmente (demo). Reglas en `docs/decisions/` (currency-tax-rate, documents-correlativos, payments-cash).
+      </p>
+    </>
   );
 }

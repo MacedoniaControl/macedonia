@@ -9,13 +9,6 @@ Este documento define como trabajaran Greeg y Salem con 2 sesiones de Codex y 1 
 - Integrar cambios pequenos y frecuentes sobre `dev`.
 - Mantener trazabilidad por modulo en `docs/progress`.
 
-## Estado actual de integracion
-
-- Pantera95 autorizo montar `feature/ui-system` directamente en `main`.
-- `main` ya contiene la base UI/admin de Salem/Codex-Salem.
-- La rama `feature/ui-system` queda como referencia historica del bloque UI.
-- Para nuevos cambios se recomienda volver a ramas por modulo para reducir conflictos.
-
 ## Sesiones activas
 
 - `Greeg`: owner principal de Core y reglas base
@@ -71,9 +64,9 @@ Responsabilidades:
 
 Ramas:
 
-- `feature/ui-system` - integrado en `main`.
-- `feature/dashboard` - UI demo en `main`, pendiente data real.
-- `feature/reports` - UI demo en `main`, pendiente data real/importador.
+- `feature/ui-system`
+- `feature/dashboard`
+- `feature/reports`
 
 Ownership principal:
 
@@ -93,11 +86,6 @@ Responsabilidades:
 - KPIs
 - reportes basicos
 - responsive desktop y tablet
-
-Estado:
-
-- Layout administrativo, sidebar/header, sistema visual, dashboard demo, reportes demo, alertas y responsive base ya estan montados.
-- Salem debe seguir sobre contratos de datos, integracion visual de modulos funcionales o mejoras de dashboard/reportes cuando Greeg entregue auth/company selector/modelos.
 
 ### Claude-Greeg
 
@@ -180,11 +168,11 @@ Eso significa:
 
 Este orden minimiza bloqueos entre ustedes:
 
-1. `feature/auth-roles` - pendiente prioritario.
-2. `feature/company-selector` - pendiente prioritario para reemplazar selector demo.
-3. `feature/ui-system` - integrado en `main`.
-4. `feature/dashboard` - UI demo integrada; pendiente contrato/data real.
-5. `feature/products-catalog` - siguiente bloque recomendado para funcionalidad admin.
+1. `feature/auth-roles`
+2. `feature/company-selector`
+3. `feature/ui-system`
+4. `feature/dashboard`
+5. `feature/products-catalog`
 6. `feature/inventory`
 7. `feature/cylinders`
 8. `feature/quotes-delivery-notes`
@@ -192,7 +180,7 @@ Este orden minimiza bloqueos entre ustedes:
 10. `feature/cash-payments`
 11. `feature/receivables-payables`
 12. `feature/purchases`
-13. `feature/reports` - UI demo integrada; pendiente data real/importador.
+13. `feature/reports`
 14. `feature/roi-rentabilidad`
 15. `feature/imports-valery-profit`
 16. `feature/settings`
@@ -200,13 +188,13 @@ Este orden minimiza bloqueos entre ustedes:
 
 ## Asignacion inmediata sugerida
 
-Asignacion inmediata actual:
+Para arrancar hoy:
 
-- Greeg + `Codex-Greeg`: cerrar `feature/auth-roles` y `feature/company-selector`.
-- Salem + `Codex-Salem`: avanzar productos/inventario admin o contratos de dashboard/reportes, sin tocar auth/core.
-- `Claude-Greeg`: actualizar criterios de aceptacion y revisar compatibilidad entre auth/company selector y la UI ya integrada.
+- Greeg + `Codex-Greeg`: `feature/auth-roles`
+- Salem + `Codex-Salem`: `feature/ui-system`
+- `Claude-Greeg`: bajar a checklist `feature/company-selector` y `feature/dashboard`, mas decisiones pendientes en `docs/decisions`
 
-Asi ustedes avanzan en paralelo usando la UI integrada como base comun.
+Asi ustedes avanzan en paralelo sin tocar todavia el mismo centro de gravedad.
 
 ## Formato minimo de avance
 
