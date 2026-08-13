@@ -8,13 +8,6 @@ App: https://sumicontrol.vercel.app
 
 ## Documentacion base
 
-- **📐 [BLUEPRINT](./docs/planning/BLUEPRINT.md)** — el plano completo del sistema: arquitectura,
-  modelo de dominio, reglas de negocio, sistema de diseño, integración con Valery y cómo migrar a
-  backend. **Empieza aquí para replicar o reconstruir el proyecto.**
-- **🧩 [Prompt para una app nueva](./docs/planning/PROMPT-NUEVA-APP.txt)** — el blueprint
-  convertido en prompt listo para pegar en Claude Code y construir otro sistema con estas lecciones.
-- **🗄️ [Puesta en marcha del backend](./docs/backend/SUPABASE-SETUP.md)** — esquema SQL, RLS y
-  receta paso a paso. El código está listo; solo falta ejecutarlo.
 - **⭐ [Estado del proyecto](./docs/planning/project_state.md)** — dónde estamos hoy, módulos,
   pendientes y riesgos. Mantener actualizado ante cada cambio significativo.
 - Planning original (histórico): [PLANNING.md](./PLANNING.md)
