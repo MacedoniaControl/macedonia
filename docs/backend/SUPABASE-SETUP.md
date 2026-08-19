@@ -7,6 +7,25 @@
 
 ---
 
+
+## Verificación de seguridad (obligatoria antes de datos reales)
+
+Después de ejecutar `01`, `02` y `03`, ejecuta **`04-verificacion.sql`**.
+
+Devuelve 7 filas. **Todas deben decir `OK`.** Si alguna dice `FALLA`, no cargues
+datos reales hasta resolverla.
+
+Comprueba, entre otras cosas:
+
+- que las 15 tablas tengan RLS activo;
+- que **ninguna vista se salte el RLS** (una vista sin `security_invoker = on`
+  corre con los privilegios de su dueño y lee todo, ignorando las políticas:
+  es la forma más silenciosa de romper la pared entre empresas);
+- que el **costo de compra** no sea legible por vendedores;
+- que el usuario **anónimo** no pueda leer finanzas ni auditoría;
+- que el **log de auditoría sea inmutable** (sin políticas de UPDATE ni DELETE).
+
+
 ## Aclaración importante sobre el costo
 
 | | Plan Free | Plan Pro ($25/mes) |
