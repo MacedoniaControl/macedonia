@@ -1,4 +1,5 @@
-// Middleware de sesión y protección de rutas.
+// Proxy de sesión y protección de rutas.
+// (En Next 16 esto se llama `proxy`; antes era `middleware`.)
 //
 // Hace dos cosas:
 //  1. Refresca el token de Supabase en cada navegación (si no, la sesión se cae
@@ -6,7 +7,7 @@
 //  2. Cierra el paso a quien no tiene sesión.
 //
 // OJO: esto es la PRIMERA barrera, no la única. La barrera real es el RLS en
-// Postgres. Si alguien se saltara este middleware, la base seguiría sin
+// Postgres. Si alguien se saltara esta capa, la base seguiría sin
 // entregarle datos de otra empresa.
 
 import { createServerClient } from "@supabase/ssr";
@@ -18,7 +19,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 /** Rutas que se ven sin haber entrado. */
 const PUBLICAS = ["/login", "/auth"];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Sin backend configurado, la app sigue funcionando en modo demo (localStorage).
   // Permite desarrollar y desplegar por partes sin dejar la app inservible.
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return NextResponse.next();

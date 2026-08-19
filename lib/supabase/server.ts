@@ -34,7 +34,7 @@ export async function createClient() {
         try {
           list.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         } catch {
-          // Server Component: las cookies las refresca el middleware.
+          // Server Component: las cookies las refresca el proxy.
         }
       },
     },
