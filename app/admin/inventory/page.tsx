@@ -12,8 +12,8 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { addNotif } from "@/lib/ux/notifications";
 import {
-  FISICO,
-  FISICO_META,
+  fisicoDe,
+  fisicoMeta,
   buildMaster,
   duplicadosBloqueados,
   inFisico,
@@ -52,21 +52,23 @@ export default function InventoryPage() {
     <Button variant="secondary" icon="plus" onClick={() => stub(area)}>Acción</Button>
   );
 
-  const conflictos = useMemo(() => duplicadosBloqueados(sItems), [sItems]);
-  const master = useMemo(() => buildMaster(sItems), [sItems]);
+  const conflictos = useMemo(() => duplicadosBloqueados(sItems, empresa), [sItems, empresa]);
+  const master = useMemo(() => buildMaster(sItems, empresa), [sItems, empresa]);
+  const fisico = useMemo(() => fisicoDe(empresa), [empresa]);
+  const fisicoMetaE = useMemo(() => fisicoMeta(empresa), [empresa]);
 
   const t = q.trim().toLowerCase();
   const match = (codigo: string, nombre: string) =>
     !t || codigo.toLowerCase().includes(t) || nombre.toLowerCase().includes(t);
 
-  const fisicoF = useMemo(() => FISICO.filter((f) => match(f.codigo, f.nombre)), [t]);
+  const fisicoF = useMemo(() => fisico.filter((f) => match(f.codigo, f.nombre)), [t, fisico]);
   const masterF = useMemo(() => master.filter((m) => match(m.codigo, m.nombre)), [master, t]);
   const sF = useMemo(() => sItems.filter((s) => match(s.codigo, s.nombre)), [sItems, t]);
 
   // --- Sub-apartados del Master (lógica preliminar; se afinará con las indicaciones) ---
   // Físico Existente: lo que realmente está en almacén (Maestro M > 0).
   const fisicoExistente = useMemo(
-    () => masterF.map((m) => ({ ...m, m: stockMaestro(m.codigo, ledger) })).filter((m) => m.m !== 0),
+    () => masterF.map((m) => ({ ...m, m: stockMaestro(m.codigo, ledger, empresa) })).filter((m) => m.m !== 0),
     [masterF, ledger],
   );
   // En Espera por Factura: notas de entrega ya emitidas, pendientes de convertir a factura fiscal.
@@ -94,7 +96,7 @@ export default function InventoryPage() {
     () => ({
       codigo: (r: (typeof fisicoExistente)[number]) => r.codigo,
       nombre: (r: (typeof fisicoExistente)[number]) => r.nombre,
-      v: (r: (typeof fisicoExistente)[number]) => stockValery(r.codigo, ledger),
+      v: (r: (typeof fisicoExistente)[number]) => stockValery(r.codigo, ledger, empresa),
       s: (r: (typeof fisicoExistente)[number]) => stockS(r.codigo, ledger, r.s),
       m: (r: (typeof fisicoExistente)[number]) => r.m,
     }),
@@ -107,7 +109,7 @@ export default function InventoryPage() {
     () =>
       masterF
         .map((m) => {
-          const disponible = stockMaestro(m.codigo, ledger);
+          const disponible = stockMaestro(m.codigo, ledger, empresa);
           const v12 = ventas12m(m.codigo);
           const avg = v12 / 12;
           return { codigo: m.codigo, nombre: m.nombre, disponible, v12, avg, precio: precioProm(m.codigo), est: estadoRotacion(disponible, avg) };
@@ -142,11 +144,11 @@ export default function InventoryPage() {
 
   const accValery = useMemo(
     () => ({
-      codigo: (r: (typeof FISICO)[number]) => r.codigo,
-      nombre: (r: (typeof FISICO)[number]) => r.nombre,
-      und: (r: (typeof FISICO)[number]) => r.undPpal,
-      existencia: (r: (typeof FISICO)[number]) => r.existPpal,
-      alt: (r: (typeof FISICO)[number]) => r.existAlt,
+      codigo: (r: (typeof fisico)[number]) => r.codigo,
+      nombre: (r: (typeof fisico)[number]) => r.nombre,
+      und: (r: (typeof fisico)[number]) => r.undPpal,
+      existencia: (r: (typeof fisico)[number]) => r.existPpal,
+      alt: (r: (typeof fisico)[number]) => r.existAlt,
     }),
     [],
   );
@@ -188,7 +190,7 @@ export default function InventoryPage() {
       almacen: "Lechería",
     };
     setSItems([nuevo, ...sItems.filter((s) => s.codigo !== codigo)]);
-    if (inFisico(codigo)) {
+    if (inFisico(codigo, empresa)) {
       addNotif({
         id: `dup-${codigo}-${Date.now()}`,
         tipo: "inventario",
@@ -247,7 +249,7 @@ export default function InventoryPage() {
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
         {([
           ["master", `Master (${master.length})`],
-          ["fisico", `Físico · Valery (${FISICO.length})`],
+          ["fisico", `Físico · Valery (${fisico.length})`],
           ["s", `Inventario S (${sItems.length})`],
           ["movimientos", "Movimientos"],
           ["fiscal", "Regularización fiscal"],
@@ -395,7 +397,7 @@ export default function InventoryPage() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {tFis.visible.map((m) => {
-                      const v = stockValery(m.codigo, ledger);
+                      const v = stockValery(m.codigo, ledger, empresa);
                       const s = stockS(m.codigo, ledger, m.s);
                       return (
                         <tr key={m.codigo} className={m.bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
@@ -496,7 +498,7 @@ export default function InventoryPage() {
       {/* -------- FÍSICO -------- */}
       {tab === "fisico" && (
         <SectionCard title="Inventario Físico (Valery)" action={<StubBtn area="Físico · Valery" />}
-          description={`Solo lectura · fuente: ${FISICO_META.fuente} (${FISICO_META.fecha}).`}>
+          description={`Solo lectura · fuente: ${fisicoMetaE.fuente} (${fisicoMetaE.fecha}).`}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
@@ -561,7 +563,7 @@ export default function InventoryPage() {
                 <tbody className="divide-y divide-border">
                   {sF.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted">Sin ítems en Inventario S.</td></tr>}
                   {tS.visible.map((s) => {
-                    const dup = inFisico(s.codigo);
+                    const dup = inFisico(s.codigo, empresa);
                     const bloqueado = dup && !s.tagDuplicado;
                     return (
                       <tr key={s.codigo} className={bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>

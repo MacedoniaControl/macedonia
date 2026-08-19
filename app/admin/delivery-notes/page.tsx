@@ -59,8 +59,8 @@ export default function DeliveryNotesPage() {
 
   function verDoc(d: Doc) {
     if (d.origen === "Valery" && d.dataUrl) return window.open(d.dataUrl, "_blank");
-    if (d.ne) return printDoc(notaEntregaHtml(d.ne));
-    if (d.dev) return printDoc(devolucionHtml(d.dev));
+    if (d.ne) return printDoc(notaEntregaHtml(d.ne, empresaKey));
+    if (d.dev) return printDoc(devolucionHtml(d.dev, empresaKey));
     alert("Este documento de Valery no tiene archivo adjunto en la demo (subido solo como registro).");
   }
 
@@ -140,13 +140,13 @@ export default function DeliveryNotesPage() {
         const t = neTotals(ne);
         setDocs((p) => [{ id: `${Date.now()}`, tipo: "entrega", correlativo: ne.correlativo, cliente: ne.cliente, fecha: ne.fecha, total: t.total, origen: "SumiControl", ne }, ...p]);
         setSeqNE((s) => s + 1);
-        printDoc(notaEntregaHtml(ne));
+        printDoc(notaEntregaHtml(ne, empresaKey));
       }} seq={seqNE} />}
 
       {tab === "dev" && <GenerarDev onSave={(dev, total) => {
         setDocs((p) => [{ id: `${Date.now()}`, tipo: "devolucion", correlativo: dev.correlativo, cliente: dev.razonSocial, fecha: dev.fechaEmision, total, origen: "SumiControl", dev }, ...p]);
         setSeqDev((s) => s + 1);
-        printDoc(devolucionHtml(dev));
+        printDoc(devolucionHtml(dev, empresaKey));
       }} seq={seqDev} />}
 
       {tab === "subir" && (
@@ -171,6 +171,7 @@ const DIVISAS = ["Bolívar", "Dólar"];
 const UNIDADES = ["CILINDRO", "UNIDAD", "KG", "MT", "PAR", "CAJA"];
 
 function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number }) {
+  const empresaKey = useEmpresaActiva();
   const [f, setF] = useState({
     cliente: "", rif: "", tlf: "", direccion: "", ordenCompra: "", notas: "",
     vendedor: "01 - GERENTE", deposito: DEPOSITOS[0], tipoPrecio: TIPOS_PRECIO[0], divisa: DIVISAS[0],
@@ -187,7 +188,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
   // completa en la lista (ver guard al registrar).
   function onScan(codigo: string) {
     setMsg("");
-    const p = lookupByCodigo(codigo);
+    const p = lookupByCodigo(codigo, empresaKey);
     if (!p) {
       beep(false);
       setScanMsg({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo de Valery.` });

@@ -6,6 +6,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { searchProductos, type InventoryProduct } from "@/lib/inventory/catalog";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 
 export function ProductSearch({
   onPick,
@@ -14,12 +15,13 @@ export function ProductSearch({
   onPick: (p: InventoryProduct) => void;
   placeholder?: string;
 }) {
+  const empresa = useEmpresaActiva();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [idx, setIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(() => searchProductos(q, 8), [q]);
+  const results = useMemo(() => searchProductos(q, empresa, 8), [q, empresa]);
 
   function elegir(p: InventoryProduct) {
     onPick(p);

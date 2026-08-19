@@ -29,14 +29,17 @@ export type KpiDatum = {
   demo?: boolean;
 };
 
+// Los KPIs operativos ("hoy / pendientes") no tienen fuente real todavía: van en CERO.
+// Antes mostraban cifras inventadas indistinguibles de un dato verdadero, y alguien
+// podía decidir sobre ellas. Se llenarán cuando el backend los alimente.
 export const kpis: KpiDatum[] = [
-  { key: "ventasHoy", label: "Ventas hoy", value: "$1.036", sub: "≈ 51.282 Bs", tone: "brand", demo: true },
-  { key: "cxc", label: "Cuentas por cobrar", value: "$18.500", sub: "12 documentos", tone: "warn", demo: true },
-  { key: "cxp", label: "Cuentas por pagar", value: "$9.200", sub: "5 proveedores", tone: "danger", demo: true },
-  { key: "stock", label: "Stock crítico", value: "7", sub: "productos bajo mínimo", tone: "warn", demo: true },
-  { key: "cilPend", label: "Cilindros pendientes", value: "9", sub: "por retorno", tone: "info", demo: true },
-  { key: "recargas", label: "Recargas pendientes", value: "5", sub: "en cola", tone: "info", demo: true },
-  { key: "pedidos", label: "Pedidos pendientes", value: "3", sub: "por despachar", tone: "navy", demo: true },
+  { key: "ventasHoy", label: "Ventas hoy", value: "$0", sub: "sin datos", tone: "brand", demo: true },
+  { key: "cxc", label: "Cuentas por cobrar", value: "$0", sub: "0 documentos", tone: "warn", demo: true },
+  { key: "cxp", label: "Cuentas por pagar", value: "$0", sub: "0 proveedores", tone: "danger", demo: true },
+  { key: "stock", label: "Stock crítico", value: "0", sub: "productos bajo mínimo", tone: "warn", demo: true },
+  { key: "cilPend", label: "Cilindros pendientes", value: "0", sub: "por retorno", tone: "info", demo: true },
+  { key: "recargas", label: "Recargas pendientes", value: "0", sub: "en cola", tone: "info", demo: true },
+  { key: "pedidos", label: "Pedidos pendientes", value: "0", sub: "por despachar", tone: "navy", demo: true },
   { key: "balance", label: "Balance general", value: "$106.826", sub: "utilidad neta 2024", tone: "ok" },
 ];
 
@@ -69,29 +72,27 @@ export const categoriasMasRentables = [
   { nombre: "Portaelectrodos y antorchas", margen: 38 },
 ];
 
+// El conteo real de cilindros lo dará el módulo de Cilindros cuando se rehaga
+// con el proceso real. Hasta entonces, cero: no inventar un parque de cilindros.
 export const cilindrosPorEstado = [
-  { estado: "Lleno", cantidad: 62, tone: "ok" as const },
-  { estado: "Vacío", cantidad: 38, tone: "muted" as const },
-  { estado: "En cliente", cantidad: 14, tone: "info" as const },
-  { estado: "Pendiente por retorno", cantidad: 9, tone: "warn" as const },
+  { estado: "Lleno", cantidad: 0, tone: "ok" as const },
+  { estado: "Vacío", cantidad: 0, tone: "muted" as const },
+  { estado: "En cliente", cantidad: 0, tone: "info" as const },
+  { estado: "Pendiente por retorno", cantidad: 0, tone: "warn" as const },
 ];
 
+// Requiere mínimos definidos por producto, que todavía no existen.
 export const stockCriticoPorAlmacen = [
-  { almacen: "Lechería", criticos: 5 },
-  { almacen: "Cumaná", criticos: 2 },
+  { almacen: "Lechería", criticos: 0 },
+  { almacen: "Cumaná", criticos: 0 },
 ];
 
-export const importacionesRecientes = [
-  { archivo: "MATRIZ DE VENTAS NOVIEMBRE II.xlsx", fecha: "2024-12-02", filas: 215, estado: "Importado" },
-  { archivo: "MATRIZ DE VENTAS AGOSTO.xlsx", fecha: "2024-09-04", filas: 267, estado: "Importado" },
-  { archivo: "VENTAS VS COMPRAS 2024.xlsx", fecha: "2024-12-30", filas: 18, estado: "Importado" },
-];
+// El módulo de Importaciones se eliminó a pedido del cliente.
+export const importacionesRecientes: { archivo: string; fecha: string; filas: number; estado: string }[] = [];
 
-export const alertasOperativas = [
-  { tone: "warn" as const, titulo: "Stock crítico", mensaje: "7 productos bajo el mínimo definido." },
-  { tone: "warn" as const, titulo: "Cilindros por retorno", mensaje: "9 cilindros entregados sin vacío de vuelta." },
-  { tone: "info" as const, titulo: "Tasa BCV", mensaje: "Tasa en uso es demo (49,5). Conectar fuente real." },
-];
+// Vacío a propósito: una alerta falsa es peor que ninguna alerta. Se llenará
+// cuando haya reglas reales (mínimos de stock, retornos vencidos, etc.).
+export const alertasOperativas: { tone: "warn" | "info" | "danger"; titulo: string; mensaje: string }[] = [];
 
 export const companies = [
   { id: "sumigases", name: "Sumigases" },

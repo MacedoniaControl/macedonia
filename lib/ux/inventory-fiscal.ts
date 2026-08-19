@@ -115,30 +115,30 @@ function sumDelta(ledger: FiscalTx[], codigo: string, field: "vDelta" | "sDelta"
   return ledger.reduce((acc, t) => (t.codigo === codigo ? acc + t[field] : acc), 0);
 }
 /** Stock fiscal actual (V) = base Valery + efecto del ledger. */
-export function stockValery(codigo: string, ledger: FiscalTx[]): number {
-  return round(fisicoExistencia(codigo) + sumDelta(ledger, codigo, "vDelta"));
+export function stockValery(codigo: string, ledger: FiscalTx[], empresa = "sumigases"): number {
+  return round(fisicoExistencia(codigo, empresa) + sumDelta(ledger, codigo, "vDelta"));
 }
 /** Balance informal actual (S). Base opcional del Inventario S manual. */
 export function stockS(codigo: string, ledger: FiscalTx[], baseS = 0): number {
   return round(baseS + sumDelta(ledger, codigo, "sDelta"));
 }
 /** Stock maestro / físico real (M) = base física + solo movimientos que afectan inventario real. */
-export function stockMaestro(codigo: string, ledger: FiscalTx[]): number {
-  return round(fisicoExistencia(codigo) + sumDelta(ledger, codigo, "mDelta"));
+export function stockMaestro(codigo: string, ledger: FiscalTx[], empresa = "sumigases"): number {
+  return round(fisicoExistencia(codigo, empresa) + sumDelta(ledger, codigo, "mDelta"));
 }
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
 
 // ---------------------------------------------------------------- semáforo
 export type Semaforo = "verde" | "ambar";
-export function lineaSuficiente(linea: NotaLinea, ledger: FiscalTx[]): boolean {
-  return stockValery(linea.codigo, ledger) >= linea.cantidad;
+export function lineaSuficiente(linea: NotaLinea, ledger: FiscalTx[], empresa = "sumigases"): boolean {
+  return stockValery(linea.codigo, ledger, empresa) >= linea.cantidad;
 }
-export function semaforoNota(nota: NotaEntrega, ledger: FiscalTx[]): Semaforo {
-  return nota.lineas.every((l) => lineaSuficiente(l, ledger)) ? "verde" : "ambar";
+export function semaforoNota(nota: NotaEntrega, ledger: FiscalTx[], empresa = "sumigases"): Semaforo {
+  return nota.lineas.every((l) => lineaSuficiente(l, ledger, empresa)) ? "verde" : "ambar";
 }
-export function lineasInsuficientes(nota: NotaEntrega, ledger: FiscalTx[]): NotaLinea[] {
-  return nota.lineas.filter((l) => !lineaSuficiente(l, ledger));
+export function lineasInsuficientes(nota: NotaEntrega, ledger: FiscalTx[], empresa = "sumigases"): NotaLinea[] {
+  return nota.lineas.filter((l) => !lineaSuficiente(l, ledger, empresa));
 }
 
 // Alerta al bell (OWNER/ADMIN): registra la factura fiscal cargada en Valery.
@@ -197,7 +197,7 @@ export function regularizarEnBloque(notaId: string, compra: CompraProveedor, fac
   const ledger = getLedger(empresa);
   const txs: FiscalTx[] = [];
   for (const l of nota.lineas) {
-    const vActual = stockValery(l.codigo, ledger);
+    const vActual = stockValery(l.codigo, ledger, empresa);
     const deficit = round(Math.max(0, l.cantidad - vActual));
     // Paso 1 — Compra fiscal en Valery (solo el déficit necesario)
     if (deficit > 0) {

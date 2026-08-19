@@ -1,5 +1,9 @@
 // Modelo de inventario Físico / S / Master. Ver docs/decisions/inventory-model.md
-import seed from "./inventory-fisico-seed.json";
+//
+// El inventario físico es POR EMPRESA: cada una tiene su propio export de Valery.
+// Sumigases usa su export real; Sudematin arranca vacío hasta que se cargue el suyo.
+// Nunca mezclar: un catálogo compartido haría que una empresa vea productos de la otra.
+import seedSumigases from "./inventory-fisico-seed.json";
 
 /** Item del Inventario Físico (export de Valery, read-only). */
 export type FisicoItem = {
@@ -24,19 +28,42 @@ export type SItem = {
   tagDuplicado?: boolean;
 };
 
-type Seed = { fuente: string; fecha: string; items: FisicoItem[] };
-const SEED = seed as Seed;
+type Seed = { fuente: string; fecha: string; items: FisicoItem[]; almacen: string };
 
-/** Físico completo (demo: todo el export = Sumigases / Lechería). */
-export const FISICO: FisicoItem[] = SEED.items;
-export const FISICO_META = { fuente: SEED.fuente, fecha: SEED.fecha, empresa: "Sumigases", almacen: "Lechería" };
+/** Export de Valery por empresa. Sudematin queda vacío hasta que se cargue su export. */
+const SEEDS: Record<string, Seed> = {
+  sumigases: { ...(seedSumigases as Omit<Seed, "almacen">), almacen: "Lechería" },
+  sudematin: { fuente: "sin cargar", fecha: "—", items: [], almacen: "Cumaná" },
+};
 
-const fisicoByCode = new Map(FISICO.map((f) => [f.codigo, f]));
-export function fisicoExistencia(codigo: string): number {
-  return fisicoByCode.get(codigo)?.existPpal ?? 0;
+const seedDe = (empresa: string): Seed => SEEDS[empresa] ?? SEEDS.sumigases;
+
+/** Físico de una empresa (solo lectura, viene del export de Valery). */
+export function fisicoDe(empresa: string): FisicoItem[] {
+  return seedDe(empresa).items;
 }
-export function inFisico(codigo: string): boolean {
-  return fisicoByCode.has(codigo);
+
+export function fisicoMeta(empresa: string) {
+  const s = seedDe(empresa);
+  return { fuente: s.fuente, fecha: s.fecha, almacen: s.almacen, cargado: s.items.length > 0 };
+}
+
+/** Índice por código, cacheado por empresa. */
+const indices = new Map<string, Map<string, FisicoItem>>();
+function indiceDe(empresa: string): Map<string, FisicoItem> {
+  let i = indices.get(empresa);
+  if (!i) {
+    i = new Map(fisicoDe(empresa).map((f) => [f.codigo, f]));
+    indices.set(empresa, i);
+  }
+  return i;
+}
+
+export function fisicoExistencia(codigo: string, empresa: string): number {
+  return indiceDe(empresa).get(codigo)?.existPpal ?? 0;
+}
+export function inFisico(codigo: string, empresa: string): boolean {
+  return indiceDe(empresa).has(codigo);
 }
 
 /** Fila del Master = Físico + S por código. */
@@ -54,7 +81,8 @@ export type MasterRow = {
   bloqueado: boolean;
 };
 
-export function buildMaster(sItems: SItem[]): MasterRow[] {
+export function buildMaster(sItems: SItem[], empresa: string): MasterRow[] {
+  const fisicoByCode = indiceDe(empresa);
   const sByCode = new Map(sItems.map((s) => [s.codigo, s]));
   const codes = new Set<string>([...fisicoByCode.keys(), ...sByCode.keys()]);
   const rows: MasterRow[] = [];
@@ -81,6 +109,6 @@ export function buildMaster(sItems: SItem[]): MasterRow[] {
 }
 
 /** Códigos en conflicto (duplicados sin aprobar). */
-export function duplicadosBloqueados(sItems: SItem[]): SItem[] {
-  return sItems.filter((s) => inFisico(s.codigo) && !s.tagDuplicado);
+export function duplicadosBloqueados(sItems: SItem[], empresa: string): SItem[] {
+  return sItems.filter((s) => inFisico(s.codigo, empresa) && !s.tagDuplicado);
 }

@@ -26,8 +26,10 @@ import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 
 const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 
-// Factores demo por empresa (Sudematin sin data propia → 0,35× etiquetado)
-const FACTORES: Record<string, number> = { sumigases: 1, sudematin: 0.35, all: 1.35 };
+// Las series mensuales provienen del histórico REAL de Sumigases. Sudematin no tiene
+// desglose mensual cargado: antes se estimaba multiplicando por 0,35 — un número
+// inventado que se veía igual que un dato real. Ahora va en 0 hasta cargar su serie.
+const FACTORES: Record<string, number> = { sumigases: 1, sudematin: 0, all: 1 };
 const RANGOS: Record<string, number> = { year: 12, sem: 6, tri: 3, mes: 1 };
 
 type Filtros = { empresa: string; rango: string; moneda: string };
@@ -50,22 +52,30 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   };
   const cnt = (n: number) => String(Math.max(0, Math.round(n * factor)));
 
+  // KPIs operativos: SIN fuente real todavía (no hay backend que los alimente).
+  // Van en CERO a propósito. Antes traían cifras inventadas ($1.036 de "ventas hoy",
+  // 7 productos en stock crítico...) indistinguibles de un dato verdadero, y alguien
+  // podía decidir sobre ellas. Se llenarán cuando existan los datos reales.
   const kpis = [
-    { key: "vh", label: "Ventas hoy", value: money(1036), sub: bs ? undefined : `≈ ${Math.round(1036 * factor * RATE_BS).toLocaleString("es-VE")} Bs`, tone: "brand" as const, demo: true },
-    { key: "cxc", label: "Cuentas por cobrar", value: money(18500), sub: `${cnt(12)} documentos`, tone: "warn" as const, demo: true },
-    { key: "cxp", label: "Cuentas por pagar", value: money(9200), sub: `${cnt(5)} proveedores`, tone: "danger" as const, demo: true },
-    { key: "sc", label: "Stock crítico", value: cnt(7), sub: "productos bajo mínimo", tone: "warn" as const, demo: true },
-    { key: "cp", label: "Cilindros pendientes", value: cnt(9), sub: "por retorno", tone: "info" as const, demo: true },
-    { key: "rp", label: "Recargas pendientes", value: cnt(5), sub: "en cola", tone: "info" as const, demo: true },
-    { key: "pp", label: "Pedidos pendientes", value: cnt(3), sub: "por despachar", tone: "navy" as const, demo: true },
+    { key: "vh", label: "Ventas hoy", value: money(0), sub: bs ? undefined : "≈ 0 Bs", tone: "brand" as const, demo: true },
+    { key: "cxc", label: "Cuentas por cobrar", value: money(0), sub: "0 documentos", tone: "warn" as const, demo: true },
+    { key: "cxp", label: "Cuentas por pagar", value: money(0), sub: "0 proveedores", tone: "danger" as const, demo: true },
+    { key: "sc", label: "Stock crítico", value: cnt(0), sub: "productos bajo mínimo", tone: "warn" as const, demo: true },
+    { key: "cp", label: "Cilindros pendientes", value: cnt(0), sub: "por retorno", tone: "info" as const, demo: true },
+    { key: "rp", label: "Recargas pendientes", value: cnt(0), sub: "en cola", tone: "info" as const, demo: true },
+    { key: "pp", label: "Pedidos pendientes", value: cnt(0), sub: "por despachar", tone: "navy" as const, demo: true },
     { key: "bg", label: "Balance del período", value: money(106826 * frac), sub: "utilidad neta 2024", tone: "ok" as const },
   ];
 
+  // Estos porcentajes y listas derivan de la serie 2024 de Sumigases. Si la empresa
+  // activa no tiene serie mensual cargada (factor 0), NO se muestran los números de
+  // otra empresa: van en cero y las listas quedan vacías.
+  const sinSerie = factor === 0;
   const roiCards = [
-    { label: "ROI del período", value: "53,3%", sub: "utilidad / inversión", accent: true },
+    { label: "ROI del período", value: sinSerie ? "0%" : "53,3%", sub: "utilidad / inversión", accent: true },
     { label: "Utilidad estimada", value: money(106826 * frac), sub: `acumulado ${count} mes(es)` },
-    { label: "Margen bruto", value: "48,0%", sub: "sobre ventas" },
-    { label: "Ventas vs compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: "ratio 3,5x" },
+    { label: "Margen bruto", value: sinSerie ? "0%" : "48,0%", sub: "sobre ventas" },
+    { label: "Ventas vs compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: sinSerie ? "sin datos" : "ratio 3,5x" },
   ];
 
   const empresaLabel = empresa === "sumigases" ? "Sumigases" : empresa === "sudematin" ? "Sudematin" : "Consolidado";
@@ -196,8 +206,9 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
               <p className="mb-2 text-sm font-medium text-text">Productos con mayor retorno</p>
+              {sinSerie && <p className="text-sm text-muted">Sin serie mensual cargada para esta empresa.</p>}
               <ul className="space-y-1.5">
-                {productosMayorRetorno.map((p) => (
+                {(sinSerie ? [] : productosMayorRetorno).map((p) => (
                   <li key={p.nombre} className="flex items-center justify-between gap-3 text-sm">
                     <span className="truncate text-muted">{p.nombre}</span>
                     <StatusBadge tone="ok">ROI {p.roi}%</StatusBadge>
@@ -207,8 +218,9 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
             </div>
             <div>
               <p className="mb-2 text-sm font-medium text-text">Categorías más rentables</p>
+              {sinSerie && <p className="text-sm text-muted">Sin serie mensual cargada para esta empresa.</p>}
               <ul className="space-y-1.5">
-                {categoriasMasRentables.map((c) => (
+                {(sinSerie ? [] : categoriasMasRentables).map((c) => (
                   <li key={c.nombre} className="flex items-center justify-between gap-3 text-sm">
                     <span className="truncate text-muted">{c.nombre}</span>
                     <StatusBadge tone="brand">Margen {c.margen}%</StatusBadge>

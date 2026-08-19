@@ -1,19 +1,26 @@
 "use client";
 
-import { SUMIGASES_LOGO } from "@/lib/ux/sumigases-logo";
+import { EMPRESAS, type EmpresaId } from "@/lib/ux/empresas";
 
-/** Réplica fiel de los formatos de Valery (Sumigases Oriente): Nota de Entrega y Nota de Crédito.
- *  FIJO = logo, RIF/dirección de la empresa, rubros, cabeceras, etiquetas y gases de cilindros.
+/** Réplica fiel de los formatos de Valery: Nota de Entrega, Nota de Crédito y Presupuesto.
+ *  FIJO = cabeceras, etiquetas y gases de cilindros.
+ *  POR EMPRESA = logo, RIF, dirección, rubros y sub-bloque (vienen de lib/ux/empresas.ts).
  *  VARIABLE = cliente, artículos, fechas, montos y N° correlativo.
- *  Para Sudematin: ver docs/planning/documentos-sumigases-valery.md. */
+ *
+ *  Toda función de impresión recibe la empresa activa: un documento nunca debe salir
+ *  con la identidad fiscal de la otra empresa. */
 
-// ---- Datos FIJOS de la empresa (Sumigases Oriente) ----
-const EMPRESA = {
-  rif: "J-502789510",
-  dir: "AV BOLIVAR LOCAL NRO SN SECTOR BELLA VISTA PUERTO LA CRUZ ANZOATEGUI",
-  subBloque: "AV MIRANDA, EDIF SUDEMATIN, PISO 1 URB PARCELAMIENTO MIRANDA, SECTOR LA COPITA CUMANA · J316971414",
-};
-const RUBROS = "ELECTRODOS - GASES INDUSTRIALES/MEDICINALES - ROLINERAS - CORREAS - CADENAS ACOPLES - POLEAS";
+/** Identidad impresa de la empresa que emite el documento. */
+function identidad(empresa: EmpresaId) {
+  const e = EMPRESAS[empresa];
+  return {
+    rif: e.rif,
+    dir: e.direccionImpresa,
+    rubros: e.rubros,
+    subBloque: e.subBloque,
+    logo: `<img src="${e.logo}" alt="${e.nombre}" class="logo">`,
+  };
+}
 const GASES_CIL = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"]; // orden fijo del formato
 
 export type NELinea = { cantidad: number; unidad: string; descripcion: string; precio: number; codigo?: string; descuento?: number };
@@ -36,7 +43,6 @@ export type DevDoc = {
 };
 
 const m = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const LOGO = `<img src="${SUMIGASES_LOGO}" alt="Sumigases Oriente" class="logo">`;
 
 const lineaTotal = (l: NELinea) => l.cantidad * l.precio * (1 - (l.descuento || 0) / 100);
 
@@ -51,7 +57,8 @@ function cilData(cils: NECil[]) {
   return GASES_CIL.map(g);
 }
 
-function neCopy(d: NEDoc) {
+function neCopy(d: NEDoc, empresa: EmpresaId) {
+  const E = identidad(empresa);
   const t = neTotals(d);
   const filas = d.lineas.map((l) =>
     `<tr><td>${m(l.cantidad)}</td><td>${l.unidad}</td><td class="l">${l.codigo ? l.codigo + " - " : ""}${l.descripcion}</td><td class="r">${m(l.precio)}</td><td class="r">${m(lineaTotal(l))}</td></tr>`).join("");
@@ -59,10 +66,10 @@ function neCopy(d: NEDoc) {
   const cilRow = (a: NECil, b: NECil) =>
     `<tr><td class="l">${a.gas}</td><td>${a.llenos || ""}</td><td>${a.vacios || ""}</td><td class="l">${b.gas}</td><td>${b.llenos || ""}</td><td>${b.vacios || ""}</td></tr>`;
   return `<div class="copy">
-    <div class="top">${LOGO}
+    <div class="top">${E.logo}
       <div class="box num"><div class="tit">CONSTANCIA DE<br>RECEPCION DE MATERIALES</div><div class="n">N° &nbsp;&nbsp; ${d.correlativo}</div></div>
     </div>
-    <div class="rubros">${RUBROS}</div>
+    ${E.rubros ? `<div class="rubros">${E.rubros}</div>` : ""}
     <table class="cli">
       <tr><td class="k">CLIENTE</td><td>${d.cliente}</td><td class="k">TLF</td><td>${d.tlf}</td></tr>
       <tr><td class="k">RIF</td><td>${d.rif}</td><td></td><td></td></tr>
@@ -83,21 +90,22 @@ function neCopy(d: NEDoc) {
   </div>`;
 }
 
-export function notaEntregaHtml(d: NEDoc) {
-  return wrap(`<div class="sheet ne">${neCopy(d)}${neCopy(d)}</div>`, `Nota de Entrega ${d.correlativo}`);
+export function notaEntregaHtml(d: NEDoc, empresa: EmpresaId) {
+  return wrap(`<div class="sheet ne">${neCopy(d, empresa)}${neCopy(d, empresa)}</div>`, `Nota de Entrega ${d.correlativo}`);
 }
 
-export function devolucionHtml(d: DevDoc) {
+export function devolucionHtml(d: DevDoc, empresa: EmpresaId) {
+  const E = identidad(empresa);
   const sub = d.lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
   const iva = sub * 0.16;
   const total = sub + iva;
   const filas = d.lineas.map((l) =>
     `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">0,00</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");
   const body = `<div class="copy dev">
-    <div class="devhead">${LOGO}<div class="empresa"><b>${EMPRESA.rif}</b><br>${EMPRESA.dir}</div></div>
+    <div class="devhead">${E.logo}<div class="empresa"><b>${E.rif}</b><br>${E.dir}</div></div>
     <div class="devbox">
       <div class="left">
-        <div class="sub">${EMPRESA.subBloque}</div>
+        ${E.subBloque ? `<div class="sub">${E.subBloque}</div>` : ""}
         <table class="cli"><tr><td class="k">Razón Social</td><td>${d.razonSocial}</td></tr>
           <tr><td class="k">RIF</td><td>${d.rif}</td></tr>
           <tr><td class="k">Dirección</td><td>${d.direccion}</td></tr>
@@ -131,14 +139,15 @@ export function devolucionHtml(d: DevDoc) {
   return wrap(`<div class="sheet">${body}</div>`, `Nota de Crédito ${d.correlativo}`);
 }
 
-export function presupuestoHtml(d: PresupuestoDoc) {
+export function presupuestoHtml(d: PresupuestoDoc, empresa: EmpresaId) {
+  const E = identidad(empresa);
   const sub = d.lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
   const iva = sub * 0.16;
   const total = sub + iva;
   const filas = d.lineas.map((l) =>
     `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %&nbsp;&nbsp;${m(l.cantidad * l.precio * l.descuento / 100)}</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");
   const body = `<div class="copy dev">
-    <div class="devhead">${LOGO}<div class="empresa"><b>${EMPRESA.rif}</b><br>${EMPRESA.dir}</div></div>
+    <div class="devhead">${E.logo}<div class="empresa"><b>${E.rif}</b><br>${E.dir}</div></div>
     <div class="devbox">
       <div class="left">
         <table class="cli"><tr><td class="k">Razón Social</td><td>${d.razonSocial}</td></tr>

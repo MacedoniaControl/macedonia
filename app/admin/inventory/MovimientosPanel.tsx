@@ -202,7 +202,7 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
     setAviso({ ok: true, text: `${p.nombre} seleccionado (${origen})` });
   }
   function onScan(codigo: string) {
-    const p = lookupByCodigo(codigo);
+    const p = lookupByCodigo(codigo, empresa);
     if (!p) {
       beep(false);
       setAviso({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo.` });

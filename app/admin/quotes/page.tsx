@@ -68,7 +68,7 @@ export default function QuotesPage() {
 
   function generarPDF(c: Cotizacion) {
     if (c.origen === "Valery" && c.dataUrl) return window.open(c.dataUrl, "_blank");
-    printDoc(presupuestoHtml({ correlativo: c.correlativo, fechaEmision: c.fechaEmision, fechaVenc: c.fechaVenc, razonSocial: c.razonSocial, rif: c.rif, direccion: c.direccion, telefonos: c.telefonos, lineas: c.lineas, moneda: c.moneda, nota: c.nota }));
+    printDoc(presupuestoHtml({ correlativo: c.correlativo, fechaEmision: c.fechaEmision, fechaVenc: c.fechaVenc, razonSocial: c.razonSocial, rif: c.rif, direccion: c.direccion, telefonos: c.telefonos, lineas: c.lineas, moneda: c.moneda, nota: c.nota }, empresaKey));
   }
   function setEstado(id: number, estado: Estado) {
     setCots((prev) => prev.map((c) => (c.id === id ? { ...c, estado } : c)));
@@ -147,7 +147,7 @@ export default function QuotesPage() {
       {(tab === "gen" || (tab === "registro" && !verRegistros)) && <GenerarPresupuesto seq={seq} onSave={(c) => {
         setCots((p) => [{ ...c, id: Date.now(), estado: "Borrador", origen: "SumiControl", fechaISO: hoyISO() }, ...p]);
         setSeq((s) => s + 1);
-        printDoc(presupuestoHtml(c));
+        printDoc(presupuestoHtml(c, empresaKey));
       }} />}
 
       {tab === "subir" && (
@@ -169,6 +169,7 @@ export default function QuotesPage() {
 type GenDoc = { correlativo: string; fechaEmision: string; fechaVenc: string; razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; moneda: string; nota: string; total: number };
 
 function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) => void }) {
+  const empresaKey = useEmpresaActiva();
   const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "01 - GERENTE", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5 });
   const [lineas, setLineas] = useState<DevLinea[]>([]);
   const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0, unidad: "UNIDAD" });
@@ -194,7 +195,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
     }
   }
   function onScan(codigo: string) {
-    const p = lookupByCodigo(codigo);
+    const p = lookupByCodigo(codigo, empresaKey);
     if (!p) {
       beep(false);
       setAviso({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo.` });
