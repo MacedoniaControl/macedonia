@@ -106,9 +106,17 @@ create policy movimientos_borra on movimientos_inventario
 -- ---------------------------------------------------------------- DOCUMENTOS
 create policy documentos_lectura on documentos
   for select using (puede_empresa(empresa_id));
-create policy documentos_escribe on documentos
-  for all using (puede_empresa(empresa_id))
-  with check (puede_empresa(empresa_id));
+-- Crear documentos: vendedores y técnicos también (es su trabajo diario).
+create policy documentos_crea on documentos
+  for insert with check (puede_empresa(empresa_id)
+                         and auth_rol() in ('owner','admin','vendedor','tecnico'));
+create policy documentos_edita on documentos
+  for update using (puede_empresa(empresa_id)
+                    and auth_rol() in ('owner','admin','vendedor'));
+-- Borrar un documento emitido: SOLO owner y admin. Antes podía hacerlo cualquier
+-- usuario de la empresa, incluido un técnico de recargas.
+create policy documentos_borra on documentos
+  for delete using (puede_empresa(empresa_id) and auth_rol() in ('owner','admin'));
 
 create policy lineas_lectura on documento_lineas
   for select using (exists (select 1 from documentos d
@@ -167,9 +175,38 @@ create policy notificaciones_resuelve on notificaciones
 -- *** SOLO OWNER *** — decisión explícita: ni siquiera los administradores.
 create policy auditoria_solo_owner on auditoria
   for select using (es_owner());
--- Cualquiera autenticado puede DEJAR rastro, nadie puede editarlo ni borrarlo.
+-- Cualquiera autenticado puede DEJAR rastro, nadie puede editarlo ni borrarlo
+-- (no hay policy de UPDATE ni DELETE: el RLS niega por defecto = log inmutable).
+--
+-- usuario_id DEBE ser el del propio autor: sin esta condición cualquier usuario
+-- podría insertar entradas atribuidas a OTRA persona. Como este log es la única
+-- fuente de verdad del Owner sobre quién hizo qué, poder falsificar el autor lo
+-- vuelve inservible como evidencia.
 create policy auditoria_inserta on auditoria
-  for insert with check (auth.uid() is not null);
+  for insert with check (auth.uid() is not null and usuario_id = auth.uid());
+
+-- ---------------------------------------------------------------- COSTOS (columna)
+-- REGLA: "Vendedor: solo precios de venta". El RLS es por FILA, no por COLUMNA:
+-- con solo RLS, un vendedor hace `select * from productos` y ve costo_unitario,
+-- es decir el costo de compra y el margen real de la empresa.
+--
+-- Por eso el costo se protege con permisos de COLUMNA y se expone únicamente a
+-- través de una función que verifica puede_finanzas() (owner + admin).
+--
+-- CONSECUENCIA PARA QUIEN ESCRIBA CODIGO: `select *` sobre productos FALLA.
+-- Hay que listar las columnas explícitamente. Es a propósito: obliga a decidir
+-- si de verdad se necesita el costo.
+revoke select (costo_unitario) on productos from authenticated, anon;
+
+create or replace function costos_productos(e text)
+returns table (codigo text, costo numeric)
+language sql stable security definer set search_path = public as $$
+  select p.codigo, p.costo_unitario
+  from productos p
+  where p.empresa_id = e
+    and puede_empresa(e)
+    and puede_finanzas()
+$$;
 
 -- ---------------------------------------------------------------- TASA BCV
 -- La leen todos; la escribe el servidor (service_role) o un admin.

@@ -110,7 +110,13 @@ create unique index movimientos_unicos_por_documento
   where documento is not null and origen <> 'manual';
 
 -- Existencia actual = suma del kardex (no se guarda un stock suelto que se desincronice).
-create view existencias as
+-- *** security_invoker = on ES OBLIGATORIO ***
+-- Sin esto la vista se ejecuta con los privilegios de SU DUEÑO (el rol que corrió
+-- la migración) y SE SALTA EL RLS de movimientos_inventario. Cualquier usuario
+-- autenticado — un técnico de Sudematin, un vendedor — podría leer el inventario
+-- COMPLETO DE AMBAS EMPRESAS a través de la vista, con las tablas "protegidas".
+-- Es la forma más silenciosa de romper la pared entre empresas.
+create view existencias with (security_invoker = on) as
 select empresa_id, codigo,
        sum(case when direccion = 'entrada' then cantidad else -cantidad end) as existencia,
        sum(case when direccion = 'entrada' and afecta_inventario_real then cantidad
