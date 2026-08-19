@@ -17,7 +17,7 @@ datos reales hasta resolverla.
 
 Comprueba, entre otras cosas:
 
-- que las 15 tablas tengan RLS activo;
+- que las 16 tablas tengan RLS activo;
 - que **ninguna vista se salte el RLS** (una vista sin `security_invoker = on`
   corre con los privilegios de su dueño y lee todo, ignorando las políticas:
   es la forma más silenciosa de romper la pared entre empresas);
