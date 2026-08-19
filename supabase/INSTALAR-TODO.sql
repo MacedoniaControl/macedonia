@@ -12,6 +12,7 @@
 -- ============================================================================
 
 
+
 -- ####################  01-schema  ####################
 
 -- ============================================================================
@@ -498,7 +499,20 @@ create policy auditoria_inserta on auditoria
 -- CONSECUENCIA PARA QUIEN ESCRIBA CODIGO: `select *` sobre productos FALLA.
 -- Hay que listar las columnas explícitamente. Es a propósito: obliga a decidir
 -- si de verdad se necesita el costo.
-revoke select (costo_unitario) on productos from authenticated, anon;
+-- OJO: `revoke select (costo_unitario)` NO funciona si existe un GRANT SELECT de
+-- TABLA (el permiso de tabla cubre todas las columnas y el revoke se ignora en
+-- silencio). Supabase otorga SELECT de tabla a authenticated por defecto.
+-- Por eso hay que QUITAR el permiso de tabla y otorgar columna por columna.
+revoke select on productos from authenticated, anon;
+grant select (
+  id, empresa_id, codigo, nombre, unidad, unidad_alt,
+  precio_unitario, es_cilindro, tag_duplicado, created_at
+) on productos to authenticated;   -- costo_unitario queda FUERA a proposito
+
+-- Defensa en profundidad: anon no necesita tocar finanzas ni auditoria.
+-- El RLS ya lo bloquea, pero un permiso de menos es una red de seguridad de mas.
+revoke select, insert, update, delete
+  on gastos, trabajadores, ventas_asignadas, auditoria from anon;
 
 create or replace function costos_productos(e text)
 returns table (codigo text, costo numeric)
