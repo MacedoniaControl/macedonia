@@ -9,9 +9,10 @@
 
 - **App en vivo:** https://sumicontrol.vercel.app — pública, sin login todavía.
 - **Marca:** **Macedonia** en el front · **SumiControl** interno (código, claves, docs).
-- **Repo:** github.com/Pantera95/Sumi · rama **`patch/greeg-ux-ui`**.
+- **Repo:** github.com/MacedoniaControl/macedonia · rama **`main`** (organización de la empresa).
 - **Worktree:** `/Users/greegvizcaino/Documents/New project/sumi-ux-patch`
-- **Naturaleza:** demo funcional **client-side** (`localStorage`). **Sin backend, sin DB, sin auth.**
+- **Naturaleza:** front **client-side** (`localStorage`) + **base de datos Supabase YA CREADA y verificada**
+  (Postgres + RLS, plan Pro). Falta conectar los módulos y el login.
 - **Prioridad #1 del cliente:** **Cilindros y recargas** (rehacer con el proceso real) + login +
   que los 6 técnicos registren recargas desde el celular.
 
@@ -68,13 +69,32 @@ El tema y el menú se aplican solos según la URL. Detalle en `BLUEPRINT.md` §3
 
 1. **Cilindros** con el proceso real — falta responder: ¿serie individual o cantidades?, ¿comodato?,
    ¿estados?, ¿se rellenan o se compran llenos?, ¿paso a paso del técnico?
-2. **Backend**: Supabase (Postgres + Auth + RLS). **Código ya preparado** en `supabase/*.sql` +
-   `lib/supabase/*`; receta en `docs/backend/SUPABASE-SETUP.md`. Falta ejecutarlo.
+2. **Backend**: ✅ base **creada y verificada** (16 tablas · 34 políticas · plan Pro).
+   Las 7 pruebas de `supabase/04-verificacion.sql` pasan. **Falta**: conectar los módulos
+   (cambiar el cuerpo de los stores, no las firmas) y el login.
 3. **Importadores diarios** con idempotencia y reversión.
 4. **Estado de Resultado** armado en Matrices.
 5. Conectar documentos al kardex — ⚠️ resolver el **doble descuento** (NE de Macedonia vs export de Valery).
 6. Notas y cotizaciones con logo/RIF por empresa.
 7. Dominio propio (`app.macedonia…`) y tasa BCV compartida cada hora.
+
+## 5-bis. Base de datos (Supabase) — verificada
+
+**16 tablas · 34 políticas · vista `existencias` · plan Pro (con backups).**
+
+Las 7 pruebas de seguridad de `supabase/04-verificacion.sql` pasan. Volver a correrlas
+tras **cualquier** cambio de esquema o de políticas.
+
+**Dos errores que la verificación atrapó** (y que sin ella habríamos dado por resueltos):
+
+1. La vista `existencias` se creó sin `security_invoker` → se saltaba el RLS por completo.
+   Cualquier técnico podía leer el inventario de **ambas** empresas.
+2. `revoke select (costo_unitario)` **no hacía nada**: en Postgres, un `GRANT SELECT` de
+   tabla cubre todas las columnas y el revoke de una columna suelta se ignora **en
+   silencio**. Hay que quitar el permiso de tabla y otorgar columna por columna.
+
+Moraleja: en seguridad de base de datos, *parecer aplicado* y *estar aplicado* son cosas
+distintas. Preguntarle siempre a la base.
 
 ## 6. Riesgos abiertos
 
