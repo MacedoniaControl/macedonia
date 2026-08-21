@@ -1,22 +1,20 @@
 // app/api/inventory/lookup/route.ts
-// Sigue el patrón de app/api/bcv/route.ts. Hoy resuelve contra el JSON en memoria;
-// mañana cambias el CUERPO por una consulta a la DB sin tocar la FIRMA:
 //
-//   POST { codigo: string, empresa: EmpresaId } -> { found: boolean, product: InventoryProduct | null }
+//   POST { codigo, empresa } -> { found, product | null, error? }
 //
-// La empresa es OBLIGATORIA: cada una tiene su propio catálogo de Valery y un
-// código puede existir en una y no en la otra (o ser un producto distinto).
+// Lo usa el escáner. La empresa es OBLIGATORIA: cada una tiene su catálogo y un
+// mismo código puede existir en una y no en la otra, o ser un producto distinto.
 //
-// OJO: los alias viven en el cliente (localStorage), así que este endpoint solo
-// conoce códigos Valery. Para el MVP el cliente resuelve todo con resolveScan()
-// (instantáneo y offline, porque el seed ya se importa en cliente). Este endpoint
-// es la "costura" para cuando el catálogo crezca / llegue la DB, momento en el que
-// también moverás los alias aquí sin cambiar la firma.
+// Un fallo de red devuelve 503 con motivo, NO un "no encontrado": para el
+// operador son cosas muy distintas — una significa "revisá la etiqueta" y la
+// otra "el sistema no está respondiendo".
+
 import { NextResponse } from "next/server";
-import { lookupByCodigo } from "@/lib/inventory/catalog";
+import { buscarPorCodigo } from "@/lib/inventory/catalog-db";
 import { isEmpresaId } from "@/lib/ux/empresas";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   let codigo = "";
@@ -26,7 +24,7 @@ export async function POST(req: Request) {
     codigo = typeof body?.codigo === "string" ? body.codigo : "";
     empresa = typeof body?.empresa === "string" ? body.empresa : "";
   } catch {
-    // body inválido -> codigo queda ""
+    // body inválido -> quedan vacíos
   }
 
   if (!codigo.trim()) {
@@ -35,7 +33,6 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-
   if (!isEmpresaId(empresa)) {
     return NextResponse.json(
       { found: false, product: null, error: "empresa requerida (sumigases | sudematin)" },
@@ -43,6 +40,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const product = lookupByCodigo(codigo, empresa);
-  return NextResponse.json({ found: !!product, product: product ?? null });
+  try {
+    const product = await buscarPorCodigo(codigo, empresa);
+    return NextResponse.json({ found: !!product, product });
+  } catch (e) {
+    return NextResponse.json(
+      { found: false, product: null, error: (e as Error).message },
+      { status: 503 },
+    );
+  }
 }
