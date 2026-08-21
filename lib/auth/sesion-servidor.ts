@@ -7,6 +7,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/ux/session";
 import type { EmpresaId } from "@/lib/ux/empresas";
+import { CLAVES_MODULO, type Permisos } from "./permisos.ts";
 
 export type UsuarioSesion = {
   id: string;
@@ -15,6 +16,8 @@ export type UsuarioSesion = {
   /** null = acceso a todas las empresas (solo tiene sentido para el owner). */
   empresaId: EmpresaId | null;
   usuario: string;
+  /** Qué puede ver. Para el Owner da igual: puede todo. */
+  permisos: Permisos;
 };
 
 /** Usuario autenticado, o null. Consulta la tabla `usuarios`, no el token. */
@@ -28,7 +31,7 @@ export async function getUsuarioSesion(): Promise<UsuarioSesion | null> {
   // puede alterar el propio usuario en algunas configuraciones, la tabla no.
   const { data, error } = await sb
     .from("usuarios")
-    .select("id, nombre, rol, empresa_id, activo")
+    .select("id, nombre, rol, empresa_id, activo, permisos")
     .eq("id", auth.user.id)
     .maybeSingle();
 
@@ -40,12 +43,32 @@ export async function getUsuarioSesion(): Promise<UsuarioSesion | null> {
     rol: data.rol as Rol,
     empresaId: (data.empresa_id as EmpresaId | null) ?? null,
     usuario: (auth.user.email ?? "").split("@")[0],
+    permisos: (data.permisos as Permisos | null) ?? {},
   };
 }
 
 /** ¿Puede entrar al panel de esta empresa? Owner: todas. Los demás: solo la suya. */
 export function puedeEntrarAEmpresa(u: UsuarioSesion, empresa: string): boolean {
   return u.rol === "owner" || u.empresaId === empresa;
+}
+
+/**
+ * ¿Puede ver esta sección? El Owner SIEMPRE puede: es irrevocable por
+ * construcción, igual que en la base de datos (función `puede`).
+ */
+export function sesionPuede(u: UsuarioSesion, clave: string): boolean {
+  return u.rol === "owner" || u.permisos[clave] === true;
+}
+
+/**
+ * Primera sección que esta persona puede ver. Es a donde se la redirige cuando
+ * intenta entrar a algo sin permiso: nunca debe quedar en una pantalla vacía
+ * sin saber qué hacer.
+ */
+export function primeraSeccion(u: UsuarioSesion): string {
+  const base = u.empresaId ? `/admin/${u.empresaId}` : "/admin";
+  const clave = CLAVES_MODULO.find((c) => sesionPuede(u, c));
+  return clave ? `${base}/${clave}` : "/sin-acceso";
 }
 
 /** A dónde mandar a cada quien después de entrar. */
