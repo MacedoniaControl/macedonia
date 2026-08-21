@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
 import { usuarioACorreo, errorDeUsuario, correoAUsuario } from "@/lib/auth/identidad";
 import { isEmpresaId } from "@/lib/ux/empresas";
+import { plantillaDeRol, TODAS_LAS_CLAVES, type Permisos } from "@/lib/auth/permisos";
 
 export type Resultado = { error: string | null; ok: string | null };
 
@@ -34,6 +35,7 @@ export type UsuarioFila = {
   rol: string;
   empresaId: string | null;
   activo: boolean;
+  permisos: Permisos;
 };
 
 export async function listarUsuarios(): Promise<UsuarioFila[]> {
@@ -42,7 +44,7 @@ export async function listarUsuarios(): Promise<UsuarioFila[]> {
 
   const { data: filas } = await admin
     .from("usuarios")
-    .select("id, nombre, rol, empresa_id, activo")
+    .select("id, nombre, rol, empresa_id, activo, permisos")
     .order("nombre");
   if (!filas) return [];
 
@@ -57,6 +59,7 @@ export async function listarUsuarios(): Promise<UsuarioFila[]> {
     rol: f.rol,
     empresaId: f.empresa_id,
     activo: f.activo,
+    permisos: (f.permisos as Permisos | null) ?? {},
   }));
 }
 
@@ -110,6 +113,8 @@ export async function crearUsuario(_prev: Resultado, form: FormData): Promise<Re
     rol,
     empresa_id: empresaId,
     activo: true,
+    // El rol es una PLANTILLA: marca lo típico y a partir de ahí el Owner ajusta.
+    permisos: plantillaDeRol(rol),
   });
 
   if (errFila) {
@@ -152,4 +157,48 @@ export async function restablecerPassword(id: string, nueva: string): Promise<Re
   if (error) return { error: error.message, ok: null };
 
   return { error: null, ok: "Contraseña restablecida. Entrégala en persona." };
+}
+
+
+/**
+ * Enciende o apaga un permiso.
+ *
+ * El Owner no se puede limitar: su acceso es total por diseño, y la base lo
+ * respalda (la función `puede` devuelve true para owner sin mirar la columna).
+ * Rechazarlo aquí además evita que la pantalla muestre un cambio que la base
+ * ignoraría.
+ */
+export async function alternarPermiso(
+  usuarioId: string,
+  clave: string,
+  valor: boolean,
+): Promise<Resultado> {
+  try {
+    await exigirOwner();
+  } catch (e) {
+    return { error: (e as Error).message, ok: null };
+  }
+
+  if (!TODAS_LAS_CLAVES.includes(clave)) {
+    return { error: "Permiso desconocido.", ok: null };
+  }
+
+  const admin = createAdminClient();
+  const { data: u, error: errLeer } = await admin
+    .from("usuarios")
+    .select("rol, permisos")
+    .eq("id", usuarioId)
+    .maybeSingle();
+
+  if (errLeer || !u) return { error: "Usuario no encontrado.", ok: null };
+  if (u.rol === "owner") {
+    return { error: "El Owner tiene acceso total y no se puede limitar.", ok: null };
+  }
+
+  const permisos: Permisos = { ...((u.permisos as Permisos | null) ?? {}), [clave]: valor };
+  const { error } = await admin.from("usuarios").update({ permisos }).eq("id", usuarioId);
+  if (error) return { error: error.message, ok: null };
+
+  revalidatePath("/admin/users");
+  return { error: null, ok: null };
 }

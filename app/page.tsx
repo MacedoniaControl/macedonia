@@ -1,110 +1,53 @@
-import Link from "next/link";
-import { Icon } from "@/components/ui/Icon";
-import { EMPRESAS, EMPRESA_IDS } from "@/lib/ux/empresas";
-import { getHistory } from "@/lib/ux/history-data";
-import { fmtUsd } from "@/lib/ux/format";
+// Portada de Macedonia.
+//
+// Sin sesión: SOLO el login. Nada más.
+//
+// Antes esta página mostraba las ventas, el margen y el ROI reales de ambas
+// empresas a cualquiera que abriera la URL, sin haber entrado. Con el
+// repositorio público, esos números salían por dos vías distintas.
+//
+// Con sesión: el Centro de Control, para que el Owner elija empresa.
 
-const consolidado = getHistory("all").totals;
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { backendActivo } from "@/lib/supabase/server";
+import { getUsuarioSesion, rutaPostLogin } from "@/lib/auth/sesion-servidor";
+import { LoginForm } from "./login/LoginForm";
+import { CentroDeControl } from "./CentroDeControl";
 
-export default function Home() {
-  return (
-    <main className="relative min-h-screen overflow-hidden">
-      {/* Fondo: halo naranja (Sumigases) a la izquierda + azul (Sudematin) a la derecha */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(48rem_26rem_at_-8%_-6%,rgba(234,106,30,0.16),transparent),radial-gradient(48rem_26rem_at_108%_-6%,rgba(42,42,140,0.20),transparent)]" />
+export const metadata: Metadata = { title: "Macedonia" };
 
-      <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
-        <header className="flex items-center justify-between">
-          <span className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-bold text-white">M</span>
-            <span className="font-semibold text-text">Macedonia</span>
-          </span>
-          <span className="hidden rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted sm:block">
-            Sumigases Oriente · Sudematin
-          </span>
-        </header>
+// Depende de quién eres: nunca se prerenderiza.
+export const dynamic = "force-dynamic";
 
-        <section className="flex flex-1 flex-col justify-center py-12">
-          <div className="text-center">
-            <h1 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-text sm:text-5xl">
-              Centro de Control Estratégico
+export default async function Portada() {
+  // Sin backend configurado la app sigue en modo demo: se muestra el Centro de
+  // Control como hasta ahora, para no dejarla inservible a medio migrar.
+  if (!backendActivo) return <CentroDeControl />;
+
+  const usuario = await getUsuarioSesion();
+
+  if (!usuario) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-bg px-4 py-10">
+        <div className="w-full max-w-sm">
+          <div className="mb-7 text-center">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-text">
+              Macedonia
             </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted sm:text-lg">
-              Elige la empresa para entrar a su panel. Cada una opera por separado — inventario,
-              cilindros, ventas, cotizaciones y rentabilidad — con sus propios números.
-            </p>
+            <p className="mt-1.5 text-sm text-muted">Centro de Control Estratégico</p>
           </div>
 
-          {/* Dos puertas: una por empresa */}
-          <div className="mt-10 grid gap-5 md:grid-cols-2">
-            {EMPRESA_IDS.map((id) => {
-              const emp = EMPRESAS[id];
-              const t = getHistory(id).totals;
-              return (
-                <Link
-                  key={id}
-                  href={`/admin/${id}/dashboard`}
-                  className={`theme-${id} group flex flex-col rounded-2xl border-2 border-border bg-surface p-6 shadow-sm transition hover:border-brand hover:shadow-md focus-visible:border-brand`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--color-brand-soft)" }}>
-                      <img src={emp.logo} alt="" className="h-8 w-auto max-w-[40px] object-contain" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-lg font-semibold text-text">{emp.nombreCorto}</p>
-                      <p className="text-xs text-muted">{emp.nombre} · RIF {emp.rif}</p>
-                    </div>
-                  </div>
-
-                  <dl className="mt-5 grid grid-cols-3 gap-3">
-                    <div className="min-w-0">
-                      <dt className="text-[11px] uppercase tracking-wide text-muted">Ventas hist.</dt>
-                      <dd className="truncate text-base font-semibold tabular-nums text-text">{fmtUsd(t.venta)}</dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className="text-[11px] uppercase tracking-wide text-muted">Margen</dt>
-                      <dd className="text-base font-semibold tabular-nums text-text">{t.margen}%</dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className="text-[11px] uppercase tracking-wide text-muted">ROI</dt>
-                      <dd className="text-base font-semibold tabular-nums text-ok">{t.roi}%</dd>
-                    </div>
-                  </dl>
-
-                  <span className="mt-6 inline-flex items-center gap-2 self-start rounded-xl bg-brand-strong px-4 py-2.5 text-sm font-medium text-white transition group-hover:brightness-90">
-                    <Icon name="dashboard" size={16} />
-                    Entrar al Dashboard de {emp.nombreCorto}
-                    <span className="transition group-hover:translate-x-0.5"><Icon name="chevronRight" size={16} /></span>
-                  </span>
-                </Link>
-              );
-            })}
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <LoginForm destino="" />
           </div>
+        </div>
+      </main>
+    );
+  }
 
-          {/* Consolidado — solo Owner */}
-          <Link
-            href="/admin/dashboard"
-            className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-4 shadow-sm transition hover:bg-surface-2"
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy/10 text-navy dark:text-accent"><Icon name="matrix" size={18} /></span>
-              <div>
-                <p className="flex items-center gap-2 text-sm font-semibold text-text">
-                  Vista Consolidada
-                  <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">Solo Owner</span>
-                </p>
-                <p className="text-xs text-muted">Ambas empresas sumadas · {fmtUsd(consolidado.venta)} en ventas · ROI {consolidado.roi}%</p>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-brand">
-              Ver consolidado <Icon name="chevronRight" size={16} />
-            </span>
-          </Link>
+  // Quien no es Owner no elige empresa: va directo a la suya.
+  if (usuario.rol !== "owner") redirect(rutaPostLogin(usuario));
 
-          <p className="mt-4 text-center text-xs text-muted">
-            El acceso al consolidado se restringirá a los Owner cuando se active la autenticación.
-          </p>
-        </section>
-      </div>
-    </main>
-  );
+  return <CentroDeControl />;
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Fragment, useActionState, useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { crearUsuario, cambiarActivo, type Resultado, type UsuarioFila } from "./actions";
+import { FichaPermisos } from "./FichaPermisos";
 import { EMPRESAS } from "@/lib/ux/empresas";
 
 const inicial: Resultado = { error: null, ok: null };
@@ -25,6 +26,7 @@ export function UsuariosPanel({ usuarios }: { usuarios: UsuarioFila[] }) {
   const [estado, accion, pendiente] = useActionState(crearUsuario, inicial);
   const [rol, setRol] = useState("vendedor");
   const [aviso, setAviso] = useState<string | null>(null);
+  const [abierto, setAbierto] = useState<string | null>(null);
 
   const esOwner = rol === "owner";
 
@@ -55,8 +57,19 @@ export function UsuariosPanel({ usuarios }: { usuarios: UsuarioFila[] }) {
               </thead>
               <tbody>
                 {usuarios.map((u) => (
-                  <tr key={u.id} className="border-b border-border/60">
-                    <td className="py-2.5 pr-3 text-text">{u.nombre}</td>
+                  <Fragment key={u.id}>
+                  <tr className="border-b border-border/60">
+                    <td className="py-2.5 pr-3 text-text">
+                      <button
+                        type="button"
+                        onClick={() => setAbierto(abierto === u.id ? null : u.id)}
+                        aria-expanded={abierto === u.id}
+                        className="inline-flex min-h-11 items-center gap-1.5 text-left hover:text-brand"
+                      >
+                        <span className={`transition ${abierto === u.id ? "rotate-90" : ""}`}>›</span>
+                        {u.nombre}
+                      </button>
+                    </td>
                     <td className="py-2.5 pr-3 font-mono text-xs text-muted">{u.usuario}</td>
                     <td className="py-2.5 pr-3">
                       <StatusBadge tone={tono[u.rol] ?? "muted"}>
@@ -77,6 +90,14 @@ export function UsuariosPanel({ usuarios }: { usuarios: UsuarioFila[] }) {
                       </Button>
                     </td>
                   </tr>
+                  {abierto === u.id && (
+                    <tr>
+                      <td colSpan={6} className="p-0">
+                        <FichaPermisos usuario={u} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

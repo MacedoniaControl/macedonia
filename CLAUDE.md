@@ -9,11 +9,18 @@ Para saber en qué punto está hoy, `docs/planning/project_state.md`.
 
 ---
 
-## REGLAS IRROMPIBLES
+## LA ÚNICA REGLA ABSOLUTA
 
-Estas no son preferencias de estilo. Son decisiones del negocio y romperlas causa daño
-real —fiscal, legal o de confianza—. **Si un cambio parece exigir romper una, para y
-pregunta.**
+**El Owner no puede quedarse sin acceso.** Ni desactivándose, ni apagándose permisos, ni
+dejando de ser Owner si es el último. Está garantizado en la BASE —la función `puede`
+devuelve `true` para el Owner sin mirar sus permisos, y un trigger impide desactivarlo—,
+no por una regla de pantalla que alguien pueda olvidar al escribir la siguiente pantalla.
+
+## REGLAS DE NEGOCIO
+
+Dos siguen siendo inviolables. Las otras tres son **valores por defecto que el Owner
+configura desde la pantalla de Usuarios** (decisión del cliente, 2026-08-19: antes eran
+irrompibles). Si un cambio parece exigir romper una de las inviolables, para y pregunta.
 
 ### 1. Macedonia NUNCA emite documentos fiscales
 Valery Small Business es y sigue siendo el sistema fiscal. Macedonia produce notas de
@@ -23,8 +30,10 @@ entrega, presupuestos y controles internos; **nunca** una factura fiscal.
 La integración es de **una sola vía**: se suben exports Excel de Valery a Macedonia.
 No hay API, no hay escritura, no hay sincronización de vuelta.
 
-### 3. Pared entre empresas
-Ningún usuario ve datos de la otra empresa. **La única excepción es el Owner.**
+### 3. Pared entre empresas — POR DEFECTO cerrada
+Nadie ve datos de la otra empresa salvo el Owner. Configurable con el permiso
+`otra_empresa`, que amplía `puede_empresa()` — **un solo lugar donde se decide**, en vez
+de repetir la comprobación en 34 políticas que pueden desincronizarse.
 
 Esta regla se rompió tres veces por creer que separar rutas y colores era suficiente.
 No lo es. La pared tiene que llegar **hasta los datos**:
@@ -32,6 +41,8 @@ No lo es. La pared tiene que llegar **hasta los datos**:
 - Toda clave de almacenamiento lleva la empresa: `ne:docs:${empresa}`, `inv-s:${empresa}`…
 - Toda función que lea datos de negocio recibe la empresa: `fisicoDe(empresa)`,
   `lookupByCodigo(codigo, empresa)`, `buildMaster(items, empresa)`…
+- **Las claves de permiso son los slugs de las rutas.** Si agregas una sección al menú,
+  su permiso ya tiene nombre: no inventes uno nuevo ni lo registres aparte.
 - Los documentos impresos llevan la identidad de SU empresa (`notaEntregaHtml(doc, empresa)`).
 - En la base de datos la hace cumplir el RLS (`supabase/02-rls.sql`), no el front.
 
@@ -39,13 +50,13 @@ No lo es. La pared tiene que llegar **hasta los datos**:
 `with (security_invoker = on)`. Una vista sin eso rompe la pared en silencio, con las
 tablas aparentemente protegidas.
 
-### 4. Registros, logs y auditoría: SOLO el Owner
-Explícitamente **ni siquiera los administradores**. Ver `puedeVerRegistros()` en
-`lib/ux/session.ts` y la política `auditoria_solo_owner`.
+### 4. Registros, logs y auditoría — POR DEFECTO solo el Owner
+Configurable: el Owner puede activar `ver_registros` a quien quiera. La política
+`auditoria_lectura` consulta `puede('audit')`.
 
-### 5. Gastos y utilidad: Owner + Administrador
-Los vendedores **solo ven precios de venta**, nunca el costo de compra ni el margen.
-En la base, el costo está protegido por permisos de columna, no solo por RLS.
+### 5. Gastos y utilidad — POR DEFECTO Owner + Administrador
+Configurable con los permisos `expenses` y `commissions`. El costo de compra sigue
+protegido por **permisos de columna** además del RLS, y se abre con `ver_costos`.
 
 ### 6. Nunca inventar datos
 Un dato de relleno que se ve igual que uno real es una trampa: alguien va a decidir
@@ -98,3 +109,17 @@ Nunca poner claves en el repo (**es público**). Para GitHub, `gh auth login` +
 `gh auth setup-git`; nunca un token en la URL ni en un archivo.
 `SUPABASE_SERVICE_ROLE_KEY` **se salta el RLS por completo**: solo en el servidor y solo
 para tareas administrativas.
+
+### Probar de verdad
+
+`npm test` — Node 25 ejecuta TypeScript nativo, sin vitest ni jest. Los archivos de
+prueba importan con **ruta relativa y extensión `.ts`**: el ejecutor de Node no lee
+`tsconfig` y no resuelve el alias `@/`.
+
+**Un test que nunca falló no prueba nada.** Tras escribir uno, rómpelo a propósito y
+comprueba que falla. Los peores errores de este proyecto pasaban todas las
+comprobaciones: un `revoke` de columna que Postgres ignoraba en silencio, una vista que
+se saltaba el RLS entero.
+
+Tras cualquier cambio de esquema o políticas, correr `supabase/04-verificacion.sql`:
+**10 filas, todas en OK.**

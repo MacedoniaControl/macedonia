@@ -1,6 +1,11 @@
 // Usuarios y roles. Server Component: la sesión y el rol se leen EN EL SERVIDOR.
 // Regla de negocio: gestionar usuarios es SOLO del Owner. Ni los administradores.
 
+// SIEMPRE dinámica. Esta página depende de QUIÉN eres: prerenderizarla no tiene
+// sentido y además cuelga el build, porque Next se queda esperando una consulta
+// a Supabase para una sesión que en tiempo de compilación no existe.
+export const dynamic = "force-dynamic";
+
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
