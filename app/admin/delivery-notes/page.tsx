@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { useRef, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { guardarDocumento, correlativoPrevisto } from "@/lib/documentos/documentos-db";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -21,7 +24,7 @@ import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 type Tipo = "entrega" | "devolucion";
 type Doc = {
   id: string; tipo: Tipo; correlativo: string; cliente: string; fecha: string; total: number;
-  origen: "SumiControl" | "Valery"; fileName?: string; dataUrl?: string; ne?: NEDoc; dev?: DevDoc;
+  origen: "Macedonia" | "SumiControl" | "Valery"; fileName?: string; dataUrl?: string; ne?: NEDoc; dev?: DevDoc;
 };
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
@@ -46,8 +49,15 @@ function inPeriod(fecha: string, period: string): boolean {
 export default function DeliveryNotesPage() {
   const empresaKey = useEmpresaActiva();
   const [docs, setDocs] = usePersistedState<Doc[]>(`ne:docs:${empresaKey}`, SEED);
-  const [seqNE, setSeqNE] = usePersistedState(`ne:seqNE:${empresaKey}`, 8204);
-  const [seqDev, setSeqDev] = usePersistedState(`ne:seqDev:${empresaKey}`, 604);
+  // El correlativo lo da la BASE, no un contador del navegador: dos vendedores
+  // generando a la vez sacarían el mismo número. Esto es solo la PREVISIÓN que
+  // se muestra antes de generar; el número real llega al guardar.
+  const [previstoNE, setPrevistoNE] = useState("…");
+  const [previstoDev, setPrevistoDev] = useState("…");
+  useEffect(() => {
+    correlativoPrevisto(empresaKey, "nota_entrega").then(setPrevistoNE).catch(() => setPrevistoNE("—"));
+    correlativoPrevisto(empresaKey, "devolucion").then(setPrevistoDev).catch(() => setPrevistoDev("—"));
+  }, [empresaKey]);
   // "Generar nota de entrega" es el apartado principal; el Registro va de último y es solo OWNER.
   const [tab, setTab] = useState<"registro" | "ne" | "dev" | "subir">("ne");
   const { rol } = useRol();
@@ -136,18 +146,36 @@ export default function DeliveryNotesPage() {
         </SectionCard>
       )}
 
-      {(tab === "ne" || (tab === "registro" && !verRegistros)) && <GenerarNE onSave={(ne) => {
-        const t = neTotals(ne);
-        setDocs((p) => [{ id: `${Date.now()}`, tipo: "entrega", correlativo: ne.correlativo, cliente: ne.cliente, fecha: ne.fecha, total: t.total, origen: "SumiControl", ne }, ...p]);
-        setSeqNE((s) => s + 1);
-        printDoc(notaEntregaHtml(ne, empresaKey));
-      }} seq={seqNE} />}
+      {(tab === "ne" || (tab === "registro" && !verRegistros)) && <GenerarNE onSave={async (ne) => {
+        // Se guarda PRIMERO y se imprime DESPUÉS. El orden importa: hasta que la
+        // base no entrega el número, no hay número que imprimir. Antes se
+        // imprimía una previsión que podía no ser la que quedara guardada.
+        const r = await guardarDocumento({
+          tipo: "nota_entrega",
+          cliente: ne.cliente,
+          clienteRif: ne.rif,
+          clienteDireccion: ne.direccion,
+          lineas: ne.lineas.map((l) => ({
+            codigo: l.codigo ?? "", descripcion: l.descripcion,
+            cantidad: l.cantidad, unidad: l.unidad,
+            precio: l.precio, descuento: l.descuento ?? 0,
+          })),
+        }, empresaKey);
+
+        if (!r.ok) return { error: r.error };
+
+        const conNumero = { ...ne, correlativo: r.documento.correlativo };
+        const t = neTotals(conNumero);
+        setDocs((p) => [{ id: String(r.documento.id), tipo: "entrega", correlativo: r.documento.correlativo, cliente: ne.cliente, fecha: ne.fecha, total: t.total, origen: "Macedonia", ne: conNumero }, ...p]);
+        setPrevistoNE(String(Number(r.documento.correlativo) + 1).padStart(10, "0"));
+        printDoc(notaEntregaHtml(conNumero, empresaKey));
+        return { error: null };
+      }} seq={previstoNE} />}
 
       {tab === "dev" && <GenerarDev onSave={(dev, total) => {
         setDocs((p) => [{ id: `${Date.now()}`, tipo: "devolucion", correlativo: dev.correlativo, cliente: dev.razonSocial, fecha: dev.fechaEmision, total, origen: "SumiControl", dev }, ...p]);
-        setSeqDev((s) => s + 1);
         printDoc(devolucionHtml(dev, empresaKey));
-      }} seq={seqDev} />}
+      }} seq={previstoDev} />}
 
       {tab === "subir" && (
         <SectionCard title="Subir documentos de Valery" description="Macedonia detecta el tipo por el nombre del archivo y lo organiza en el registro por fecha.">
@@ -170,12 +198,16 @@ const TIPOS_PRECIO = ["Precio Máximo", "Precio Mínimo", "Precio Especial"];
 const DIVISAS = ["Bolívar", "Dólar"];
 const UNIDADES = ["CILINDRO", "UNIDAD", "KG", "MT", "PAR", "CAJA"];
 
-function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number }) {
+/** Formulario en blanco. Se reutiliza al limpiar tras guardar. */
+const formularioVacio = () => ({
+  cliente: "", rif: "", tlf: "", direccion: "", ordenCompra: "", notas: "",
+  vendedor: "01 - GERENTE", deposito: DEPOSITOS[0], tipoPrecio: TIPOS_PRECIO[0], divisa: DIVISAS[0],
+});
+
+function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: string | null }>; seq: string }) {
   const empresaKey = useEmpresaActiva();
-  const [f, setF] = useState({
-    cliente: "", rif: "", tlf: "", direccion: "", ordenCompra: "", notas: "",
-    vendedor: "01 - GERENTE", deposito: DEPOSITOS[0], tipoPrecio: TIPOS_PRECIO[0], divisa: DIVISAS[0],
-  });
+  const [guardando, setGuardando] = useState(false);
+  const [f, setF] = useState(formularioVacio());
   const [lineas, setLineas] = useState<NELinea[]>([]);
   const [ln, setLn] = useState<NELinea>({ codigo: "", cantidad: 1, unidad: "CILINDRO", descripcion: "", precio: 0, descuento: 0 });
   const [cil, setCil] = useState<NECil[]>(GASES.map((g) => ({ gas: g, llenos: 0, vacios: 0 })));
@@ -234,7 +266,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <SectionCard title="Datos de la nota de entrega" description={`N° ${String(seq).padStart(10, "0")}`}>
+      <SectionCard title="Datos de la nota de entrega" description={`N° ${seq}`}>
         <div className="space-y-3">
           <div><label className={label}>Cliente</label><input className={inputClass} value={f.cliente} onChange={set("cliente")} placeholder="Nombre / Razón social" /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -326,20 +358,30 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
           {enBs && <div className="flex justify-between"><dt className="text-muted">Dólar $</dt><dd className="text-muted">{fmtUsd(t.total)}</dd></div>}
         </dl>
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
-        <Button icon="delivery" className="mt-3 w-full" onClick={() => {
+        <Button icon="delivery" className="mt-3 w-full" disabled={guardando} onClick={async () => {
           setMsg("");
           if (!f.cliente.trim()) return setMsg("El cliente es obligatorio.");
           if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
           if (lineas.some((l) => l.precio <= 0)) return setMsg("Hay renglones sin precio (marcados en rojo). Complétalos antes de generar.");
-          onSave({ ...f, correlativo: String(seq).padStart(10, "0"), fecha: hoyISO(), lineas, cilindros: cil });
-        }}>Registrar y generar (PDF)</Button>
+          if (guardando) return;                    // doble clic: no emitir dos veces
+          setGuardando(true);
+          try {
+            const r = await onSave({ ...f, correlativo: seq, fecha: hoyISO(), lineas, cilindros: cil });
+            // Si la base rechazó, hay que decirlo: antes el documento "se
+            // generaba" en pantalla aunque no quedara guardado en ningún lado.
+            if (r.error) setMsg(r.error);
+            else { setLineas([]); setF(formularioVacio()); }
+          } finally {
+            setGuardando(false);
+          }
+        }}>{guardando ? "Guardando…" : "Registrar y generar (PDF)"}</Button>
       </SectionCard>
     </div>
   );
 }
 
 // ---- Generar Devolución (Nota de Crédito) ----
-function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc, total: number) => void; seq: number }) {
+function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc, total: number) => void; seq: string }) {
   const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", referencia: "", nota: "", formaPago: "" });
   const [lineas, setLineas] = useState<DevLinea[]>([]);
   const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0 });
@@ -350,7 +392,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc, total: number) => voi
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <SectionCard title="Datos de la devolución (Nota de Crédito)" description={`N° ${String(seq).padStart(10, "0")}`}>
+      <SectionCard title="Datos de la devolución (Nota de Crédito)" description={`N° ${seq}`}>
         <div className="space-y-3">
           <div><label className={label}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -384,7 +426,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc, total: number) => voi
           setMsg("");
           if (!f.razonSocial.trim()) return setMsg("La razón social es obligatoria.");
           if (lineas.length === 0) return setMsg("Agrega al menos un producto devuelto.");
-          onSave({ ...f, correlativo: String(seq).padStart(10, "0"), fechaEmision: hoyISO(), fechaVenc: hoyISO(), lineas }, total);
+          onSave({ ...f, correlativo: seq, fechaEmision: hoyISO(), fechaVenc: hoyISO(), lineas }, total);
         }}>Generar y guardar (PDF)</Button>
       </SectionCard>
     </div>
