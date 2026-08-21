@@ -90,6 +90,78 @@ color**, nunca solo por color. Encendido: `bg-brand-strong`.
 Guardado inmediato al alternar, con reversión optimista si el servidor rechaza: nunca
 debe quedar la pantalla diciendo ON mientras la base dice OFF.
 
+
+## Plantillas por rol (al crear el usuario)
+
+| Rol | Encendido por defecto |
+|---|---|
+| **Owner** | **Todo, siempre.** No configurable — ver «Owner irrevocable». |
+| **Administrador** | Las 17 de su empresa. Apagados: `users`, `audit`, `ver_registros`. |
+| **Vendedor** | `dashboard`, `quotes`, `delivery-notes`, `sales`, `products`, `inventory`. |
+| **Técnico** | Solo `cylinders`. Entra desde el celular, registra la recarga y sale. |
+
+Ninguna plantilla deja a nadie en cero. El Owner ajusta desde ahí.
+
+## Owner irrevocable — por construcción
+
+La función de la base devuelve `true` para el Owner **sin mirar los permisos**:
+
+```sql
+select es_owner() or coalesce((permisos ->> clave)::boolean, false)
+```
+
+No puede quedarse fuera aunque se intente a propósito. En su ficha los interruptores
+aparecen encendidos y bloqueados, con la explicación. `activo = false` sobre un Owner
+se prohíbe **en la base**, no en el formulario: una regla de pantalla se olvida, una
+restricción de la base no.
+
+## Acceso sin permiso
+
+**Las secciones sin permiso no se muestran** — se ocultan del menú, no se deshabilitan.
+
+Si alguien escribe la URL directamente (`/admin/expenses`):
+
+1. **Se comprueba en el layout de `/admin`**, por donde pasan las 18 secciones. No en el
+   `proxy`: consultar la base en cada petición es lento, y el layout es igual de
+   imposible de saltar desde el navegador.
+2. **Redirección a su primera sección disponible**, con el mensaje «No tienes permiso
+   para ver Gastos». Nunca queda en una pantalla vacía.
+3. **Se registra en auditoría** y **se alerta al Owner**.
+
+## Alertas con contador
+
+Estructura nueva en `notificaciones`: `veces`, `ultima_vez`, `clave_grupo`, más un índice
+único parcial sobre las pendientes.
+
+El cuarto intento de José a Gastos no crea una alerta nueva: encuentra la abierta, sube
+`veces` a 4 y refresca `ultima_vez`. **La auditoría registra todos los intentos igual** —
+se agrupa la alerta, nunca el rastro.
+
+Al marcarla revisada, el índice la libera: el siguiente intento abre una alerta nueva, así
+se sabe que volvió a pasar después de darlo por cerrado.
+
+**También alerta a partir de 3 fallos de contraseña seguidos** con el mismo usuario. Uno o
+dos son un error de tecleo; tres seguidos merecen saberse.
+
+### ⚠️ Arreglo aparte, que vale por sí solo
+
+`para_rol` existe en la tabla y **ninguna política la consulta**: hoy una alerta marcada
+«solo Owner» la ve cualquier administrador. Se corrige junto con esto, pero es un fallo
+independiente del sistema de permisos.
+
+## Puesta en marcha
+
+| Decisión | Elegido |
+|---|---|
+| Orden de migración | **Todos los módulos de una vez** |
+| Datos del navegador | **Migran solo los cargados por una persona**; se excluyen las semillas de ejemplo |
+| Usuarios | **2 o 3 de prueba primero**, el equipo completo tras verificar |
+| Sesión | **No expira sola**. Solo cierra sesión, o el Owner desactiva |
+| Despliegue | **sumicontrol.vercel.app** por ahora |
+
+⚠️ Consecuencia de mantener el despliegue actual: **Salem conserva acceso a producción**
+mientras dure. Es una postergación consciente, no un olvido.
+
 ## Riesgos
 
 1. **Se reescribe seguridad ya verificada.** Las 34 políticas funcionan hoy y pasaron
@@ -98,8 +170,9 @@ debe quedar la pantalla diciendo ON mientras la base dice OFF.
 2. **Un usuario sin permisos entra a un sistema vacío** y parece que la app está rota.
    Mitigación: la plantilla por rol nunca deja a nadie en cero, y el Sidebar muestra un
    mensaje explícito si no hay ningún módulo visible.
-3. **El Owner puede dejarse fuera a sí mismo.** Mitigación: el Owner no puede quitarse
-   `users` ni desactivarse (ya implementado para "desactivar").
+3. **Alertas ruidosas.** Una marca vieja del navegador dispara alertas de gente que no
+   hace nada malo; si suena por ruido se ignora justo cuando importa. Mitigación: el
+   contador agrupa, y solo alerta desde el tercer fallo de contraseña.
 
 ## Pruebas
 
