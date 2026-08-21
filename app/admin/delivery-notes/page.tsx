@@ -14,7 +14,7 @@ import {
   type NEDoc, type DevDoc, type NELinea, type DevLinea, type NECil,
 } from "@/lib/ux/doc-templates";
 import { ScanBar } from "@/components/inventory/ScanBar";
-import { lookupByCodigo } from "@/lib/inventory/catalog";
+import { escanear, mensajeDeEscaneo } from "@/lib/inventory/escanear";
 import { beep } from "@/lib/inventory/scan-feedback";
 import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 
@@ -186,24 +186,43 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => void; seq: number })
   // Escanear un producto lo agrega como renglón; si ya está, sube la cantidad.
   // El catálogo de Valery no trae precio, por eso el renglón nace en 0 y se
   // completa en la lista (ver guard al registrar).
-  function onScan(codigo: string) {
+  async function onScan(codigo: string) {
     setMsg("");
-    const p = lookupByCodigo(codigo, empresaKey);
-    if (!p) {
+    const r = await escanear(codigo, empresaKey);
+
+    // Tres desenlaces, no dos: "no está en el catálogo" y "el sistema no
+    // respondió" exigen acciones distintas del operador.
+    if (r.estado !== "encontrado") {
       beep(false);
-      setScanMsg({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo de Valery.` });
+      setScanMsg(mensajeDeEscaneo(r));
       return;
     }
+
+    const p = r.producto;
     beep(true);
-    const i = lineas.findIndex((l) => l.codigo === p.codigo);
-    if (i >= 0) {
-      const nueva = lineas[i].cantidad + 1;
-      setLineas(lineas.map((l, j) => (j === i ? { ...l, cantidad: nueva } : l)));
-      setScanMsg({ ok: true, text: `${p.nombre} · cantidad ${nueva}` });
-    } else {
-      setLineas([...lineas, { codigo: p.codigo, descripcion: p.nombre, cantidad: 1, unidad: ln.unidad, precio: 0, descuento: 0 }]);
-      setScanMsg({ ok: true, text: `${p.nombre} agregado · falta indicar el precio` });
-    }
+    // Se usa la forma funcional: entre que salió la petición y volvió, el
+    // operador pudo haber escaneado otra cosa. Leer `lineas` de la clausura
+    // perdería esa lectura en silencio.
+    setLineas((prev) => {
+      const i = prev.findIndex((l) => l.codigo === p.codigo);
+      if (i >= 0) {
+        const nueva = prev[i].cantidad + 1;
+        setScanMsg({ ok: true, text: `${p.nombre} · cantidad ${nueva}` });
+        return prev.map((l, j) => (j === i ? { ...l, cantidad: nueva } : l));
+      }
+      setScanMsg({
+        ok: true,
+        text: p.precio > 0 ? `${p.nombre} agregado` : `${p.nombre} agregado · falta indicar el precio`,
+      });
+      return [...prev, {
+        codigo: p.codigo,
+        descripcion: p.nombre,
+        cantidad: 1,
+        unidad: p.unidad ?? ln.unidad,
+        precio: p.precio,   // el catálogo de la base SÍ trae precio
+        descuento: 0,
+      }];
+    });
   }
   const updLinea = (i: number, patch: Partial<NELinea>) => {
     setMsg(""); // el aviso de "renglones sin precio" quedaría obsoleto al corregirlo

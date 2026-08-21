@@ -13,7 +13,7 @@ import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
-import { lookupByCodigo, type InventoryProduct } from "@/lib/inventory/catalog";
+import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
 import { beep } from "@/lib/inventory/scan-feedback";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
@@ -189,27 +189,27 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
 // ---------------------------------------------------------------- alta manual
 function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; empresa: string; onDone: () => void }) {
   const motivos = direccion === "entrada" ? MOTIVOS_ENTRADA : MOTIVOS_SALIDA;
-  const [prod, setProd] = useState<InventoryProduct | null>(null);
+  const [prod, setProd] = useState<ProductoEscaneado | null>(null);
   const [cantidad, setCantidad] = useState(1);
   const [motivo, setMotivo] = useState(motivos[0]);
   const [nota, setNota] = useState("");
   const [aviso, setAviso] = useState<{ ok: boolean; text: string } | null>(null);
   const [msg, setMsg] = useState("");
 
-  function elegir(p: InventoryProduct, origen: string) {
+  function elegir(p: ProductoEscaneado, origen: string) {
     setProd(p);
     setMsg("");
     setAviso({ ok: true, text: `${p.nombre} seleccionado (${origen})` });
   }
-  function onScan(codigo: string) {
-    const p = lookupByCodigo(codigo, empresa);
-    if (!p) {
+  async function onScan(codigo: string) {
+    const r = await escanear(codigo, empresa);
+    if (r.estado !== "encontrado") {
       beep(false);
-      setAviso({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo.` });
+      setAviso(mensajeDeEscaneo(r));
       return;
     }
     beep(true);
-    elegir(p, "escáner");
+    elegir(r.producto, "escáner");
   }
 
   function registrar() {
@@ -250,7 +250,13 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
           {prod ? (
             <>
               <p className="text-sm font-medium text-text">{prod.nombre}</p>
-              <p className="font-mono text-xs text-muted">{prod.codigo} · existencia actual {prod.existPpal} {prod.undPpal}</p>
+              {/* La existencia sale del kardex, no del catálogo: mostrarla aquí
+                  antes de que haya movimientos daría 0 para todo, y un cero
+                  falso confunde más que no mostrar nada. */}
+              <p className="font-mono text-xs text-muted">
+                {prod.codigo}{prod.unidad ? ` · ${prod.unidad}` : ""}
+                {prod.precio > 0 ? ` · $${prod.precio.toFixed(2)}` : ""}
+              </p>
             </>
           ) : (
             <p className="text-sm text-muted">Ningún producto seleccionado todavía.</p>

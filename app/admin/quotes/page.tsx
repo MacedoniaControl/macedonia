@@ -12,7 +12,7 @@ import { fmtUsd } from "@/lib/ux/format";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
 import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
-import { lookupByCodigo, type InventoryProduct } from "@/lib/inventory/catalog";
+import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
 import { beep } from "@/lib/inventory/scan-feedback";
 import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 
@@ -182,27 +182,38 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
 
   // Agrega un producto del catálogo (escáner o buscador). Si ya está, sube la cantidad.
   // El catálogo de Valery no trae precio: el renglón nace en 0 y se completa abajo.
-  function agregarProducto(p: InventoryProduct, origen: "escáner" | "buscador") {
+  function agregarProducto(p: ProductoEscaneado, origen: "escáner" | "buscador") {
     setMsg("");
-    const i = lineas.findIndex((l) => l.codigo === p.codigo);
-    if (i >= 0) {
-      const nueva = lineas[i].cantidad + 1;
-      setLineas(lineas.map((l, j) => (j === i ? { ...l, cantidad: nueva } : l)));
-      setAviso({ ok: true, text: `${p.nombre} · cantidad ${nueva}` });
-    } else {
-      setLineas([...lineas, { codigo: p.codigo, descripcion: p.nombre, cantidad: 1, precio: 0, descuento: 0, unidad: ln.unidad }]);
-      setAviso({ ok: true, text: `${p.nombre} agregado (${origen}) · falta indicar el precio` });
-    }
+    // Forma funcional: entre que salió la consulta y volvió, pudo entrar otra
+    // lectura. Leer `lineas` de la clausura la perdería en silencio.
+    setLineas((prev) => {
+      const i = prev.findIndex((l) => l.codigo === p.codigo);
+      if (i >= 0) {
+        const nueva = prev[i].cantidad + 1;
+        setAviso({ ok: true, text: `${p.nombre} · cantidad ${nueva}` });
+        return prev.map((l, j) => (j === i ? { ...l, cantidad: nueva } : l));
+      }
+      setAviso({
+        ok: true,
+        text: p.precio > 0
+          ? `${p.nombre} agregado (${origen})`
+          : `${p.nombre} agregado (${origen}) · falta indicar el precio`,
+      });
+      return [...prev, {
+        codigo: p.codigo, descripcion: p.nombre, cantidad: 1,
+        precio: p.precio, descuento: 0, unidad: p.unidad ?? ln.unidad,
+      }];
+    });
   }
-  function onScan(codigo: string) {
-    const p = lookupByCodigo(codigo, empresaKey);
-    if (!p) {
+  async function onScan(codigo: string) {
+    const r = await escanear(codigo, empresaKey);
+    if (r.estado !== "encontrado") {
       beep(false);
-      setAviso({ ok: false, text: `Código "${codigo}" no encontrado en el catálogo.` });
+      setAviso(mensajeDeEscaneo(r));
       return;
     }
     beep(true);
-    agregarProducto(p, "escáner");
+    agregarProducto(r.producto, "escáner");
   }
   const updLinea = (i: number, patch: Partial<DevLinea>) => {
     setMsg("");
