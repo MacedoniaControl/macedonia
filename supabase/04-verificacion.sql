@@ -79,5 +79,37 @@ with pruebas as (
          || ' tablas · '
          || (select count(*)::text from pg_policies where schemaname = 'public')
          || ' políticas'
+  union all
+
+  -- 8) El Owner es irrevocable: existe la funcion puede() y el trigger que
+  --    impide desactivarlo. Sin esto, alguien puede dejar el sistema sin dueno.
+  select 8, 'Owner irrevocable',
+         case when exists (select 1 from pg_proc where proname = 'puede')
+               and exists (select 1 from pg_trigger where tgname = 'trg_owner_activo')
+              then 'OK — funcion puede() y trigger presentes'
+              else 'FALLA — falta la funcion o el trigger' end
+
+  union all
+
+  -- 9) Las alertas se agrupan. Sin el indice, cada intento crearia una fila
+  --    nueva y el Owner recibiria decenas de alertas por lo mismo.
+  select 9, 'Alertas agrupadas',
+         case when exists (select 1 from pg_indexes
+                           where schemaname = 'public' and indexname = 'notif_grupo_abierto')
+              then 'OK — indice de agrupacion presente'
+              else 'FALLA — sin indice: una alerta por cada intento' end
+
+  union all
+
+  -- 10) para_rol se respeta. Existia y ninguna politica la consultaba: una
+  --     alerta "solo Owner" la veia cualquier administrador.
+  select 10, 'para_rol respetada',
+         case when exists (select 1 from pg_policies
+                           where schemaname = 'public' and tablename = 'notificaciones'
+                             and policyname = 'notificaciones_lectura'
+                             and qual like '%para_rol%')
+              then 'OK — la politica consulta para_rol'
+              else 'FALLA — para_rol sigue siendo decorativa' end
+
 )
 select prueba, resultado from pruebas order by n;

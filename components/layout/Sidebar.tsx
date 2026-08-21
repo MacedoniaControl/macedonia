@@ -4,13 +4,43 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { navGroups } from "@/lib/ux/nav";
+import type { Permisos } from "@/lib/auth/permisos";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 
-export function Sidebar({ empresa, open, onClose }: { empresa?: string | null; open: boolean; onClose: () => void }) {
+export function Sidebar({
+  empresa,
+  open,
+  onClose,
+  permisos,
+  esOwner = false,
+}: {
+  empresa?: string | null;
+  open: boolean;
+  onClose: () => void;
+  /** Permisos del usuario. Sin backend activo llega undefined: se muestra todo. */
+  permisos?: Permisos;
+  esOwner?: boolean;
+}) {
   const pathname = usePathname();
   const emp = empresa && isEmpresaId(empresa) ? EMPRESAS[empresa] : null;
   // Prefija los links con la empresa activa: /admin/quotes -> /admin/<empresa>/quotes
   const scoped = (href: string) => (emp ? href.replace(/^\/admin\//, `/admin/${emp.id}/`) : href);
+
+  // Las secciones sin permiso se OCULTAN, no se deshabilitan: mostrar una puerta
+  // que no abre solo genera preguntas. Un grupo que queda sin ítems tampoco se
+  // dibuja, para no dejar un encabezado "Finanzas" con nada debajo.
+  //
+  // Sin permisos (backend no configurado todavía) se muestra todo: la app sigue
+  // usable en modo demo en vez de quedar vacía.
+  const gruposVisibles = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (esOwner || !permisos) return true;
+        return permisos[item.href.replace("/admin/", "")] === true;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <>
@@ -62,7 +92,12 @@ export function Sidebar({ empresa, open, onClose }: { empresa?: string | null; o
         </div>
 
         <nav className="sumi-scroll flex-1 overflow-y-auto px-3 py-4">
-          {navGroups.map((group) => (
+          {gruposVisibles.length === 0 && (
+            <p className="px-2 py-4 text-sm text-muted">
+              No tienes secciones asignadas. Pídele al Owner que te dé acceso.
+            </p>
+          )}
+          {gruposVisibles.map((group) => (
             <div key={group.title} className="mb-5">
               <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">
                 {group.title}
