@@ -38,8 +38,10 @@ begin
     raise exception 'Sin acceso a la empresa %', p_empresa;
   end if;
 
+  -- Si el par (empresa, tipo) no existe todavia, arranca en ARRANQUE y no en 1:
+  -- un documento numerado 0000000001 anuncia que el sistema acaba de nacer.
   insert into correlativos (empresa_id, tipo, siguiente)
-  values (p_empresa, p_tipo, 1)
+  values (p_empresa, p_tipo, 45200)
   on conflict (empresa_id, tipo) do nothing;
 
   -- El UPDATE bloquea la fila hasta que termina la transaccion: el siguiente
@@ -55,24 +57,41 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Numeros de arranque.
 --
--- Los de Sumigases vienen de su numeracion real en Valery.
+-- Macedonia arranca una numeracion PROPIA, no continua la de Valery.
 --
--- ATENCION: los de Sudematin son los MISMOS por ahora, porque no tenemos su
--- numeracion real. Antes de emitir el primer documento de Sudematin hay que
--- confirmarlos: un correlativo equivocado en un documento que va al cliente es
--- un problema de verdad, no un detalle.
+-- Se eligio un rango ALTO (45.200 y siguientes) por dos razones:
+--
+--   1. Un documento que empieza en 0000000001 anuncia que el sistema es nuevo.
+--      Arrancar alto se ve como una operacion en marcha, que es lo que es: las
+--      empresas llevan anos operando, lo nuevo es la herramienta.
+--
+--   2. No choca con Valery. Valery va por 8.204 y avanza de a poco; 45.200 esta
+--      lo bastante lejos como para que no se crucen en anos. Si se cruzaran,
+--      conciliar seria un infierno: dos documentos distintos con el mismo numero
+--      en dos sistemas distintos.
+--
+-- El formato NO cambia: 10 digitos con ceros a la izquierda, igual que Valery.
+-- El documento impreso se ve exactamente igual.
+--
+-- Los tres tipos cambian juntos: si las notas arrancaran en 45.200 y las
+-- cotizaciones siguieran en 2.243, la diferencia se notaria igual.
 -- ---------------------------------------------------------------------------
 insert into correlativos (empresa_id, tipo, siguiente) values
-  ('sumigases', 'nota_entrega', 8204),
-  ('sumigases', 'cotizacion',   2243),
-  ('sumigases', 'devolucion',    604),
-  ('sudematin', 'nota_entrega', 8204),   -- ⚠ confirmar con Valery de Sudematin
-  ('sudematin', 'cotizacion',   2243),   -- ⚠ confirmar
-  ('sudematin', 'devolucion',    604)    -- ⚠ confirmar
+  ('sumigases', 'nota_entrega', 45200),
+  ('sumigases', 'cotizacion',   45200),
+  ('sumigases', 'devolucion',   45200),
+  ('sudematin', 'nota_entrega', 45200),
+  ('sudematin', 'cotizacion',   45200),
+  ('sudematin', 'devolucion',   45200)
 on conflict (empresa_id, tipo) do nothing;
+
+-- Si la tabla ya existia con los valores viejos, esto la corrige.
+-- Solo sube el numero, nunca lo baja: bajarlo repetiria correlativos ya usados.
+update correlativos set siguiente = 45200
+ where siguiente < 45200;
 
 -- ---------------------------------------------------------------------------
 -- COMPROBACION: dos llamadas seguidas deben dar numeros DISTINTOS y correlativos.
---   select siguiente_correlativo('sumigases','nota_entrega');  -- 0000008204
---   select siguiente_correlativo('sumigases','nota_entrega');  -- 0000008205
+--   select siguiente_correlativo('sumigases','nota_entrega');  -- 0000045200
+--   select siguiente_correlativo('sumigases','nota_entrega');  -- 0000045201
 -- ---------------------------------------------------------------------------

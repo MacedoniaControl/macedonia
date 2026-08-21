@@ -182,5 +182,7 @@ export async function correlativoPrevisto(empresa: string, tipo: TipoDoc): Promi
   // Es una PREVISIÓN, no una reserva: si otro vendedor genera antes, el número
   // real será el siguiente. Por eso el número definitivo solo se conoce después
   // de guardar.
-  return String(data?.siguiente ?? 1).padStart(10, "0");
+  // Mismo arranque que la base (supabase/10-correlativos.sql): si aquí quedara
+  // un 1, la pantalla anunciaría "0000000001" antes de guardar.
+  return String(data?.siguiente ?? 45200).padStart(10, "0");
 }
