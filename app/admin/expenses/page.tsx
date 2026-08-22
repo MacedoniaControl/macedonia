@@ -1,9 +1,11 @@
 "use client";
 
+import { registrarGasto, listarGastos, eliminarGasto, type GastoGuardado } from "@/lib/finanzas/gastos-db";
+
 // Gastos (Finanzas). Carga manual de gastos que alimentan el Estado de Resultado.
 // Catálogo de partidas y categorías = las del EdR real. Ver lib/ux/gastos.ts.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -19,7 +21,7 @@ import { SortableTh } from "@/components/ui/SortableTh";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 import { useBcvRate } from "@/lib/ux/bcv-rate";
 import {
-  useGastos, addGasto, removeGasto, totalesPorCategoria,
+  totalesPorCategoria,
   PARTIDAS, CATEGORIAS, TIPOS_TRANSACCION, categoriaDe, type Gasto,
 } from "@/lib/ux/gastos";
 
@@ -32,13 +34,28 @@ export default function ExpensesPage() {
   const empresa = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/)?.[1] ?? "sumigases";
   const { rol } = useRol();
   const permitido = puedeVerFinanzas(rol);
-  const { gastos, ready } = useGastos(empresa);
+  // Los gastos viven en la base: son la mitad del Estado de Resultado y tienen
+  // que ser los mismos para el Owner y para el administrador, no uno por máquina.
+  const [gastos, setGastos] = useState<GastoGuardado[]>([]);
+  const [ready, setReady] = useState(false);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [recarga, setRecarga] = useState(0);
+
+  useEffect(() => {
+    let vigente = true;
+    setReady(false);
+    listarGastos(empresa)
+      .then((g) => { if (vigente) { setGastos(g); setErrorCarga(null); } })
+      .catch((e) => { if (vigente) setErrorCarga((e as Error).message); })
+      .finally(() => { if (vigente) setReady(true); });
+    return () => { vigente = false; };
+  }, [empresa, recarga]);
   const bcv = useBcvRate();
   const [abierto, setAbierto] = useState(false);
   const [mes, setMes] = useState(() => hoyISO().slice(0, 7));
 
   const delMes = useMemo(() => gastos.filter((g) => g.fecha.startsWith(mes)), [gastos, mes]);
-  const totales = useMemo(() => totalesPorCategoria(delMes), [delMes]);
+  const totales = useMemo(() => totalesPorCategoria(delMes as unknown as Gasto[]), [delMes]);
   const totalMes = useMemo(() => delMes.reduce((a, g) => a + g.montoUsd, 0), [delMes]);
 
   const acc = useMemo(
@@ -51,7 +68,7 @@ export default function ExpensesPage() {
     }),
     [],
   );
-  const t = useTableView(delMes, acc, 25);
+  const t = useTableView(delMes as unknown as Gasto[], acc, 25);
 
   if (!permitido) {
     return (
@@ -130,7 +147,7 @@ export default function ExpensesPage() {
                       </td>
                       <td className="py-2.5 pr-3 text-right font-medium tabular-nums text-text">{fmtUsd(g.montoUsd)}</td>
                       <td className="py-2.5 text-right">
-                        <button type="button" aria-label={`Eliminar gasto ${g.partida}`} onClick={() => removeGasto(g.id)}
+                        <button type="button" aria-label={`Eliminar gasto ${g.partida}`} onClick={async () => { await eliminarGasto(Number(g.id), empresa); setRecarga((n) => n + 1); }}
                           className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-danger"><Icon name="close" size={14} /></button>
                       </td>
                     </tr>
@@ -166,14 +183,16 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
   const tasa = Number(f.tasa) || 0;
   const enUsd = f.moneda === "USD" ? monto : tasa > 0 ? monto / tasa : 0;
 
-  function guardar() {
+  async function guardar() {
     setMsg("");
     if (monto <= 0) return setMsg("El monto debe ser mayor que cero.");
     if (f.moneda === "BS" && tasa <= 0) return setMsg("Indica la tasa de cambio para convertir de Bs a dólares.");
-    addGasto({
+    // El usuario sale de la sesión del servidor. Antes todo gasto quedaba
+    // firmado como "Greeg V." aunque lo cargara el administrador.
+    const r = await registrarGasto({
       fecha: f.fecha,
-      empresa,
       partida: f.partida,
+      categoria: categoriaDe(f.partida),
       monto,
       moneda: f.moneda,
       tasa: f.moneda === "BS" ? tasa : undefined,
@@ -181,8 +200,9 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
       tipoTransaccion: f.tipoTransaccion,
       documento: f.documento.trim() || undefined,
       nota: f.nota.trim() || undefined,
-      usuario: "Greeg V.", // vendrá de la sesión con el backend
-    });
+    }, empresa);
+
+    if (!r.ok) return setMsg(r.error);
     onDone();
   }
 
