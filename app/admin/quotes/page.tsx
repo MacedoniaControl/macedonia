@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { guardarDocumento, correlativoPrevisto } from "@/lib/documentos/documentos-db";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
@@ -20,7 +21,7 @@ type Estado = "Borrador" | "Aprobada" | "Rechazada" | "Nota de entrega";
 type Cotizacion = {
   id: number; correlativo: string; razonSocial: string; rif: string; direccion: string; telefonos: string;
   fechaEmision: string; fechaVenc: string; fechaISO: string; moneda: string; nota: string;
-  lineas: DevLinea[]; total: number; estado: Estado; origen: "SumiControl" | "Valery"; fileName?: string; dataUrl?: string;
+  lineas: DevLinea[]; total: number; estado: Estado; origen: "Macedonia" | "SumiControl" | "Valery"; fileName?: string; dataUrl?: string;
 };
 
 const CATALOGO = [
@@ -55,7 +56,12 @@ const SEED: Cotizacion[] = [
 export default function QuotesPage() {
   const empresaKey = useEmpresaActiva();
   const [cots, setCots] = usePersistedState<Cotizacion[]>(`cot:docs:${empresaKey}`, SEED);
-  const [seq, setSeq] = usePersistedState(`cot:seq:${empresaKey}`, 2243);
+  // El número lo da la BASE, no un contador del navegador. Esto es solo la
+  // previsión que se muestra antes de generar.
+  const [previsto, setPrevisto] = useState("…");
+  useEffect(() => {
+    correlativoPrevisto(empresaKey, "cotizacion").then(setPrevisto).catch(() => setPrevisto("—"));
+  }, [empresaKey]);
   // "Generar presupuesto" es el apartado principal (lo que más se usa).
   const [tab, setTab] = useState<"registro" | "gen" | "subir">("gen");
   const [period, setPeriod] = useState("mes");
@@ -144,10 +150,27 @@ export default function QuotesPage() {
         </SectionCard>
       )}
 
-      {(tab === "gen" || (tab === "registro" && !verRegistros)) && <GenerarPresupuesto seq={seq} onSave={(c) => {
-        setCots((p) => [{ ...c, id: Date.now(), estado: "Borrador", origen: "SumiControl", fechaISO: hoyISO() }, ...p]);
-        setSeq((s) => s + 1);
-        printDoc(presupuestoHtml(c, empresaKey));
+      {(tab === "gen" || (tab === "registro" && !verRegistros)) && <GenerarPresupuesto seq={previsto} onSave={async (c) => {
+        // Guardar primero, imprimir después: el número solo existe una vez que
+        // la base lo reservó.
+        const r = await guardarDocumento({
+          tipo: "cotizacion",
+          cliente: c.razonSocial,
+          clienteRif: c.rif,
+          clienteDireccion: c.direccion,
+          lineas: c.lineas.map((l) => ({
+            codigo: l.codigo, descripcion: l.descripcion, cantidad: l.cantidad,
+            unidad: l.unidad, precio: l.precio, descuento: l.descuento,
+          })),
+        }, empresaKey);
+
+        if (!r.ok) return { error: r.error };
+
+        const conNumero = { ...c, correlativo: r.documento.correlativo };
+        setCots((p) => [{ ...conNumero, id: r.documento.id, estado: "Borrador", origen: "Macedonia", fechaISO: hoyISO() }, ...p]);
+        setPrevisto(String(Number(r.documento.correlativo) + 1).padStart(10, "0"));
+        printDoc(presupuestoHtml(conNumero, empresaKey));
+        return { error: null };
       }} />}
 
       {tab === "subir" && (
@@ -168,7 +191,8 @@ export default function QuotesPage() {
 // ---- Generar presupuesto (formato Valery) ----
 type GenDoc = { correlativo: string; fechaEmision: string; fechaVenc: string; razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; moneda: string; nota: string; total: number };
 
-function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) => void }) {
+function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) => Promise<{ error: string | null }> }) {
+  const [guardando, setGuardando] = useState(false);
   const empresaKey = useEmpresaActiva();
   const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "01 - GERENTE", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5 });
   const [lineas, setLineas] = useState<DevLinea[]>([]);
@@ -313,14 +337,22 @@ function GenerarPresupuesto({ seq, onSave }: { seq: number; onSave: (d: GenDoc) 
           </>
         )}
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
-        <Button icon="quote" className="mt-3 w-full" onClick={() => {
+        <Button icon="quote" className="mt-3 w-full" disabled={guardando} onClick={async () => {
           setMsg("");
           if (!f.razonSocial.trim()) return setMsg("La razón social es obligatoria.");
           if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
           if (lineas.some((l) => l.precio <= 0)) return setMsg("Hay renglones sin precio (marcados en rojo). Complétalos antes de generar.");
           const emision = new Date(); const venc = new Date(Date.now() + f.venceDias * 86400000);
-          onSave({ correlativo: String(seq).padStart(10, "0"), fechaEmision: dmy(emision), fechaVenc: dmy(venc), razonSocial: f.razonSocial, rif: f.rif, direccion: f.direccion, telefonos: f.telefonos, lineas, moneda: f.moneda, nota: f.nota, total: totalOp });
-        }}>Registrar y generar (PDF)</Button>
+          if (guardando) return;                       // doble clic: no emitir dos veces
+          setGuardando(true);
+          try {
+            const r = await onSave({ correlativo: seq, fechaEmision: dmy(emision), fechaVenc: dmy(venc), razonSocial: f.razonSocial, rif: f.rif, direccion: f.direccion, telefonos: f.telefonos, lineas, moneda: f.moneda, nota: f.nota, total: totalOp });
+            if (r.error) setMsg(r.error);
+            else setLineas([]);
+          } finally {
+            setGuardando(false);
+          }
+        }}>{guardando ? "Guardando…" : "Registrar y generar (PDF)"}</Button>
       </SectionCard>
     </div>
   );

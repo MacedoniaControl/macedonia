@@ -65,10 +65,9 @@ end $$;
 --      Arrancar alto se ve como una operacion en marcha, que es lo que es: las
 --      empresas llevan anos operando, lo nuevo es la herramienta.
 --
---   2. No choca con Valery. Valery va por 8.204 y avanza de a poco; 45.200 esta
---      lo bastante lejos como para que no se crucen en anos. Si se cruzaran,
---      conciliar seria un infierno: dos documentos distintos con el mismo numero
---      en dos sistemas distintos.
+--   2. No choca con Valery. Las notas de entrega son de Macedonia y no dependen
+--      de Valery, pero mantener los rangos separados evita confusion al mirar
+--      papeles de los dos sistemas sobre la misma mesa.
 --
 -- El formato NO cambia: 10 digitos con ceros a la izquierda, igual que Valery.
 -- El documento impreso se ve exactamente igual.
