@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -12,8 +12,6 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { addNotif } from "@/lib/ux/notifications";
 import {
-  fisicoDe,
-  fisicoMeta,
   buildMaster,
   duplicadosBloqueados,
   inFisico,
@@ -25,6 +23,7 @@ import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory-fiscal";
+import { inventarioDe, type ItemInventario } from "@/lib/inventory/inventario-db";
 import { ventas12m, precioProm, estadoRotacion, rotacionVentana } from "@/lib/ux/inventory-rotation";
 import { fmtUsd } from "@/lib/ux/format";
 
@@ -54,8 +53,22 @@ export default function InventoryPage() {
 
   const conflictos = useMemo(() => duplicadosBloqueados(sItems, empresa), [sItems, empresa]);
   const master = useMemo(() => buildMaster(sItems, empresa), [sItems, empresa]);
-  const fisico = useMemo(() => fisicoDe(empresa), [empresa]);
-  const fisicoMetaE = useMemo(() => fisicoMeta(empresa), [empresa]);
+  // El físico viene de la BASE: catálogo + existencia calculada del kardex.
+  // Antes salía de un JSON del código con la existencia congelada del día del
+  // export de Valery, que dejaba de ser cierta al primer movimiento.
+  const [fisico, setFisico] = useState<ItemInventario[]>([]);
+  const [cargandoInv, setCargandoInv] = useState(true);
+  const [errorInv, setErrorInv] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    setCargandoInv(true);
+    inventarioDe(empresa)
+      .then((items) => { if (vigente) { setFisico(items); setErrorInv(null); } })
+      .catch((e) => { if (vigente) { setErrorInv((e as Error).message); setFisico([]); } })
+      .finally(() => { if (vigente) setCargandoInv(false); });
+    return () => { vigente = false; };   // al cambiar de empresa, descartar lo viejo
+  }, [empresa]);
 
   const t = q.trim().toLowerCase();
   const match = (codigo: string, nombre: string) =>
@@ -498,7 +511,7 @@ export default function InventoryPage() {
       {/* -------- FÍSICO -------- */}
       {tab === "fisico" && (
         <SectionCard title="Inventario Físico (Valery)" action={<StubBtn area="Físico · Valery" />}
-          description={`Solo lectura · fuente: ${fisicoMetaE.fuente} (${fisicoMetaE.fecha}).`}>
+          description={`Solo lectura · fuente: base de datos · existencia calculada del kardex.`}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
