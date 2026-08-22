@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { leerConfig, guardarConfig, type Configuracion } from "@/lib/config/config-db";
 
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
@@ -42,17 +42,54 @@ const metodos = [
 
 export default function SettingsPage() {
   const empresaKey = useEmpresaActiva();
-  const [saved, setSaved] = usePersistedState<Config>(`config:${empresaKey}`, DEFAULTS);
-  const [form, setForm] = useState<Config>(saved);
+  // La configuración vive en la BASE, no en el navegador: el IVA y la tasa
+  // tienen que ser los mismos para todos. Dos vendedores con IVA distinto emiten
+  // totales distintos por el mismo producto.
+  const [form, setForm] = useState<Config>(DEFAULTS);
+  const [cargando, setCargando] = useState(true);
   const [msg, setMsg] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    let vigente = true;
+    setCargando(true);
+    leerConfig(empresaKey)
+      .then((c) => {
+        if (!vigente) return;
+        setForm({
+          ...DEFAULTS,
+          iva: c.iva_pct ?? DEFAULTS.iva,
+          tasa: c.tasa_manual && c.tasa_manual !== "0" ? c.tasa_manual : DEFAULTS.tasa,
+          rangoTasa: c.dias_vencimiento_cotizacion ?? DEFAULTS.rangoTasa,
+        });
+      })
+      .catch((e) => { if (vigente) setMsg((e as Error).message); })
+      .finally(() => { if (vigente) setCargando(false); });
+    return () => { vigente = false; };
+  }, [empresaKey]);
   const set = (k: keyof Config) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setMsg("");
     setForm({ ...form, [k]: e.target.value });
   };
 
-  function guardar() {
-    setSaved(form);
-    setMsg("Configuración guardada. Los valores persisten en este navegador.");
+  async function guardar() {
+    if (guardando) return;
+    setGuardando(true);
+    setMsg("");
+    try {
+      const r = await guardarConfig({
+        iva_pct: form.iva,
+        tasa_manual: form.tasa,
+        dias_vencimiento_cotizacion: form.rangoTasa,
+      }, empresaKey);
+      // Decir "guardado" cuando la base rechazó es peor que no decir nada: la
+      // persona se va creyendo que el IVA cambió y sigue emitiendo con el viejo.
+      setMsg(r.ok
+        ? "Configuración guardada. Aplica para toda la empresa, no solo para este navegador."
+        : `No se pudo guardar: ${r.error}`);
+    } finally {
+      setGuardando(false);
+    }
   }
 
   const [bcv, setBcv] = useState<{ loading: boolean; msg: string; err: boolean }>({ loading: false, msg: "", err: false });
@@ -64,7 +101,9 @@ export default function SettingsPage() {
       if (!d.ok) throw new Error(d.error || "No disponible");
       const next = { ...form, tasa: String(d.tasa) };
       setForm(next);
-      setSaved(next);
+      // La tasa del BCV se guarda para toda la empresa: si cada quien tuviera la
+      // suya, dos personas convertirían el mismo monto a dólares distintos.
+      await guardarConfig({ tasa_manual: String(d.tasa) }, empresaKey);
       setBcv({ loading: false, err: false, msg: `Tasa BCV actualizada a ${d.tasa} Bs/USD${d.fecha ? ` · ${d.fecha}` : ""}.` });
     } catch (e) {
       setBcv({ loading: false, err: true, msg: `No se pudo actualizar desde el BCV (${String(e)}). Ingrésala manual.` });
@@ -77,7 +116,7 @@ export default function SettingsPage() {
         title="Configuración"
         description="Parámetros base del sistema. La configuración crítica queda reservada a OWNER."
         breadcrumbs={[{ label: "Sistema" }, { label: "Configuración" }]}
-        actions={<Button icon="check" onClick={guardar}>Guardar cambios</Button>}
+        actions={<Button icon="check" onClick={guardar} disabled={guardando || cargando}>{guardando ? "Guardando…" : "Guardar cambios"}</Button>}
       />
 
       {msg && <p className="mb-4 rounded-xl bg-ok/10 px-3 py-2 text-sm text-ok">{msg}</p>}
