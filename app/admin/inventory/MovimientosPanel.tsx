@@ -5,7 +5,7 @@
 //   SALIDA   → Ventas  · Salidas manuales
 // Ver docs/decisions/inventory-model.md
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
@@ -14,14 +14,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
 import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
+import { registrarMovimiento, listarMovimientos, revertirMovimiento, type MovimientoGuardado } from "@/lib/inventory/movimientos-db";
 import { beep } from "@/lib/inventory/scan-feedback";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
 import {
-  useMovimientos,
-  addMovimiento,
-  removeMovimiento,
   MOTIVOS_ENTRADA,
   MOTIVOS_SALIDA,
   type Direccion,
@@ -35,21 +33,39 @@ const hoyISO = () => new Date().toISOString().slice(0, 10);
 type Filtro = "todos" | "entrada" | "salida";
 
 export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }) {
-  const { movs, ready } = useMovimientos(empresa);
+  // Los movimientos vienen de la BASE, no del navegador: el kardex es la fuente
+  // de la existencia y tiene que ser el mismo para todos, no uno por máquina.
+  const [movs, setMovs] = useState<MovimientoGuardado[]>([]);
+  const [ready, setReady] = useState(false);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [recarga, setRecarga] = useState(0);
+
+  useEffect(() => {
+    let vigente = true;
+    setReady(false);
+    listarMovimientos(empresa)
+      .then((m) => { if (vigente) { setMovs(m); setErrorCarga(null); } })
+      .catch((e) => { if (vigente) setErrorCarga((e as Error).message); })
+      .finally(() => { if (vigente) setReady(true); });
+    return () => { vigente = false; };   // al cambiar de empresa, descartar lo viejo
+  }, [empresa, recarga]);
+
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [alta, setAlta] = useState<Direccion | null>(null);
 
+  // Un fallo de carga NO puede verse como "no hay movimientos": son cosas
+  // distintas y confundirlas hace creer que el inventario está vacío.
   const totEntrada = useMemo(() => movs.filter((m) => m.direccion === "entrada").reduce((a, m) => a + m.cantidad, 0), [movs]);
   const totSalida = useMemo(() => movs.filter((m) => m.direccion === "salida").reduce((a, m) => a + m.cantidad, 0), [movs]);
   const visibles = useMemo(() => (filtro === "todos" ? movs : movs.filter((m) => m.direccion === filtro)), [movs, filtro]);
 
-  const acc = useMemo(
+  const acc = useMemo<Record<string, (r: MovimientoGuardado) => string | number>>(
     () => ({
-      fecha: (m: Movimiento) => m.fecha,
-      codigo: (m: Movimiento) => m.codigo,
-      nombre: (m: Movimiento) => m.nombre,
-      cantidad: (m: Movimiento) => (m.direccion === "entrada" ? m.cantidad : -m.cantidad),
-      origen: (m: Movimiento) => m.origen,
+      fecha: (m: MovimientoGuardado) => m.fecha,
+      codigo: (m: MovimientoGuardado) => m.codigo,
+      nombre: (m: MovimientoGuardado) => m.nombre,
+      cantidad: (m: MovimientoGuardado) => (m.direccion === "entrada" ? m.cantidad : -m.cantidad),
+      origen: (m: MovimientoGuardado) => m.origen,
     }),
     [],
   );
@@ -107,7 +123,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
         }
       >
         {alta ? (
-          <FormMovimiento direccion={alta} empresa={empresa} onDone={() => setAlta(null)} />
+          <FormMovimiento direccion={alta} empresa={empresa} onDone={() => { setAlta(null); setRecarga((n) => n + 1); }} />
         ) : (
           <p className="text-sm text-muted">
             Elige <strong className="text-text">Ingreso</strong> o <strong className="text-text">Salida</strong> para registrar un movimiento manual.
@@ -166,8 +182,8 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
                       <td className="py-2.5 text-xs text-muted">{m.usuario}</td>
                       <td className="py-2.5 text-right">
                         {m.origen === "manual" && (
-                          <button type="button" aria-label={`Revertir movimiento de ${m.nombre}`}
-                            onClick={() => removeMovimiento(m.id)}
+                          <button type="button" aria-label={`Revertir movimiento de ${m.nombre}`} title="Registra un movimiento contrario. No borra el original."
+                            onClick={async () => { await revertirMovimiento(m.id, empresa); setRecarga((n) => n + 1); }}
                             className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-danger">
                             <Icon name="close" size={14} />
                           </button>
@@ -188,6 +204,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
 
 // ---------------------------------------------------------------- alta manual
 function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; empresa: string; onDone: () => void }) {
+  const [guardando, setGuardando] = useState(false);
   const motivos = direccion === "entrada" ? MOTIVOS_ENTRADA : MOTIVOS_SALIDA;
   const [prod, setProd] = useState<ProductoEscaneado | null>(null);
   const [cantidad, setCantidad] = useState(1);
@@ -212,22 +229,31 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
     elegir(r.producto, "escáner");
   }
 
-  function registrar() {
+  async function registrar() {
     setMsg("");
     if (!prod) return setMsg("Selecciona un producto (escanéalo o búscalo).");
     if (cantidad <= 0) return setMsg("La cantidad debe ser mayor que cero.");
-    addMovimiento({
-      fecha: hoyISO(),
-      empresa,
-      direccion,
-      origen: "manual",
-      codigo: prod.codigo,
-      nombre: prod.nombre,
-      cantidad,
-      motivo: nota.trim() ? `${motivo} — ${nota.trim()}` : motivo,
-      usuario: "Greeg V.", // vendrá de la sesión con el backend
-    });
-    onDone();
+    if (guardando) return;
+
+    setGuardando(true);
+    try {
+      // El usuario ya NO se escribe a mano: sale de la sesión del servidor. Antes
+      // todo movimiento quedaba firmado como "Greeg V." aunque lo hiciera otro,
+      // y eso vuelve inservible el registro de quién movió qué.
+      const r = await registrarMovimiento({
+        direccion,
+        origen: "manual",
+        codigo: prod.codigo,
+        nombre: prod.nombre,
+        cantidad,
+        motivo: nota.trim() ? `${motivo} — ${nota.trim()}` : motivo,
+      }, empresa);
+
+      if (!r.ok) return setMsg(r.error);
+      onDone();
+    } finally {
+      setGuardando(false);
+    }
   }
 
   return (
@@ -285,7 +311,7 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
 
         <div className="flex gap-2">
           <Button className={direccion === "entrada" ? "bg-ok-strong text-white hover:brightness-90" : "bg-warn-strong text-white hover:brightness-90"}
-            icon={direccion === "entrada" ? "plus" : "close"} onClick={registrar}>
+            icon={direccion === "entrada" ? "plus" : "close"} onClick={registrar} disabled={guardando}>
             Registrar {direccion === "entrada" ? "ingreso" : "salida"}
           </Button>
           <Button variant="secondary" onClick={onDone}>Cancelar</Button>
