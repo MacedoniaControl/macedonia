@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { listarCuentas, abonar, type Cuenta as CuentaDb } from "@/lib/finanzas/cuentas-db";
+import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -14,18 +15,8 @@ import { downloadCsv } from "@/lib/ux/export-csv";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
 
-const HOY = new Date("2026-06-23");
 
-const SEED: Cuenta[] = [
-  { id: 1, cliente: "Taller Lago C.A.", doc: "NE-2026-000101", monto: 1200, abonado: 0, venc: "2026-06-10" },
-  { id: 2, cliente: "Metalúrgica T.", doc: "NE-2026-000098", monto: 3400, abonado: 1000, venc: "2026-06-30" },
-  { id: 3, cliente: "Tigasco Gas", doc: "FAC-000259", monto: 860, abonado: 0, venc: "2026-07-15" },
-  { id: 4, cliente: "Náutica RS", doc: "NE-2026-000110", monto: 540, abonado: 200, venc: "2026-06-18" },
-];
 
-function diasVenc(venc: string): number {
-  return Math.round((new Date(venc).getTime() - HOY.getTime()) / 86400000);
-}
 function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
   if (saldo <= 0) return { label: "Pagado", tone: "ok" };
   if (dias < 0) return { label: `Vencido (${-dias}d)`, tone: "danger" };
@@ -37,24 +28,35 @@ const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surfac
 
 export default function ReceivablesPage() {
   const empresaKey = useEmpresaActiva();
-  const [cuentas, setCuentas] = usePersistedState<Cuenta[]>(`cxc:cuentas:${empresaKey}`, SEED);
-  const [docSel, setDocSel] = useState(SEED[0].doc);
+  // Las cuentas viven en la base y el saldo lo calcula la vista sumando abonos.
+  const [recarga, setRecarga] = useState(0);
+  const carga = useCarga(`${empresaKey}:${recarga}`, () => listarCuentas(empresaKey, "cobrar"));
+  const cuentas: CuentaDb[] = carga.datos ?? [];
+  const [docSel, setDocSel] = useState("");
   const [abono, setAbono] = useState(0);
   const [msg, setMsg] = useState("");
 
-  function registrarAbono() {
+  async function registrarAbono() {
     setMsg("");
     const a = Number(abono);
+    const c = cuentas.find((x) => x.documento === docSel);
+    if (!c) return setMsg("ERR:Selecciona un documento.");
     if (!a || a <= 0) return setMsg("ERR:Ingresa un abono mayor a 0.");
-    const c = cuentas.find((x) => x.doc === docSel)!;
-    const saldo = c.monto - c.abonado;
-    if (a > saldo) return setMsg(`ERR:El abono supera el saldo (${fmtUsd(saldo)}).`);
-    setCuentas((prev) => prev.map((x) => (x.doc === docSel ? { ...x, abonado: x.abonado + a } : x)));
+
+    // La base vuelve a comprobar que el abono no supere el saldo: dos personas
+    // abonando a la vez podrian pasarse si solo se validara aqui.
+    const r = await abonar(c.id, a);
+    if (!r.ok) return setMsg(`ERR:${r.error}`);
+
+    setRecarga((n) => n + 1);
     setMsg(`Abono de ${fmtUsd(a)} aplicado a ${docSel}.`);
     setAbono(0);
   }
 
-  const conSaldo = cuentas.map((c) => ({ ...c, saldo: c.monto - c.abonado, dias: diasVenc(c.venc) }));
+    // saldo y dias los calcula la BASE. La version anterior usaba una fecha de
+  // "hoy" escrita a mano (23/06/2026) que quedo congelada: una cuenta vencida
+  // hace dos meses se mostraba al dia.
+  const conSaldo = cuentas;
   const totalSaldo = conSaldo.reduce((a, c) => a + c.saldo, 0);
   const vencido = conSaldo.filter((c) => c.saldo > 0 && c.dias < 0).reduce((a, c) => a + c.saldo, 0);
   const porVencer = conSaldo.filter((c) => c.saldo > 0 && c.dias >= 0 && c.dias <= 8).reduce((a, c) => a + c.saldo, 0);
@@ -66,7 +68,7 @@ export default function ReceivablesPage() {
         title="Cuentas por cobrar"
         description="Saldos por cliente, vencimientos, abonos parciales y alertas. Demo funcional."
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por cobrar" }]}
-        actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-cobrar", [["Cliente", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.cliente, c.doc, c.monto, c.abonado, c.saldo, c.venc])])}>Exportar CSV</Button>}
+        actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-cobrar", [["Cliente", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.abonado, c.saldo, c.vence])])}>Exportar CSV</Button>}
       />
 
       <SectionCard title="Resumen de cartera">
@@ -92,7 +94,7 @@ export default function ReceivablesPage() {
               <label className="mb-1 block text-xs font-medium text-muted" htmlFor="doc">Documento</label>
               <select id="doc" className={inputClass} value={docSel} onChange={(e) => setDocSel(e.target.value)}>
                 {conSaldo.filter((c) => c.saldo > 0).map((c) => (
-                  <option key={c.doc} value={c.doc}>{c.doc} · {c.cliente} · saldo {fmtUsd(c.saldo)}</option>
+                  <option key={c.documento} value={c.documento}>{c.documento} · {c.contraparte} · saldo {fmtUsd(c.saldo)}</option>
                 ))}
               </select>
             </div>
@@ -127,11 +129,11 @@ export default function ReceivablesPage() {
                   const e = estadoDe(c.saldo, c.dias);
                   return (
                     <tr key={c.id} className="hover:bg-surface-2">
-                      <td className="py-2.5 pr-3 text-text">{c.cliente}</td>
-                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{c.doc}</td>
+                      <td className="py-2.5 pr-3 text-text">{c.contraparte}</td>
+                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{c.documento}</td>
                       <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(c.monto)}</td>
                       <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.saldo)}</td>
-                      <td className="py-2.5 pr-3 text-muted">{c.venc}</td>
+                      <td className="py-2.5 pr-3 text-muted">{c.vence}</td>
                       <td className="py-2.5"><StatusBadge tone={e.tone}>{e.label}</StatusBadge></td>
                     </tr>
                   );

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { listarCuentas, abonar, type Cuenta as CuentaDb } from "@/lib/finanzas/cuentas-db";
+import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -13,13 +14,6 @@ import { fmtUsd } from "@/lib/ux/format";
 import { downloadCsv } from "@/lib/ux/export-csv";
 
 type Cta = { id: number; proveedor: string; doc: string; monto: number; abonado: number; venc: string };
-const HOY = new Date("2026-06-23");
-const SEED: Cta[] = [
-  { id: 1, proveedor: "Linconl Import C.A.", doc: "OC-2026-000012", monto: 4800, abonado: 1500, venc: "2026-06-20" },
-  { id: 2, proveedor: "Gases del Oriente", doc: "OC-2026-000015", monto: 2300, abonado: 0, venc: "2026-06-28" },
-  { id: 3, proveedor: "Hoffman Supply", doc: "OC-2026-000016", monto: 1250, abonado: 0, venc: "2026-07-10" },
-];
-const dias = (v: string) => Math.round((new Date(v).getTime() - HOY.getTime()) / 86400000);
 const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
   saldo <= 0 ? { label: "Pagada", tone: "ok" }
   : d < 0 ? { label: `Vencida (${-d}d)`, tone: "danger" }
@@ -29,24 +23,32 @@ const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surfac
 
 export default function PayablesPage() {
   const empresaKey = useEmpresaActiva();
-  const [ctas, setCtas] = usePersistedState<Cta[]>(`cxp:cuentas:${empresaKey}`, SEED);
-  const [docSel, setDocSel] = useState(SEED[0].doc);
+  const [recarga, setRecarga] = useState(0);
+  const carga = useCarga(`${empresaKey}:${recarga}`, () => listarCuentas(empresaKey, "pagar"));
+  const ctas: CuentaDb[] = carga.datos ?? [];
+  const [docSel, setDocSel] = useState("");
   const [abono, setAbono] = useState(0);
   const [msg, setMsg] = useState("");
 
-  function registrarAbono() {
+  async function registrarAbono() {
     setMsg("");
     const a = Number(abono);
-    const c = ctas.find((x) => x.doc === docSel)!;
-    const saldo = c.monto - c.abonado;
+    const c = ctas.find((x) => x.documento === docSel);
+    if (!c) return setMsg("ERR:Selecciona un documento.");
     if (!a || a <= 0) return setMsg("ERR:Ingresa un abono mayor a 0.");
-    if (a > saldo) return setMsg(`ERR:El abono supera el saldo (${fmtUsd(saldo)}).`);
-    setCtas((prev) => prev.map((x) => (x.doc === docSel ? { ...x, abonado: x.abonado + a } : x)));
+
+    // La base vuelve a comprobar que el abono no supere el saldo: dos personas
+    // abonando a la vez podrian pasarse si solo se validara aqui.
+    const r = await abonar(c.id, a);
+    if (!r.ok) return setMsg(`ERR:${r.error}`);
+
+    setRecarga((n) => n + 1);
     setMsg(`Abono de ${fmtUsd(a)} aplicado a ${docSel}.`);
     setAbono(0);
   }
 
-  const conSaldo = ctas.map((c) => ({ ...c, saldo: c.monto - c.abonado, d: dias(c.venc) }));
+    // saldo y dias los calcula la BASE, contra la fecha de hoy real.
+  const conSaldo = ctas.map((c) => ({ ...c, d: c.dias }));
   const total = conSaldo.reduce((a, c) => a + c.saldo, 0);
   const vencido = conSaldo.filter((c) => c.saldo > 0 && c.d < 0).reduce((a, c) => a + c.saldo, 0);
   const alerta = conSaldo.filter((c) => c.saldo > 0 && c.d >= 0 && c.d <= 7).reduce((a, c) => a + c.saldo, 0);
@@ -58,7 +60,7 @@ export default function PayablesPage() {
         title="Cuentas por pagar"
         description="Saldos por proveedor, abonos y alertas desde 7 días. Visible para owner/admin (§24)."
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por pagar" }]}
-        actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.proveedor, c.doc, c.monto, c.abonado, c.saldo, c.venc])])}>Exportar CSV</Button>}
+        actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.abonado, c.saldo, c.vence])])}>Exportar CSV</Button>}
       />
       <SectionCard title="Resumen">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -80,7 +82,7 @@ export default function PayablesPage() {
               <label className="mb-1 block text-xs font-medium text-muted" htmlFor="doc">Compra / documento</label>
               <select id="doc" className={inputClass} value={docSel} onChange={(e) => setDocSel(e.target.value)}>
                 {conSaldo.filter((c) => c.saldo > 0).map((c) => (
-                  <option key={c.doc} value={c.doc}>{c.doc} · {c.proveedor} · saldo {fmtUsd(c.saldo)}</option>
+                  <option key={c.documento} value={c.documento}>{c.documento} · {c.contraparte} · saldo {fmtUsd(c.saldo)}</option>
                 ))}
               </select>
             </div>
@@ -109,8 +111,8 @@ export default function PayablesPage() {
                   const e = estadoDe(c.saldo, c.d);
                   return (
                     <tr key={c.id} className="hover:bg-surface-2">
-                      <td className="py-2.5 pr-3 text-text">{c.proveedor}</td>
-                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{c.doc}</td>
+                      <td className="py-2.5 pr-3 text-text">{c.contraparte}</td>
+                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{c.documento}</td>
                       <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(c.monto)}</td>
                       <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.saldo)}</td>
                       <td className="py-2.5"><StatusBadge tone={e.tone}>{e.label}</StatusBadge></td>
