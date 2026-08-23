@@ -1,6 +1,7 @@
 "use client";
 
 import { registrarGasto, listarGastos, eliminarGasto, type GastoGuardado } from "@/lib/finanzas/gastos-db";
+import { useCarga } from "@/lib/ux/use-carga";
 
 // Gastos (Finanzas). Carga manual de gastos que alimentan el Estado de Resultado.
 // Catálogo de partidas y categorías = las del EdR real. Ver lib/ux/gastos.ts.
@@ -36,20 +37,10 @@ export default function ExpensesPage() {
   const permitido = puedeVerFinanzas(rol);
   // Los gastos viven en la base: son la mitad del Estado de Resultado y tienen
   // que ser los mismos para el Owner y para el administrador, no uno por máquina.
-  const [gastos, setGastos] = useState<GastoGuardado[]>([]);
-  const [ready, setReady] = useState(false);
-  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
-
-  useEffect(() => {
-    let vigente = true;
-    setReady(false);
-    listarGastos(empresa)
-      .then((g) => { if (vigente) { setGastos(g); setErrorCarga(null); } })
-      .catch((e) => { if (vigente) setErrorCarga((e as Error).message); })
-      .finally(() => { if (vigente) setReady(true); });
-    return () => { vigente = false; };
-  }, [empresa, recarga]);
+  const carga = useCarga(`${empresa}:${recarga}`, () => listarGastos(empresa));
+  const gastos: GastoGuardado[] = carga.datos ?? [];
+  const ready = !carga.cargando;
   const bcv = useBcvRate();
   const [abierto, setAbierto] = useState(false);
   const [mes, setMes] = useState(() => hoyISO().slice(0, 7));

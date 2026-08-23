@@ -18,6 +18,7 @@ import {
   type SItem,
 } from "@/lib/ux/inventory-data";
 import { FiscalRegularization } from "./FiscalRegularization";
+import { MasterInventario } from "./MasterInventario";
 import { MovimientosPanel } from "./MovimientosPanel";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
@@ -32,7 +33,6 @@ const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surfac
 const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 type Tab = "master" | "movimientos" | "fisico" | "s" | "fiscal";
-type MasterView = "fisico" | "espera-ne" | "espera-factura";
 
 export default function InventoryPage() {
   // Empresa activa según la ruta (consolidado -> sumigases).
@@ -41,7 +41,6 @@ export default function InventoryPage() {
   const [q, setQ] = useState("");
   const [sItems, setSItems] = usePersistedState<SItem[]>(`inv-s:${empresa}`, []);
   const { notas, ledger, ready } = useFiscal(empresa);
-  const [masterView, setMasterView] = useState<MasterView>("fisico");
   const [fisView, setFisView] = useState<"existencias" | "rotacion">("existencias");
   const [placeholder, setPlaceholder] = useState("");
   function stub(area: string) {
@@ -298,217 +297,16 @@ export default function InventoryPage() {
         <>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight text-text">Inventario Master</h2>
-            <StubBtn area="Master" />
           </div>
 
-          {/* Tiles resumen de los tres apartados */}
-          <div className="mb-4 grid gap-3 sm:grid-cols-3">
-            {([
-              ["fisico", "Físico Existente", totFisico, fisicoExistente.length, "En almacén (Maestro M)"],
-              ["espera-ne", "En Espera por Nota de Entrega", totNE, esperaNE.length, "Comprometido sin NE emitida"],
-              ["espera-factura", "En Espera por Factura", totFactura, esperaFactura.length, "NE pendiente de factura fiscal"],
-            ] as [MasterView, string, number, number, string][]).map(([id, label, unidades, skus, hint]) => (
-              <button key={id} onClick={() => setMasterView(id)}
-                className={`rounded-2xl border p-4 text-left transition ${masterView === id ? "border-brand bg-brand/5" : "border-border bg-surface hover:bg-surface-2"}`}>
-                <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
-                {ready ? (
-                  <>
-                    <div className="mt-1 text-2xl font-semibold text-text">{Math.round(unidades * 100) / 100}</div>
-                    <div className="text-xs text-muted">{skus} SKU · {hint}</div>
-                  </>
-                ) : (
-                  // Sin esto se pintaría un 0 que salta al valor real al hidratar.
-                  <div aria-busy="true" aria-label="Cargando">
-                    <div className="sumi-skeleton mt-1 h-8 w-24" />
-                    <div className="sumi-skeleton mt-1.5 h-3 w-40" />
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Físico Existente */}
-          {masterView === "fisico" && (
-            <SectionCard title="Físico Existente" action={<StubBtn area="Físico Existente" />}
-              description={fisView === "existencias"
-                ? "Lo que realmente está en almacén (Maestro M). Referencia V/S/M. Ordena por cualquier columna."
-                : `Estado en tiempo real: existencia (M) vs velocidad de venta. Ventana ${rotacionVentana.desde} → ${rotacionVentana.hasta} (Valery).`}>
-
-              {/* Toggle Existencias / Rotación */}
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-border bg-surface-2 p-0.5">
-                  {([["existencias", "Existencias"], ["rotacion", "Rotación / Estado"]] as const).map(([id, lbl]) => (
-                    <button key={id} onClick={() => setFisView(id)}
-                      className={`min-h-11 rounded-lg px-3 text-sm font-medium transition ${fisView === id ? "bg-brand-strong text-white" : "text-muted hover:text-text"}`}>
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
-                {fisView === "rotacion" && (
-                  <div className="flex flex-wrap gap-1.5 text-xs">
-                    <StatusBadge tone="warn">{resumenRot.reponer} por reponer</StatusBadge>
-                    <StatusBadge tone="danger">{resumenRot.agotado} agotados</StatusBadge>
-                    <StatusBadge tone="danger">{resumenRot.sobrestock} sobrestock</StatusBadge>
-                    <StatusBadge tone="muted">{resumenRot.sinRotacion} sin rotación</StatusBadge>
-                  </div>
-                )}
-              </div>
-
-              {fisView === "rotacion" ? (
-                <>
-                  <div className="sumi-scroll max-w-full overflow-x-auto">
-                    <table className="w-full min-w-[860px] text-left text-sm">
-                      <thead className="text-xs uppercase tracking-wide text-muted">
-                        <tr className="border-b border-border">
-                          <SortableTh label="Código" sortKey="codigo" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
-                          <SortableTh label="Producto" sortKey="nombre" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
-                          <SortableTh label="Disponible" sortKey="disponible" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
-                          <SortableTh label="Vend. 12m" sortKey="v12" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
-                          <SortableTh label="Prom./mes" sortKey="avg" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
-                          <SortableTh label="Meses stock" sortKey="meses" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
-                          <SortableTh label="Precio" sortKey="precio" align="right" ariaSort={tRot.ariaSort} onSort={tRot.toggleSort} />
-                          <th scope="col" className="py-2.5 font-medium">Estado / Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {tRot.visible.map((r) => (
-                          <tr key={r.codigo} className="hover:bg-surface-2">
-                            <td className="py-2.5 pr-3 font-mono text-xs text-muted">{r.codigo}</td>
-                            <td className="py-2.5 pr-3 text-text">{r.nombre}</td>
-                            <td className={`py-2.5 pr-3 text-right font-medium ${r.disponible <= 0 ? "text-danger" : "text-text"}`}>{r.disponible}</td>
-                            <td className="py-2.5 pr-3 text-right text-muted">{r.v12}</td>
-                            <td className="py-2.5 pr-3 text-right text-muted">{r.avg ? r.avg.toFixed(1) : "—"}</td>
-                            <td className="py-2.5 pr-3 text-right font-medium text-text">{r.est.meses === null ? "—" : r.est.meses.toFixed(1)}</td>
-                            <td className="py-2.5 pr-3 text-right text-muted">{r.precio ? fmtUsd(r.precio) : "—"}</td>
-                            <td className="py-2.5">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <StatusBadge tone={r.est.tono}>{r.est.label}</StatusBadge>
-                                {r.est.accion !== "—" && r.est.accion !== "OK" && (
-                                  <span className="text-xs text-muted">→ {r.est.accion}</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <TablePager {...tRot} etiqueta="productos" />
-                </>
-              ) : (
-              <div className="sumi-scroll max-w-full overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-muted">
-                    <tr className="border-b border-border">
-                      <SortableTh label="Código" sortKey="codigo" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
-                      <SortableTh label="Nombre" sortKey="nombre" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
-                      <SortableTh label="V · Valery" sortKey="v" align="right" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
-                      <SortableTh label="S · informal" sortKey="s" align="right" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
-                      <SortableTh label="Físico exist. (M)" sortKey="m" align="right" ariaSort={tFis.ariaSort} onSort={tFis.toggleSort} />
-                      <th scope="col" className="py-2.5 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {tFis.visible.map((m) => {
-                      const v = stockValery(m.codigo, ledger, empresa);
-                      const s = stockS(m.codigo, ledger, m.s);
-                      return (
-                        <tr key={m.codigo} className={m.bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
-                          <td className="py-2.5 pr-3 font-mono text-xs text-muted">{m.codigo}</td>
-                          <td className="py-2.5 pr-3 text-text">{m.nombre}</td>
-                          <td className={`py-2.5 pr-3 text-right ${v < 0 ? "text-danger" : "text-muted"}`}>{v}</td>
-                          <td className="py-2.5 pr-3 text-right text-muted">{s !== 0 || m.enS ? s : "—"}</td>
-                          <td className={`py-2.5 pr-3 text-right font-medium ${m.m < 0 ? "text-danger" : "text-text"}`}>{m.m}</td>
-                          <td className="py-2.5">
-                            {m.bloqueado ? <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
-                              : m.m <= 0 ? <StatusBadge tone="warn">Sin existencia</StatusBadge>
-                              : <StatusBadge tone="ok">Disponible</StatusBadge>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              )}
-              {fisView === "existencias" && <TablePager {...tFis} etiqueta="productos" />}
-            </SectionCard>
-          )}
-
-          {/* En Espera por Nota de Entrega */}
-          {masterView === "espera-ne" && (
-            <SectionCard title="En Espera por Nota de Entrega" action={<StubBtn area="En Espera por Nota de Entrega" />}
-              description="Existencia comprometida en pedidos aún sin Nota de Entrega emitida.">
-              <p className="mb-3 rounded-xl border border-border-strong bg-surface-2 px-3 py-2 text-xs text-muted">
-                Apartado creado. <strong className="text-text">Lógica pendiente de definir</strong> (mañana): qué origina un compromiso, cómo entra y sale de este estado, y su relación con V/S/M.
-              </p>
-              {esperaNE.length === 0 ? (
-                <EmptyState title="Sin existencia en espera por NE" message="Aún no hay compromisos registrados en este apartado." />
-              ) : (
-                <div className="sumi-scroll max-w-full overflow-x-auto">
-                  <table className="w-full min-w-[560px] text-left text-sm">
-                    <thead className="text-xs uppercase tracking-wide text-muted">
-                      <tr className="border-b border-border">
-                        <th className="py-2.5 pr-3 font-medium">Código</th>
-                        <th className="py-2.5 pr-3 font-medium">Nombre</th>
-                        <th className="py-2.5 pr-3 text-right font-medium">Cantidad</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {esperaNE.map((e) => (
-                        <tr key={e.codigo} className="hover:bg-surface-2">
-                          <td className="py-2.5 pr-3 font-mono text-xs text-muted">{e.codigo}</td>
-                          <td className="py-2.5 pr-3 text-text">{e.nombre}</td>
-                          <td className="py-2.5 pr-3 text-right text-text">{e.cantidad}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </SectionCard>
-          )}
-
-          {/* En Espera por Factura */}
-          {masterView === "espera-factura" && (
-            <SectionCard title="En Espera por Factura" action={<StubBtn area="En Espera por Factura" />}
-              description="Notas de Entrega emitidas, pendientes de convertir a Factura Fiscal (Valery).">
-              <p className="mb-3 rounded-xl border border-border-strong bg-surface-2 px-3 py-2 text-xs text-muted">
-                Fuente preliminar: bandeja de <strong className="text-text">Regularización fiscal</strong> (NE pendientes). <strong className="text-text">Lógica a afinar</strong> con tus indicaciones.
-              </p>
-              {esperaFactura.length === 0 ? (
-                <EmptyState title="Sin existencia en espera por factura" message="No hay notas de entrega pendientes de facturar." />
-              ) : (
-                <div className="sumi-scroll max-w-full overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead className="text-xs uppercase tracking-wide text-muted">
-                      <tr className="border-b border-border">
-                        <SortableTh label="Código" sortKey="codigo" ariaSort={tFac.ariaSort} onSort={tFac.toggleSort} />
-                        <SortableTh label="Nombre" sortKey="nombre" ariaSort={tFac.ariaSort} onSort={tFac.toggleSort} />
-                        <SortableTh label="Cantidad" sortKey="cantidad" align="right" ariaSort={tFac.ariaSort} onSort={tFac.toggleSort} />
-                        <th scope="col" className="py-2.5 font-medium">Notas de entrega</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {tFac.visible.map((e) => (
-                        <tr key={e.codigo} className="hover:bg-surface-2">
-                          <td className="py-2.5 pr-3 font-mono text-xs text-muted">{e.codigo}</td>
-                          <td className="py-2.5 pr-3 text-text">{e.nombre}</td>
-                          <td className="py-2.5 pr-3 text-right font-medium text-text">{e.cantidad}</td>
-                          <td className="py-2.5 text-xs text-muted">{e.notas.join(", ")}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <TablePager {...tFac} etiqueta="códigos" />
-                </div>
-              )}
-            </SectionCard>
-          )}
+          {/* DOS cifras, no tres. El kardex ya distingue lo que movio mercancia
+              de lo que solo cuadra papeles, asi que V/S/M se simplifica a
+              FISICO REAL vs FISCAL. Ver MasterInventario.tsx. */}
+          <MasterInventario empresa={empresa} filtro={q} />
         </>
       )}
 
-      {/* -------- FÍSICO -------- */}
+
       {tab === "fisico" && (
         <SectionCard title="Inventario Físico (Valery)" action={<StubBtn area="Físico · Valery" />}
           description={`Solo lectura · fuente: base de datos · existencia calculada del kardex.`}>
