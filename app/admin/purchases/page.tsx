@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { listarOrdenes, crearOrden, recibir, type Orden as OrdenDb } from "@/lib/compras/compras-db";
+import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { fmtUsd } from "@/lib/ux/format";
 
-type Estado = "Abierta" | "Recibida parcial" | "Recibida";
-type Orden = { id: number; correlativo: string; proveedor: string; producto: string; qty: number; recibido: number; costo: number; estado: Estado; cxp: boolean };
 
 const PROVEEDORES = ["Linconl Import C.A.", "Gases del Oriente", "Hoffman Supply", "Carboweld Andina"];
 const PRODUCTOS = [
@@ -20,37 +19,54 @@ const PRODUCTOS = [
   { n: "Regulador de argón c/ flujómetro", c: 25.81 },
   { n: "Manguera morocha 1/4 GNC", c: 3.3 },
 ];
-const toneOf: Record<Estado, Tone> = { Abierta: "info", "Recibida parcial": "warn", Recibida: "ok" };
+const toneOf: Record<string, Tone> = {
+  abierta: "info",
+  parcial: "warn",
+  recibida: "ok",
+};
+const etiqueta: Record<string, string> = {
+  abierta: "Abierta",
+  parcial: "Recibida parcial",
+  recibida: "Recibida",
+};
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function PurchasesPage() {
   const empresaKey = useEmpresaActiva();
-  const [ordenes, setOrdenes] = usePersistedState<Orden[]>(`oc:lista:${empresaKey}`, []);
-  const [seq, setSeq] = usePersistedState(`oc:seq:${empresaKey}`, 17);
+  // Las ordenes viven en la base y el estado se DEDUCE de cuanto llego:
+  // nadie tiene que acordarse de marcar "recibida parcial".
+  const [recarga, setRecarga] = useState(0);
+  const carga = useCarga(`${empresaKey}:${recarga}`, () => listarOrdenes(empresaKey));
+  const ordenes: OrdenDb[] = carga.datos ?? [];
   const [prov, setProv] = useState(PROVEEDORES[0]);
   const [prod, setProd] = useState(PRODUCTOS[0].n);
   const [qty, setQty] = useState(10);
   const [msg, setMsg] = useState("");
 
-  function crear() {
+  async function crear() {
     setMsg("");
     const q = Number(qty);
     if (!q || q < 1) return setMsg("ERR:La cantidad debe ser al menos 1.");
     const p = PRODUCTOS.find((x) => x.n === prod)!;
-    const correlativo = `OC-2026-${String(seq).padStart(6, "0")}`;
-    setOrdenes((prev) => [{ id: Date.now(), correlativo, proveedor: prov, producto: p.n, qty: q, recibido: 0, costo: p.c, estado: "Abierta", cxp: false }, ...prev]);
-    setSeq((s) => s + 1);
-    setMsg(`Orden ${correlativo} creada (presupuesto reservado: ${fmtUsd(q * p.c)}).`);
+
+    const r = await crearOrden(
+      { proveedor: prov, codigo: p.n, descripcion: p.n, cantidad: q, costoUsd: p.c },
+      empresaKey,
+    );
+    if (!r.ok) return setMsg(`ERR:${r.error}`);
+
+    setRecarga((n) => n + 1);
+    setMsg(`Orden creada por ${fmtUsd(q * p.c)}.`);
   }
 
-  function recibir(id: number, cant: number) {
-    setOrdenes((prev) => prev.map((o) => {
-      if (o.id !== id) return o;
-      const rec = Math.min(o.qty, o.recibido + cant);
-      const estado: Estado = rec >= o.qty ? "Recibida" : "Recibida parcial";
-      return { ...o, recibido: rec, estado, cxp: true };
-    }));
-    setMsg("Recepción registrada: stock y costo actualizados; cuenta por pagar generada.");
+  async function recibirOrden(id: number, cant: number) {
+    setMsg("");
+    // Cada recepción entra al kardex: lo que llega al almacén tiene que
+    // aparecer en la existencia, o el inventario queda corto sin explicación.
+    const r = await recibir(id, cant, empresaKey);
+    if (!r.ok) return setMsg(`ERR:${r.error}`);
+    setRecarga((n) => n + 1);
+    setMsg("Recepción registrada y sumada al inventario.");
   }
 
   return (
@@ -94,16 +110,16 @@ export default function PurchasesPage() {
                 <li key={o.id} className="rounded-xl border border-border-strong bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-xs text-muted">{o.correlativo}</span>
-                    <StatusBadge tone={toneOf[o.estado]}>{o.estado}</StatusBadge>
+                    <StatusBadge tone={toneOf[o.estado] ?? "muted"}>{etiqueta[o.estado] ?? o.estado}</StatusBadge>
                   </div>
-                  <p className="mt-1 text-sm text-text">{o.proveedor} · {o.qty} × {o.producto}</p>
+                  <p className="mt-1 text-sm text-text">{o.proveedor} · {o.cantidad} × {o.descripcion}</p>
                   <p className="text-xs text-muted">
-                    Recibido {o.recibido}/{o.qty} · total {fmtUsd(o.qty * o.costo)}{o.cxp ? " · CxP generada ✓" : ""}
+                    Recibido {o.recibido}/{o.cantidad} · total {fmtUsd(o.cantidad * o.costoUsd)}
                   </p>
-                  {o.estado !== "Recibida" && (
+                  {o.estado !== "recibida" && (
                     <div className="mt-2 flex gap-2">
-                      <Button variant="secondary" onClick={() => recibir(o.id, Math.ceil(o.qty / 2))}>Recepción parcial</Button>
-                      <Button variant="ghost" onClick={() => recibir(o.id, o.qty)}>Recibir todo</Button>
+                      <Button variant="secondary" onClick={() => recibirOrden(o.id, Math.ceil(o.cantidad / 2))}>Recepción parcial</Button>
+                      <Button variant="ghost" onClick={() => recibirOrden(o.id, o.cantidad)}>Recibir todo</Button>
                     </div>
                   )}
                 </li>

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { listarProductos, type ProductoLista } from "@/lib/inventory/productos-db";
+import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { fmtUsd } from "@/lib/ux/format";
 
-type Prod = { sku: string; nombre: string; cat: string; precio: number; costo: number; nuevo?: boolean };
+type Prod = { codigo: string; nombre: string; cat: string; precio: number; costo: number; nuevo?: boolean };
 
 const CATS: Record<string, string> = {
   "Gases industriales y medicinales": "GAS",
@@ -22,23 +23,15 @@ const CATS: Record<string, string> = {
   "Accesorios y repuestos": "REP",
 };
 
-const SEED: Prod[] = [
-  { sku: "GAS-0001", nombre: "Oxígeno gaseoso cil 6M³", cat: "Gases industriales y medicinales", precio: 16.01, costo: 8.98 },
-  { sku: "GAS-0002", nombre: "Nitrógeno gaseoso cil 6M³", cat: "Gases industriales y medicinales", precio: 38.04, costo: 17.52 },
-  { sku: "GAS-0003", nombre: "Argón cil 6M³", cat: "Gases industriales y medicinales", precio: 51.65, costo: 35.47 },
-  { sku: "ANT-0001", nombre: "Antorcha TIG 200A flex WP26F", cat: "Portaelectrodos y antorchas", precio: 172.65, costo: 122.69 },
-  { sku: "REG-0001", nombre: "Regulador de argón c/ flujómetro", cat: "Reguladores y válvulas", precio: 63.87, costo: 25.81 },
-  { sku: "ELE-0001", nombre: "Electrodo 6010 5/32 Linconl", cat: "Electrodos y varillas", precio: 6.24, costo: 4.05 },
-  { sku: "ELE-0003", nombre: "Electrodo 7018 5/32 Linconl", cat: "Electrodos y varillas", precio: 5.86, costo: 1.47 },
-  { sku: "MAQ-0001", nombre: "Cable p/ máquina de soldar", cat: "Máquinas de soldar y equipos", precio: 26.08, costo: 17.32 },
-  { sku: "REP-0001", nombre: "Manguera morocha 1/4 GNC", cat: "Accesorios y repuestos", precio: 5.78, costo: 3.3 },
-];
 
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
 export default function ProductsPage() {
   const empresaKey = useEmpresaActiva();
-  const [prods, setProds] = usePersistedState<Prod[]>(`prod:lista:${empresaKey}`, SEED);
+  // El catálogo real vive en la base: 1.704 productos de Sumigases y 2.599 de
+  // Sudematin, no los 5 de ejemplo que había aquí escritos.
+  const carga = useCarga(empresaKey, () => listarProductos(empresaKey));
+  const prods: ProductoLista[] = carga.datos ?? [];
   const [q, setQ] = useState("");
   const [nombre, setNombre] = useState("");
   const [cat, setCat] = useState(Object.keys(CATS)[0]);
@@ -48,26 +41,26 @@ export default function ProductsPage() {
 
   const filtrados = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return t ? prods.filter((p) => p.nombre.toLowerCase().includes(t) || p.sku.toLowerCase().includes(t) || p.cat.toLowerCase().includes(t)) : prods;
+    return t ? prods.filter((p) => p.nombre.toLowerCase().includes(t) || p.codigo.toLowerCase().includes(t) || (p.unidad ?? "—").toLowerCase().includes(t)) : prods;
   }, [q, prods]);
 
   function nextSku(c: string): string {
     const pre = CATS[c];
-    const nums = prods.filter((p) => p.sku.startsWith(pre + "-")).map((p) => Number(p.sku.split("-")[1] || 0));
+    const nums = prods.filter((p) => p.codigo.startsWith(pre + "-")).map((p) => Number(p.codigo.split("-")[1] || 0));
     return `${pre}-${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(4, "0")}`;
   }
 
+  // Crear productos a mano queda para más adelante: el catálogo real viene del
+  // export de Valery, y un producto inventado aquí no existiría en Valery ni
+  // tendría costo. Se deja la pantalla como consulta hasta definir ese flujo.
   function crear() {
-    setMsg("");
-    if (!nombre.trim()) return setMsg("ERR:El nombre es obligatorio.");
-    if (!precio || precio <= 0) return setMsg("ERR:El precio debe ser mayor a 0.");
-    const sku = nextSku(cat);
-    setProds((prev) => [{ sku, nombre: nombre.trim(), cat, precio: Number(precio), costo: Number(costo) || 0, nuevo: true }, ...prev]);
-    setMsg(`Producto ${sku} creado (SKU autogenerado por categoría, editable antes de importar).`);
-    setNombre(""); setPrecio(0); setCosto(0);
+    setMsg("ERR:Los productos vienen del catálogo de Valery. Crear uno a mano todavía no está disponible.");
   }
 
-  const margen = (p: Prod) => (p.costo > 0 ? Math.round(((p.precio - p.costo) / p.costo) * 100) : null);
+  // Sin costo no hay margen que calcular — ni para quien no puede verlo, ni
+  // para un producto que nunca se compró.
+  const margen = (p: ProductoLista) =>
+    p.costo !== null && p.costo > 0 ? Math.round(((p.precio - p.costo) / p.costo) * 100) : null;
 
   return (
     <>
@@ -124,13 +117,17 @@ export default function ProductsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filtrados.map((p) => (
-                  <tr key={p.sku} className="hover:bg-surface-2">
+                  <tr key={p.codigo} className="hover:bg-surface-2">
                     <td className="py-2.5 pr-3 font-mono text-xs text-muted">
-                      {p.sku}{p.nuevo && <span className="ml-1.5 rounded-full bg-brand-soft px-1.5 text-[10px] text-brand">nuevo</span>}
+                      {p.codigo}
                     </td>
                     <td className="py-2.5 pr-3 text-text">{p.nombre}</td>
                     <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(p.precio)}</td>
-                    <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(p.costo)}</td>
+                    <td className="py-2.5 pr-3 text-right text-muted">
+                      {/* null = esta persona no puede ver costos. Mostrar $0
+                          seria mentir; el guion dice "no te toca verlo". */}
+                      {p.costo === null ? "—" : fmtUsd(p.costo)}
+                    </td>
                     <td className="py-2.5 text-right">{margen(p) !== null ? <span className="font-medium text-ok">{margen(p)}%</span> : <span className="text-muted">—</span>}</td>
                   </tr>
                 ))}
