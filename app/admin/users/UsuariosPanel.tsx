@@ -164,6 +164,51 @@ export function UsuariosPanel({ usuarios }: { usuarios: UsuarioFila[] }) {
             <p className="mt-1 text-xs text-muted">{ROLES.find((r) => r.id === rol)?.ayuda}</p>
           </div>
 
+          {/* La ficha de vendedor ES el alta del usuario: no hay un registro
+              aparte que alguien tenga que crear después y pueda olvidarse. */}
+          {rol === "vendedor" && (
+            <div className="rounded-xl border border-border bg-surface-2 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                Datos del vendedor
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="pct" className="mb-1 block text-sm font-medium text-text">
+                    % Comisión
+                  </label>
+                  <input
+                    id="pct"
+                    name="pctComision"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={100}
+                    step="0.1"
+                    defaultValue={0.5}
+                    className={`${input} tabular-nums`}
+                  />
+                  <p className="mt-1 text-xs text-muted">Sobre sus ventas propias.</p>
+                </div>
+                <div>
+                  <label htmlFor="tipoVend" className="mb-1 block text-sm font-medium text-text">
+                    Tipo
+                  </label>
+                  <select id="tipoVend" name="tipoVendedor" className={input}>
+                    <option value="junior">Junior</option>
+                    <option value="senior">Senior</option>
+                    <option value="otro">Externo</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label htmlFor="telVend" className="mb-1 block text-sm font-medium text-text">
+                  Teléfono
+                </label>
+                <input id="telVend" name="telefonoVendedor" className={input} placeholder="0414-0000000" />
+              </div>
+            </div>
+          )}
+
           <div>
             <label htmlFor="empresa" className="mb-1 block text-sm font-medium text-text">Empresa</label>
             <select id="empresa" name="empresa" className={input} disabled={esOwner}>

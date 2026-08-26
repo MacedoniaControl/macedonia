@@ -19,6 +19,7 @@ import {
 } from "@/lib/ux/inventory-data";
 import { FiscalRegularization } from "./FiscalRegularization";
 import { MasterInventario } from "./MasterInventario";
+import ProductosPage from "@/app/admin/products/page";
 import { MovimientosPanel } from "./MovimientosPanel";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
@@ -32,7 +33,7 @@ const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-s
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
 const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
-type Tab = "master" | "movimientos" | "fisico" | "s" | "fiscal";
+type Tab = "master" | "movimientos" | "fisico" | "productos" | "s" | "fiscal";
 
 export default function InventoryPage() {
   // Empresa activa según la ruta (consolidado -> sumigases).
@@ -262,6 +263,8 @@ export default function InventoryPage() {
         {([
           ["master", `Master (${master.length})`],
           ["fisico", `Físico · Valery (${fisico.length})`],
+          // Productos y catalogo pasa a subdepartamento del inventario.
+          ["productos", "Productos y catálogo"],
           ["s", `Inventario S (${sItems.length})`],
           ["movimientos", "Movimientos"],
           ["fiscal", "Regularización fiscal"],
@@ -282,6 +285,9 @@ export default function InventoryPage() {
           </label>
         </div>
       )}
+
+      {/* Productos y catalogo: subdepartamento del inventario, no seccion aparte. */}
+      {tab === "productos" && <ProductosPage />}
 
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 

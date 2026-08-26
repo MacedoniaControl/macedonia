@@ -10,6 +10,7 @@ import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { fmtUsd } from "@/lib/ux/format";
+import { VentasExternas } from "./VentasExternas";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
 import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
@@ -63,7 +64,7 @@ export default function QuotesPage() {
     correlativoPrevisto(empresaKey, "cotizacion").then(setPrevisto).catch(() => setPrevisto("—"));
   }, [empresaKey]);
   // "Generar presupuesto" es el apartado principal (lo que más se usa).
-  const [tab, setTab] = useState<"registro" | "gen" | "subir">("gen");
+  const [tab, setTab] = useState<"registro" | "gen" | "subir" | "externas">("gen");
   const [period, setPeriod] = useState("mes");
   const fileRef = useRef<HTMLInputElement>(null);
   // Los registros/logs son solo del OWNER.
@@ -104,6 +105,9 @@ export default function QuotesPage() {
         {([
           ["gen", "Generar presupuesto"] as const,
           ["subir", "Subir de Valery"] as const,
+          // Ventas externas vive aqui, no en el menu principal: es una forma de
+          // cotizar/vender, no un departamento aparte.
+          ["externas", "Ventas externas"] as const,
           ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
         ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
@@ -172,6 +176,8 @@ export default function QuotesPage() {
         printDoc(presupuestoHtml(conNumero, empresaKey));
         return { error: null };
       }} />}
+
+      {tab === "externas" && <VentasExternas />}
 
       {tab === "subir" && (
         <SectionCard title="Subir presupuestos de Valery" description="Macedonia los guarda en el registro y los organiza por fecha.">

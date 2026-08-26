@@ -10,6 +10,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { normalizarRif } from "./rif";
 
 export type TipoPersona = "natural" | "juridica";
 
@@ -32,11 +33,6 @@ export type Proveedor = Omit<Cliente, "denominacion"> & {
   nacional: boolean;
   pctRetencion: number;
 };
-
-/** Normaliza el RIF: sin espacios, en mayúsculas. J-123 y j 123 son el mismo. */
-export function normalizarRif(rif: string): string {
-  return rif.trim().toUpperCase().replace(/\s+/g, "");
-}
 
 // ------------------------------------------------------------------ CLIENTES
 

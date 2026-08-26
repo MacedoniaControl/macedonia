@@ -124,6 +124,33 @@ export async function crearUsuario(_prev: Resultado, form: FormData): Promise<Re
     return { error: `No se pudo guardar el perfil: ${errFila.message}`, ok: null };
   }
 
+  // Si es vendedor, su ficha se crea EN EL MISMO PASO. Un alta en dos partes es
+  // un alta que a veces queda a medias: el usuario existe, entra, vende, y nadie
+  // le liquida comisión porque falta el registro que alguien debía crear después.
+  if (rol === "vendedor") {
+    const pct = Number(form.get("pctComision")) || 0;
+    const tipo = String(form.get("tipoVendedor") ?? "junior");
+    const { error: errVend } = await admin.from("trabajadores").insert({
+      empresa_id: empresaId,
+      usuario_id: creado.user.id,
+      nombre,
+      tipo: ["junior", "senior", "otro"].includes(tipo) ? tipo : "otro",
+      pct_comision: pct,
+      pct_bono: 0,
+      activo: true,
+    });
+
+    if (errVend) {
+      // El usuario ya existe y puede entrar; lo que falta es su comisión. Se
+      // avisa en vez de callar, porque si no nadie se entera hasta el cierre.
+      revalidatePath("/admin/users");
+      return {
+        error: null,
+        ok: `Usuario "${usuario}" creado, pero NO se pudo guardar su ficha de vendedor (${errVend.message}). Puede entrar, pero no se le calculará comisión hasta corregirlo.`,
+      };
+    }
+  }
+
   revalidatePath("/admin/users");
   return { error: null, ok: `Usuario "${usuario}" creado. Entrégale la contraseña en persona.` };
 }

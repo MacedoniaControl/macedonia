@@ -5,6 +5,7 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarOrdenes, crearOrden, recibir, type Orden as OrdenDb } from "@/lib/compras/compras-db";
 import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { PanelProveedores } from "./PanelProveedores";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
@@ -36,6 +37,7 @@ export default function PurchasesPage() {
   // Las ordenes viven en la base y el estado se DEDUCE de cuanto llego:
   // nadie tiene que acordarse de marcar "recibida parcial".
   const [recarga, setRecarga] = useState(0);
+  const [tab, setTab] = useState<"ordenes" | "proveedores">("ordenes");
   const carga = useCarga(`${empresaKey}:${recarga}`, () => listarOrdenes(empresaKey));
   const ordenes: OrdenDb[] = carga.datos ?? [];
   const [prov, setProv] = useState(PROVEEDORES[0]);
@@ -73,10 +75,29 @@ export default function PurchasesPage() {
     <>
       <PageHeader
         title="Compras"
-        description="Orden → recepción parcial → actualiza stock/costo y genera cuenta por pagar (§25)."
+        description="Orden → recepción parcial → suma al inventario. La cuenta por pagar se carga aparte."
         breadcrumbs={[{ label: "Finanzas" }, { label: "Compras" }]}
         actions={<StatusBadge tone="brand">{ordenes.length} orden(es)</StatusBadge>}
       />
+      <div className="sumi-tabs mb-4 flex gap-1 overflow-x-auto">
+        {([["ordenes", "Órdenes de compra"], ["proveedores", "Proveedores"]] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            aria-current={tab === id ? "page" : undefined}
+            className={`min-h-11 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition ${
+              tab === id ? "bg-brand-strong text-white" : "border border-border text-muted hover:text-text"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "proveedores" && <PanelProveedores />}
+
+      {tab === "ordenes" && (
       <div className="grid gap-4 lg:grid-cols-[1fr_1.5fr]">
         <SectionCard title="Nueva orden de compra">
           <div className="space-y-3">
@@ -128,7 +149,7 @@ export default function PurchasesPage() {
           )}
         </SectionCard>
       </div>
-      <p className="mt-4 text-xs text-muted">Demo client-side. Reglas §25: último costo, CxP automática al recibir; el pago se registra en Caja.</p>
+      )}
     </>
   );
 }
