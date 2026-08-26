@@ -5,10 +5,10 @@ import { useEffect } from "react";
 import { useRef, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
-import { guardarDocumento, correlativoPrevisto } from "@/lib/documentos/documentos-db";
+import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
+import { useCarga } from "@/lib/ux/use-carga";
 import { SelectorCliente } from "@/components/directorio/SelectorCliente";
 import { leerConfig } from "@/lib/config/config-db";
-import { useCarga } from "@/lib/ux/use-carga";
 import type { Cliente } from "@/lib/directorio/directorio-db";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -36,10 +36,18 @@ const GASES = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"];
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 const label = "mb-1 block text-xs font-medium text-muted";
 
-const SEED: Doc[] = [
-  { id: "s1", tipo: "entrega", correlativo: "0000008203", cliente: "JOSE LUIS", fecha: hoyISO(), total: 139.2, origen: "Valery", fileName: "NET-0000008203.pdf" },
-  { id: "s2", tipo: "devolucion", correlativo: "0000000603", cliente: "ELECTRIN C.A.", fecha: hoyISO(), total: 46975.13, origen: "Valery", fileName: "NC-0000000603.pdf" },
-];
+
+function deDocumento(d: DocumentoGuardado): Doc {
+  return {
+    id: String(d.id),
+    tipo: d.tipo === "devolucion" ? "devolucion" : "entrega",
+    correlativo: d.correlativo,
+    cliente: d.cliente,
+    fecha: d.fecha,
+    total: d.total,
+    origen: "Macedonia",
+  };
+}
 
 function inPeriod(fecha: string, period: string): boolean {
   const d = new Date(fecha + "T00:00:00");
@@ -52,7 +60,22 @@ function inPeriod(fecha: string, period: string): boolean {
 
 export default function DeliveryNotesPage() {
   const empresaKey = useEmpresaActiva();
-  const [docs, setDocs] = usePersistedState<Doc[]>(`ne:docs:${empresaKey}`, SEED);
+  // Los PDF que se suben de Valery son archivos, no registros: se quedan en el
+  // navegador porque no hay donde guardarlos todavia. Todo lo que GENERA
+  // Macedonia sale de la base, que es la unica copia que ven los demas.
+  const [subidos, setSubidos] = usePersistedState<Doc[]>(`ne:subidos:${empresaKey}`, []);
+  const [recarga, setRecarga] = useState(0);
+
+  const guardados = useCarga(`${empresaKey}:${recarga}`, async () => {
+    const [nes, devs] = await Promise.all([
+      listarDocumentos(empresaKey, "nota_entrega", 200),
+      listarDocumentos(empresaKey, "devolucion", 200),
+    ]);
+    return [...nes, ...devs].map(deDocumento);
+  });
+
+  const docs: Doc[] = [...(guardados.datos ?? []), ...subidos]
+    .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
   // El correlativo lo da la BASE, no un contador del navegador: dos vendedores
   // generando a la vez sacarían el mismo número. Esto es solo la PREVISIÓN que
   // se muestra antes de generar; el número real llega al guardar.
@@ -86,7 +109,7 @@ export default function DeliveryNotesPage() {
         const name = f.name.toUpperCase();
         const tipo: Tipo = /NC|CREDITO|DEVOL/.test(name) ? "devolucion" : "entrega";
         const num = (f.name.match(/\d{4,}/) || ["—"])[0];
-        setDocs((prev) => [
+        setSubidos((prev) => [
           { id: `${Date.now()}-${f.name}`, tipo, correlativo: num, cliente: "(desde archivo)", fecha: hoyISO(), total: 0, origen: "Valery", fileName: f.name, dataUrl: String(reader.result) },
           ...prev,
         ]);
@@ -170,15 +193,37 @@ export default function DeliveryNotesPage() {
 
         const conNumero = { ...ne, correlativo: r.documento.correlativo };
         const t = neTotals(conNumero);
-        setDocs((p) => [{ id: String(r.documento.id), tipo: "entrega", correlativo: r.documento.correlativo, cliente: ne.cliente, fecha: ne.fecha, total: t.total, origen: "Macedonia", ne: conNumero }, ...p]);
+        void t;
+        // No se agrega a mano a la lista: se relee de la base. Empujar la fila
+        // aca dejaria la pantalla mostrando algo que quiza no se guardo igual.
+        setRecarga((n) => n + 1);
         setPrevistoNE(String(Number(r.documento.correlativo) + 1).padStart(10, "0"));
         printDoc(notaEntregaHtml(conNumero, empresaKey));
         return { error: null };
       }} seq={previstoNE} />}
 
-      {tab === "dev" && <GenerarDev onSave={(dev, total) => {
-        setDocs((p) => [{ id: `${Date.now()}`, tipo: "devolucion", correlativo: dev.correlativo, cliente: dev.razonSocial, fecha: dev.fechaEmision, total, origen: "SumiControl", dev }, ...p]);
-        printDoc(devolucionHtml(dev, empresaKey));
+      {tab === "dev" && <GenerarDev onSave={async (dev) => {
+        // Antes la devolucion solo se imprimia: no quedaba registro en ningun
+        // lado. Una devolucion que no se guarda es mercaderia que volvio y que
+        // el sistema sigue dando por vendida.
+        const r = await guardarDocumento({
+          tipo: "devolucion",
+          cliente: dev.razonSocial,
+          clienteRif: dev.rif,
+          lineas: dev.lineas.map((l) => ({
+            codigo: l.codigo ?? "", descripcion: l.descripcion,
+            cantidad: l.cantidad, unidad: l.unidad,
+            precio: l.precio, descuento: l.descuento ?? 0,
+          })),
+        }, empresaKey);
+
+        if (!r.ok) return { error: r.error };
+
+        const conNumero = { ...dev, correlativo: r.documento.correlativo };
+        setRecarga((n) => n + 1);
+        setPrevistoDev(String(Number(r.documento.correlativo) + 1).padStart(10, "0"));
+        printDoc(devolucionHtml(conNumero, empresaKey));
+        return { error: null };
       }} seq={previstoDev} />}
 
       {tab === "subir" && (
@@ -415,14 +460,20 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
 }
 
 // ---- Generar Devolución (Nota de Crédito) ----
-function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc, total: number) => void; seq: string }) {
+function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: string | null }>; seq: string }) {
+  const empresaDev = useEmpresaActiva();
+  const [guardando, setGuardando] = useState(false);
   const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", referencia: "", nota: "", formaPago: "" });
   const [lineas, setLineas] = useState<DevLinea[]>([]);
   const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0 });
   const [msg, setMsg] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const sub = lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
-  const total = sub * 1.16;
+  // El IVA sale de la configuracion de la empresa, no de un 16 escrito aca:
+  // si cambia la alicuota, cambiarla en un solo lugar y no buscarla por el codigo.
+  const cfgDev = useCarga(empresaDev, () => leerConfig(empresaDev));
+  const ivaPctDev = Number(cfgDev.datos?.iva_pct) || 16;
+  const total = sub * (1 + ivaPctDev / 100);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -452,16 +503,26 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc, total: number) => voi
         {lineas.length > 0 && (
           <ul className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
             {lineas.map((l, i) => <li key={i} className="flex justify-between"><span className="truncate text-text">{l.cantidad} × {l.descripcion}</span><span className="text-muted">{fmtUsd(l.cantidad * l.precio * (1 - l.descuento / 100))}</span></li>)}
-            <li className="flex justify-between border-t border-border pt-1 font-semibold"><span>Total operación (IVA incl.)</span><span>{fmtUsd(total)}</span></li>
+            <li className="flex justify-between border-t border-border pt-1 font-semibold"><span>Total operación (IVA {ivaPctDev}% incl.)</span><span>{fmtUsd(total)}</span></li>
           </ul>
         )}
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
-        <Button icon="quote" className="mt-3 w-full" onClick={() => {
+        <Button icon="quote" className="mt-3 w-full" disabled={guardando} onClick={async () => {
           setMsg("");
           if (!f.razonSocial.trim()) return setMsg("La razón social es obligatoria.");
           if (lineas.length === 0) return setMsg("Agrega al menos un producto devuelto.");
-          onSave({ ...f, correlativo: seq, fechaEmision: hoyISO(), fechaVenc: hoyISO(), lineas }, total);
-        }}>Generar y guardar (PDF)</Button>
+          if (guardando) return;                    // doble clic: no emitir dos veces
+          setGuardando(true);
+          try {
+            // Se ESPERA el resultado. Antes no se esperaba, asi que un fallo al
+            // guardar pasaba desapercibido y el PDF salia igual.
+            const r = await onSave({ ...f, correlativo: seq, fechaEmision: hoyISO(), fechaVenc: hoyISO(), lineas });
+            if (r.error) setMsg(r.error);
+            else { setLineas([]); setF({ razonSocial: "", rif: "", direccion: "", telefonos: "", referencia: "", nota: "", formaPago: "" }); }
+          } finally {
+            setGuardando(false);
+          }
+        }}>{guardando ? "Guardando…" : "Generar y guardar (PDF)"}</Button>
       </SectionCard>
     </div>
   );
