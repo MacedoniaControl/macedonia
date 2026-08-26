@@ -30,25 +30,42 @@ export type NEDoc = {
   lineas: NELinea[]; cilindros: NECil[];
   // Campos que Valery captura (no todos se imprimen en la constancia física):
   vendedor?: string; deposito?: string; tipoPrecio?: string; divisa?: string; notas?: string;
+  /** Si el documento lleva IVA. Por defecto: sí cuando el pago es en bolívares. */
+  llevaIva?: boolean;
+  /** Porcentaje aplicado, de la configuración de la empresa. */
+  ivaPct?: number;
 };
 export type DevLinea = { codigo: string; descripcion: string; cantidad: number; precio: number; descuento: number; unidad?: string };
 export type PresupuestoDoc = {
   correlativo: string; fechaEmision: string; fechaVenc: string;
   razonSocial: string; rif: string; direccion: string; telefonos: string;
   lineas: DevLinea[]; moneda: string; nota: string;
+  llevaIva?: boolean; ivaPct?: number;
 };
 export type DevDoc = {
   correlativo: string; fechaEmision: string; fechaVenc: string; referencia: string;
   razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; nota: string; formaPago: string;
+  llevaIva?: boolean; ivaPct?: number;
 };
 
 const m = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const lineaTotal = (l: NELinea) => l.cantidad * l.precio * (1 - (l.descuento || 0) / 100);
 
-export function neTotals(d: NEDoc) {
+/**
+ * Totales de una nota de entrega.
+ *
+ * El IVA es OPCIONAL y lo decide quien emite. Por defecto se enciende cuando el
+ * pago es en bolívares, que es la regla del negocio, pero el vendedor puede
+ * cambiarlo: no todos los casos son iguales y el sistema no tiene por qué
+ * saberlo mejor que la persona que tiene al cliente enfrente.
+ *
+ * El porcentaje viene de la configuración de la empresa, no escrito aquí: antes
+ * estaba fijo en 0,16 en tres sitios distintos y cambiarlo exigía tocar código.
+ */
+export function neTotals(d: NEDoc, ivaPct = 16) {
   const base = d.lineas.reduce((a, l) => a + lineaTotal(l), 0);
-  const iva = base * 0.16;
+  const iva = d.llevaIva ? base * (ivaPct / 100) : 0;
   return { base, iva, total: base + iva };
 }
 
@@ -59,7 +76,7 @@ function cilData(cils: NECil[]) {
 
 function neCopy(d: NEDoc, empresa: EmpresaId) {
   const E = identidad(empresa);
-  const t = neTotals(d);
+  const t = neTotals(d, d.ivaPct ?? 16);
   const filas = d.lineas.map((l) =>
     `<tr><td>${m(l.cantidad)}</td><td>${l.unidad}</td><td class="l">${l.codigo ? l.codigo + " - " : ""}${l.descripcion}</td><td class="r">${m(l.precio)}</td><td class="r">${m(lineaTotal(l))}</td></tr>`).join("");
   const c = cilData(d.cilindros);
@@ -80,7 +97,7 @@ function neCopy(d: NEDoc, empresa: EmpresaId) {
       <tbody>${filas}${"<tr class='sp'><td></td><td></td><td></td><td></td><td></td></tr>".repeat(Math.max(0, 6 - d.lineas.length))}</tbody></table>
     <table class="tot">
       <tr><td class="k">BASE IMPONIBLE</td><td class="r">${m(t.base)}</td></tr>
-      <tr><td class="k">IVA &nbsp; 16,00 %</td><td class="r">${m(t.iva)}</td></tr>
+      ${d.llevaIva ? `<tr><td class="k">IVA &nbsp; ${m(d.ivaPct ?? 16)} %</td><td class="r">${m(t.iva)}</td></tr>` : ""}
       <tr><td class="k">TOTAL OPERACION</td><td class="r">${m(t.total)}</td></tr>
     </table>
     <table class="cilt"><thead><tr><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACIOS</th><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACIOS</th></tr></thead>
@@ -97,7 +114,7 @@ export function notaEntregaHtml(d: NEDoc, empresa: EmpresaId) {
 export function devolucionHtml(d: DevDoc, empresa: EmpresaId) {
   const E = identidad(empresa);
   const sub = d.lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
-  const iva = sub * 0.16;
+  const iva = d.llevaIva === false ? 0 : sub * ((d.ivaPct ?? 16) / 100);
   const total = sub + iva;
   const filas = d.lineas.map((l) =>
     `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">0,00</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");
@@ -142,7 +159,7 @@ export function devolucionHtml(d: DevDoc, empresa: EmpresaId) {
 export function presupuestoHtml(d: PresupuestoDoc, empresa: EmpresaId) {
   const E = identidad(empresa);
   const sub = d.lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
-  const iva = sub * 0.16;
+  const iva = d.llevaIva === false ? 0 : sub * ((d.ivaPct ?? 16) / 100);
   const total = sub + iva;
   const filas = d.lineas.map((l) =>
     `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %&nbsp;&nbsp;${m(l.cantidad * l.precio * l.descuento / 100)}</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");

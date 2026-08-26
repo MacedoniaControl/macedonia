@@ -6,6 +6,10 @@ import { useRef, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { guardarDocumento, correlativoPrevisto } from "@/lib/documentos/documentos-db";
+import { SelectorCliente } from "@/components/directorio/SelectorCliente";
+import { leerConfig } from "@/lib/config/config-db";
+import { useCarga } from "@/lib/ux/use-carga";
+import type { Cliente } from "@/lib/directorio/directorio-db";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -207,7 +211,20 @@ const formularioVacio = () => ({
 function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: string | null }>; seq: string }) {
   const empresaKey = useEmpresaActiva();
   const [guardando, setGuardando] = useState(false);
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const cfg = useCarga(empresaKey, () => leerConfig(empresaKey));
+  const ivaPct = Number(cfg.datos?.iva_pct) || 16;
+  // El IVA se enciende solo cuando el pago es en bolivares — la regla del
+  // negocio — pero el vendedor puede cambiarlo: tiene al cliente enfrente y
+  // sabe cosas que el sistema no.
+  // null = seguir la moneda. Un booleano guardado necesitaria un efecto que lo
+  // sincronice, y ese efecto encadena renders. Derivarlo no necesita efecto.
+  const [ivaManual, setIvaManual] = useState<boolean | null>(null);
+
   const [f, setF] = useState(formularioVacio());
+
+  // El IVA sigue a la moneda salvo que el vendedor lo haya tocado a mano.
+  const llevaIva = ivaManual ?? f.divisa === "Bolívar";
   const [lineas, setLineas] = useState<NELinea[]>([]);
   const [ln, setLn] = useState<NELinea>({ codigo: "", cantidad: 1, unidad: "CILINDRO", descripcion: "", precio: 0, descuento: 0 });
   const [cil, setCil] = useState<NECil[]>(GASES.map((g) => ({ gas: g, llenos: 0, vacios: 0 })));
@@ -358,6 +375,23 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           {enBs && <div className="flex justify-between"><dt className="text-muted">Dólar $</dt><dd className="text-muted">{fmtUsd(t.total)}</dd></div>}
         </dl>
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
+        {/* El IVA sigue a la moneda por defecto; esta casilla permite corregirlo
+            sin tener que cambiar la divisa del documento. */}
+        <label className="mt-3 flex min-h-11 items-center gap-2.5 rounded-xl border border-border bg-surface-2 px-3">
+          <input
+            type="checkbox"
+            checked={llevaIva}
+            onChange={(e) => setIvaManual(e.target.checked)}
+            className="h-5 w-5 accent-[var(--color-brand-strong)]"
+          />
+          <span className="text-sm text-text">
+            Incluir IVA {ivaPct}%
+            <span className="ml-1 text-xs text-muted">
+              {f.divisa === "Bolívar" ? "(el pago es en bolívares)" : "(el pago es en dólares)"}
+            </span>
+          </span>
+        </label>
+
         <Button icon="delivery" className="mt-3 w-full" disabled={guardando} onClick={async () => {
           setMsg("");
           if (!f.cliente.trim()) return setMsg("El cliente es obligatorio.");
@@ -366,7 +400,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           if (guardando) return;                    // doble clic: no emitir dos veces
           setGuardando(true);
           try {
-            const r = await onSave({ ...f, correlativo: seq, fecha: hoyISO(), lineas, cilindros: cil });
+            const r = await onSave({ ...f, correlativo: seq, fecha: hoyISO(), lineas, cilindros: cil, llevaIva, ivaPct });
             // Si la base rechazó, hay que decirlo: antes el documento "se
             // generaba" en pantalla aunque no quedara guardado en ningún lado.
             if (r.error) setMsg(r.error);

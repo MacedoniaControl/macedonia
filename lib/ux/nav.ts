@@ -21,13 +21,11 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Cotizaciones", href: "/admin/quotes", icon: "quote" },
       { label: "Notas de entrega", href: "/admin/delivery-notes", icon: "delivery" },
-      { label: "Ventas internas", href: "/admin/sales", icon: "sales" },
     ],
   },
   {
     title: "Inventario",
     items: [
-      { label: "Productos y catálogo", href: "/admin/products", icon: "products" },
       { label: "Inventario", href: "/admin/inventory", icon: "inventory" },
       { label: "Cilindros y recargas", href: "/admin/cylinders", icon: "cylinder" },
     ],

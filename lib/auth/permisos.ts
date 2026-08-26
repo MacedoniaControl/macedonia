@@ -10,9 +10,15 @@ import { navGroups } from "../ux/nav.ts";
 import type { Rol } from "../ux/session.ts";
 
 /** Los módulos del menú, derivados de la navegación real. */
-export const CLAVES_MODULO: readonly string[] = navGroups
-  .flatMap((g) => g.items)
-  .map((i) => i.href.replace("/admin/", ""));
+// Subdepartamentos: existen como ruta y como permiso, pero no como item del
+// menu principal. "sales" (Ventas externas) vive dentro de Cotizaciones y
+// "products" dentro de Inventario.
+const SUBDEPARTAMENTOS = ["sales", "products"] as const;
+
+export const CLAVES_MODULO: readonly string[] = [
+  ...navGroups.flatMap((g) => g.items).map((i) => i.href.replace("/admin/", "")),
+  ...SUBDEPARTAMENTOS,
+];
 
 /** Capacidades transversales: no son secciones del menú, son cosas que se pueden hacer. */
 export const CLAVES_ESPECIALES = ["ver_registros", "ver_costos", "otra_empresa"] as const;
