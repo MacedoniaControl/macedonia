@@ -6,7 +6,9 @@
 // otra, pero sin los campos que Macedonia no usa (Zona de ventas, Grupo,
 // Referencia, Fax): un campo que nadie llena es un campo que estorba.
 //
-// El RIF es la clave, así que es lo único obligatorio junto con el nombre.
+// Lo único obligatorio es el nombre. El RIF quedó opcional: Macedonia no emite
+// documentos fiscales, y más de la mitad de la cartera son personas naturales
+// que compran en el mostrador y no lo dan. Ver supabase/16-clientes-sin-rif.sql.
 
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
@@ -97,7 +99,7 @@ export function FormularioCliente({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Campo label="R.I.F. *">
+          <Campo label="R.I.F.">
             <input
               value={f.rif}
               onChange={set("rif")}
@@ -105,6 +107,9 @@ export function FormularioCliente({
               autoCapitalize="characters"
               className={`${campo} font-mono`}
             />
+            <span className="mt-1 block text-[11px] text-muted">
+              Opcional. Déjalo vacío si el cliente no lo da.
+            </span>
           </Campo>
 
           <Campo label="Tipo de cliente">

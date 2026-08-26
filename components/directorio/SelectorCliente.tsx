@@ -63,8 +63,8 @@ export function SelectorCliente({
   // carga en vez de guardarse en su propio estado: guardarlo obligaba a un
   // setState síncrono que encadena renders.
   const saldo = useCarga(
-    seleccionado ? `${seleccionado.rif}:${empresa}` : "",
-    () => (seleccionado ? saldoCliente(seleccionado.rif, empresa) : Promise.resolve(null)),
+    seleccionado ? `${seleccionado.id}:${empresa}` : "",
+    () => (seleccionado ? saldoCliente(seleccionado.id, empresa) : Promise.resolve(null)),
   );
   const aviso = saldo.datos?.excedido
     ? `Este cliente debe $${saldo.datos.debe.toFixed(2)} y su límite es $${saldo.datos.limite.toFixed(2)}.`
@@ -83,7 +83,7 @@ export function SelectorCliente({
         <div className="flex items-start justify-between gap-3 rounded-xl border border-border-strong bg-surface-2 px-3.5 py-2.5">
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium text-text">{seleccionado.nombre}</span>
-            <span className="font-mono text-xs text-muted">{seleccionado.rif}</span>
+            <span className="font-mono text-xs text-muted">{seleccionado.rif ?? "sin RIF"}</span>
           </span>
           <button
             type="button"
@@ -135,7 +135,7 @@ export function SelectorCliente({
                 </li>
               )}
               {resultados.map((c) => (
-                <li key={c.rif}>
+                <li key={c.id}>
                   <button
                     type="button"
                     role="option"
@@ -145,7 +145,7 @@ export function SelectorCliente({
                     className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-surface-2"
                   >
                     <span className="truncate text-sm text-text">{c.nombre}</span>
-                    <span className="font-mono text-[11px] text-muted">{c.rif}</span>
+                    <span className="font-mono text-[11px] text-muted">{c.rif ?? "sin RIF"}</span>
                   </button>
                 </li>
               ))}

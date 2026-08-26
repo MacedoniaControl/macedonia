@@ -15,7 +15,9 @@ import { normalizarRif } from "./rif";
 export type TipoPersona = "natural" | "juridica";
 
 export type Cliente = {
-  rif: string;
+  id: number;
+  /** Opcional: el mostrador no siempre lo pide. Único cuando está. */
+  rif: string | null;
   tipoPersona: TipoPersona;
   nombre: string;
   denominacion: string | null;
@@ -29,9 +31,22 @@ export type Cliente = {
   notas: string | null;
 };
 
-export type Proveedor = Omit<Cliente, "denominacion"> & {
+// No deriva de Cliente: el proveedor SI se identifica por RIF (sale del libro
+// de compras, donde es obligatorio), mientras que el cliente puede no tenerlo.
+export type Proveedor = {
+  rif: string;
+  tipoPersona: TipoPersona;
+  nombre: string;
   nacional: boolean;
+  contacto: string | null;
+  correo: string | null;
+  telefonos: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  limiteCredito: number;
+  diasCredito: number;
   pctRetencion: number;
+  notas: string | null;
 };
 
 // ------------------------------------------------------------------ CLIENTES
@@ -60,20 +75,19 @@ export async function clientePorRif(rif: string): Promise<Cliente | null> {
 }
 
 export async function guardarCliente(
-  c: Partial<Cliente> & { rif: string; nombre: string },
+  c: Partial<Cliente> & { nombre: string },
 ): Promise<{ ok: true; cliente: Cliente } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
 
-  const rif = normalizarRif(c.rif);
-  if (!rif) return { ok: false, error: "El RIF es obligatorio: es el código del cliente." };
+  // El RIF quedo opcional: Macedonia no emite documentos fiscales, y mas de la
+  // mitad de la cartera son personas naturales que compran en el mostrador.
+  // Cadena vacia -> null, porque dos cadenas vacias chocarian contra el unique.
+  const rif = c.rif ? normalizarRif(c.rif) || null : null;
   if (!c.nombre?.trim()) return { ok: false, error: "El nombre es obligatorio." };
 
   const sb = await createClient();
-  const { data, error } = await sb
-    .from("clientes")
-    .upsert({
-      rif,
+  const fila = {
       tipo_persona: c.tipoPersona ?? "juridica",
       nombre: c.nombre.trim(),
       denominacion: c.denominacion?.trim() || null,
@@ -86,7 +100,16 @@ export async function guardarCliente(
       dias_credito: c.diasCredito ?? 0,
       notas: c.notas?.trim() || null,
       creado_por: usuario.id,
-    }, { onConflict: "rif" })
+    };
+
+  // Con RIF se puede deduplicar; sin RIF no hay contra que comparar, asi que
+  // cada alta es un cliente nuevo. Forzar un upsert sin clave real terminaria
+  // pisando fichas distintas que comparten nombre.
+  const q = rif
+    ? sb.from("clientes").upsert({ ...fila, rif }, { onConflict: "rif" })
+    : sb.from("clientes").insert(fila);
+
+  const { data, error } = await q
     .select("*")
     .single();
 
@@ -101,14 +124,14 @@ export async function guardarCliente(
  * Y el límite AVISA, no bloquea — nadie queda trabado en el mostrador.
  */
 export async function saldoCliente(
-  rif: string,
+  clienteId: number,
   empresa: string,
 ): Promise<{ debe: number; limite: number; excedido: boolean }> {
   const sb = await createClient();
   const { data } = await sb
     .from("clientes_saldo")
     .select("debe, limite_credito")
-    .eq("rif", normalizarRif(rif))
+    .eq("id", clienteId)
     .eq("empresa_id", empresa)
     .maybeSingle();
 
@@ -175,14 +198,15 @@ export async function guardarProveedor(
 // ------------------------------------------------------------------ mapeo
 
 type FilaBase = {
-  rif: string; tipo_persona: TipoPersona; nombre: string;
+  tipo_persona: TipoPersona; nombre: string;
   contacto: string | null; correo: string | null; telefonos: string | null;
   direccion: string | null; ciudad: string | null;
   limite_credito: number; dias_credito: number; notas: string | null;
 };
 
+// Sin el RIF: el cliente lo tiene opcional y el proveedor obligatorio, asi que
+// cada uno lo agrega con su propio tipo.
 const base = (f: FilaBase) => ({
-  rif: f.rif,
   tipoPersona: f.tipo_persona,
   nombre: f.nombre,
   contacto: f.contacto,
@@ -195,10 +219,14 @@ const base = (f: FilaBase) => ({
   notas: f.notas,
 });
 
-function aCliente(f: FilaBase & { denominacion: string | null }): Cliente {
-  return { ...base(f), denominacion: f.denominacion };
+function aCliente(
+  f: FilaBase & { id: number; rif: string | null; denominacion: string | null },
+): Cliente {
+  return { ...base(f), id: f.id, rif: f.rif, denominacion: f.denominacion };
 }
 
-function aProveedor(f: FilaBase & { nacional: boolean; pct_retencion: number }): Proveedor {
-  return { ...base(f), nacional: f.nacional, pctRetencion: Number(f.pct_retencion) || 0 };
+function aProveedor(
+  f: FilaBase & { rif: string; nacional: boolean; pct_retencion: number },
+): Proveedor {
+  return { ...base(f), rif: f.rif, nacional: f.nacional, pctRetencion: Number(f.pct_retencion) || 0 };
 }
