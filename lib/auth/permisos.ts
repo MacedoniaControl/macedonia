@@ -37,7 +37,7 @@ const VENDEDOR = ["dashboard", "quotes", "delivery-notes", "sales", "products", 
 const TECNICO = ["cylinders"];
 
 /** El admin ve todo de SU empresa, salvo estas tres. */
-const ADMIN_APAGADOS = ["users", "audit", "ver_registros"];
+const ADMIN_APAGADOS = ["users", "ver_registros"];
 
 /**
  * Permisos iniciales al crear un usuario.

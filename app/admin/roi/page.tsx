@@ -38,7 +38,7 @@ export default function RoiPage() {
     <>
       <PageHeader
         title="ROI / Rentabilidad"
-        description="ROI como métrica transversal, sobre el histórico real de ventas y compras (Valery)."
+        description=""
         breadcrumbs={[{ label: "Inteligencia" }, { label: "ROI / Rentabilidad" }]}
         filters={
           <>
@@ -54,7 +54,6 @@ export default function RoiPage() {
       {/* ---- Histórico real (Valery) ---- */}
       <SectionCard
         title={`ROI histórico real · ${label}`}
-        description={`Todo el histórico de operaciones (${h.meta.desde} → ${h.meta.hasta}).`}
         action={<StatusBadge tone="ok">ROI {h.totals.roi}%</StatusBadge>}
       >
         <HistoryKpis empresa={empresa} />
@@ -82,7 +81,7 @@ export default function RoiPage() {
       </div>
 
       <div className="mb-6 mt-8 flex items-center gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Indicadores demo (proyección 2024)</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Indicadores</h2>
         <span className="h-px flex-1 bg-border" />
       </div>
 

@@ -114,7 +114,6 @@ export default function SalesPage() {
           )}
         </SectionCard>
       </div>
-      <p className="mt-4 text-xs text-muted">Demo client-side. Crédito alimenta CxC; contado se cobra al registrar la venta.</p>
     </>
   );
 }

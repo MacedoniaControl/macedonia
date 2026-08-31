@@ -35,7 +35,7 @@ describe("decidirAcceso", () => {
 
   test("el OWNER pasa a todo, incluso con permisos vacios", () => {
     const u: Sesion = { id: "o", nombre: "O", rol: "owner", empresaId: null, permisos: {} };
-    for (const r of ["/admin/expenses", "/admin/audit", "/admin/users", "/admin/sumigases/commissions"]) {
+    for (const r of ["/admin/expenses", "/admin/users", "/admin/sumigases/receivables"]) {
       assert.equal(decidirAcceso(u, r).tipo, "permitir", `el owner deberia entrar a ${r}`);
     }
   });
@@ -47,11 +47,10 @@ describe("decidirAcceso", () => {
     assert.equal(decidirAcceso(u, "/admin/sumigases/expenses").tipo, "denegar");
   });
 
-  test("el admin no entra a usuarios ni auditoria", () => {
+  test("el admin no entra a usuarios", () => {
     const u = sesion("admin");
     assert.equal(decidirAcceso(u, "/admin/sumigases/expenses").tipo, "permitir");
     assert.equal(decidirAcceso(u, "/admin/sumigases/users").tipo, "denegar");
-    assert.equal(decidirAcceso(u, "/admin/sumigases/audit").tipo, "denegar");
   });
 
   test("fuera del panel no decide nada", () => {
@@ -85,7 +84,7 @@ describe("claveAlerta", () => {
   test("agrupa por persona Y seccion", () => {
     assert.equal(claveAlerta("u1", "expenses"), "acceso-denegado:u1:expenses");
     assert.notEqual(claveAlerta("u1", "expenses"), claveAlerta("u2", "expenses"));
-    assert.notEqual(claveAlerta("u1", "expenses"), claveAlerta("u1", "audit"));
+    assert.notEqual(claveAlerta("u1", "expenses"), claveAlerta("u1", "purchases"));
   });
 });
 

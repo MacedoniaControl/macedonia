@@ -98,7 +98,7 @@ export default function DeliveryNotesPage() {
     if (d.origen === "Valery" && d.dataUrl) return window.open(d.dataUrl, "_blank");
     if (d.ne) return printDoc(notaEntregaHtml(d.ne, empresaKey));
     if (d.dev) return printDoc(devolucionHtml(d.dev, empresaKey));
-    alert("Este documento de Valery no tiene archivo adjunto en la demo (subido solo como registro).");
+    alert("Este documento de Valery no tiene archivo adjunto.");
   }
 
   function onUpload(files: FileList | null) {
@@ -122,7 +122,7 @@ export default function DeliveryNotesPage() {
     <>
       <PageHeader
         title="Notas de entrega y devoluciones"
-        description="Registro, generación e importación de Notas de Entrega (Valery/Macedonia) y Notas de Crédito (devoluciones)."
+        description=""
         breadcrumbs={[{ label: "Operación" }, { label: "Notas de entrega" }]}
         actions={verRegistros ? <StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge> : undefined}
       />

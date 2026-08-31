@@ -21,7 +21,7 @@ export const metadata: Metadata = { title: "Macedonia" };
 export const dynamic = "force-dynamic";
 
 export default async function Portada() {
-  // Sin backend configurado la app sigue en modo demo: se muestra el Centro de
+  // Sin backend configurado se muestra el Centro de
   // Control como hasta ahora, para no dejarla inservible a medio migrar.
   if (!backendActivo) return <CentroDeControl />;
 

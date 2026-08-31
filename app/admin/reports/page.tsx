@@ -29,7 +29,7 @@ export default function ReportsPage() {
     <>
       <PageHeader
         title="Reportes"
-        description="Selecciona un reporte para ver la tabla con cifras reales 2024 y descárgalo en CSV."
+        description=""
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Reportes" }]}
         actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv(sel.title, [["Mes", ...sel.cols.map((c) => c.h)], ...months.map((m, i) => [m, ...sel.cols.map((c) => c.get(i))]), ["Total", ...totales]])}>Exportar CSV</Button>}
       />

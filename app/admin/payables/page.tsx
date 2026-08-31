@@ -58,7 +58,7 @@ export default function PayablesPage() {
     <>
       <PageHeader
         title="Cuentas por pagar"
-        description="Saldos por proveedor, abonos y alertas desde 7 días. Visible para owner/admin (§24)."
+        description=""
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por pagar" }]}
         actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.abonado, c.saldo, c.vence])])}>Exportar CSV</Button>}
       />
@@ -124,7 +124,6 @@ export default function PayablesPage() {
           </div>
         </SectionCard>
       </div>
-      <p className="mt-4 text-xs text-muted">Demo client-side. Reglas §24 del planning.</p>
     </>
   );
 }

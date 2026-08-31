@@ -14,7 +14,7 @@ import { listarUsuarios } from "./actions";
 import { UsuariosPanel } from "./UsuariosPanel";
 
 export default async function UsersPage() {
-  // Sin backend configurado la app sigue en modo demo: se avisa en vez de reventar.
+  // Sin backend configurado se avisa en vez de reventar.
   if (!backendActivo) {
     return (
       <>

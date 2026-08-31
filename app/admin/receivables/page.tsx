@@ -66,7 +66,7 @@ export default function ReceivablesPage() {
     <>
       <PageHeader
         title="Cuentas por cobrar"
-        description="Saldos por cliente, vencimientos, abonos parciales y alertas. Demo funcional."
+        description=""
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por cobrar" }]}
         actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-cobrar", [["Cliente", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.abonado, c.saldo, c.vence])])}>Exportar CSV</Button>}
       />
@@ -143,7 +143,6 @@ export default function ReceivablesPage() {
           </div>
         </SectionCard>
       </div>
-      <p className="mt-4 text-xs text-muted">Demo client-side (hoy = 2026-06-23). Reglas en §23 del planning / `docs/decisions`.</p>
     </>
   );
 }

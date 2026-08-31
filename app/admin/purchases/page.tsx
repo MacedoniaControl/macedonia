@@ -75,7 +75,7 @@ export default function PurchasesPage() {
     <>
       <PageHeader
         title="Compras"
-        description="Orden → recepción parcial → suma al inventario. La cuenta por pagar se carga aparte."
+        description=""
         breadcrumbs={[{ label: "Finanzas" }, { label: "Compras" }]}
         actions={<StatusBadge tone="brand">{ordenes.length} orden(es)</StatusBadge>}
       />

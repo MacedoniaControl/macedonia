@@ -31,7 +31,7 @@ export function Sidebar({
   // dibuja, para no dejar un encabezado "Finanzas" con nada debajo.
   //
   // Sin permisos (backend no configurado todavía) se muestra todo: la app sigue
-  // usable en modo demo en vez de quedar vacía.
+  // usable en vez de quedar vacía.
   const gruposVisibles = navGroups
     .map((group) => ({
       ...group,

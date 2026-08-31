@@ -27,7 +27,7 @@ export default function MatricesPage() {
     <>
       <PageHeader
         title="Matrices administrativas"
-        description="Matriz ROI mensual/anual alimentada por las matrices 2024. Mes · Ventas · Compras · Costo · Utilidad · ROI."
+        description=""
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Matrices administrativas" }]}
       />
       <SectionCard title="Matriz ROI 2024 (USD)" description="Cifras reales de Sumigases.">

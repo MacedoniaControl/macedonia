@@ -136,7 +136,6 @@ export default function ProductsPage() {
           </div>
         </SectionCard>
       </div>
-      <p className="mt-4 text-xs text-muted">Demo client-side con precios/costos reales 2024 (`docs/data/catalog-inventory-mock-2024.md`).</p>
     </>
   );
 }

@@ -52,18 +52,18 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   };
   const cnt = (n: number) => String(Math.max(0, Math.round(n * factor)));
 
-  // KPIs operativos: SIN fuente real todavía (no hay backend que los alimente).
+  // KPIs operativos: pendientes de conectar a la base.
   // Van en CERO a propósito. Antes traían cifras inventadas ($1.036 de "ventas hoy",
   // 7 productos en stock crítico...) indistinguibles de un dato verdadero, y alguien
   // podía decidir sobre ellas. Se llenarán cuando existan los datos reales.
   const kpis = [
-    { key: "vh", label: "Ventas hoy", value: money(0), sub: bs ? undefined : "≈ 0 Bs", tone: "brand" as const, demo: true },
-    { key: "cxc", label: "Cuentas por cobrar", value: money(0), sub: "0 documentos", tone: "warn" as const, demo: true },
-    { key: "cxp", label: "Cuentas por pagar", value: money(0), sub: "0 proveedores", tone: "danger" as const, demo: true },
-    { key: "sc", label: "Stock crítico", value: cnt(0), sub: "productos bajo mínimo", tone: "warn" as const, demo: true },
-    { key: "cp", label: "Cilindros pendientes", value: cnt(0), sub: "por retorno", tone: "info" as const, demo: true },
-    { key: "rp", label: "Recargas pendientes", value: cnt(0), sub: "en cola", tone: "info" as const, demo: true },
-    { key: "pp", label: "Pedidos pendientes", value: cnt(0), sub: "por despachar", tone: "navy" as const, demo: true },
+    { key: "vh", label: "Ventas hoy", value: money(0), sub: bs ? undefined : "≈ 0 Bs", tone: "brand" as const },
+    { key: "cxc", label: "Cuentas por cobrar", value: money(0), sub: "0 documentos", tone: "warn" as const },
+    { key: "cxp", label: "Cuentas por pagar", value: money(0), sub: "0 proveedores", tone: "danger" as const },
+    { key: "sc", label: "Stock crítico", value: cnt(0), sub: "productos bajo mínimo", tone: "warn" as const },
+    { key: "cp", label: "Cilindros pendientes", value: cnt(0), sub: "por retorno", tone: "info" as const },
+    { key: "rp", label: "Recargas pendientes", value: cnt(0), sub: "en cola", tone: "info" as const },
+    { key: "pp", label: "Pedidos pendientes", value: cnt(0), sub: "por despachar", tone: "navy" as const },
     { key: "bg", label: "Balance del período", value: money(106826 * frac), sub: "utilidad neta 2024", tone: "ok" as const },
   ];
 
@@ -81,7 +81,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   const empresaLabel = empresa === "sumigases" ? "Sumigases" : empresa === "sudematin" ? "Sudematin" : "Consolidado";
 
   const bcv = useBcvRate();
-  // Histórico REAL de la empresa seleccionada (no usa el factor demo).
+  // Histórico real de la empresa seleccionada.
   const hist = getHistory(empresa);
   const histLabel = empresaLabel;
 
@@ -99,8 +99,6 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       )}
       <PageHeader
         title="Dashboard"
-        description={`Visión ejecutiva · ${empresaLabel}. Los KPIs demo se recalculan con los filtros; el histórico es real.`}
-        breadcrumbs={[{ label: "Resumen" }, { label: "Dashboard" }]}
         filters={
           <>
             {!empresaFija && (
@@ -131,7 +129,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
 
       {/* Banda superior: resumen real (histórico) + tipo de cambio BCV */}
       <div className="mb-4 grid gap-3 lg:grid-cols-2">
-        {/* Resumen real — contrasta con los KPIs demo de abajo */}
+        {/* Resumen del histórico */}
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ok/10 text-ok"><Icon name="roi" size={18} /></span>
@@ -177,7 +175,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {kpis.map((k) => (
-          <KpiCard key={k.key} label={k.label} value={k.value} sub={k.sub} tone={k.tone} demo={k.demo} />
+          <KpiCard key={k.key} label={k.label} value={k.value} sub={k.sub} tone={k.tone} />
         ))}
       </div>
 

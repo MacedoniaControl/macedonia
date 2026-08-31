@@ -95,8 +95,8 @@ export default function QuotesPage() {
   return (
     <>
       <PageHeader
-        title="Cotizaciones / Presupuestos"
-        description="Registro, generación (formato oficial Valery) e importación de presupuestos."
+        title="Cotizaciones"
+        description=""
         breadcrumbs={[{ label: "Operación" }, { label: "Cotizaciones" }]}
         actions={verRegistros ? <StatusBadge tone="brand">{cots.length} presupuesto(s)</StatusBadge> : undefined}
       />
@@ -270,7 +270,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
         </div>
       </SectionCard>
 
-      <SectionCard title="Renglones" description="Escanea o busca en el catálogo para agregar; también puedes cargarlo a mano.">
+      <SectionCard title="Renglones" description="">
         {/* Escáner de productos */}
         <ScanBar onScan={onScan} hint="Dispara el lector: el producto se agrega al presupuesto." />
 

@@ -114,7 +114,7 @@ export default function SettingsPage() {
     <>
       <PageHeader
         title="Configuración"
-        description="Parámetros base del sistema. La configuración crítica queda reservada a OWNER."
+        description=""
         breadcrumbs={[{ label: "Sistema" }, { label: "Configuración" }]}
         actions={<Button icon="check" onClick={guardar} disabled={guardando || cargando}>{guardando ? "Guardando…" : "Guardar cambios"}</Button>}
       />
@@ -139,7 +139,7 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Moneda y tasa" description="USD/Bs, tasa BCV e IVA." action={<StatusBadge tone="warn">tasa demo</StatusBadge>}>
+        <SectionCard title="Moneda y tasa" description="USD/Bs, tasa BCV e IVA." >
           <div className="grid grid-cols-2 gap-3">
             <Field label="Tasa BCV (Bs/USD)"><input className={inputClass} value={form.tasa} onChange={set("tasa")} /></Field>
             <Field label="IVA (%)"><input className={inputClass} value={form.iva} onChange={set("iva")} /></Field>
@@ -185,7 +185,6 @@ export default function SettingsPage() {
       </div>
 
       <p className="mt-4 text-xs text-muted">
-        Los valores guardados persisten localmente (demo). Reglas en `docs/decisions/` (currency-tax-rate, documents-correlativos, payments-cash).
       </p>
     </>
   );

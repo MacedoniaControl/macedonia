@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { downloadCsv } from "@/lib/ux/export-csv";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
@@ -17,23 +16,20 @@ import {
   inFisico,
   type SItem,
 } from "@/lib/ux/inventory-data";
-import { FiscalRegularization } from "./FiscalRegularization";
 import { MasterInventario } from "./MasterInventario";
 import ProductosPage from "@/app/admin/products/page";
 import { MovimientosPanel } from "./MovimientosPanel";
 import { useTableView } from "@/lib/ux/use-table-view";
+import { useCarga } from "@/lib/ux/use-carga";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory-fiscal";
 import { inventarioDe, type ItemInventario } from "@/lib/inventory/inventario-db";
-import { ventas12m, precioProm, estadoRotacion, rotacionVentana } from "@/lib/ux/inventory-rotation";
-import { fmtUsd } from "@/lib/ux/format";
+import { ventas12m, precioProm, estadoRotacion } from "@/lib/ux/inventory-rotation";
 
-const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
-const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
 
-type Tab = "master" | "movimientos" | "fisico" | "productos" | "s" | "fiscal";
+type Tab = "master" | "movimientos" | "fisico" | "productos";
 
 export default function InventoryPage() {
   // Empresa activa según la ruta (consolidado -> sumigases).
@@ -41,8 +37,7 @@ export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("master");
   const [q, setQ] = useState("");
   const [sItems, setSItems] = usePersistedState<SItem[]>(`inv-s:${empresa}`, []);
-  const { notas, ledger, ready } = useFiscal(empresa);
-  const [fisView, setFisView] = useState<"existencias" | "rotacion">("existencias");
+  const { notas, ledger } = useFiscal(empresa);
   const [placeholder, setPlaceholder] = useState("");
   function stub(area: string) {
     setPlaceholder(`Acción pendiente de definir · ${area}`);
@@ -56,19 +51,10 @@ export default function InventoryPage() {
   // El físico viene de la BASE: catálogo + existencia calculada del kardex.
   // Antes salía de un JSON del código con la existencia congelada del día del
   // export de Valery, que dejaba de ser cierta al primer movimiento.
-  const [fisico, setFisico] = useState<ItemInventario[]>([]);
-  const [cargandoInv, setCargandoInv] = useState(true);
-  const [errorInv, setErrorInv] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    setCargandoInv(true);
-    inventarioDe(empresa)
-      .then((items) => { if (vigente) { setFisico(items); setErrorInv(null); } })
-      .catch((e) => { if (vigente) { setErrorInv((e as Error).message); setFisico([]); } })
-      .finally(() => { if (vigente) setCargandoInv(false); });
-    return () => { vigente = false; };   // al cambiar de empresa, descartar lo viejo
-  }, [empresa]);
+  // Se DERIVA la carga en vez de guardarla: llamar a setState dentro del efecto
+  // encadena renders. Mismo patron que el resto de la app.
+  const cargaInv = useCarga(empresa, () => inventarioDe(empresa));
+  const fisico: ItemInventario[] = cargaInv.datos ?? [];
 
   const t = q.trim().toLowerCase();
   const match = (codigo: string, nombre: string) =>
@@ -231,7 +217,7 @@ export default function InventoryPage() {
     <>
       <PageHeader
         title="Inventario"
-        description="Físico (Valery) + Inventario S (Macedonia) = Master. La existencia total real de la empresa."
+        description=""
         breadcrumbs={[{ label: "Inventario" }, { label: "Inventario" }]}
         actions={
           <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-master",
@@ -265,9 +251,7 @@ export default function InventoryPage() {
           ["fisico", `Físico · Valery (${fisico.length})`],
           // Productos y catalogo pasa a subdepartamento del inventario.
           ["productos", "Productos y catálogo"],
-          ["s", `Inventario S (${sItems.length})`],
           ["movimientos", "Movimientos"],
-          ["fiscal", "Regularización fiscal"],
         ] as [Tab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>
@@ -276,7 +260,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {tab !== "fiscal" && tab !== "movimientos" && (
+      {tab !== "movimientos" && (
         <div className="mb-3">
           <label className="relative flex max-w-md items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
@@ -291,12 +275,6 @@ export default function InventoryPage() {
 
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 
-      {tab === "fiscal" && (
-        <>
-          <div className="mb-3 flex justify-end"><StubBtn area="Regularización fiscal" /></div>
-          <FiscalRegularization empresa={empresa} />
-        </>
-      )}
 
       {/* -------- MASTER dividido en 3 apartados -------- */}
       {tab === "master" && (
@@ -350,69 +328,6 @@ export default function InventoryPage() {
         </SectionCard>
       )}
 
-      {/* -------- INVENTARIO S -------- */}
-      {tab === "s" && (
-        <>
-          <SectionCard title="Agregar a Inventario S" description="Stock propio de Macedonia. Si el código ya existe en el Físico, se marca duplicado y se bloquea hasta aprobación OWNER/ADMIN.">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-              <input className={`${fieldClass} lg:col-span-1`} placeholder="Código" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
-              <input className={`${fieldClass} lg:col-span-2`} placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
-              <input className={fieldClass} type="number" placeholder="Existencia" value={form.existencia} onChange={(e) => setForm({ ...form, existencia: e.target.value })} />
-              <input className={fieldClass} type="number" placeholder="Precio $" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} />
-              <Button icon="plus" onClick={addS}>Agregar</Button>
-            </div>
-          </SectionCard>
-
-          <div className="h-4" />
-
-          <SectionCard title="Inventario S" action={<StubBtn area="Inventario S" />} description={`${sItems.length} ítem(s) propios.`}>
-            <div className="sumi-scroll max-w-full overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="text-xs uppercase tracking-wide text-muted">
-                  <tr className="border-b border-border">
-                    <SortableTh label="Código" sortKey="codigo" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
-                    <SortableTh label="Nombre" sortKey="nombre" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
-                    <SortableTh label="Precio" sortKey="precio" align="right" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
-                    <SortableTh label="Existencia" sortKey="existencia" align="right" ariaSort={tS.ariaSort} onSort={tS.toggleSort} />
-                    <th scope="col" className="py-2.5 font-medium">Estado / Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {sF.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-muted">Sin ítems en Inventario S.</td></tr>}
-                  {tS.visible.map((s) => {
-                    const dup = inFisico(s.codigo, empresa);
-                    const bloqueado = dup && !s.tagDuplicado;
-                    return (
-                      <tr key={s.codigo} className={bloqueado ? "bg-danger/5" : "hover:bg-surface-2"}>
-                        <td className="py-2.5 pr-3 font-mono text-xs text-muted">{s.codigo}</td>
-                        <td className="py-2.5 pr-3 text-text">{s.nombre}</td>
-                        <td className="py-2.5 pr-3 text-right text-text">${s.precio.toFixed(2)}</td>
-                        <td className="py-2.5 pr-3 text-right text-text">{s.existencia}</td>
-                        <td className="py-2.5">
-                          {bloqueado ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <StatusBadge tone="danger">Duplicado · bloqueado</StatusBadge>
-                              <Button variant="secondary" onClick={() => aprobarDuplicado(s.codigo)}>Aprobar duplicado (OWNER/ADMIN)</Button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {dup && <StatusBadge tone="warn">Documento Duplicado</StatusBadge>}
-                              <Button variant="secondary" onClick={() => ajustar(s.codigo, 1)}>+1</Button>
-                              <Button variant="secondary" onClick={() => ajustar(s.codigo, -1)}>−1</Button>
-                              <Button variant="ghost" icon="close" onClick={() => eliminar(s.codigo)}>Quitar</Button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <TablePager {...tS} etiqueta="ítems" />
-          </SectionCard>
-        </>
-      )}
     </>
   );
 }

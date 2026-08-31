@@ -1,6 +1,6 @@
 "use client";
 
-// Cilindros y recargas.
+// Cilindros.
 //
 // Reemplaza al diseño provisional que tenía existencias inventadas escritas en
 // el código (24 llenos, 12 vacíos…). Ahora todo sale de los movimientos
@@ -34,8 +34,8 @@ export default function CylindersPage() {
   return (
     <>
       <PageHeader
-        title="Cilindros y recargas"
-        description="Los cilindros son de la empresa. Lo que está en manos de un cliente hay que recuperarlo."
+        title="Cilindros"
+        description=""
         breadcrumbs={[{ label: "Inventario" }, { label: "Cilindros" }]}
       />
 

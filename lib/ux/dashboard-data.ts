@@ -1,11 +1,11 @@
 /**
  * Datos del dashboard. Cifras REALES de Sumigases 2024 (derivadas de las matrices Excel,
  * ver docs/data/dashboard-mock-2024.md). Los KPIs "hoy/pendientes" y bloques sin fuente
- * puntual son demo, marcados con `demo: true`. Esta capa es solo presentación; no cambia
+ * puntual todavía no tienen fuente. Esta capa es solo presentación; no cambia
  * reglas de negocio ni modelo de datos.
  */
 
-export const RATE_BS = 49.5; // Bs/$ representativo 2024 (demo)
+export const RATE_BS = 49.5; // Bs/$ de referencia; la tasa real sale de /api/bcv
 
 export type Money = { usd: number; bs: number };
 export const usd = (n: number): Money => ({ usd: n, bs: Math.round(n * RATE_BS) });
@@ -26,20 +26,19 @@ export type KpiDatum = {
   value: string;
   sub?: string;
   tone: "brand" | "navy" | "ok" | "warn" | "danger" | "info";
-  demo?: boolean;
 };
 
 // Los KPIs operativos ("hoy / pendientes") no tienen fuente real todavía: van en CERO.
 // Antes mostraban cifras inventadas indistinguibles de un dato verdadero, y alguien
 // podía decidir sobre ellas. Se llenarán cuando el backend los alimente.
 export const kpis: KpiDatum[] = [
-  { key: "ventasHoy", label: "Ventas hoy", value: "$0", sub: "sin datos", tone: "brand", demo: true },
-  { key: "cxc", label: "Cuentas por cobrar", value: "$0", sub: "0 documentos", tone: "warn", demo: true },
-  { key: "cxp", label: "Cuentas por pagar", value: "$0", sub: "0 proveedores", tone: "danger", demo: true },
-  { key: "stock", label: "Stock crítico", value: "0", sub: "productos bajo mínimo", tone: "warn", demo: true },
-  { key: "cilPend", label: "Cilindros pendientes", value: "0", sub: "por retorno", tone: "info", demo: true },
-  { key: "recargas", label: "Recargas pendientes", value: "0", sub: "en cola", tone: "info", demo: true },
-  { key: "pedidos", label: "Pedidos pendientes", value: "0", sub: "por despachar", tone: "navy", demo: true },
+  { key: "ventasHoy", label: "Ventas hoy", value: "$0", sub: "sin datos", tone: "brand" },
+  { key: "cxc", label: "Cuentas por cobrar", value: "$0", sub: "0 documentos", tone: "warn" },
+  { key: "cxp", label: "Cuentas por pagar", value: "$0", sub: "0 proveedores", tone: "danger" },
+  { key: "stock", label: "Stock crítico", value: "0", sub: "productos bajo mínimo", tone: "warn" },
+  { key: "cilPend", label: "Cilindros pendientes", value: "0", sub: "por retorno", tone: "info" },
+  { key: "recargas", label: "Recargas pendientes", value: "0", sub: "en cola", tone: "info" },
+  { key: "pedidos", label: "Pedidos pendientes", value: "0", sub: "por despachar", tone: "navy" },
   { key: "balance", label: "Balance general", value: "$106.826", sub: "utilidad neta 2024", tone: "ok" },
 ];
 

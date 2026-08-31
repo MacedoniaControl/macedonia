@@ -12,24 +12,24 @@ No hay consolidado (D4).
 ---
 
 ## Global
-- [ ] Eliminar la palabra «demo» de todo (42 apariciones)
+- [x] ~~Eliminar la palabra «demo» de todo (42 apariciones)~~
 - [ ] Nada se guarda en el navegador
 
 ## Dashboard
-- [ ] Borrar: «Visión ejecutiva · Sumigases. Los KPIs demo se recalculan…»
-- [ ] Borrar el breadcrumb «Resumen > Dashboard»
+- [x] ~~Borrar: «Visión ejecutiva · Sumigases. Los KPIs demo se recalculan…»~~
+- [x] ~~Borrar el breadcrumb «Resumen > Dashboard»~~
 - [ ] Período por defecto: **Mes**
 - [ ] Agregar breakdown por calendario + **Fecha personalizada**
 - [ ] La tasa de Bs debe ser la MISMA que la del precio BCV
 
 ## Cotizaciones
-- [ ] Título: solo «Cotizaciones» (hoy dice «Cotizaciones / Presupuestos»)
-- [ ] Borrar: «Registro, generación (formato oficial Valery) e importación…»
+- [x] ~~Título: solo «Cotizaciones» (hoy dice «Cotizaciones / Presupuestos»)~~
+- [x] ~~Borrar: «Registro, generación (formato oficial Valery) e importación…»~~
 - [ ] «Subir de Valery» sale del apartado principal → esquina derecha, se llama
       **Subir Archivo**, abre ventana de drop
 - [ ] Nuevo presupuesto → **Vendedor**: se llena con los usuarios del sistema
 - [ ] Nuevo presupuesto → **Tipo de precio**: Mayorista / Oferta / Detal
-- [ ] Borrar: «Escanea o busca en el catálogo para agregar…»
+- [x] ~~Borrar: «Escanea o busca en el catálogo para agregar…»~~
 - [ ] Buscador: textbox de texto + píldora **Escanear** al lado (código de barras)
 - [ ] «Agregar renglón» debe incluir **Agregar Gases**
 - [ ] Panel de **preview** de lo que se va agregando
@@ -38,19 +38,19 @@ No hay consolidado (D4).
 - [ ] **Registro** solo lo ven los Owners (logs de todos los presupuestos)
 
 ## Notas de entrega
-- [ ] Borrar: «Registro, generación e importación de Notas de Entrega…»
+- [x] ~~Borrar: «Registro, generación e importación de Notas de Entrega…»~~
 - [ ] Mismo cambio de «Subir de Valery» → **Subir Archivo** en esquina derecha
 - [ ] Registro: misma regla que en Cotizaciones (solo Owners)
 
 ## Inventario
-- [ ] Borrar: «Físico (Valery) + Inventario S (Macedonia) = Master…»
+- [x] ~~Borrar: «Físico (Valery) + Inventario S (Macedonia) = Master…»~~
 - [ ] Solo quedan 4: **Inventario Master · Inventario Físico · Inventario Valery · Movimientos**
-- [ ] ELIMINAR «Regularización Fiscal»
-- [ ] ELIMINAR «Inventario S»
+- [x] ~~ELIMINAR «Regularización Fiscal»~~
+- [x] ~~ELIMINAR «Inventario S»~~
 
 ## Cilindros
-- [ ] Renombrar el apartado: «Cilindros y Recarga» → **Cilindros**
-- [ ] Borrar: «Los cilindros son de la empresa. Lo que está en manos de un cliente…»
+- [x] ~~Renombrar el apartado: «Cilindros y Recarga» → **Cilindros**~~
+- [x] ~~Borrar: «Los cilindros son de la empresa. Lo que está en manos de un cliente…»~~
 - [ ] Botón «Dónde están» → se llama **Rampa**
 - [ ] Rampa = donde se registran todos los cilindros y se ven los movimientos
 - [ ] Píldora **Agregar Movimiento**: agregar o quitar cilindros a mano
@@ -58,10 +58,10 @@ No hay consolidado (D4).
 - [ ] Precios/depósitos de gas EDITABLES desde la pantalla (D6)
 
 ## Comisiones y Bonos
-- [ ] ELIMINAR el apartado completo
+- [x] ~~ELIMINAR el apartado completo~~
 
 ## Cuentas por cobrar
-- [ ] Borrar: «Saldos por cliente, vencimientos, abonos parciales y alertas. Demo funcional.»
+- [x] ~~Borrar: «Saldos por cliente, vencimientos, abonos parciales y alertas. Demo funcional.»~~
 - [ ] Píldora **nueva cuenta por cobrar**, al lado de exportar CSV
 - [ ] Importar Excel y que el sistema lo lea y cargue a la cartera
 - [ ] **Registrar abono**: píldora con menú desplegable, NO dentro del panel de
@@ -69,19 +69,19 @@ No hay consolidado (D4).
 - [ ] Cada cuenta genera un registro
 
 ## Cuentas por pagar
-- [ ] Borrar: «Saldos por proveedor, abonos y alertas desde 7 días… (§24)»
+- [x] ~~Borrar: «Saldos por proveedor, abonos y alertas desde 7 días… (§24)»~~
 - [ ] Mismas tres cosas que en cobrar: píldora de alta, importar Excel, abono en píldora
 - [ ] Cada cuenta genera un registro
 
 ## Compras
-- [ ] Borrar: «Orden → recepción parcial → suma al inventario…»
+- [x] ~~Borrar: «Orden → recepción parcial → suma al inventario…»~~
 - [ ] Formulario de orden de compra MUCHO más amplio
 - [ ] Los productos son los que hay en existencia
 - [ ] Si no existe → popup que avise que hay que crear el producto en inventario,
       y que se cree ahí mismo (no cargarlo dos veces)
 
 ## Reportes
-- [ ] Borrar: «Selecciona un reporte para ver la tabla con cifras reales 2024…»
+- [x] ~~Borrar: «Selecciona un reporte para ver la tabla con cifras reales 2024…»~~
 - [ ] Ver por lapsos: desde el inicio de la empresa hasta hoy
 - [ ] Breakdown por **Semanas · Meses · Años**
 - [ ] ELIMINAR «Exportar CSV» → convertirlo en **Descargar PDF** con todas las
@@ -89,19 +89,39 @@ No hay consolidado (D4).
 
 ## ROI
 - [ ] Revisar textos: nada de Sudematin dentro de Sumigases ni al revés
-- [ ] Borrar: «ROI como métrica transversal, sobre el histórico real…»
-- [ ] Borrar: «Todo el histórico de operaciones (2022-01 → 2026-07).»
+- [x] ~~Borrar: «ROI como métrica transversal, sobre el histórico real…»~~
+- [x] ~~Borrar: «Todo el histórico de operaciones (2022-01 → 2026-07).»~~
 - [ ] Convertir los gráficos a **BI**
 - [ ] Ver por lapsos + breakdown Semanas / Meses / Años
 
 ## Matrices administrativas
-- [ ] Borrar: «Matriz ROI mensual/anual alimentada por las matrices 2024…»
+- [x] ~~Borrar: «Matriz ROI mensual/anual alimentada por las matrices 2024…»~~
 - [ ] Ver por lapsos + breakdown Semanas / Meses / Años
 - [ ] Píldora **Crear Matriz**: cargar .xls y .xlsx (sin texto explicativo)
 - [ ] El formato digital = el mismo del Excel que se subió al principio
 
 ## Configuración
-- [ ] Borrar: «Parámetros base del sistema. La configuración crítica queda reservada a OWNER.»
+- [x] ~~Borrar: «Parámetros base del sistema. La configuración crítica queda reservada a OWNER.»~~
 
 ## Auditoría
-- [ ] ELIMINAR el apartado completo
+- [x] ~~ELIMINAR el apartado completo~~
+
+
+---
+
+## Deuda que dejó la Tanda 1 (26-ago)
+
+- `lib/ux/inventory-fiscal.ts` sigue existiendo: el Master lo usa para calcular.
+  Contiene `SEED_NOTAS` (datos sembrados) y 3 menciones de «demo». Se limpia
+  cuando se defina qué es Master ahora que Inventario S no existe.
+- Cálculos huérfanos en `app/admin/inventory/page.tsx` (`totFisico`, `totFactura`,
+  `totNE`, `tFis`, `resumenRot`): eran de las vistas borradas. Son advertencias
+  de lint, no rompen nada. No los arranqué sin leer de qué más dependen.
+
+## Pregunta abierta de la Tanda 1
+
+Pediste que Inventario tenga **Master · Físico · Valery · Movimientos**.
+Hoy la pestaña «Físico» ES la de Valery (dice «Inventario Físico (Valery)»).
+¿Son dos cosas distintas que hay que separar, o es la misma con otro nombre?
+Dejé 4 pestañas: Master · Físico · Productos y catálogo · Movimientos.
+(Productos lo mantuve porque lo pediste como subdepartamento de Inventario.)

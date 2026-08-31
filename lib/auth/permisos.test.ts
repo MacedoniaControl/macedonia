@@ -21,7 +21,7 @@ describe("plantillaDeRol", () => {
     assert.equal(p["inventory"], true);
     assert.equal(p["products"], true);
     assert.equal(p["expenses"], false);
-    assert.equal(p["commissions"], false);
+    assert.equal(p["receivables"], false);
   });
 
   test("el tecnico SOLO ve cilindros", () => {
@@ -33,9 +33,8 @@ describe("plantillaDeRol", () => {
   test("el admin ve todo de su empresa menos registros y usuarios", () => {
     const p = plantillaDeRol("admin");
     assert.equal(p["expenses"], true);
-    assert.equal(p["commissions"], true);
+    assert.equal(p["receivables"], true);
     assert.equal(p["users"], false);
-    assert.equal(p["audit"], false);
     assert.equal(p["ver_registros"], false);
   });
 
@@ -83,7 +82,7 @@ describe("puedeVer", () => {
   test("el owner puede aunque tenga TODO apagado", () => {
     const ninguno = Object.fromEntries(TODAS_LAS_CLAVES.map((k) => [k, false]));
     assert.equal(puedeVer(ninguno, "owner", "expenses"), true);
-    assert.equal(puedeVer({}, "owner", "audit"), true);
+    assert.equal(puedeVer({}, "owner", "users"), true);
   });
 
   test("los demas dependen de su permiso", () => {
@@ -94,8 +93,9 @@ describe("puedeVer", () => {
 });
 
 describe("CLAVES_MODULO", () => {
-  test("cubre las 18 secciones del menu", () => {
-    assert.equal(CLAVES_MODULO.length, 18);
+  // 16 desde que se eliminaron Auditoria y Comisiones y bonos (26-ago-2026).
+  test("cubre las 16 secciones del menu", () => {
+    assert.equal(CLAVES_MODULO.length, 16);
   });
 
   test("no tiene claves repetidas", () => {
