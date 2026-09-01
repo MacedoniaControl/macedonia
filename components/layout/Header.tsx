@@ -46,10 +46,10 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         onClick={dolarPrice}
         disabled={bcvLoading}
         aria-label="Actualizar precio del dólar BCV"
-        className="ml-3 inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-strong px-3 text-sm font-semibold text-white transition hover:brightness-90 disabled:opacity-60"
+        className="ml-2 inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border-strong bg-surface px-3 text-sm font-medium text-text transition hover:bg-surface-2 disabled:opacity-60"
       >
         <Icon name="dollar" size={16} />
-        {bcvLoading ? "Consultando…" : "Dolar Price"}
+        {bcvLoading ? "Consultando…" : <><span className="sm:hidden">Tasa</span><span className="hidden sm:inline">Tasa BCV</span></>}
       </button>
 
       {/* Precio del dólar BCV, siempre visible junto al botón */}
@@ -69,15 +69,13 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         ) : (
           <>
             <p className="text-sm font-semibold text-muted">— Bs</p>
-            <p className="text-[10px] text-muted">Pulsa “Dolar Price”</p>
+            <p className="text-[10px] text-muted">Pulsá “Tasa BCV”</p>
           </>
         )}
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="hidden sm:block">
-          <CompanySelector />
-        </div>
+        <CompanySelector />
 
         <div className="relative">
           <button
@@ -141,8 +139,8 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           )}
         </div>
 
-        <ThemeToggle />
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-2 py-1.5">
+        <div className="hidden sm:block"><ThemeToggle /></div>
+        <div className="hidden items-center gap-2 rounded-xl border border-border bg-surface px-2 py-1.5 sm:flex">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-navy text-xs font-semibold text-white">GV</span>
           <div className="hidden leading-tight md:block">
             <p className="text-xs font-medium text-text">Greeg V.</p>

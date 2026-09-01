@@ -60,7 +60,9 @@ export function MasterInventario({
             galpón. Hasta que alguien cuente, solo hay una de las dos mitades.
           </p>
           <p className="mt-3 text-sm text-muted">
-            Usá <strong>Cargar conteo</strong>, arriba a la derecha.
+            {/* Sin indicación de dirección: en el teléfono la píldora queda a la
+                izquierda, y decir «a la derecha» manda a mirar donde no está. */}
+            Usá el botón <strong>Cargar conteo</strong>, arriba de esta tarjeta.
           </p>
         </div>
       )}

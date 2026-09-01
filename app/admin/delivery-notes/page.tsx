@@ -7,6 +7,7 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
 import { useCarga } from "@/lib/ux/use-carga";
+import { useTasaViva } from "@/lib/ux/bcv-rate";
 import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { SelectorCliente } from "@/components/directorio/SelectorCliente";
 import { leerConfig } from "@/lib/config/config-db";
@@ -319,7 +320,11 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
   };
   const t = neTotals({ ...f, correlativo: "", fecha: "", lineas, cilindros: cil } as NEDoc);
   const enBs = f.divisa === "Bolívar";
-  const RATE = 49.5;
+  // La tasa sale del BCV, no de una constante. Estaba en 49,5 mientras el BCV
+  // real está cerca de 798: el total en bolívares que se le leía al cliente
+  // salía DIECISÉIS VECES por debajo. El dashboard ya se había corregido; este
+  // archivo, que es el documento que va al cliente, quedó afuera.
+  const tasa = useTasaViva();
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -409,11 +414,17 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           </div>
         )}
         <dl className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
-          <div className="flex justify-between"><dt className="text-muted">Base imponible</dt><dd className="text-text">{enBs ? `${(t.base * RATE).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.base)}</dd></div>
-          <div className="flex justify-between"><dt className="text-muted">I.V.A. 16%</dt><dd className="text-text">{enBs ? `${(t.iva * RATE).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.iva)}</dd></div>
-          <div className="flex justify-between font-semibold"><dt>{enBs ? "Total Bs." : "Total $"}</dt><dd>{enBs ? `${(t.total * RATE).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.total)}</dd></div>
+          <div className="flex justify-between"><dt className="text-muted">Base imponible</dt><dd className="text-text">{enBs ? (tasa ? `${(t.base * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa") : fmtUsd(t.base)}</dd></div>
+          <div className="flex justify-between"><dt className="text-muted">I.V.A. {ivaPct}%</dt><dd className="text-text">{enBs ? (tasa ? `${(t.iva * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa") : fmtUsd(t.iva)}</dd></div>
+          <div className="flex justify-between font-semibold"><dt>{enBs ? "Total Bs." : "Total $"}</dt><dd>{enBs ? (tasa ? `${(t.total * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa") : fmtUsd(t.total)}</dd></div>
           {enBs && <div className="flex justify-between"><dt className="text-muted">Dólar $</dt><dd className="text-muted">{fmtUsd(t.total)}</dd></div>}
         </dl>
+        {enBs && !tasa && (
+          <p role="alert" className="mt-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+            No se pudo consultar la tasa del BCV. No emitas en bolívares hasta que cargue:
+            un total inventado es peor que no tener total.
+          </p>
+        )}
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
         {/* El IVA sigue a la moneda por defecto; esta casilla permite corregirlo
             sin tener que cambiar la divisa del documento. */}
