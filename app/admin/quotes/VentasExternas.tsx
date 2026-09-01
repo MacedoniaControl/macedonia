@@ -15,7 +15,7 @@ import { fmtUsd } from "@/lib/ux/format";
 
 export function VentasExternas() {
   const empresa = useEmpresaActiva();
-  const carga = useCarga(empresa, () => listarDocumentos(empresa, "cotizacion", 100));
+  const carga = useCarga(empresa, () => listarDocumentos(empresa, "cotizacion", 100, "externas"));
   const docs: DocumentoGuardado[] = carga.datos ?? [];
 
   const total = docs.reduce((a, d) => a + d.total, 0);
@@ -23,14 +23,9 @@ export function VentasExternas() {
   return (
     <SectionCard
       title="Ventas externas"
-      description="Cotizaciones hechas por vendedores que no son del personal."
+      description="Cotizaciones de vendedores que no son del personal. Se separan por `vendedor_externo`."
     >
-      {/* Mientras `documentos.vendedor_externo` no exista, no hay forma de
-          separarlas: se avisa en vez de presentar todas como externas. */}
-      <p className="mb-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
-        Se están mostrando todas las cotizaciones. Para separar las externas falta
-        la columna <code className="font-mono">vendedor_externo</code> en la base.
-      </p>
+
       {carga.error && <p className="text-sm text-danger">{carga.error}</p>}
 
       {!carga.cargando && docs.length === 0 && (
@@ -52,6 +47,7 @@ export function VentasExternas() {
                   <th className="py-2 pr-3 font-medium">N°</th>
                   <th className="py-2 pr-3 font-medium">Fecha</th>
                   <th className="py-2 pr-3 font-medium">Cliente</th>
+                  <th className="py-2 pr-3 font-medium">Vendedor</th>
                   <th className="py-2 pr-3 text-right font-medium">Total</th>
                 </tr>
               </thead>
@@ -61,6 +57,7 @@ export function VentasExternas() {
                     <td className="py-2.5 pr-3 font-mono text-xs text-muted">{d.correlativo}</td>
                     <td className="py-2.5 pr-3 text-muted">{d.fecha}</td>
                     <td className="py-2.5 pr-3 text-text">{d.cliente}</td>
+                    <td className="py-2.5 pr-3 text-text">{d.vendedorExterno}</td>
                     <td className="py-2.5 pr-3 text-right font-medium tabular-nums text-text">
                       {fmtUsd(d.total)}
                     </td>

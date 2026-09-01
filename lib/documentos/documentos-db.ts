@@ -28,6 +28,8 @@ export type DocumentoNuevo = {
   clienteRif?: string;
   clienteDireccion?: string;
   moneda?: "USD" | "BS";
+  /** Nombre del vendedor externo. Vacío = lo hizo alguien del personal. */
+  vendedorExterno?: string;
   lineas: LineaDoc[];
 };
 
@@ -38,6 +40,7 @@ export type DocumentoGuardado = {
   tipo: TipoDoc;
   cliente: string;
   clienteRif: string | null;
+  vendedorExterno: string | null;
   total: number;
   lineas: LineaDoc[];
 };
@@ -86,9 +89,10 @@ export async function guardarDocumento(
       total_usd: totalDe(doc.lineas),
       estado: "emitido",
       vendedor_id: usuario.id,
+      vendedor_externo: doc.vendedorExterno?.trim() || null,
       creado_por: usuario.id,
     })
-    .select("id, correlativo, fecha, tipo, cliente, cliente_rif, total_usd")
+    .select("id, correlativo, fecha, tipo, cliente, cliente_rif, vendedor_externo, total_usd")
     .single();
 
   if (errDoc || !cabecera) {
@@ -123,6 +127,7 @@ export async function guardarDocumento(
       tipo: cabecera.tipo as TipoDoc,
       cliente: cabecera.cliente,
       clienteRif: cabecera.cliente_rif,
+      vendedorExterno: cabecera.vendedor_externo,
       total: Number(cabecera.total_usd) || 0,
       lineas: doc.lineas,
     },
@@ -134,21 +139,27 @@ export async function listarDocumentos(
   empresa: string,
   tipo: TipoDoc,
   limite = 100,
+  /** "externas" = solo vendedores de afuera. "internas" = solo personal. */
+  origen?: "externas" | "internas",
 ): Promise<DocumentoGuardado[]> {
   const sb = await createClient();
 
-  const { data, error } = await sb
+  let q = sb
     .from("documentos")
-    .select("id, correlativo, fecha, tipo, cliente, cliente_rif, total_usd, documento_lineas(codigo, descripcion, cantidad, unidad, precio_usd, descuento_pct)")
+    .select("id, correlativo, fecha, tipo, cliente, cliente_rif, vendedor_externo, total_usd, documento_lineas(codigo, descripcion, cantidad, unidad, precio_usd, descuento_pct)")
     .eq("empresa_id", empresa)
     .eq("tipo", tipo)
     .order("id", { ascending: false })
     .limit(limite);
 
+  if (origen === "externas") q = q.not("vendedor_externo", "is", null);
+  if (origen === "internas") q = q.is("vendedor_externo", null);
+
+  const { data, error } = await q;
   if (error) throw new Error(`No se pudieron leer los documentos: ${error.message}`);
 
   type FilaLinea = { codigo: string; descripcion: string; cantidad: number; unidad: string | null; precio_usd: number; descuento_pct: number };
-  type Fila = { id: number; correlativo: string; fecha: string; tipo: string; cliente: string; cliente_rif: string | null; total_usd: number; documento_lineas: FilaLinea[] | null };
+  type Fila = { id: number; correlativo: string; fecha: string; tipo: string; cliente: string; cliente_rif: string | null; vendedor_externo: string | null; total_usd: number; documento_lineas: FilaLinea[] | null };
 
   return ((data as Fila[] | null) ?? []).map((d) => ({
     id: d.id,
@@ -157,6 +168,7 @@ export async function listarDocumentos(
     tipo: d.tipo as TipoDoc,
     cliente: d.cliente,
     clienteRif: d.cliente_rif,
+    vendedorExterno: d.vendedor_externo,
     total: Number(d.total_usd) || 0,
     lineas: (d.documento_lineas ?? []).map((l) => ({
       codigo: l.codigo,

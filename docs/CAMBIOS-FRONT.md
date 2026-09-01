@@ -33,8 +33,8 @@ No hay consolidado (D4).
 - [x] ~~Buscador: textbox de texto + píldora **Escanear** al lado (código de barras)~~
 - [x] ~~«Agregar renglón» debe incluir **Agregar Gases**~~
 - [x] ~~Panel de **preview** de lo que se va agregando~~
-- [ ] **Ventas Externas** = registro de vendedores externos a Sumigases; ahí se
-      guardan las cotizaciones que ellos hacen
+- [x] ~~**Ventas Externas** = registro de vendedores externos a Sumigases; ahí se
+      guardan las cotizaciones que ellos hacen~~
 - [x] ~~**Registro** solo lo ven los Owners (logs de todos los presupuestos)~~
 
 ## Notas de entrega
@@ -170,12 +170,7 @@ almacén porque no venden).
 **Registro ya era solo de Owners.** `puedeVerRegistros` devuelve
 `rol === "owner"` y las dos pantallas lo respetaban. No hubo que tocar nada.
 
-**Ventas Externas está bloqueada por la base.** Muestra TODAS las cotizaciones
-porque `documentos.vendedor_id` apunta a `usuarios`, y un vendedor externo no es
-usuario del sistema. Falta la columna `vendedor_externo`. Por ahora la pantalla
-lo avisa en vez de presentar todas como externas.
-
-SQL pendiente:
-```sql
-alter table public.documentos add column if not exists vendedor_externo text;
-```
+**Ventas Externas quedó terminada.** Greeg corrió el `alter table` y se verificó
+contra la base: una cotización externa y una interna, cada filtro trajo la suya.
+El desplegable de vendedor lleva la opción «Vendedor externo…» con nombre libre,
+y la tabla muestra quién vendió — que es el punto de esa pantalla.

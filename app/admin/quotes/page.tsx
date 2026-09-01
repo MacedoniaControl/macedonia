@@ -172,6 +172,7 @@ export default function QuotesPage() {
           cliente: c.razonSocial,
           clienteRif: c.rif,
           clienteDireccion: c.direccion,
+          vendedorExterno: c.vendedorExterno,
           lineas: c.lineas.map((l) => ({
             codigo: l.codigo, descripcion: l.descripcion, cantidad: l.cantidad,
             unidad: l.unidad, precio: l.precio, descuento: l.descuento,
@@ -194,12 +195,12 @@ export default function QuotesPage() {
 }
 
 // ---- Generar presupuesto (formato Valery) ----
-type GenDoc = { correlativo: string; fechaEmision: string; fechaVenc: string; razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; moneda: string; nota: string; total: number };
+type GenDoc = { correlativo: string; fechaEmision: string; fechaVenc: string; razonSocial: string; rif: string; direccion: string; telefonos: string; lineas: DevLinea[]; moneda: string; nota: string; total: number; vendedorExterno: string };
 
 function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) => Promise<{ error: string | null }> }) {
   const [guardando, setGuardando] = useState(false);
   const empresaKey = useEmpresaActiva();
-  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5 });
+  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5, vendedorExterno: "" });
 
   // El vendedor sale de la tabla de usuarios: antes era un texto fijo igual
   // para todos y no se sabia quien habia hecho cada cotizacion.
@@ -277,8 +278,17 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
               <select className={inputClass} value={f.vendedor} onChange={set("vendedor")}>
                 <option value="">— elegir —</option>
                 {vendedores.map((v) => <option key={v.id} value={v.nombre}>{v.nombre} · {v.rol}</option>)}
+                <option value="__externo">Vendedor externo…</option>
               </select>
               {cargaVend.error && <span className="mt-1 block text-xs text-danger">{cargaVend.error}</span>}
+              {f.vendedor === "__externo" && (
+                <input
+                  className={`${inputClass} mt-2`}
+                  placeholder="Nombre del vendedor externo"
+                  value={f.vendedorExterno}
+                  onChange={(e) => setF({ ...f, vendedorExterno: e.target.value })}
+                />
+              )}
             </div>
             <div><label className={lbl}>Tipo de precio</label><select className={inputClass} value={f.tipoPrecio} onChange={set("tipoPrecio")}>{TIPOS_PRECIO.map((tp) => <option key={tp}>{tp}</option>)}</select></div>
             <div><label className={lbl}>Divisa / Expresado en</label><select className={inputClass} value={f.moneda} onChange={set("moneda")}>{MONEDAS.map((mo) => <option key={mo}>{mo}</option>)}</select></div>
@@ -406,11 +416,12 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
           if (!f.razonSocial.trim()) return setMsg("La razón social es obligatoria.");
           if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
           if (lineas.some((l) => l.precio <= 0)) return setMsg("Hay renglones sin precio (marcados en rojo). Complétalos antes de generar.");
+          if (f.vendedor === "__externo" && !f.vendedorExterno.trim()) return setMsg("Falta el nombre del vendedor externo.");
           const emision = new Date(); const venc = new Date(Date.now() + f.venceDias * 86400000);
           if (guardando) return;                       // doble clic: no emitir dos veces
           setGuardando(true);
           try {
-            const r = await onSave({ correlativo: seq, fechaEmision: dmy(emision), fechaVenc: dmy(venc), razonSocial: f.razonSocial, rif: f.rif, direccion: f.direccion, telefonos: f.telefonos, lineas, moneda: f.moneda, nota: f.nota, total: totalOp });
+            const r = await onSave({ correlativo: seq, fechaEmision: dmy(emision), fechaVenc: dmy(venc), razonSocial: f.razonSocial, rif: f.rif, direccion: f.direccion, telefonos: f.telefonos, lineas, moneda: f.moneda, nota: f.nota, total: totalOp, vendedorExterno: f.vendedor === "__externo" ? f.vendedorExterno : "" });
             if (r.error) setMsg(r.error);
             else setLineas([]);
           } finally {
@@ -441,7 +452,12 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
             {f.rif && <p><span className="text-muted">RIF: </span><span className="font-mono text-text">{f.rif}</span></p>}
             {f.direccion && <p><span className="text-muted">Dirección: </span><span className="text-text">{f.direccion}</span></p>}
             <p><span className="text-muted">Vendedor: </span>
-              <span className="text-text">{f.vendedor || <em className="text-muted">sin elegir</em>}</span></p>
+              <span className="text-text">
+                {f.vendedor === "__externo"
+                  ? (f.vendedorExterno || <em className="text-muted">externo, sin nombre</em>)
+                  : (f.vendedor || <em className="text-muted">sin elegir</em>)}
+              </span>
+              {f.vendedor === "__externo" && <span className="ml-1.5 text-[11px] text-muted">· externo</span>}</p>
           </div>
 
           {lineas.length === 0 ? (
