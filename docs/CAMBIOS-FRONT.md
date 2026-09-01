@@ -63,7 +63,7 @@ No hay consolidado (D4).
 ## Cuentas por cobrar
 - [x] ~~Borrar: «Saldos por cliente, vencimientos, abonos parciales y alertas. Demo funcional.»~~
 - [x] ~~Píldora **nueva cuenta por cobrar**, al lado de exportar CSV~~
-- [ ] Importar Excel y que el sistema lo lea y cargue a la cartera
+- [x] ~~Importar Excel y que el sistema lo lea y cargue a la cartera~~
 - [x] ~~**Registrar abono**: píldora con menú desplegable, NO dentro del panel de
       visualización. Al lado de carteras.~~
 - [ ] Cada cuenta genera un registro
@@ -75,10 +75,10 @@ No hay consolidado (D4).
 
 ## Compras
 - [x] ~~Borrar: «Orden → recepción parcial → suma al inventario…»~~
-- [ ] Formulario de orden de compra MUCHO más amplio
-- [ ] Los productos son los que hay en existencia
-- [ ] Si no existe → popup que avise que hay que crear el producto en inventario,
-      y que se cree ahí mismo (no cargarlo dos veces)
+- [x] ~~Formulario de orden de compra MUCHO más amplio~~
+- [x] ~~Los productos son los que hay en existencia~~
+- [x] ~~Si no existe → popup que avise que hay que crear el producto en inventario,
+      y que se cree ahí mismo (no cargarlo dos veces)~~
 
 ## Reportes
 - [x] ~~Borrar: «Selecciona un reporte para ver la tabla con cifras reales 2024…»~~
@@ -174,3 +174,40 @@ almacén porque no venden).
 contra la base: una cotización externa y una interna, cada filtro trajo la suya.
 El desplegable de vendedor lleva la opción «Vendedor externo…» con nombre libre,
 y la tabla muestra quién vendió — que es el punto de esa pantalla.
+
+
+## Tanda 5 — decisiones y lo que falta
+
+**Compras leía dos listas escritas a mano.** `PROVEEDORES` y `PRODUCTOS` eran
+constantes en el archivo: se podía armar una orden a un proveedor que no existe,
+por un producto que no existe. Ahora salen de la base (33 proveedores, 4.303
+productos).
+
+**El costo NO se autocompleta** al elegir un producto. El inventario expone el
+precio de VENTA, no el de compra, y el costo real lo trae la factura del
+proveedor. Ponerle el precio sería adivinar.
+
+**La importación acepta CSV y texto con tabulaciones**, no `.xls` binario.
+Instalar una librería de Excel tiene una arista de seguridad que hay que decidir
+(ver abajo). Desde Excel: Guardar como → CSV, y funciona.
+
+**La importación muestra antes de escribir.** Se ve cuántas filas entran,
+cuántas no y por qué, antes de tocar la base.
+
+### Pendiente de decisión: librería de Excel
+
+`xlsx` (SheetJS) es la opción estándar, pero la versión que está en npm (0.18.5)
+tiene una vulnerabilidad conocida de prototype pollution; las versiones
+corregidas solo se publican en el CDN propio de SheetJS, fuera de npm. Instalar
+la de npm mete esa deuda; instalar desde su CDN saca la dependencia del control
+de `package-lock.json`.
+
+Alternativa sin dependencia: `.xlsx` es un ZIP con XML adentro y se podría leer
+a mano, pero `.xls` (el formato viejo, que es el que exporta Valery) es binario y
+no es razonable parsearlo sin librería.
+
+### Pendiente: gráficos a BI
+
+No entró en esta tanda. Hay que definir qué significa «BI» acá: si es cambiar el
+tipo de gráfico, agregar cruces y filtros interactivos, o incrustar una
+herramienta externa.

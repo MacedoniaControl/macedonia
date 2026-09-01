@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
+import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb } from "@/lib/finanzas/cuentas-db";
 import { useCarga } from "@/lib/ux/use-carga";
@@ -117,6 +118,7 @@ export default function ReceivablesPage() {
                   onCreada={() => setRecarga((n) => n + 1)} onCerrar={cerrar} />
               )}
             </PildoraPanel>
+            <ImportarCartera tipo="cobrar" empresa={empresaKey} onImportada={() => setRecarga((n) => n + 1)} />
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>

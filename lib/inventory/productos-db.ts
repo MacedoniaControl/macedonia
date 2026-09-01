@@ -11,6 +11,7 @@
 // sin la columna de costo, en vez de romperse.
 
 import { createClient } from "@/lib/supabase/server";
+import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
 
 export type ProductoLista = {
   codigo: string;
@@ -68,4 +69,53 @@ export async function puedeVerCostos(empresa: string): Promise<boolean> {
   const sb = await createClient();
   const { data } = await sb.rpc("costos_productos", { e: empresa });
   return Array.isArray(data) && data.length > 0;
+}
+
+/**
+ * Alta de un producto en el catálogo.
+ *
+ * Existe para el momento en que se está cargando una compra y el producto
+ * todavía no está: si hay que ir al inventario, crearlo y volver, la orden se
+ * carga dos veces o no se carga. Se crea acá y la compra sigue.
+ *
+ * El código es único por empresa y distingue mayúsculas: `6x8AT` y `6X8AT` son
+ * productos distintos en Valery, y respetarlo es lo que evita fusionar dos
+ * existencias que no son la misma.
+ */
+export async function crearProducto(
+  p: { codigo: string; nombre: string; unidad?: string; costoUsd?: number; precioUsd?: number; esCilindro?: boolean },
+  empresa: string,
+): Promise<{ ok: true; codigo: string } | { ok: false; error: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+
+  const codigo = p.codigo.trim();
+  if (!codigo) return { ok: false, error: "Falta el código." };
+  if (!p.nombre.trim()) return { ok: false, error: "Falta el nombre." };
+
+  const sb = await createClient();
+
+  // Avisar del duplicado antes de intentar: el error de la base habla de
+  // restricciones, y quien carga una compra no tiene por qué entenderlo.
+  const { data: existe } = await sb
+    .from("productos")
+    .select("codigo")
+    .eq("empresa_id", empresa)
+    .eq("codigo", codigo)
+    .maybeSingle();
+
+  if (existe) return { ok: false, error: `El código ${codigo} ya existe en esta empresa.` };
+
+  const { error } = await sb.from("productos").insert({
+    empresa_id: empresa,
+    codigo,
+    nombre: p.nombre.trim(),
+    unidad: p.unidad?.trim() || null,
+    costo_unitario: p.costoUsd ?? 0,
+    precio_unitario: p.precioUsd ?? 0,
+    es_cilindro: p.esCilindro ?? false,
+  });
+
+  if (error) return { ok: false, error: `No se pudo crear: ${error.message}` };
+  return { ok: true, codigo };
 }

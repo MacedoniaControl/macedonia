@@ -5,6 +5,7 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb } from "@/lib/finanzas/cuentas-db";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
+import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -106,6 +107,7 @@ export default function PayablesPage() {
                   onCreada={() => setRecarga((n) => n + 1)} onCerrar={cerrar} />
               )}
             </PildoraPanel>
+            <ImportarCartera tipo="pagar" empresa={empresaKey} onImportada={() => setRecarga((n) => n + 1)} />
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
