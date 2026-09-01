@@ -11,6 +11,7 @@ import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { Button } from "@/components/ui/Button";
 import { crearCuenta, type TipoCuenta } from "@/lib/finanzas/cuentas-db";
 import { leerCartera, type Lectura } from "@/lib/finanzas/importar-cuentas";
+import { leerXlsx, hojasDe, pareceXlsx, aTexto } from "@/lib/ux/xlsx";
 import { fmtUsd } from "@/lib/ux/format";
 
 export function ImportarCartera({
@@ -24,13 +25,46 @@ export function ImportarCartera({
 }) {
   const [lectura, setLectura] = useState<Lectura | null>(null);
   const [nombre, setNombre] = useState("");
+  // Un libro suele abrir con una portada o notas: hay que poder elegir la hoja
+  // en vez de adivinar cuál trae la cartera.
+  const [libro, setLibro] = useState<{ buf: ArrayBuffer; hojas: string[] } | null>(null);
+  const [hoja, setHoja] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
 
   async function leer(f: File) {
     setResultado(null);
+    setError(null);
     setNombre(f.name);
-    setLectura(leerCartera(await f.text()));
+    setLibro(null);
+    setLectura(null);
+
+    const buf = await f.arrayBuffer();
+
+    if (pareceXlsx(buf)) {
+      try {
+        const hojas = await hojasDe(buf);
+        setLibro({ buf, hojas });
+        await verHoja(buf, 0);
+      } catch (e) {
+        setError((e as Error).message);
+      }
+      return;
+    }
+
+    // .xls binario (Excel 97-2003) no se lee: es otro formato por completo.
+    if (/\.xls$/i.test(f.name)) {
+      setError("Ese es un .xls de Excel 97-2003. Abrilo en Excel y guardalo como .xlsx o .csv.");
+      return;
+    }
+
+    setLectura(leerCartera(new TextDecoder().decode(buf)));
+  }
+
+  async function verHoja(buf: ArrayBuffer, i: number) {
+    setHoja(i);
+    setLectura(leerCartera(aTexto(await leerXlsx(buf, i))));
   }
 
   async function importar(cerrar: () => void) {
@@ -65,7 +99,7 @@ export function ImportarCartera({
 
           <input
             type="file"
-            accept=".csv,.txt,.tsv"
+            accept=".xlsx,.csv,.txt,.tsv"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void leer(f); }}
             className="block w-full text-sm text-muted file:mr-3 file:h-9 file:rounded-full file:border-0
                        file:bg-brand-soft file:px-4 file:text-sm file:font-medium file:text-brand"
@@ -74,8 +108,27 @@ export function ImportarCartera({
           <p className="text-[11px] text-muted">
             Necesita las columnas <strong>{tipo === "cobrar" ? "Cliente" : "Proveedor"}</strong>,{" "}
             <strong>Documento</strong> y <strong>Monto</strong>. «Vence» es opcional.
-            Desde Excel: Guardar como → CSV.
+            Lee <strong>.xlsx</strong> (Excel 2007 en adelante) y CSV.
           </p>
+
+          {libro && libro.hojas.length > 1 && (
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted">Hoja</span>
+              <select
+                className="h-10 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm text-text"
+                value={hoja}
+                onChange={(e) => void verHoja(libro.buf, Number(e.target.value))}
+              >
+                {libro.hojas.map((h, i) => <option key={i} value={i}>{h}</option>)}
+              </select>
+            </label>
+          )}
+
+          {error && (
+            <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          )}
 
           {lectura && (
             <div className="rounded-xl border border-border bg-surface-2 p-3">

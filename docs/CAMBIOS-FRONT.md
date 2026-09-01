@@ -91,7 +91,7 @@ No hay consolidado (D4).
 - [x] ~~Revisar textos: nada de Sudematin dentro de Sumigases ni al revés~~
 - [x] ~~Borrar: «ROI como métrica transversal, sobre el histórico real…»~~
 - [x] ~~Borrar: «Todo el histórico de operaciones (2022-01 → 2026-07).»~~
-- [ ] Convertir los gráficos a **BI**
+- [x] ~~Convertir los gráficos a **BI**~~
 - [x] ~~Ver por lapsos + breakdown Semanas / Meses / Años~~
 
 ## Matrices administrativas
@@ -194,20 +194,22 @@ Instalar una librería de Excel tiene una arista de seguridad que hay que decidi
 **La importación muestra antes de escribir.** Se ve cuántas filas entran,
 cuántas no y por qué, antes de tocar la base.
 
-### Pendiente de decisión: librería de Excel
+### Resuelto: Excel 2007 en adelante, sin dependencia
 
-`xlsx` (SheetJS) es la opción estándar, pero la versión que está en npm (0.18.5)
-tiene una vulnerabilidad conocida de prototype pollution; las versiones
-corregidas solo se publican en el CDN propio de SheetJS, fuera de npm. Instalar
-la de npm mete esa deuda; instalar desde su CDN saca la dependencia del control
-de `package-lock.json`.
+Greeg aclaró que hace falta `.xlsx` (2007+), no el `.xls` binario. Eso cambia
+todo: un `.xlsx` es un ZIP con XML adentro, y descomprimirlo lo hace el propio
+motor con `DecompressionStream`. Se escribió `lib/ux/xlsx.ts` a mano — 0
+dependencias, 13 pruebas — y NO hubo que instalar `xlsx` (SheetJS) ni cargar su
+vulnerabilidad.
 
-Alternativa sin dependencia: `.xlsx` es un ZIP con XML adentro y se podría leer
-a mano, pero `.xls` (el formato viejo, que es el que exporta Valery) es binario y
-no es razonable parsearlo sin librería.
+Verificado contra archivos reales de la carpeta Sumigases, no contra ejemplos
+inventados. El `.xls` de 97-2003 no se lee: la pantalla lo dice y sugiere
+guardarlo como .xlsx o .csv.
 
-### Pendiente: gráficos a BI
+### Resuelto: animaciones BI en los gráficos del ROI
 
-No entró en esta tanda. Hay que definir qué significa «BI» acá: si es cambiar el
-tipo de gráfico, agregar cruces y filtros interactivos, o incrustar una
-herramienta externa.
+Las barras crecen desde la base al entrar y al cambiar el período, escalonadas
+de izquierda a derecha, con globo de cifras al pasar el mouse y el resto
+atenuado. Se anima `transform: scaleY` y no el alto: el alto recalcula el layout
+en cada cuadro, la transformación la resuelve la GPU. Con
+`prefers-reduced-motion` no se mueve nada.

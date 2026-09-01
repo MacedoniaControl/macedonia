@@ -9,6 +9,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SeriesChart } from "@/components/ui/SeriesChart";
+import { fmtUsd } from "@/lib/ux/format";
 import {
   roiCards,
   series,
@@ -108,6 +109,7 @@ export default function RoiPage() {
         <SectionCard title="Ventas vs utilidad" description="Evolución mensual de la rentabilidad (USD).">
           <SeriesChart
             labels={periodos.map((p) => p.etiqueta)}
+            formato={(n) => fmtUsd(n)}
             series={[
               { name: "Ventas", color: "var(--color-brand)", values: periodos.map((p) => p.venta) },
               { name: "Utilidad", color: "var(--color-navy)", values: periodos.map((p) => p.util) },
