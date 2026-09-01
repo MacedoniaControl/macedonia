@@ -2,28 +2,61 @@
 
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SelectorRango } from "@/components/ui/SelectorRango";
+import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
-import { months, series } from "@/lib/ux/dashboard-data";
+import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO, type Periodo } from "@/lib/ux/historico-rango";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
+import { printDoc } from "@/lib/ux/doc-templates";
 import { fmtUsd } from "@/lib/ux/format";
-import { downloadCsv } from "@/lib/ux/export-csv";
 
-type Col = { h: string; get: (i: number) => number };
+type Col = { h: string; get: (p: Periodo) => number };
 type Reporte = { id: string; title: string; desc: string; cols: Col[] };
 
 const REPORTES: Reporte[] = [
-  { id: "ventas", title: "Ventas mensuales", desc: "Ingresos por mes (USD).", cols: [{ h: "Ventas", get: (i) => series.ventas[i] }] },
-  { id: "utilidad", title: "Utilidad", desc: "Utilidad neta por mes.", cols: [{ h: "Ventas", get: (i) => series.ventas[i] }, { h: "Utilidad", get: (i) => series.utilidad[i] }] },
-  { id: "vc", title: "Ventas vs compras", desc: "Comparativo mensual.", cols: [{ h: "Ventas", get: (i) => series.ventas[i] }, { h: "Compras", get: (i) => series.compras[i] }] },
-  { id: "fne", title: "Facturas vs notas de entrega", desc: "Documentos emitidos por mes.", cols: [{ h: "Facturas", get: (i) => series.factura[i] }, { h: "Notas de entrega", get: (i) => series.notasEntrega[i] }] },
-  { id: "cc", title: "Crédito vs contado", desc: "Composición de cobros (proxy NE=crédito).", cols: [{ h: "Contado", get: (i) => series.factura[i] }, { h: "Crédito", get: (i) => series.notasEntrega[i] }] },
+  { id: "ventas",   title: "Ventas",            desc: "Ingresos del período (USD).",
+    cols: [{ h: "Ventas", get: (p) => p.venta }] },
+  { id: "utilidad", title: "Utilidad",          desc: "Venta, costo y lo que quedó.",
+    cols: [{ h: "Ventas", get: (p) => p.venta }, { h: "Costo", get: (p) => p.costo }, { h: "Utilidad", get: (p) => p.util }] },
+  { id: "vc",       title: "Ventas vs compras", desc: "Comparativo del período.",
+    cols: [{ h: "Ventas", get: (p) => p.venta }, { h: "Compras", get: (p) => p.compra }] },
+  { id: "roi",      title: "Rentabilidad",      desc: "Margen sobre venta y retorno sobre compra.",
+    cols: [{ h: "Utilidad", get: (p) => p.util }, { h: "Margen %", get: (p) => p.margen }, { h: "ROI %", get: (p) => p.roi }] },
 ];
 
 export default function ReportsPage() {
+  const empresa = useEmpresaActiva();
+  const [rango, setRango] = useState<Rango>(RANGO_POR_DEFECTO);
   const [sel, setSel] = useState<Reporte>(REPORTES[0]);
 
-  const totales = sel.cols.map((c) => months.reduce((a, _, i) => a + c.get(i), 0));
+  const periodos = historicoEnRango(empresa, rango);
+  const tot = totalesDe(periodos);
+  const totales = sel.cols.map((c) => periodos.reduce((a, p) => a + c.get(p), 0));
+
+  // PDF por impresión del navegador: sin librería, y sale igual en toda máquina.
+  function descargarPdf() {
+    const filas = periodos
+      .map((p) => `<tr><td>${p.etiqueta}</td>${sel.cols.map((c) => `<td style="text-align:right">${c.get(p).toLocaleString("es-VE")}</td>`).join("")}</tr>`)
+      .join("");
+    printDoc(`
+      <h1 style="font:600 18px system-ui;margin:0 0 4px">${sel.title}</h1>
+      <p style="font:12px system-ui;color:#555;margin:0 0 16px">
+        ${empresa} · ${rango.desde} a ${rango.hasta} · por ${rango.agrupacion === "anio" ? "año" : "mes"}
+      </p>
+      <table style="width:100%;border-collapse:collapse;font:12px system-ui">
+        <thead><tr style="border-bottom:2px solid #333">
+          <th style="text-align:left;padding:6px 4px">Período</th>
+          ${sel.cols.map((c) => `<th style="text-align:right;padding:6px 4px">${c.h}</th>`).join("")}
+        </tr></thead>
+        <tbody>${filas}</tbody>
+        <tfoot><tr style="border-top:2px solid #333;font-weight:600">
+          <td style="padding:6px 4px">Total</td>
+          ${totales.map((t) => `<td style="text-align:right;padding:6px 4px">${t.toLocaleString("es-VE")}</td>`).join("")}
+        </tr></tfoot>
+      </table>`);
+  }
 
   return (
     <>
@@ -31,10 +64,14 @@ export default function ReportsPage() {
         title="Reportes"
         description=""
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Reportes" }]}
-        actions={<Button variant="secondary" icon="report" onClick={() => downloadCsv(sel.title, [["Mes", ...sel.cols.map((c) => c.h)], ...months.map((m, i) => [m, ...sel.cols.map((c) => c.get(i))]), ["Total", ...totales]])}>Exportar CSV</Button>}
+        actions={<Button variant="secondary" icon="report" onClick={descargarPdf}>Descargar PDF</Button>}
       />
       <div className="grid gap-4 lg:grid-cols-[1fr_1.8fr]">
-        <SectionCard title="Reportes disponibles">
+        <div className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3">
+        <SelectorRango valor={rango} onCambio={setRango} agrupaciones={AGRUPACIONES_HISTORICO} />
+      </div>
+
+      <SectionCard title="Reportes disponibles">
           <ul className="space-y-2">
             {REPORTES.map((r) => (
               <li key={r.id}>
@@ -61,10 +98,15 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {months.map((m, i) => (
-                  <tr key={m} className="hover:bg-surface-2">
-                    <td className="py-2.5 pr-3 text-text">{m}</td>
-                    {sel.cols.map((c) => <td key={c.h} className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.get(i))}</td>)}
+                {periodos.length === 0 && (
+                  <tr><td colSpan={sel.cols.length + 1} className="py-8 text-center text-muted">
+                    Sin datos en este período.
+                  </td></tr>
+                )}
+                {periodos.map((p) => (
+                  <tr key={p.clave} className="hover:bg-surface-2">
+                    <td className="py-2.5 pr-3 text-text">{p.etiqueta}</td>
+                    {sel.cols.map((c) => <td key={c.h} className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.get(p))}</td>)}
                   </tr>
                 ))}
               </tbody>

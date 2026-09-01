@@ -2,29 +2,26 @@
 
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SelectorRango } from "@/components/ui/SelectorRango";
+import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
 import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { SectionCard } from "@/components/ui/SectionCard";
-import { months, series } from "@/lib/ux/dashboard-data";
+import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
+import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { fmtUsd } from "@/lib/ux/format";
 
 export default function MatricesPage() {
-  const rows = months.map((m, i) => {
-    const ventas = series.ventas[i];
-    const compras = series.compras[i];
-    const utilidad = series.utilidad[i];
-    const costo = ventas - utilidad;
-    const roi = costo > 0 ? Math.round((utilidad / costo) * 100) : 0;
-    return { m, ventas, compras, costo, utilidad, roi };
-  });
-  const tot = rows.reduce(
-    (a, r) => ({
-      ventas: a.ventas + r.ventas,
-      compras: a.compras + r.compras,
-      costo: a.costo + r.costo,
-      utilidad: a.utilidad + r.utilidad,
-    }),
-    { ventas: 0, compras: 0, costo: 0, utilidad: 0 },
-  );
+  const empresa = useEmpresaActiva();
+  const [rango, setRango] = useState<Rango>(RANGO_POR_DEFECTO);
+  // Sale del historico con mes y año, no de los doce meses sueltos de 2024:
+  // con aquellos el selector de rango no podia significar nada.
+  const periodos = historicoEnRango(empresa, rango);
+  const rows = periodos.map((p) => ({
+    m: p.etiqueta, ventas: p.venta, compras: p.compra,
+    costo: p.costo, utilidad: p.util, roi: p.roi,
+  }));
+  const t = totalesDe(periodos);
+  const tot = { ventas: t.venta, compras: t.compra, costo: t.costo, utilidad: t.util };
   const totRoi = Math.round((tot.utilidad / tot.costo) * 100);
 
   const [aviso, setAviso] = useState<string | null>(null);
@@ -50,7 +47,11 @@ export default function MatricesPage() {
           </div>
         }
       />
-      <SectionCard title="Matriz ROI 2024 (USD)" description="Cifras reales de Sumigases.">
+      <div className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3">
+        <SelectorRango valor={rango} onCambio={setRango} agrupaciones={AGRUPACIONES_HISTORICO} />
+      </div>
+
+      <SectionCard title="Matriz ROI (USD)" description={`${periodos.length} período(s) · ${rango.desde} a ${rango.hasta}`}>
         <div className="sumi-scroll max-w-full overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">

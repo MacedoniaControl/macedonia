@@ -11,10 +11,11 @@ import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
 import { getHistory } from "@/lib/ux/history-data";
 import { fmtUsd } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
-import { useBcvRate } from "@/lib/ux/bcv-rate";
+import { useBcvRate, useTasaViva } from "@/lib/ux/bcv-rate";
+import { SelectorRango } from "@/components/ui/SelectorRango";
+import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
 import { Icon } from "@/components/ui/Icon";
 import {
-  RATE_BS,
   productosMayorRetorno,
   categoriasMasRentables,
   cilindrosPorEstado,
@@ -30,24 +31,29 @@ const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-s
 // desglose mensual cargado: antes se estimaba multiplicando por 0,35 — un número
 // inventado que se veía igual que un dato real. Ahora va en 0 hasta cargar su serie.
 const FACTORES: Record<string, number> = { sumigases: 1, sudematin: 0, all: 1 };
-const RANGOS: Record<string, number> = { year: 12, sem: 6, tri: 3, mes: 1 };
 
-type Filtros = { empresa: string; rango: string; moneda: string };
+type Filtros = { empresa: string; rango: Rango; moneda: string };
 
 // Vista de dashboard reutilizable. Con `empresaFija` queda bloqueada a una empresa
 // (rutas /admin/[empresa]/dashboard, con su tema). Sin ella, es filtrable (consolidado).
 export function DashboardView({ empresaFija }: { empresaFija?: string }) {
-  const [f, setF] = usePersistedState<Filtros>("dash:filtros", { empresa: "sumigases", rango: "year", moneda: "usd" });
+  // v2: el rango pasa a ser {desde,hasta,agrupacion}. Clave nueva para no
+  // leer el formato viejo guardado en el navegador.
+  const [f, setF] = usePersistedState<Filtros>("dash:filtros:v2", { empresa: "sumigases", rango: RANGO_POR_DEFECTO, moneda: "usd" });
   const empresa = empresaFija ?? f.empresa;
   const emp = isEmpresaId(empresa) ? EMPRESAS[empresa] : null;
   const factor = FACTORES[empresa] ?? 1;
-  const count = RANGOS[f.rango] ?? 12;
+  const dias = Math.max(1, Math.round((new Date(f.rango.hasta).getTime() - new Date(f.rango.desde).getTime()) / 86400000));
+  const count = Math.max(1, Math.round(dias / 30));
   const bs = f.moneda === "bs";
+  // La tasa sale del BCV, no de una constante. Antes convertia con 49,5
+  // mientras el BCV estaba en 787: los montos en Bs salian 16 veces abajo.
+  const tasa = useTasaViva();
   const frac = count / 12; // proporción del año para KPIs monetarios acumulados
 
   const money = (usd: number) => {
     const v = usd * factor;
-    const n = bs ? v * RATE_BS : v;
+    const n = bs && tasa ? v * tasa : v;
     return (bs ? "" : "$") + Math.round(n).toLocaleString("es-VE") + (bs ? " Bs" : "");
   };
   const cnt = (n: number) => String(Math.max(0, Math.round(n * factor)));
@@ -107,25 +113,21 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
                 <select id="f-empresa" className={selectClass} value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}>
                   <option value="sumigases">Sumigases</option>
                   <option value="sudematin">Sudematin</option>
-                  <option value="all">Consolidado</option>
                 </select>
               </>
             )}
-            <label className="sr-only" htmlFor="f-rango">Rango</label>
-            <select id="f-rango" className={selectClass} value={f.rango} onChange={(e) => setF({ ...f, rango: e.target.value })}>
-              <option value="year">Año 2024</option>
-              <option value="sem">Últimos 6 meses</option>
-              <option value="tri">Último trimestre</option>
-              <option value="mes">Último mes</option>
-            </select>
             <label className="sr-only" htmlFor="f-moneda">Moneda</label>
             <select id="f-moneda" className={selectClass} value={f.moneda} onChange={(e) => setF({ ...f, moneda: e.target.value })}>
               <option value="usd">USD</option>
-              <option value="bs">Bs (tasa {RATE_BS})</option>
+              <option value="bs">{tasa ? `Bs (tasa ${tasa.toFixed(2)})` : "Bs (sin tasa)"}</option>
             </select>
           </>
         }
       />
+
+      <div className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3">
+        <SelectorRango valor={f.rango} onCambio={(r) => setF({ ...f, rango: r })} />
+      </div>
 
       {/* Banda superior: resumen real (histórico) + tipo de cambio BCV */}
       <div className="mb-4 grid gap-3 lg:grid-cols-2">

@@ -18,9 +18,9 @@ No hay consolidado (D4).
 ## Dashboard
 - [x] ~~Borrar: «Visión ejecutiva · Sumigases. Los KPIs demo se recalculan…»~~
 - [x] ~~Borrar el breadcrumb «Resumen > Dashboard»~~
-- [ ] Período por defecto: **Mes**
-- [ ] Agregar breakdown por calendario + **Fecha personalizada**
-- [ ] La tasa de Bs debe ser la MISMA que la del precio BCV
+- [x] ~~Período por defecto: **Mes**~~
+- [x] ~~Agregar breakdown por calendario + **Fecha personalizada**~~
+- [x] ~~La tasa de Bs debe ser la MISMA que la del precio BCV~~
 
 ## Cotizaciones
 - [x] ~~Título: solo «Cotizaciones» (hoy dice «Cotizaciones / Presupuestos»)~~
@@ -82,21 +82,21 @@ No hay consolidado (D4).
 
 ## Reportes
 - [x] ~~Borrar: «Selecciona un reporte para ver la tabla con cifras reales 2024…»~~
-- [ ] Ver por lapsos: desde el inicio de la empresa hasta hoy
-- [ ] Breakdown por **Semanas · Meses · Años**
-- [ ] ELIMINAR «Exportar CSV» → convertirlo en **Descargar PDF** con todas las
-      cifras según el breakdown elegido
+- [x] ~~Ver por lapsos: desde el inicio de la empresa hasta hoy~~
+- [x] ~~Breakdown por **Semanas · Meses · Años**~~
+- [x] ~~ELIMINAR «Exportar CSV» → convertirlo en **Descargar PDF** con todas las
+      cifras según el breakdown elegido~~
 
 ## ROI
-- [ ] Revisar textos: nada de Sudematin dentro de Sumigases ni al revés
+- [x] ~~Revisar textos: nada de Sudematin dentro de Sumigases ni al revés~~
 - [x] ~~Borrar: «ROI como métrica transversal, sobre el histórico real…»~~
 - [x] ~~Borrar: «Todo el histórico de operaciones (2022-01 → 2026-07).»~~
 - [ ] Convertir los gráficos a **BI**
-- [ ] Ver por lapsos + breakdown Semanas / Meses / Años
+- [x] ~~Ver por lapsos + breakdown Semanas / Meses / Años~~
 
 ## Matrices administrativas
 - [x] ~~Borrar: «Matriz ROI mensual/anual alimentada por las matrices 2024…»~~
-- [ ] Ver por lapsos + breakdown Semanas / Meses / Años
+- [x] ~~Ver por lapsos + breakdown Semanas / Meses / Años~~
 - [x] ~~Píldora **Crear Matriz**: cargar .xls y .xlsx (sin texto explicativo)~~
 - [ ] El formato digital = el mismo del Excel que se subió al principio
 
@@ -133,3 +133,25 @@ Dejé 4 pestañas: Master · Físico · Productos y catálogo · Movimientos.
   .xls y volcarlo a la cartera es parseo, va en la Tanda 5.
 - **Crear Matriz**: la píldora recibe .xls/.xlsx y avisa cuántos archivos
   llegaron, pero todavía no los procesa. Avisa en vez de fingir que cargó.
+
+
+## Tanda 3 — lo que hay que saber
+
+**La tasa de Bs estaba 16 veces abajo.** El dashboard importaba la tasa del BCV
+pero convertía con `RATE_BS = 49.5` mientras el BCV real está en 787,52. Ahora
+usa la viva; si no hay tasa, dice «sin tasa» en vez de inventar un número.
+
+**Semanas no está disponible en Reportes, ROI y Matrices.** El histórico es
+mensual (`HISTORY.months`, con `ym`), así que repartir un mes en semanas sería
+inventar. El selector solo ofrece Meses y Años en esas tres. Cuando las ventas
+diarias estén en la base, se habilita.
+
+**Reportes pasó de 5 tipos a 4.** «Facturas vs notas de entrega» y «Crédito vs
+contado» salían de `series` inventadas y no tienen equivalente en el histórico:
+necesitan la tabla `documentos` con volumen real.
+
+**Las tres pantallas leían `series` de dashboard-data**: doce meses de 2024 sin
+año pegado. Con eso el selector de rango no podía significar nada. Ahora leen
+`HISTORY`, que trae mes con año (2023-04 → 2026-07).
+
+**El consolidado se fue** del dashboard y del ROI (D4).

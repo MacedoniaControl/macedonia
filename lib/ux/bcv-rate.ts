@@ -55,3 +55,26 @@ export function useBcvRate() {
   }, []);
   return v;
 }
+
+/**
+ * La tasa del BCV, traída del servidor al montar.
+ *
+ * `useBcvRate` solo LEE lo que alguien haya guardado antes; si nadie la
+ * refrescó, devuelve null y la pantalla se queda con una constante vieja. Acá
+ * se pide de verdad. Devuelve `null` mientras no haya respuesta, para que quien
+ * la use decida qué mostrar en vez de inventar un número.
+ */
+export function useTasaViva(): number | null {
+  const guardada = useBcvRate();
+  const [tasa, setTasa] = useState<number | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    fetchBcvRate().then((r) => {
+      if (vigente && r.ok && r.rate) setTasa(r.rate.tasa);
+    });
+    return () => { vigente = false; };
+  }, []);
+
+  return tasa ?? guardada?.tasa ?? null;
+}

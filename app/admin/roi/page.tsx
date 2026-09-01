@@ -1,14 +1,16 @@
 "use client";
 
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
+import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SelectorRango } from "@/components/ui/SelectorRango";
+import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SeriesChart } from "@/components/ui/SeriesChart";
 import {
   roiCards,
-  months,
   series,
   productosMayorRetorno,
   categoriasMasRentables,
@@ -22,16 +24,21 @@ import {
   HistoryTopProveedores,
 } from "@/components/ui/HistoryStats";
 import { getHistory } from "@/lib/ux/history-data";
+import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
 
 const EMPRESAS = [
   { id: "sumigases", label: "Sumigases" },
   { id: "sudematin", label: "Sudematin" },
-  { id: "all", label: "Consolidado" },
 ];
 
 export default function RoiPage() {
+  const [rango, setRango] = useState<Rango>(RANGO_POR_DEFECTO);
   const [empresa, setEmpresa] = usePersistedState("roi:empresa", "sumigases");
   const h = getHistory(empresa);
+  // Los indicadores siguen el rango elegido; antes eran siempre el total
+  // historico, dijera lo que dijera el selector.
+  const periodos = historicoEnRango(empresa, rango);
+  const t = totalesDe(periodos);
   const label = EMPRESAS.find((e) => e.id === empresa)?.label ?? "Sumigases";
 
   return (
@@ -52,9 +59,13 @@ export default function RoiPage() {
       />
 
       {/* ---- Histórico real (Valery) ---- */}
+      <div className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3">
+        <SelectorRango valor={rango} onCambio={setRango} agrupaciones={AGRUPACIONES_HISTORICO} />
+      </div>
+
       <SectionCard
         title={`ROI histórico real · ${label}`}
-        action={<StatusBadge tone="ok">ROI {h.totals.roi}%</StatusBadge>}
+        action={<StatusBadge tone="ok">ROI {t.roi}%</StatusBadge>}
       >
         <HistoryKpis empresa={empresa} />
         <div className="mt-5 border-t border-border pt-4">
@@ -96,10 +107,10 @@ export default function RoiPage() {
       <div className="mt-6">
         <SectionCard title="Ventas vs utilidad" description="Evolución mensual de la rentabilidad (USD).">
           <SeriesChart
-            labels={months}
+            labels={periodos.map((p) => p.etiqueta)}
             series={[
-              { name: "Ventas", color: "var(--color-brand)", values: series.ventas },
-              { name: "Utilidad", color: "var(--color-navy)", values: series.utilidad },
+              { name: "Ventas", color: "var(--color-brand)", values: periodos.map((p) => p.venta) },
+              { name: "Utilidad", color: "var(--color-navy)", values: periodos.map((p) => p.util) },
             ]}
             height={260}
           />
