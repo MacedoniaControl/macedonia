@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { PanelGases } from "./PanelGases";
 import { EntregaCilindros } from "./EntregaCilindros";
 import { SaldosCilindros } from "./SaldosCilindros";
 import { AltaCilindros } from "./AltaCilindros";
@@ -37,6 +38,7 @@ export default function CylindersPage() {
         title="Cilindros"
         description=""
         breadcrumbs={[{ label: "Inventario" }, { label: "Cilindros" }]}
+        actions={<PanelGases empresa={empresa} onCambio={refrescar} />}
       />
 
       <div className="sumi-tabs mb-4 flex gap-1 overflow-x-auto">

@@ -225,3 +225,58 @@ export async function movimientoManual(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+/**
+ * Alta o edición de un gas y su depósito en garantía.
+ *
+ * El depósito estaba en 0 para los ocho gases, así que `garantias_cliente`
+ * devolvía siempre cero SIN AVISAR que el dato faltaba — que es la peor forma
+ * de estar mal: parece una respuesta.
+ *
+ * Se edita desde la pantalla y no se carga por SQL porque el precio del gas
+ * cambia, y cada cambio no puede depender de que alguien escriba una consulta.
+ */
+export async function guardarGas(
+  g: { nombre: string; depositoUsd: number; seRellena: boolean; activo?: boolean },
+  empresa: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+
+  const nombre = g.nombre.trim().toUpperCase();
+  if (!nombre) return { ok: false, error: "Falta el nombre del gas." };
+  if (!(g.depositoUsd >= 0)) return { ok: false, error: "El depósito no puede ser negativo." };
+
+  const sb = await createClient();
+  const { error } = await sb.from("gases").upsert(
+    {
+      empresa_id: empresa,
+      nombre,
+      deposito_usd: g.depositoUsd,
+      se_rellena: g.seRellena,
+      activo: g.activo ?? true,
+    },
+    { onConflict: "empresa_id,nombre" },
+  );
+
+  if (error) return { ok: false, error: `No se pudo guardar: ${error.message}` };
+  return { ok: true };
+}
+
+/**
+ * Baja lógica de un gas.
+ *
+ * No se borra: los movimientos históricos lo nombran, y borrarlo dejaría
+ * huérfano todo lo que ya pasó por él.
+ */
+export async function desactivarGas(nombre: string, empresa: string): Promise<{ ok: boolean; error?: string }> {
+  const sb = await createClient();
+  const { error } = await sb
+    .from("gases")
+    .update({ activo: false })
+    .eq("empresa_id", empresa)
+    .eq("nombre", nombre);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
