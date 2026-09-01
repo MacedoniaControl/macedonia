@@ -9,10 +9,19 @@ import { isEmpresaId, type EmpresaId } from "./empresas";
  * "sumigases" como contexto de escritura para no perder datos, pero cada
  * módulo debe leer/escribir SIEMPRE con la clave de esta empresa.
  */
+/**
+ * A qué empresa se cae cuando la ruta no la nombra.
+ *
+ * Lo usan el hook Y el selector de la cabecera. Si cada uno tiene el suyo, la
+ * pantalla lee de una empresa y muestra el nombre de la otra — que es
+ * exactamente lo que pasó.
+ */
+export const EMPRESA_POR_DEFECTO = "sumigases" as const;
+
 export function useEmpresaActiva(): EmpresaId {
   const pathname = usePathname();
   const m = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/);
-  return m && isEmpresaId(m[1]) ? m[1] : "sumigases";
+  return m && isEmpresaId(m[1]) ? m[1] : EMPRESA_POR_DEFECTO;
 }
 
 /**

@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useCarga } from "@/lib/ux/use-carga";
@@ -219,17 +220,30 @@ function Contando({
       )}
 
       <div className="flex gap-2 border-t border-border pt-3">
-        <Button icon="check" className="flex-1" cargando={cerrando} disabled={cerrando || lineas.length === 0} textoCargando="Cerrando…"
-          onClick={async () => {
+        {/* Se confirma porque al cerrar, lo contado pasa a ser la verdad de la
+            empresa y el boton vivia al lado de los de borrar renglon. El
+            mensaje dice CUANTOS productos entran: cerrar con tres cuando la
+            zona tiene treinta es el error que hay que poder ver a tiempo. */}
+        <ConfirmDialog
+          title="¿Cerrar el conteo?"
+          message={`Entran ${lineas.length} producto(s) al Master y se comparan contra Valery. Después no se puede seguir agregando a este conteo.`}
+          confirmLabel="Sí, cerrar"
+          onConfirm={async () => {
             setCerrando(true);
             try {
               const r = await cerrarConteo(conteoId);
               if (!r.ok) return setAviso({ ok: false, text: r.error ?? "No se pudo cerrar." });
               onTerminado();
             } finally { setCerrando(false); }
-          }}>
-          Cerrar conteo
-        </Button>
+          }}
+          trigger={(abrir) => (
+            <Button icon="check" className="flex-1" cargando={cerrando}
+              disabled={cerrando || lineas.length === 0} textoCargando="Cerrando…"
+              onClick={abrir}>
+              Cerrar conteo
+            </Button>
+          )}
+        />
       </div>
       <p className="text-[11px] text-muted">
         Al cerrar, lo contado entra al Master. Mientras esté abierto podés seguir

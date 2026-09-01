@@ -4,12 +4,17 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { EMPRESA_IDS, EMPRESAS } from "@/lib/ux/empresas";
+import { EMPRESA_POR_DEFECTO } from "@/lib/ux/use-empresa";
 
 /**
  * Selector de empresa activa. Navega entre los dashboards separados por empresa
- * (/admin/<id>/dashboard) y el consolidado (/admin/dashboard). Refleja la ruta actual.
- * El aislamiento real de datos por empresa vivirá en el backend (RLS).
+ * (/admin/<id>/dashboard) y refleja la ruta actual.
+ *
+ * NO hay consolidado: las dos empresas son separadas y nada de una aparece
+ * dentro de la otra. El aislamiento real vive en el RLS de la base; esto es
+ * solo la etiqueta, y su trabajo es no mentir sobre cuál está activa.
  */
+
 const OPCIONES = [
   ...EMPRESA_IDS.map((id) => ({ id, name: EMPRESAS[id].nombreCorto, href: `/admin/${id}/dashboard` })),
 ];
@@ -19,10 +24,20 @@ export function CompanySelector() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Empresa activa según la URL: /admin/<id>/... ; si no, consolidado.
+  // Empresa activa según la URL: /admin/<id>/...
+  //
+  // Cuando la ruta NO trae empresa, cae al mismo lugar que useEmpresaActiva:
+  // "sumigases". Antes caía a "all" —el consolidado— y como esa opción se
+  // eliminó, el `find` fallaba y agarraba el ÚLTIMO elemento de la lista:
+  // Sudematin. El resultado era una pantalla que leía datos de Sumigases con
+  // el nombre de Sudematin arriba. La pared entre empresas la rompí yo al
+  // sacar el consolidado y dejar esta línea buscándolo.
+  //
+  // Este valor de reserva tiene que seguir siendo el MISMO que el de
+  // lib/ux/use-empresa.ts, o la etiqueta vuelve a mentir.
   const match = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/);
-  const activeId = match ? match[1] : "all";
-  const active = OPCIONES.find((o) => o.id === activeId) ?? OPCIONES[OPCIONES.length - 1];
+  const activeId = match ? match[1] : EMPRESA_POR_DEFECTO;
+  const active = OPCIONES.find((o) => o.id === activeId) ?? OPCIONES[0];
 
   return (
     <div className="relative">
