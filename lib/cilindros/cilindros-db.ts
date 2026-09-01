@@ -187,3 +187,41 @@ export async function cambiarEstado(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+/**
+ * Movimiento manual de cilindros: sumar o restar a mano.
+ *
+ * Para cuando la realidad del galpón no coincide con lo registrado y hay que
+ * corregirla. No pisa el saldo: agrega un movimiento más, igual que todo lo
+ * demás. Un ajuste que borra el historial esconde justo lo que hay que ver.
+ *
+ * La nota es obligatoria: un ajuste sin explicación es un agujero con permiso.
+ */
+export async function movimientoManual(
+  gas: string,
+  cantidad: number,
+  direccion: "entrada" | "salida",
+  estado: "lleno" | "vacio",
+  empresa: string,
+  nota: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+  if (!(cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
+  if (!nota.trim()) return { ok: false, error: "Explicá el motivo del ajuste." };
+
+  const sb = await createClient();
+  const { error } = await sb.from("cilindros_mov").insert({
+    empresa_id: empresa,
+    gas,
+    cantidad,
+    // entrada: aparece de la nada. salida: desaparece hacia la nada.
+    estado_desde: direccion === "entrada" ? null : estado,
+    estado_hacia: direccion === "entrada" ? estado : null,
+    nota: `Ajuste manual · ${nota.trim()}`,
+    usuario_id: usuario.id,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

@@ -1,6 +1,6 @@
 "use client";
 
-// Dónde está cada cilindro y quién tiene los que faltan.
+// Rampa: dónde está cada cilindro y quién tiene los que faltan.
 //
 // Los números NO se guardan: los calcula la base sumando movimientos. Por eso
 // siempre cuadran con su propio historial.
@@ -8,7 +8,10 @@
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
-import { saldos, comodatos, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
+import { saldos, comodatos, movimientoManual, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
+import { PildoraPanel } from "@/components/ui/PildoraPanel";
+import { Button } from "@/components/ui/Button";
+import { useState } from "react";
 
 const ESTADOS: { id: string; label: string; tone: Tone }[] = [
   { id: "lleno", label: "Llenos", tone: "ok" },
@@ -18,7 +21,16 @@ const ESTADOS: { id: string; label: string; tone: Tone }[] = [
   { id: "fuera_servicio", label: "Fuera de servicio", tone: "danger" },
 ];
 
-export function SaldosCilindros({ empresa, recarga }: { empresa: string; recarga: number }) {
+const campo =
+  "h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm text-text " +
+  "outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
+
+export function SaldosCilindros({
+  empresa, recarga, onCambio,
+}: { empresa: string; recarga: number; onCambio?: () => void }) {
+  const [mov, setMov] = useState({ gas: "", cantidad: 1, direccion: "entrada" as "entrada" | "salida", estado: "lleno" as "lleno" | "vacio", nota: "" });
+  const [msgMov, setMsgMov] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
   const carga = useCarga(`${empresa}:${recarga}`, async () => {
     const [sa, co] = await Promise.all([saldos(empresa), comodatos(empresa)]);
     return { sa, co };
@@ -35,8 +47,70 @@ export function SaldosCilindros({ empresa, recarga }: { empresa: string; recarga
   return (
     <div className="grid gap-4">
       <SectionCard
-        title="Dónde están los cilindros"
+        title="Rampa"
         description="Calculado de los movimientos, no de un conteo guardado."
+        action={
+          <PildoraPanel etiqueta="Agregar Movimiento" icono="plus">
+            {(cerrar) => (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-text">Movimiento manual</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-muted">Gas</span>
+                    <select value={mov.gas} onChange={(e) => setMov({ ...mov, gas: e.target.value })} className={campo}>
+                      <option value="">Elegí…</option>
+                      {gases.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-muted">Cantidad</span>
+                    <input type="number" min={1} value={mov.cantidad}
+                      onChange={(e) => setMov({ ...mov, cantidad: Math.max(1, Number(e.target.value) || 1) })}
+                      className={`${campo} tabular-nums`} />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-muted">Movimiento</span>
+                    <select value={mov.direccion} onChange={(e) => setMov({ ...mov, direccion: e.target.value as "entrada" | "salida" })} className={campo}>
+                      <option value="entrada">Agregar</option>
+                      <option value="salida">Quitar</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-muted">Estado</span>
+                    <select value={mov.estado} onChange={(e) => setMov({ ...mov, estado: e.target.value as "lleno" | "vacio" })} className={campo}>
+                      <option value="lleno">Lleno</option>
+                      <option value="vacio">Vacío</option>
+                    </select>
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted">Motivo *</span>
+                  <input value={mov.nota} onChange={(e) => setMov({ ...mov, nota: e.target.value })}
+                    placeholder="Por qué se ajusta" className={campo} />
+                </label>
+                {msgMov && (
+                  <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{msgMov}</p>
+                )}
+                <div className="flex gap-2">
+                  <Button icon="plus" className="flex-1" disabled={guardando}
+                    onClick={async () => {
+                      setMsgMov(null);
+                      if (!mov.gas) return setMsgMov("Elegí el gas.");
+                      setGuardando(true);
+                      try {
+                        const r = await movimientoManual(mov.gas, mov.cantidad, mov.direccion, mov.estado, empresa, mov.nota);
+                        if (!r.ok) return setMsgMov(r.error ?? "No se pudo registrar.");
+                        setMov({ ...mov, cantidad: 1, nota: "" });
+                        onCambio?.();
+                        cerrar();
+                      } finally { setGuardando(false); }
+                    }}>{guardando ? "Registrando…" : "Registrar"}</Button>
+                  <Button variant="secondary" onClick={cerrar}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+          </PildoraPanel>
+        }
       >
         {error && <p className="text-sm text-danger">{error}</p>}
         {!error && listo && gases.length === 0 && (

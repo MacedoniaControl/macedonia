@@ -9,6 +9,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { fmtUsd } from "@/lib/ux/format";
 import { VentasExternas } from "./VentasExternas";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
@@ -64,7 +65,7 @@ export default function QuotesPage() {
     correlativoPrevisto(empresaKey, "cotizacion").then(setPrevisto).catch(() => setPrevisto("—"));
   }, [empresaKey]);
   // "Generar presupuesto" es el apartado principal (lo que más se usa).
-  const [tab, setTab] = useState<"registro" | "gen" | "subir" | "externas">("gen");
+  const [tab, setTab] = useState<"registro" | "gen" | "externas">("gen");
   const [period, setPeriod] = useState("mes");
   const fileRef = useRef<HTMLInputElement>(null);
   // Los registros/logs son solo del OWNER.
@@ -98,13 +99,18 @@ export default function QuotesPage() {
         title="Cotizaciones"
         description=""
         breadcrumbs={[{ label: "Operación" }, { label: "Cotizaciones" }]}
-        actions={verRegistros ? <StatusBadge tone="brand">{cots.length} presupuesto(s)</StatusBadge> : undefined}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {verRegistros && <StatusBadge tone="brand">{cots.length} cotización(es)</StatusBadge>}
+            <SubirArchivo onArchivos={onUpload}
+              ayuda="Se registran por fecha y quedan disponibles para consultar." />
+          </div>
+        }
       />
 
       <div className="sumi-tabs mb-4 gap-2">
         {([
           ["gen", "Generar presupuesto"] as const,
-          ["subir", "Subir de Valery"] as const,
           // Ventas externas vive aqui, no en el menu principal: es una forma de
           // cotizar/vender, no un departamento aparte.
           ["externas", "Ventas externas"] as const,
@@ -179,17 +185,6 @@ export default function QuotesPage() {
 
       {tab === "externas" && <VentasExternas />}
 
-      {tab === "subir" && (
-        <SectionCard title="Subir presupuestos de Valery" description="Macedonia los guarda en el registro y los organiza por fecha.">
-          <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-12 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand"><Icon name="upload" size={24} /></span>
-            <p className="mt-3 text-sm font-medium text-text">Selecciona los PDF de presupuesto de Valery</p>
-            <p className="mt-1 text-xs text-muted">Se registran por fecha y quedan disponibles para consultar/imprimir.</p>
-            <Button icon="upload" onClick={() => fileRef.current?.click()} className="mt-4">Seleccionar archivos</Button>
-          </div>
-        </SectionCard>
-      )}
     </>
   );
 }

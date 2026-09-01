@@ -7,6 +7,7 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
 import { useCarga } from "@/lib/ux/use-carga";
+import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { SelectorCliente } from "@/components/directorio/SelectorCliente";
 import { leerConfig } from "@/lib/config/config-db";
 import type { Cliente } from "@/lib/directorio/directorio-db";
@@ -86,7 +87,7 @@ export default function DeliveryNotesPage() {
     correlativoPrevisto(empresaKey, "devolucion").then(setPrevistoDev).catch(() => setPrevistoDev("—"));
   }, [empresaKey]);
   // "Generar nota de entrega" es el apartado principal; el Registro va de último y es solo OWNER.
-  const [tab, setTab] = useState<"registro" | "ne" | "dev" | "subir">("ne");
+  const [tab, setTab] = useState<"registro" | "ne" | "dev">("ne");
   const { rol } = useRol();
   const verRegistros = puedeVerRegistros(rol);
   const [period, setPeriod] = useState("mes");
@@ -124,7 +125,13 @@ export default function DeliveryNotesPage() {
         title="Notas de entrega y devoluciones"
         description=""
         breadcrumbs={[{ label: "Operación" }, { label: "Notas de entrega" }]}
-        actions={verRegistros ? <StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge> : undefined}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {verRegistros && <StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge>}
+            <SubirArchivo onArchivos={onUpload}
+              ayuda="NET/entrega → Nota de entrega · NC/crédito/devolución → Devolución." />
+          </div>
+        }
       />
 
       {/* Tabs */}
@@ -132,7 +139,6 @@ export default function DeliveryNotesPage() {
         {([
           ["ne", "Generar nota de entrega"] as const,
           ["dev", "Generar devolución"] as const,
-          ["subir", "Subir de Valery"] as const,
           ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
         ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
@@ -226,17 +232,6 @@ export default function DeliveryNotesPage() {
         return { error: null };
       }} seq={previstoDev} />}
 
-      {tab === "subir" && (
-        <SectionCard title="Subir documentos de Valery" description="Macedonia detecta el tipo por el nombre del archivo y lo organiza en el registro por fecha.">
-          <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-12 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand"><Icon name="upload" size={24} /></span>
-            <p className="mt-3 text-sm font-medium text-text">Arrastra o selecciona los PDF de Valery</p>
-            <p className="mt-1 text-xs text-muted">Nombres con NET/entrega → Nota de entrega · NC/crédito/devolución → Devolución.</p>
-            <Button icon="upload" onClick={() => fileRef.current?.click()} className="mt-4">Seleccionar archivos</Button>
-          </div>
-        </SectionCard>
-      )}
     </>
   );
 }

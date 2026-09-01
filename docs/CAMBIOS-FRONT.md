@@ -25,8 +25,8 @@ No hay consolidado (D4).
 ## Cotizaciones
 - [x] ~~Título: solo «Cotizaciones» (hoy dice «Cotizaciones / Presupuestos»)~~
 - [x] ~~Borrar: «Registro, generación (formato oficial Valery) e importación…»~~
-- [ ] «Subir de Valery» sale del apartado principal → esquina derecha, se llama
-      **Subir Archivo**, abre ventana de drop
+- [x] ~~«Subir de Valery» sale del apartado principal → esquina derecha, se llama
+      **Subir Archivo**, abre ventana de drop~~
 - [ ] Nuevo presupuesto → **Vendedor**: se llena con los usuarios del sistema
 - [ ] Nuevo presupuesto → **Tipo de precio**: Mayorista / Oferta / Detal
 - [x] ~~Borrar: «Escanea o busca en el catálogo para agregar…»~~
@@ -39,7 +39,7 @@ No hay consolidado (D4).
 
 ## Notas de entrega
 - [x] ~~Borrar: «Registro, generación e importación de Notas de Entrega…»~~
-- [ ] Mismo cambio de «Subir de Valery» → **Subir Archivo** en esquina derecha
+- [x] ~~Mismo cambio de «Subir de Valery» → **Subir Archivo** en esquina derecha~~
 - [ ] Registro: misma regla que en Cotizaciones (solo Owners)
 
 ## Inventario
@@ -51,10 +51,10 @@ No hay consolidado (D4).
 ## Cilindros
 - [x] ~~Renombrar el apartado: «Cilindros y Recarga» → **Cilindros**~~
 - [x] ~~Borrar: «Los cilindros son de la empresa. Lo que está en manos de un cliente…»~~
-- [ ] Botón «Dónde están» → se llama **Rampa**
-- [ ] Rampa = donde se registran todos los cilindros y se ven los movimientos
-- [ ] Píldora **Agregar Movimiento**: agregar o quitar cilindros a mano
-- [ ] Volver a mostrar los cilindros separados por gases, dentro de Rampa
+- [x] ~~Botón «Dónde están» → se llama **Rampa**~~
+- [x] ~~Rampa = donde se registran todos los cilindros y se ven los movimientos~~
+- [x] ~~Píldora **Agregar Movimiento**: agregar o quitar cilindros a mano~~
+- [x] ~~Volver a mostrar los cilindros separados por gases, dentro de Rampa~~
 - [ ] Precios/depósitos de gas EDITABLES desde la pantalla (D6)
 
 ## Comisiones y Bonos
@@ -62,15 +62,15 @@ No hay consolidado (D4).
 
 ## Cuentas por cobrar
 - [x] ~~Borrar: «Saldos por cliente, vencimientos, abonos parciales y alertas. Demo funcional.»~~
-- [ ] Píldora **nueva cuenta por cobrar**, al lado de exportar CSV
+- [x] ~~Píldora **nueva cuenta por cobrar**, al lado de exportar CSV~~
 - [ ] Importar Excel y que el sistema lo lea y cargue a la cartera
-- [ ] **Registrar abono**: píldora con menú desplegable, NO dentro del panel de
-      visualización. Al lado de carteras.
+- [x] ~~**Registrar abono**: píldora con menú desplegable, NO dentro del panel de
+      visualización. Al lado de carteras.~~
 - [ ] Cada cuenta genera un registro
 
 ## Cuentas por pagar
 - [x] ~~Borrar: «Saldos por proveedor, abonos y alertas desde 7 días… (§24)»~~
-- [ ] Mismas tres cosas que en cobrar: píldora de alta, importar Excel, abono en píldora
+- [x] ~~Mismas tres cosas que en cobrar: píldora de alta, importar Excel, abono en píldora~~
 - [ ] Cada cuenta genera un registro
 
 ## Compras
@@ -97,7 +97,7 @@ No hay consolidado (D4).
 ## Matrices administrativas
 - [x] ~~Borrar: «Matriz ROI mensual/anual alimentada por las matrices 2024…»~~
 - [ ] Ver por lapsos + breakdown Semanas / Meses / Años
-- [ ] Píldora **Crear Matriz**: cargar .xls y .xlsx (sin texto explicativo)
+- [x] ~~Píldora **Crear Matriz**: cargar .xls y .xlsx (sin texto explicativo)~~
 - [ ] El formato digital = el mismo del Excel que se subió al principio
 
 ## Configuración
@@ -125,3 +125,11 @@ Hoy la pestaña «Físico» ES la de Valery (dice «Inventario Físico (Valery)�
 ¿Son dos cosas distintas que hay que separar, o es la misma con otro nombre?
 Dejé 4 pestañas: Master · Físico · Productos y catálogo · Movimientos.
 (Productos lo mantuve porque lo pediste como subdepartamento de Inventario.)
+
+
+## Tanda 2 — lo que quedó a medias (a propósito)
+
+- **Importar Excel en Cobrar/Pagar**: la píldora de alta manual está; leer un
+  .xls y volcarlo a la cartera es parseo, va en la Tanda 5.
+- **Crear Matriz**: la píldora recibe .xls/.xlsx y avisa cuántos archivos
+  llegaron, pero todavía no los procesa. Avisa en vez de fingir que cargó.

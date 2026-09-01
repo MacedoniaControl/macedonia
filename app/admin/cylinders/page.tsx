@@ -27,7 +27,7 @@ export default function CylindersPage() {
   const tabs: { id: Tab; label: string }[] = [
     // Entrega va primero: es lo que hacen seis técnicos todos los días.
     { id: "entrega", label: "Registrar entrega" },
-    { id: "saldos", label: "Dónde están" },
+    { id: "saldos", label: "Rampa" },
     { id: "alta", label: "Dar de alta" },
   ];
 
@@ -58,7 +58,7 @@ export default function CylindersPage() {
       </div>
 
       {tab === "entrega" && <EntregaCilindros empresa={empresa} onRegistrada={refrescar} />}
-      {tab === "saldos" && <SaldosCilindros empresa={empresa} recarga={recarga} />}
+      {tab === "saldos" && <SaldosCilindros empresa={empresa} recarga={recarga} onCambio={refrescar} />}
       {tab === "alta" && <AltaCilindros empresa={empresa} onRegistrada={refrescar} />}
     </>
   );

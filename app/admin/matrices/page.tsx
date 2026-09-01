@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { months, series } from "@/lib/ux/dashboard-data";
 import { fmtUsd } from "@/lib/ux/format";
@@ -23,12 +27,28 @@ export default function MatricesPage() {
   );
   const totRoi = Math.round((tot.utilidad / tot.costo) * 100);
 
+  const [aviso, setAviso] = useState<string | null>(null);
+
   return (
     <>
       <PageHeader
         title="Matrices administrativas"
         description=""
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Matrices administrativas" }]}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {aviso && <span className="text-xs text-muted">{aviso}</span>}
+            <SubirArchivo
+              etiqueta="Crear Matriz" acepta=".xls,.xlsx"
+              onArchivos={(fs) => {
+                if (!fs?.length) return;
+                // Todavia no se procesa: el parseo de la matriz va en su propia
+                // tanda. Se avisa en vez de fingir que se cargo.
+                setAviso(`${fs.length} archivo(s) recibido(s) · lectura pendiente`);
+              }}
+            />
+          </div>
+        }
       />
       <SectionCard title="Matriz ROI 2024 (USD)" description="Cifras reales de Sumigases.">
         <div className="sumi-scroll max-w-full overflow-x-auto">
