@@ -29,7 +29,7 @@ import { ventas12m, precioProm, estadoRotacion } from "@/lib/ux/inventory-rotati
 
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
 
-type Tab = "master" | "movimientos" | "fisico" | "productos";
+type Tab = "master" | "movimientos" | "valery" | "productos";
 
 export default function InventoryPage() {
   // Empresa activa según la ruta (consolidado -> sumigases).
@@ -248,7 +248,7 @@ export default function InventoryPage() {
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
         {([
           ["master", `Master (${master.length})`],
-          ["fisico", `Físico · Valery (${fisico.length})`],
+          ["valery", `Valery (${fisico.length})`],
           // Productos y catalogo pasa a subdepartamento del inventario.
           ["productos", "Productos y catálogo"],
           ["movimientos", "Movimientos"],
@@ -291,9 +291,9 @@ export default function InventoryPage() {
       )}
 
 
-      {tab === "fisico" && (
-        <SectionCard title="Inventario Físico (Valery)" action={<StubBtn area="Físico · Valery" />}
-          description={`Solo lectura · fuente: base de datos · existencia calculada del kardex.`}>
+      {tab === "valery" && (
+        <SectionCard title="Inventario Valery" action={<StubBtn area="Valery" />}
+          description="Lo que dicen los papeles. Solo lectura.">
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
