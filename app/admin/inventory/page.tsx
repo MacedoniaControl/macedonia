@@ -17,6 +17,7 @@ import {
   type SItem,
 } from "@/lib/ux/inventory-data";
 import { MasterInventario } from "./MasterInventario";
+import { PanelConteo } from "./PanelConteo";
 import ProductosPage from "@/app/admin/products/page";
 import { MovimientosPanel } from "./MovimientosPanel";
 import { useTableView } from "@/lib/ux/use-table-view";
@@ -35,6 +36,7 @@ export default function InventoryPage() {
   // Empresa activa según la ruta (consolidado -> sumigases).
   const empresa = useEmpresaActiva();
   const [tab, setTab] = useState<Tab>("master");
+  const [recargaMaster, setRecargaMaster] = useState(0);
   const [q, setQ] = useState("");
   const [sItems, setSItems] = usePersistedState<SItem[]>(`inv-s:${empresa}`, []);
   const { notas, ledger } = useFiscal(empresa);
@@ -220,10 +222,15 @@ export default function InventoryPage() {
         description=""
         breadcrumbs={[{ label: "Inventario" }, { label: "Inventario" }]}
         actions={
-          <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-master",
-            [["Código", "Nombre", "Físico", "S", "Master"], ...masterF.map((m) => [m.codigo, m.nombre, m.fisico, m.s, m.master])])}>
-            Exportar CSV
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Cargar conteo va primero: es la acción principal de esta
+                pantalla, y la razón por la que el Master significa algo. */}
+            <PanelConteo empresa={empresa} onCerrado={() => setRecargaMaster((n) => n + 1)} />
+            <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-master",
+              [["Código", "Nombre", "Físico", "S", "Master"], ...masterF.map((m) => [m.codigo, m.nombre, m.fisico, m.s, m.master])])}>
+              Exportar CSV
+            </Button>
+          </div>
         }
       />
 
@@ -247,7 +254,7 @@ export default function InventoryPage() {
 
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
         {([
-          ["master", `Master (${master.length})`],
+          ["master", "Master"],
           ["valery", `Valery (${fisico.length})`],
           // Productos y catalogo pasa a subdepartamento del inventario.
           ["productos", "Productos y catálogo"],
@@ -283,10 +290,9 @@ export default function InventoryPage() {
             <h2 className="text-lg font-semibold tracking-tight text-text">Inventario Master</h2>
           </div>
 
-          {/* DOS cifras, no tres. El kardex ya distingue lo que movio mercancia
-              de lo que solo cuadra papeles, asi que V/S/M se simplifica a
-              FISICO REAL vs FISCAL. Ver MasterInventario.tsx. */}
-          <MasterInventario empresa={empresa} filtro={q} />
+          {/* Valery contra lo contado a mano. Es la razon de ser del producto:
+              lo que se fue sin registrarse no aparece en ningun kardex. */}
+          <MasterInventario empresa={empresa} filtro={q} recarga={recargaMaster} />
         </>
       )}
 
