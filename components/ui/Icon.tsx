@@ -35,6 +35,7 @@ export type IconName =
   | "alert"
   | "upload"
   | "eye"
+  | "eye-off"
   | "dollar";
 
 const paths: Record<IconName, JSX.Element> = {
@@ -220,6 +221,16 @@ const paths: Record<IconName, JSX.Element> = {
     <>
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
       <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  "eye-off": (
+    <>
+      {/* El mismo ojo, partido por la diagonal: se lee al instante como su
+          contrario, sin tener que descifrar un glifo nuevo. */}
+      <path d="M10.6 6.2A9.9 9.9 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-2.7 3.4" />
+      <path d="M6.6 6.7A17 17 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 4.5-1.1" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="M3 3l18 18" />
     </>
   ),
   dollar: (

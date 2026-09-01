@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { entrar, type EstadoLogin } from "./actions";
 import { Icon } from "@/components/ui/Icon";
 
@@ -8,6 +8,10 @@ const inicial: EstadoLogin = { error: null };
 
 export function LoginForm({ destino }: { destino: string }) {
   const [estado, accion, pendiente] = useActionState(entrar, inicial);
+  // Escribir a ciegas en un teclado de galpón, con guantes, es la primera causa
+  // de "no me deja entrar". Poder mirar lo que se escribió evita el intento
+  // fallido y el pedido de restablecer la clave.
+  const [verClave, setVerClave] = useState(false);
 
   return (
     <form action={accion} className="space-y-4">
@@ -38,17 +42,36 @@ export function LoginForm({ destino }: { destino: string }) {
         <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-text">
           Contraseña
         </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          placeholder="••••••••"
-          className="h-12 w-full rounded-xl border border-border-strong bg-surface px-3.5 text-base text-text
-                     outline-none transition placeholder:text-muted
-                     focus:border-brand focus:ring-2 focus:ring-brand/30"
-        />
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={verClave ? "text" : "password"}
+            autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            required
+            placeholder="••••••••"
+            className="h-12 w-full rounded-xl border border-border-strong bg-surface pl-3.5 pr-12 text-base text-text
+                       outline-none transition placeholder:text-muted
+                       focus:border-brand focus:ring-2 focus:ring-brand/30"
+          />
+          <button
+            type="button"
+            onClick={() => setVerClave((v) => !v)}
+            // No entra en el orden de tabulación: quien navega con teclado va
+            // del campo al botón de entrar, sin escalas.
+            tabIndex={-1}
+            aria-label={verClave ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={verClave}
+            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl
+                       text-muted transition hover:text-text
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <Icon name={verClave ? "eye-off" : "eye"} size={18} />
+          </button>
+        </div>
       </div>
 
       {estado.error && (
