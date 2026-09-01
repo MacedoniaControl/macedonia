@@ -7,6 +7,7 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
 import { useCarga } from "@/lib/ux/use-carga";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useTasaViva } from "@/lib/ux/bcv-rate";
 import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { SelectorCliente } from "@/components/directorio/SelectorCliente";
@@ -443,23 +444,45 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           </span>
         </label>
 
-        <Button icon="delivery" className="mt-3 w-full" disabled={guardando} onClick={async () => {
-          setMsg("");
-          if (!f.cliente.trim()) return setMsg("El cliente es obligatorio.");
-          if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
-          if (lineas.some((l) => l.precio <= 0)) return setMsg("Hay renglones sin precio (marcados en rojo). Complétalos antes de generar.");
-          if (guardando) return;                    // doble clic: no emitir dos veces
-          setGuardando(true);
-          try {
-            const r = await onSave({ ...f, correlativo: seq, fecha: hoyISO(), lineas, cilindros: cil, llevaIva, ivaPct });
-            // Si la base rechazó, hay que decirlo: antes el documento "se
-            // generaba" en pantalla aunque no quedara guardado en ningún lado.
-            if (r.error) setMsg(r.error);
-            else { setLineas([]); setF(formularioVacio()); }
-          } finally {
-            setGuardando(false);
-          }
-        }} cargando={guardando} textoCargando="Guardando…">Registrar y generar (PDF)</Button>
+        {/* Se confirma antes de emitir: pedir el numero quema un correlativo
+            que no vuelve, y el documento sale impreso hacia el cliente. El
+            resumen repite CLIENTE y TOTAL, que son los dos datos que duelen si
+            estan mal y los unicos que el vendedor no puede corregir despues. */}
+        <ConfirmDialog
+          title="¿Emitir la nota de entrega?"
+          message={`${f.cliente || "Sin cliente"} · ${lineas.length} renglón(es) · ${
+            enBs && tasa ? `${(t.total * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : fmtUsd(t.total)
+          }. Se consume el número ${seq} y no se puede deshacer.`}
+          confirmLabel="Sí, emitir"
+          onConfirm={async () => {
+            if (guardando) return;                  // doble clic: no emitir dos veces
+            setGuardando(true);
+            try {
+              const r = await onSave({ ...f, correlativo: seq, fecha: hoyISO(), lineas, cilindros: cil, llevaIva, ivaPct });
+              // Si la base rechazó, hay que decirlo: antes el documento "se
+              // generaba" en pantalla aunque no quedara guardado en ningún lado.
+              if (r.error) setMsg(r.error);
+              else { setLineas([]); setF(formularioVacio()); }
+            } finally {
+              setGuardando(false);
+            }
+          }}
+          trigger={(abrir) => (
+            <Button icon="delivery" className="mt-3 w-full" cargando={guardando} textoCargando="Guardando…"
+              onClick={() => {
+                // Se valida ANTES de abrir el diálogo: confirmar y recién
+                // entonces enterarse de que falta un precio es peor que no
+                // confirmar nada.
+                setMsg("");
+                if (!f.cliente.trim()) return setMsg("El cliente es obligatorio.");
+                if (lineas.length === 0) return setMsg("Agrega al menos un renglón.");
+                if (lineas.some((l) => l.precio <= 0)) return setMsg("Hay renglones sin precio (marcados en rojo). Complétalos antes de generar.");
+                abrir();
+              }}>
+              Registrar y generar (PDF)
+            </Button>
+          )}
+        />
       </SectionCard>
     </div>
   );

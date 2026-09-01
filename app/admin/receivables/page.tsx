@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
 import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
@@ -90,8 +91,27 @@ export default function ReceivablesPage() {
         </p>
       )}
       <div className="flex gap-2">
-        <Button icon="cash" className="flex-1"
-          onClick={async () => { if (await registrarAbono()) cerrar(); }}>Registrar abono</Button>
+        {/* Se confirma porque mueve dinero y no se deshace, y porque el panel
+            se cierra con un toque afuera: es facil pulsar de mas. El resumen
+            repite el documento y el monto, que es lo unico que hay que
+            verificar antes de que quede asentado. */}
+        <ConfirmDialog
+          title="¿Registrar el abono?"
+          message={`${fmtUsd(Number(abono) || 0)} a ${docSel || "(sin documento)"}. Queda asentado y no se puede deshacer.`}
+          confirmLabel="Sí, registrar"
+          onConfirm={async () => { if (await registrarAbono()) cerrar(); }}
+          trigger={(abrir) => (
+            <Button icon="cash" className="flex-1"
+              onClick={() => {
+                // Se valida antes de abrir: confirmar y recien ahi enterarse de
+                // que falta el documento es peor que no confirmar.
+                setMsg("");
+                if (!docSel) return setMsg("ERR:Selecciona un documento.");
+                if (!Number(abono) || Number(abono) <= 0) return setMsg("ERR:Ingresa un abono mayor a 0.");
+                abrir();
+              }}>Registrar abono</Button>
+          )}
+        />
         <Button variant="secondary" onClick={cerrar}>Cancelar</Button>
       </div>
     </div>
