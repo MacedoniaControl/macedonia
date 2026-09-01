@@ -70,7 +70,7 @@ export default function ProductsPage() {
         breadcrumbs={[{ label: "Inventario" }, { label: "Productos y catálogo" }]}
         actions={<StatusBadge tone="brand">{prods.length} producto(s)</StatusBadge>}
       />
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.7fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.7fr]">
         <SectionCard title="Crear producto">
           <div className="space-y-3">
             <div>

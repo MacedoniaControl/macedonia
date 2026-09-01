@@ -91,7 +91,7 @@ export function FormularioProveedor({
           </button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo label="R.I.F. *">
             <input
               value={f.rif}
@@ -142,7 +142,7 @@ export function FormularioProveedor({
         <p className="mt-4 mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
           Crédito y retención
         </p>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Campo label="Días de crédito">
             <input type="number" inputMode="numeric" min={0} value={f.diasCredito}
               onChange={num("diasCredito")} className={`${campo} tabular-nums`} />

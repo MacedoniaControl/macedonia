@@ -327,7 +327,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
   const tasa = useTasaViva();
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <SectionCard title="Datos de la nota de entrega" description={`N° ${seq}`}>
         <div className="space-y-3">
           <div><label className={label}>Cliente</label><input className={inputClass} value={f.cliente} onChange={set("cliente")} placeholder="Nombre / Razón social" /></div>
@@ -459,7 +459,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           } finally {
             setGuardando(false);
           }
-        }}>{guardando ? "Guardando…" : "Registrar y generar (PDF)"}</Button>
+        }} cargando={guardando} textoCargando="Guardando…">Registrar y generar (PDF)</Button>
       </SectionCard>
     </div>
   );
@@ -482,7 +482,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: s
   const total = sub * (1 + ivaPctDev / 100);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <SectionCard title="Datos de la devolución (Nota de Crédito)" description={`N° ${seq}`}>
         <div className="space-y-3">
           <div><label className={label}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} /></div>
@@ -528,7 +528,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: s
           } finally {
             setGuardando(false);
           }
-        }}>{guardando ? "Guardando…" : "Generar y guardar (PDF)"}</Button>
+        }} cargando={guardando} textoCargando="Guardando…">Generar y guardar (PDF)</Button>
       </SectionCard>
     </div>
   );

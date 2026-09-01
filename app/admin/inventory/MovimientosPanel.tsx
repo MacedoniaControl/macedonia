@@ -74,7 +74,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
   return (
     <>
       {/* Resumen: las dos ramas del modelo */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <button onClick={() => setFiltro("entrada")}
           className={`rounded-2xl border p-4 text-left transition ${filtro === "entrada" ? "border-ok bg-ok/5" : "border-border bg-surface hover:bg-surface-2"}`}>
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
@@ -257,7 +257,7 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <div>
         <ScanBar onScan={onScan} hint={`Dispara el lector para elegir el producto del ${direccion === "entrada" ? "ingreso" : "la salida"}.`} />
         <div className="mt-3">

@@ -36,7 +36,7 @@ export function CentroDeControl() {
           </div>
 
           {/* Dos puertas: una por empresa */}
-          <div className="mt-10 grid gap-5 md:grid-cols-2">
+          <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2">
             {EMPRESA_IDS.map((id) => {
               const emp = EMPRESAS[id];
               const t = getHistory(id).totals;

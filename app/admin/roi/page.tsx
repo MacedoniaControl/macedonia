@@ -74,7 +74,7 @@ export default function RoiPage() {
         </div>
       </SectionCard>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="ROI por año" description="Ventas, compras, utilidad, margen y ROI anual.">
           <HistoryYearly empresa={empresa} />
         </SectionCard>
@@ -83,7 +83,7 @@ export default function RoiPage() {
         </SectionCard>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="Clientes de mayor facturación" description="Ventas acumuladas por cliente (histórico).">
           <HistoryTopClientes empresa={empresa} />
         </SectionCard>
@@ -119,7 +119,7 @@ export default function RoiPage() {
         </SectionCard>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="ROI por producto" description="Mayor retorno sobre costo.">
           <ul className="divide-y divide-border">
             {productosMayorRetorno.map((p) => (

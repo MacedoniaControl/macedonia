@@ -94,7 +94,7 @@ export function AltaCilindros({
   );
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <SectionCard title="Dar de alta" description="Cilindros nuevos que entran al parque.">
         <div className="space-y-3">
           <div>

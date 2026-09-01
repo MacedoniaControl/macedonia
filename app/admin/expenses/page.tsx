@@ -199,7 +199,7 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
 
   return (
     <SectionCard title="Registrar gasto" description="Queda registrado con fecha, partida, beneficiario y usuario.">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className={lbl}>Fecha</label>
           <input type="date" className={fieldClass} value={f.fecha} onChange={set("fecha")} />

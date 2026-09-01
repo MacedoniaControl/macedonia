@@ -64,7 +64,7 @@ export default function SalesPage() {
           <StatCard label="Documentos" value={String(ventas.length)} />
         </div>
       </SectionCard>
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.5fr]">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.5fr]">
         <SectionCard title="Registrar venta">
           <div className="space-y-3">
             <div>

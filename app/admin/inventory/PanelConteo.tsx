@@ -78,7 +78,7 @@ function Abrir({ empresa, onAbierto }: { empresa: string; onAbierto: () => void 
 
       {msg && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
 
-      <Button icon="inventory" className="w-full" disabled={yendo}
+      <Button icon="inventory" className="w-full" cargando={yendo} textoCargando="Abriendo…"
         onClick={async () => {
           setMsg(null);
           if (!zona.trim()) return setMsg("Poné la zona: sin eso, después nadie sabe qué se contó.");
@@ -89,7 +89,7 @@ function Abrir({ empresa, onAbierto }: { empresa: string; onAbierto: () => void 
             onAbierto();
           } finally { setYendo(false); }
         }}>
-        {yendo ? "Abriendo…" : "Empezar a contar"}
+        Empezar a contar
       </Button>
     </div>
   );
@@ -219,7 +219,7 @@ function Contando({
       )}
 
       <div className="flex gap-2 border-t border-border pt-3">
-        <Button icon="check" className="flex-1" disabled={cerrando || lineas.length === 0}
+        <Button icon="check" className="flex-1" cargando={cerrando} disabled={cerrando || lineas.length === 0} textoCargando="Cerrando…"
           onClick={async () => {
             setCerrando(true);
             try {
@@ -228,7 +228,7 @@ function Contando({
               onTerminado();
             } finally { setCerrando(false); }
           }}>
-          {cerrando ? "Cerrando…" : "Cerrar conteo"}
+          Cerrar conteo
         </Button>
       </div>
       <p className="text-[11px] text-muted">

@@ -66,7 +66,7 @@ export default function ReportsPage() {
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Reportes" }]}
         actions={<Button variant="secondary" icon="report" onClick={descargarPdf}>Descargar PDF</Button>}
       />
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.8fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.8fr]">
         <div className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3">
         <SelectorRango valor={rango} onCambio={setRango} agrupaciones={AGRUPACIONES_HISTORICO} />
       </div>

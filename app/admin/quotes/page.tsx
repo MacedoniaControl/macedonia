@@ -295,7 +295,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr_1fr] lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.2fr_1fr] lg:grid-cols-2">
       <SectionCard title="Nueva cotización" description={`N° ${String(seq).padStart(10, "0")}`}>
         <div className="space-y-3">
           <div><label className={lbl}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} placeholder="Empresa externa" /></div>
@@ -458,7 +458,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
           } finally {
             setGuardando(false);
           }
-        }}>{guardando ? "Guardando…" : "Registrar y generar (PDF)"}</Button>
+        }} cargando={guardando} textoCargando="Guardando…">Registrar y generar (PDF)</Button>
       </SectionCard>
 
       {/* Vista previa. Se ve mientras se arma, no después de emitir: corregir un

@@ -142,7 +142,7 @@ export function EntregaCilindros({
         {lista.map((g) => (
           <div key={g.nombre} className="rounded-2xl border border-border bg-surface-2 p-3">
             <p className="mb-2.5 text-sm font-semibold text-text">{g.nombre}</p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
                   Llenos que dejas

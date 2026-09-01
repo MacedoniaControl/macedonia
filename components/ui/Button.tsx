@@ -16,16 +16,43 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   icon?: IconName;
   children?: ReactNode;
+  /** En curso. Deshabilita y muestra `textoCargando` SIN cambiar de ancho. */
+  cargando?: boolean;
+  textoCargando?: string;
 };
 
-export function Button({ variant = "primary", icon, children, className = "", ...rest }: ButtonProps) {
+export function Button({
+  variant = "primary", icon, children, className = "",
+  cargando = false, textoCargando, disabled, ...rest
+}: ButtonProps) {
+  // Los dos rótulos viven en la MISMA celda de rejilla: el ancho lo fija el
+  // más largo y no cambia nunca. Cambiar el texto a secas encoge el botón bajo
+  // el dedo justo en el momento de pulsarlo, que es cuando peor se siente.
+  const conEstados = textoCargando !== undefined;
+
   return (
     <button
-      className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
+      disabled={disabled ?? cargando}
+      aria-busy={cargando || undefined}
+      className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition active:scale-[0.972] disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
       {...rest}
     >
       {icon && <Icon name={icon} size={18} />}
-      {children}
+      {conEstados ? (
+        <span className="grid items-center justify-items-center">
+          <span className={`col-start-1 row-start-1 whitespace-nowrap transition ${cargando ? "opacity-0" : "opacity-100"}`}>
+            {children}
+          </span>
+          <span
+            aria-hidden={!cargando}
+            className={`col-start-1 row-start-1 whitespace-nowrap transition ${cargando ? "opacity-100" : "opacity-0"}`}
+          >
+            {textoCargando}
+          </span>
+        </span>
+      ) : (
+        children
+      )}
     </button>
   );
 }

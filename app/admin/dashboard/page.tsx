@@ -130,7 +130,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       </div>
 
       {/* Banda superior: resumen real (histórico) + tipo de cambio BCV */}
-      <div className="mb-4 grid gap-3 lg:grid-cols-2">
+      <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {/* Resumen del histórico */}
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2">
@@ -203,7 +203,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
               <StatCard key={c.label} label={c.label} value={c.value} sub={c.sub} accent={c.accent} />
             ))}
           </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <p className="mb-2 text-sm font-medium text-text">Productos con mayor retorno</p>
               {sinSerie && <p className="text-sm text-muted">Sin serie mensual cargada para esta empresa.</p>}
@@ -238,7 +238,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
         </SectionCard>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="Ventas vs compras" description="Responde a los filtros. Interactivo.">
           <BiVentasCompras factor={factor} bs={bs} count={count} />
         </SectionCard>
@@ -247,7 +247,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
         </SectionCard>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="Cilindros por estado" description="Inventario operativo de cilindros.">
           <ul className="space-y-3">
             {cilindrosPorEstado.map((c) => {
@@ -279,7 +279,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
         </SectionCard>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="Importaciones recientes" description="Últimas matrices cargadas.">
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full text-left text-sm">

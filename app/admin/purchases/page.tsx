@@ -140,7 +140,7 @@ export default function PurchasesPage() {
       {tab === "proveedores" && <PanelProveedores />}
 
       {tab === "ordenes" && (
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.5fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.5fr]">
         <SectionCard title="Nueva orden de compra" description="Los productos salen del inventario de la empresa.">
           <div className="space-y-3">
             <div>

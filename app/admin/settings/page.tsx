@@ -116,12 +116,12 @@ export default function SettingsPage() {
         title="Configuración"
         description=""
         breadcrumbs={[{ label: "Sistema" }, { label: "Configuración" }]}
-        actions={<Button icon="check" onClick={guardar} disabled={guardando || cargando}>{guardando ? "Guardando…" : "Guardar cambios"}</Button>}
+        actions={<Button icon="check" onClick={guardar} disabled={guardando || cargando} cargando={guardando} textoCargando="Guardando…">Guardar cambios</Button>}
       />
 
       {msg && <p className="mb-4 rounded-xl bg-ok/10 px-3 py-2 text-sm text-ok">{msg}</p>}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="Empresas" description="Multiempresa: Sumigases y Sudematin." action={<StatusBadge tone="brand">2 activas</StatusBadge>}>
           <div className="space-y-3">
             <Field label="Empresa por defecto">
