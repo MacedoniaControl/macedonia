@@ -3,7 +3,8 @@
 import { useRef, useEffect, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
-import { guardarDocumento, correlativoPrevisto } from "@/lib/documentos/documentos-db";
+import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
+import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
@@ -17,7 +18,6 @@ import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
 import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
 import { beep } from "@/lib/inventory/scan-feedback";
-import { useCarga } from "@/lib/ux/use-carga";
 import { vendedoresDe } from "@/lib/auth/vendedores";
 import { gases as gasesDe } from "@/lib/cilindros/cilindros-db";
 import { leerConfig } from "@/lib/config/config-db";
@@ -55,13 +55,42 @@ function inPeriod(iso: string, period: string): boolean {
   return d.getFullYear() === n.getFullYear();
 }
 
-const SEED: Cotizacion[] = [
-  { id: 1, correlativo: "0000002242", razonSocial: "SERVICIOS Y SUMINISTROS V & B, C.A", rif: "J080142489", direccion: "", telefonos: "0000", fechaEmision: dmy(new Date()), fechaVenc: dmy(new Date()), fechaISO: hoyISO(), moneda: "Dolar", nota: "", lineas: [{ codigo: "ARG6", descripcion: "ARGON CIL 6 M3", cantidad: 2, precio: 120, descuento: 0 }], total: 916.4, estado: "Aprobada", origen: "Valery", fileName: "Presupuesto-0000002242.pdf" },
-];
+function deDocumento(d: DocumentoGuardado): Cotizacion {
+  return {
+    id: d.id,
+    correlativo: d.correlativo,
+    razonSocial: d.cliente,
+    rif: d.clienteRif ?? "",
+    direccion: "",
+    telefonos: "",
+    fechaEmision: d.fecha,
+    fechaVenc: "",
+    fechaISO: d.fecha,
+    moneda: "Dolar",
+    nota: "",
+    lineas: d.lineas.map((l) => ({
+      codigo: l.codigo, descripcion: l.descripcion,
+      cantidad: l.cantidad, precio: l.precio, descuento: l.descuento ?? 0,
+    })),
+    total: d.total,
+    estado: "Aprobada",
+    origen: "Macedonia",
+  };
+}
 
 export default function QuotesPage() {
   const empresaKey = useEmpresaActiva();
-  const [cots, setCots] = usePersistedState<Cotizacion[]>(`cot:docs:${empresaKey}`, SEED);
+  // El registro sale de la BASE. Los PDF que se suben de Valery son archivos,
+  // no registros, y siguen en el navegador porque todavía no hay dónde
+  // guardarlos. Mismo criterio que en notas de entrega.
+  const [subidos, setSubidos] = usePersistedState<Cotizacion[]>(`cot:subidos:${empresaKey}`, []);
+  const [recarga, setRecarga] = useState(0);
+
+  const guardadas = useCarga(`${empresaKey}:${recarga}`, () => listarDocumentos(empresaKey, "cotizacion", 200));
+  const cots: Cotizacion[] = [
+    ...(guardadas.datos ?? []).map(deDocumento),
+    ...subidos,
+  ].sort((a, b) => (a.fechaISO < b.fechaISO ? 1 : a.fechaISO > b.fechaISO ? -1 : 0));
   // El número lo da la BASE, no un contador del navegador. Esto es solo la
   // previsión que se muestra antes de generar.
   const [previsto, setPrevisto] = useState("…");
@@ -83,7 +112,7 @@ export default function QuotesPage() {
     printDoc(presupuestoHtml({ correlativo: c.correlativo, fechaEmision: c.fechaEmision, fechaVenc: c.fechaVenc, razonSocial: c.razonSocial, rif: c.rif, direccion: c.direccion, telefonos: c.telefonos, lineas: c.lineas, moneda: c.moneda, nota: c.nota }, empresaKey));
   }
   function setEstado(id: number, estado: Estado) {
-    setCots((prev) => prev.map((c) => (c.id === id ? { ...c, estado } : c)));
+    setSubidos((prev) => prev.map((c) => (c.id === id ? { ...c, estado } : c)));
   }
   function onUpload(files: FileList | null) {
     if (!files) return;
@@ -91,7 +120,7 @@ export default function QuotesPage() {
       const r = new FileReader();
       r.onload = () => {
         const num = (file.name.match(/\d{4,}/) || ["—"])[0];
-        setCots((p) => [{ id: Date.now() + Math.random(), correlativo: num, razonSocial: "(desde archivo)", rif: "", direccion: "", telefonos: "", fechaEmision: dmy(new Date()), fechaVenc: "", fechaISO: hoyISO(), moneda: "Dolar", nota: "", lineas: [], total: 0, estado: "Aprobada", origen: "Valery", fileName: file.name, dataUrl: String(r.result) }, ...p]);
+        setSubidos((p) => [{ id: Date.now() + Math.random(), correlativo: num, razonSocial: "(desde archivo)", rif: "", direccion: "", telefonos: "", fechaEmision: dmy(new Date()), fechaVenc: "", fechaISO: hoyISO(), moneda: "Dolar", nota: "", lineas: [], total: 0, estado: "Aprobada", origen: "Valery", fileName: file.name, dataUrl: String(r.result) }, ...p]);
       };
       r.readAsDataURL(file);
     });
@@ -182,7 +211,9 @@ export default function QuotesPage() {
         if (!r.ok) return { error: r.error };
 
         const conNumero = { ...c, correlativo: r.documento.correlativo };
-        setCots((p) => [{ ...conNumero, id: r.documento.id, estado: "Borrador", origen: "Macedonia", fechaISO: hoyISO() }, ...p]);
+        // Se relee de la base: empujar la fila a mano mostraría algo que quizá
+        // no se guardó igual.
+        setRecarga((n) => n + 1);
         setPrevisto(String(Number(r.documento.correlativo) + 1).padStart(10, "0"));
         printDoc(presupuestoHtml(conNumero, empresaKey));
         return { error: null };

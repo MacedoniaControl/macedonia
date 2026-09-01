@@ -8,14 +8,6 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { downloadCsv } from "@/lib/ux/export-csv";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
-import { addNotif } from "@/lib/ux/notifications";
-import {
-  buildMaster,
-  duplicadosBloqueados,
-  inFisico,
-  type SItem,
-} from "@/lib/ux/inventory-data";
 import { MasterInventario } from "./MasterInventario";
 import { PanelConteo } from "./PanelConteo";
 import ProductosPage from "@/app/admin/products/page";
@@ -24,9 +16,7 @@ import { useTableView } from "@/lib/ux/use-table-view";
 import { useCarga } from "@/lib/ux/use-carga";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
-import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory-fiscal";
 import { inventarioDe, type ItemInventario } from "@/lib/inventory/inventario-db";
-import { ventas12m, precioProm, estadoRotacion } from "@/lib/ux/inventory-rotation";
 
 const inputClass = "sumi-campo sumi-campo--con-icono";
 
@@ -38,18 +28,7 @@ export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("master");
   const [recargaMaster, setRecargaMaster] = useState(0);
   const [q, setQ] = useState("");
-  const [sItems, setSItems] = usePersistedState<SItem[]>(`inv-s:${empresa}`, []);
-  const { notas, ledger } = useFiscal(empresa);
-  const [placeholder, setPlaceholder] = useState("");
-  function stub(area: string) {
-    setPlaceholder(`Acción pendiente de definir · ${area}`);
-  }
-  const StubBtn = ({ area }: { area: string }) => (
-    <Button variant="secondary" icon="plus" onClick={() => stub(area)}>Acción</Button>
-  );
 
-  const conflictos = useMemo(() => duplicadosBloqueados(sItems, empresa), [sItems, empresa]);
-  const master = useMemo(() => buildMaster(sItems, empresa), [sItems, empresa]);
   // El físico viene de la BASE: catálogo + existencia calculada del kardex.
   // Antes salía de un JSON del código con la existencia congelada del día del
   // export de Valery, que dejaba de ser cierta al primer movimiento.
@@ -63,157 +42,19 @@ export default function InventoryPage() {
     !t || codigo.toLowerCase().includes(t) || nombre.toLowerCase().includes(t);
 
   const fisicoF = useMemo(() => fisico.filter((f) => match(f.codigo, f.nombre)), [t, fisico]);
-  const masterF = useMemo(() => master.filter((m) => match(m.codigo, m.nombre)), [master, t]);
-  const sF = useMemo(() => sItems.filter((s) => match(s.codigo, s.nombre)), [sItems, t]);
 
-  // --- Sub-apartados del Master (lógica preliminar; se afinará con las indicaciones) ---
-  // Físico Existente: lo que realmente está en almacén (Maestro M > 0).
-  const fisicoExistente = useMemo(
-    () => masterF.map((m) => ({ ...m, m: stockMaestro(m.codigo, ledger, empresa) })).filter((m) => m.m !== 0),
-    [masterF, ledger],
-  );
-  // En Espera por Factura: notas de entrega ya emitidas, pendientes de convertir a factura fiscal.
-  const esperaFactura = useMemo(() => {
-    const map = new Map<string, { codigo: string; nombre: string; cantidad: number; notas: string[] }>();
-    notas.filter((n) => n.estado === "pendiente").forEach((n) =>
-      n.lineas.forEach((l) => {
-        const e = map.get(l.codigo) ?? { codigo: l.codigo, nombre: l.nombre, cantidad: 0, notas: [] };
-        e.cantidad += l.cantidad;
-        if (!e.notas.includes(n.numero)) e.notas.push(n.numero);
-        map.set(l.codigo, e);
-      }),
-    );
-    return [...map.values()].filter((e) => match(e.codigo, e.nombre));
-  }, [notas, t]);
-  // En Espera por Nota de Entrega: pedidos/compromisos aún sin NE emitida. Lógica a definir.
-  const esperaNE: { codigo: string; nombre: string; cantidad: number }[] = [];
-
-  const totFisico = fisicoExistente.reduce((a, m) => a + m.m, 0);
-  const totFactura = esperaFactura.reduce((a, e) => a + e.cantidad, 0);
-  const totNE = esperaNE.reduce((a, e) => a + e.cantidad, 0);
-
-  // --- Orden + paginación por tabla ---
-  const accFisicoExistente = useMemo(
-    () => ({
-      codigo: (r: (typeof fisicoExistente)[number]) => r.codigo,
-      nombre: (r: (typeof fisicoExistente)[number]) => r.nombre,
-      v: (r: (typeof fisicoExistente)[number]) => stockValery(r.codigo, ledger, empresa),
-      s: (r: (typeof fisicoExistente)[number]) => stockS(r.codigo, ledger, r.s),
-      m: (r: (typeof fisicoExistente)[number]) => r.m,
-    }),
-    [ledger],
-  );
-  const tFis = useTableView(fisicoExistente, accFisicoExistente);
-
-  // --- Rotación: existencia (M en vivo) vs velocidad de venta (12m histórico) ---
-  const rotacion = useMemo(
-    () =>
-      masterF
-        .map((m) => {
-          const disponible = stockMaestro(m.codigo, ledger, empresa);
-          const v12 = ventas12m(m.codigo);
-          const avg = v12 / 12;
-          return { codigo: m.codigo, nombre: m.nombre, disponible, v12, avg, precio: precioProm(m.codigo), est: estadoRotacion(disponible, avg) };
-        })
-        // se muestra lo que tienes en almacén o lo que se vende (agotados con ventas incluidos)
-        .filter((r) => r.disponible !== 0 || r.v12 > 0),
-    [masterF, ledger],
-  );
-  const resumenRot = useMemo(() => {
-    const c = { reponer: 0, sobrestock: 0, sinRotacion: 0, agotado: 0 };
-    rotacion.forEach((r) => {
-      if (r.est.label === "Reponer pronto") c.reponer++;
-      else if (r.est.label === "Sobrestock") c.sobrestock++;
-      else if (r.est.label === "Sin rotación") c.sinRotacion++;
-      else if (r.est.label === "Agotado") c.agotado++;
-    });
-    return c;
-  }, [rotacion]);
-  const accRot = useMemo(
-    () => ({
-      codigo: (r: (typeof rotacion)[number]) => r.codigo,
-      nombre: (r: (typeof rotacion)[number]) => r.nombre,
-      disponible: (r: (typeof rotacion)[number]) => r.disponible,
-      v12: (r: (typeof rotacion)[number]) => r.v12,
-      avg: (r: (typeof rotacion)[number]) => r.avg,
-      meses: (r: (typeof rotacion)[number]) => (r.est.meses ?? 99999),
-      precio: (r: (typeof rotacion)[number]) => r.precio,
-    }),
-    [],
-  );
-  const tRot = useTableView(rotacion, accRot);
-
+  // La tabla de Valery: lo único que queda acá, y sale de la base.
   const accValery = useMemo(
     () => ({
-      codigo: (r: (typeof fisico)[number]) => r.codigo,
-      nombre: (r: (typeof fisico)[number]) => r.nombre,
-      und: (r: (typeof fisico)[number]) => r.undPpal,
-      existencia: (r: (typeof fisico)[number]) => r.existPpal,
-      alt: (r: (typeof fisico)[number]) => r.existAlt,
+      codigo: (r: ItemInventario) => r.codigo,
+      nombre: (r: ItemInventario) => r.nombre,
+      und: (r: ItemInventario) => r.undPpal,
+      existencia: (r: ItemInventario) => r.existPpal,
+      alt: (r: ItemInventario) => r.existAlt,
     }),
     [],
   );
   const tVal = useTableView(fisicoF, accValery);
-
-  const accS = useMemo(
-    () => ({
-      codigo: (r: SItem) => r.codigo,
-      nombre: (r: SItem) => r.nombre,
-      precio: (r: SItem) => r.precio,
-      existencia: (r: SItem) => r.existencia,
-    }),
-    [],
-  );
-  const tS = useTableView(sF, accS);
-
-  const accFactura = useMemo(
-    () => ({
-      codigo: (r: (typeof esperaFactura)[number]) => r.codigo,
-      nombre: (r: (typeof esperaFactura)[number]) => r.nombre,
-      cantidad: (r: (typeof esperaFactura)[number]) => r.cantidad,
-    }),
-    [],
-  );
-  const tFac = useTableView(esperaFactura, accFactura);
-
-  // --- Inventario S: alta / ajuste / duplicados ---
-  const [form, setForm] = useState({ codigo: "", nombre: "", existencia: "", costo: "", precio: "" });
-  function addS() {
-    const codigo = form.codigo.trim();
-    if (!codigo || !form.nombre.trim()) return;
-    const nuevo: SItem = {
-      codigo,
-      nombre: form.nombre.trim(),
-      existencia: Number(form.existencia) || 0,
-      costo: Number(form.costo) || 0,
-      precio: Number(form.precio) || 0,
-      empresa: "Sumigases",
-      almacen: "Lechería",
-    };
-    setSItems([nuevo, ...sItems.filter((s) => s.codigo !== codigo)]);
-    if (inFisico(codigo, empresa)) {
-      addNotif({
-        id: `dup-${codigo}-${Date.now()}`,
-        tipo: "inventario",
-        titulo: "Código duplicado en ambos inventarios",
-        mensaje: `El código ${codigo} existe en el Inventario Físico (Valery) y en el Inventario S. Requiere revisión OWNER/ADMIN antes de modificarse.`,
-        para: "OWNER/ADMIN",
-        estado: "pendiente",
-        hora: new Date().toLocaleString("es-VE"),
-        payload: { codigo },
-      });
-    }
-    setForm({ codigo: "", nombre: "", existencia: "", costo: "", precio: "" });
-  }
-  function aprobarDuplicado(codigo: string) {
-    setSItems(sItems.map((s) => (s.codigo === codigo ? { ...s, tagDuplicado: true } : s)));
-  }
-  function ajustar(codigo: string, delta: number) {
-    setSItems(sItems.map((s) => (s.codigo === codigo ? { ...s, existencia: s.existencia + delta } : s)));
-  }
-  function eliminar(codigo: string) {
-    setSItems(sItems.filter((s) => s.codigo !== codigo));
-  }
 
   return (
     <>
@@ -226,31 +67,14 @@ export default function InventoryPage() {
             {/* Cargar conteo va primero: es la acción principal de esta
                 pantalla, y la razón por la que el Master significa algo. */}
             <PanelConteo empresa={empresa} onCerrado={() => setRecargaMaster((n) => n + 1)} />
-            <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-master",
-              [["Código", "Nombre", "Físico", "S", "Master"], ...masterF.map((m) => [m.codigo, m.nombre, m.fisico, m.s, m.master])])}>
+            <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-valery",
+              [["Código", "Nombre", "Unidad", "Existencia"], ...fisicoF.map((f) => [f.codigo, f.nombre, f.undPpal, f.existPpal])])}>
               Exportar CSV
             </Button>
           </div>
         }
       />
 
-      {conflictos.length > 0 && (
-        <div className="mb-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm">
-          <p className="font-medium text-danger">
-            {conflictos.length} código(s) duplicado(s) en Físico y S — modificación bloqueada hasta aprobación OWNER/ADMIN.
-          </p>
-          <p className="mt-1 text-muted">
-            {conflictos.slice(0, 8).map((c) => c.codigo).join(", ")}
-            {conflictos.length > 8 ? "…" : ""} · Revísalos en la pestaña <strong>Inventario S</strong>.
-          </p>
-        </div>
-      )}
-
-      {placeholder && (
-        <p className="mb-3 flex items-center gap-2 rounded-xl bg-info/10 px-3 py-2 text-sm text-info">
-          <Icon name="alert" size={16} /> {placeholder}
-        </p>
-      )}
 
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
         {([
@@ -298,7 +122,7 @@ export default function InventoryPage() {
 
 
       {tab === "valery" && (
-        <SectionCard title="Inventario Valery" action={<StubBtn area="Valery" />}
+        <SectionCard title="Inventario Valery"
           description="Lo que dicen los papeles. Solo lectura.">
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
