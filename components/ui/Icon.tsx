@@ -25,6 +25,7 @@ export type IconName =
   | "moon"
   | "menu"
   | "search"
+  | "scan"
   | "plus"
   | "chevronDown"
   | "chevronRight"
@@ -175,6 +176,16 @@ const paths: Record<IconName, JSX.Element> = {
   ),
   moon: <path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  scan: (
+    <>
+      {/* Código de barras entre las esquinas de un visor. */}
+      <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+      <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+      <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+      <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+      <path d="M7 8v8M10.5 8v8M14 8v8M17 8v8" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="7" />

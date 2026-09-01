@@ -27,15 +27,15 @@ No hay consolidado (D4).
 - [x] ~~Borrar: «Registro, generación (formato oficial Valery) e importación…»~~
 - [x] ~~«Subir de Valery» sale del apartado principal → esquina derecha, se llama
       **Subir Archivo**, abre ventana de drop~~
-- [ ] Nuevo presupuesto → **Vendedor**: se llena con los usuarios del sistema
-- [ ] Nuevo presupuesto → **Tipo de precio**: Mayorista / Oferta / Detal
+- [x] ~~Nuevo presupuesto → **Vendedor**: se llena con los usuarios del sistema~~
+- [x] ~~Nuevo presupuesto → **Tipo de precio**: Mayorista / Oferta / Detal~~
 - [x] ~~Borrar: «Escanea o busca en el catálogo para agregar…»~~
-- [ ] Buscador: textbox de texto + píldora **Escanear** al lado (código de barras)
-- [ ] «Agregar renglón» debe incluir **Agregar Gases**
-- [ ] Panel de **preview** de lo que se va agregando
+- [x] ~~Buscador: textbox de texto + píldora **Escanear** al lado (código de barras)~~
+- [x] ~~«Agregar renglón» debe incluir **Agregar Gases**~~
+- [x] ~~Panel de **preview** de lo que se va agregando~~
 - [ ] **Ventas Externas** = registro de vendedores externos a Sumigases; ahí se
       guardan las cotizaciones que ellos hacen
-- [ ] **Registro** solo lo ven los Owners (logs de todos los presupuestos)
+- [x] ~~**Registro** solo lo ven los Owners (logs de todos los presupuestos)~~
 
 ## Notas de entrega
 - [x] ~~Borrar: «Registro, generación e importación de Notas de Entrega…»~~
@@ -155,3 +155,27 @@ año pegado. Con eso el selector de rango no podía significar nada. Ahora leen
 `HISTORY`, que trae mes con año (2023-04 → 2026-07).
 
 **El consolidado se fue** del dashboard y del ROI (D4).
+
+
+## Tanda 4 — lo que hay que saber
+
+**El IVA fijo apareció por quinta vez.** `* 1.16` en el total de la cotización.
+Ahora sale de `configuracion`.
+
+**El vendedor era un texto fijo** — `"01 - GERENTE"`, igual para todos: no se
+sabía quién había hecho cada cotización. Ahora es un desplegable poblado desde
+`usuarios` (nueva función `vendedoresDe`, que deja afuera a los técnicos de
+almacén porque no venden).
+
+**Registro ya era solo de Owners.** `puedeVerRegistros` devuelve
+`rol === "owner"` y las dos pantallas lo respetaban. No hubo que tocar nada.
+
+**Ventas Externas está bloqueada por la base.** Muestra TODAS las cotizaciones
+porque `documentos.vendedor_id` apunta a `usuarios`, y un vendedor externo no es
+usuario del sistema. Falta la columna `vendedor_externo`. Por ahora la pantalla
+lo avisa en vez de presentar todas como externas.
+
+SQL pendiente:
+```sql
+alter table public.documentos add column if not exists vendedor_externo text;
+```

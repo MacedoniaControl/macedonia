@@ -23,8 +23,14 @@ export function VentasExternas() {
   return (
     <SectionCard
       title="Ventas externas"
-      description="Lo que colocaron los vendedores externos. Su comisión sale de estos documentos."
+      description="Cotizaciones hechas por vendedores que no son del personal."
     >
+      {/* Mientras `documentos.vendedor_externo` no exista, no hay forma de
+          separarlas: se avisa en vez de presentar todas como externas. */}
+      <p className="mb-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
+        Se están mostrando todas las cotizaciones. Para separar las externas falta
+        la columna <code className="font-mono">vendedor_externo</code> en la base.
+      </p>
       {carga.error && <p className="text-sm text-danger">{carga.error}</p>}
 
       {!carga.cargando && docs.length === 0 && (

@@ -17,6 +17,10 @@ import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
 import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
 import { beep } from "@/lib/inventory/scan-feedback";
+import { useCarga } from "@/lib/ux/use-carga";
+import { vendedoresDe } from "@/lib/auth/vendedores";
+import { gases as gasesDe } from "@/lib/cilindros/cilindros-db";
+import { leerConfig } from "@/lib/config/config-db";
 import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 
 type Estado = "Borrador" | "Aprobada" | "Rechazada" | "Nota de entrega";
@@ -35,7 +39,7 @@ const CATALOGO = [
   { codigo: "2001105", descripcion: "REGULADOR DE ARGON C/ FLUJOMETRO", precio: 63.87 },
 ];
 const MONEDAS = ["Dolar", "Bolívar"];
-const TIPOS_PRECIO = ["Precio Máximo", "Precio Mínimo", "Precio Oferta", "Precio Mayor"];
+const TIPOS_PRECIO = ["Precio Mayorista", "Precio Oferta", "Detal"];
 const UNIDADES = ["UNIDAD", "CILINDRO", "KG", "MT", "PAR", "CAJA"];
 const toneOf: Record<Estado, Tone> = { Borrador: "muted", Aprobada: "info", Rechazada: "danger", "Nota de entrega": "ok" };
 const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
@@ -195,15 +199,28 @@ type GenDoc = { correlativo: string; fechaEmision: string; fechaVenc: string; ra
 function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) => Promise<{ error: string | null }> }) {
   const [guardando, setGuardando] = useState(false);
   const empresaKey = useEmpresaActiva();
-  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "01 - GERENTE", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5 });
+  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5 });
+
+  // El vendedor sale de la tabla de usuarios: antes era un texto fijo igual
+  // para todos y no se sabia quien habia hecho cada cotizacion.
+  const cargaVend = useCarga(empresaKey, () => vendedoresDe(empresaKey));
+  const vendedores = cargaVend.datos ?? [];
+
+  // Se venden gases, asi que tienen que poder elegirse en un presupuesto.
+  const cargaGases = useCarga(empresaKey, () => gasesDe(empresaKey));
+  const gases = cargaGases.datos ?? [];
+
+  const cfg = useCarga(empresaKey, () => leerConfig(empresaKey));
+  const ivaPct = Number(cfg.datos?.iva_pct) || 16;
   const [lineas, setLineas] = useState<DevLinea[]>([]);
   const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0, unidad: "UNIDAD" });
   const [msg, setMsg] = useState("");
   const [aviso, setAviso] = useState<{ ok: boolean; text: string } | null>(null);
+  const [escaneando, setEscaneando] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   const pick = (codigo: string) => { const p = CATALOGO.find((c) => c.codigo === codigo); if (p) setLn({ ...ln, codigo: p.codigo, descripcion: p.descripcion, precio: p.precio }); };
   const sub = lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
-  const totalOp = sub * 1.16;
+  const totalOp = sub * (1 + ivaPct / 100);
 
   // Agrega un producto del catálogo (escáner o buscador). Si ya está, sube la cantidad.
   // El catálogo de Valery no trae precio: el renglón nace en 0 y se completa abajo.
@@ -246,8 +263,8 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
-      <SectionCard title="Nuevo presupuesto" description={`N° ${String(seq).padStart(10, "0")}`}>
+    <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr_1fr] lg:grid-cols-2">
+      <SectionCard title="Nueva cotización" description={`N° ${String(seq).padStart(10, "0")}`}>
         <div className="space-y-3">
           <div><label className={lbl}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} placeholder="Empresa externa" /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -256,7 +273,13 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
           </div>
           <div><label className={lbl}>Dirección</label><input className={inputClass} value={f.direccion} onChange={set("direccion")} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={lbl}>Vendedor</label><input className={inputClass} value={f.vendedor} onChange={set("vendedor")} /></div>
+            <div><label className={lbl}>Vendedor</label>
+              <select className={inputClass} value={f.vendedor} onChange={set("vendedor")}>
+                <option value="">— elegir —</option>
+                {vendedores.map((v) => <option key={v.id} value={v.nombre}>{v.nombre} · {v.rol}</option>)}
+              </select>
+              {cargaVend.error && <span className="mt-1 block text-xs text-danger">{cargaVend.error}</span>}
+            </div>
             <div><label className={lbl}>Tipo de precio</label><select className={inputClass} value={f.tipoPrecio} onChange={set("tipoPrecio")}>{TIPOS_PRECIO.map((tp) => <option key={tp}>{tp}</option>)}</select></div>
             <div><label className={lbl}>Divisa / Expresado en</label><select className={inputClass} value={f.moneda} onChange={set("moneda")}>{MONEDAS.map((mo) => <option key={mo}>{mo}</option>)}</select></div>
             <div><label className={lbl}>Caduca en (días)</label><input type="number" min={1} className={inputClass} value={f.venceDias} onChange={set("venceDias")} /></div>
@@ -266,14 +289,54 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
       </SectionCard>
 
       <SectionCard title="Renglones" description="">
-        {/* Escáner de productos */}
-        <ScanBar onScan={onScan} hint="Dispara el lector: el producto se agrega al presupuesto." />
-
-        {/* Buscador del catálogo (inventario) */}
-        <div className="mt-3">
-          <label className={lbl}>Buscar en productos y catálogo</label>
-          <ProductSearch onPick={(p) => agregarProducto(p, "buscador")} />
+        {/* Buscar por texto, o escanear. El escáner vive en una píldora al lado
+            del buscador: se usa con el lector en la mano, no siempre. */}
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <label className={lbl}>Buscar producto</label>
+            <ProductSearch onPick={(p) => agregarProducto(p, "buscador")} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setEscaneando((v) => !v)}
+            aria-pressed={escaneando}
+            className={`flex h-11 flex-none items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition
+              ${escaneando
+                ? "border-brand-strong bg-brand-soft text-brand"
+                : "border-border-strong bg-surface text-text hover:bg-surface-2"}`}
+          >
+            <Icon name="scan" size={16} />
+            {escaneando ? "Escaneando…" : "Escanear"}
+          </button>
         </div>
+
+        {escaneando && (
+          <div className="mt-3">
+            <ScanBar onScan={onScan} hint="Dispará el lector: el producto se agrega solo." />
+          </div>
+        )}
+
+        {/* Gases: se venden, así que tienen que poder elegirse. */}
+        {gases.length > 0 && (
+          <div className="mt-3">
+            <label className={lbl}>Agregar gases</label>
+            <div className="flex flex-wrap gap-1.5">
+              {gases.map((g) => (
+                <button
+                  key={g.nombre}
+                  type="button"
+                  onClick={() => agregarProducto(
+                    { codigo: g.nombre, nombre: g.nombre, precio: 0, unidad: "CILINDRO" } as ProductoEscaneado,
+                    "buscador",
+                  )}
+                  className="min-h-9 rounded-full border border-border bg-surface px-3 text-sm text-muted transition hover:bg-surface-2 hover:text-text"
+                >
+                  + {g.nombre}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {aviso && (
           <p className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${aviso.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
@@ -333,7 +396,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
               </table>
             </div>
             <p className="mt-2 flex justify-between border-t border-border pt-2 text-sm font-semibold text-text">
-              <span>Total operación (IVA 16%)</span><span className="tabular-nums">{fmtUsd(totalOp)}</span>
+              <span>Total operación (IVA {ivaPct}%)</span><span className="tabular-nums">{fmtUsd(totalOp)}</span>
             </p>
           </>
         )}
@@ -354,6 +417,74 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
             setGuardando(false);
           }
         }}>{guardando ? "Guardando…" : "Registrar y generar (PDF)"}</Button>
+      </SectionCard>
+
+      {/* Vista previa. Se ve mientras se arma, no después de emitir: corregir un
+          documento ya generado cuesta un correlativo quemado. */}
+      <SectionCard title="Vista previa" description="Así va a salir el documento.">
+        <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+            <div>
+              <p className="font-display text-base font-semibold text-text">Cotización</p>
+              <p className="font-mono text-xs text-muted">N° {String(seq).padStart(10, "0")}</p>
+            </div>
+            <div className="text-right text-xs text-muted">
+              <p>{f.tipoPrecio}</p>
+              <p>{f.moneda}</p>
+              <p>Vence en {f.venceDias} día(s)</p>
+            </div>
+          </div>
+
+          <div className="grid gap-1 py-3 text-xs">
+            <p><span className="text-muted">Cliente: </span>
+              <span className="text-text">{f.razonSocial || <em className="text-muted">sin completar</em>}</span></p>
+            {f.rif && <p><span className="text-muted">RIF: </span><span className="font-mono text-text">{f.rif}</span></p>}
+            {f.direccion && <p><span className="text-muted">Dirección: </span><span className="text-text">{f.direccion}</span></p>}
+            <p><span className="text-muted">Vendedor: </span>
+              <span className="text-text">{f.vendedor || <em className="text-muted">sin elegir</em>}</span></p>
+          </div>
+
+          {lineas.length === 0 ? (
+            <p className="border-t border-border py-6 text-center text-xs text-muted">
+              Todavía no hay renglones. Escaneá, buscá o agregá un gas.
+            </p>
+          ) : (
+            <table className="w-full border-t border-border text-xs">
+              <thead>
+                <tr className="text-left text-muted">
+                  <th className="py-1.5 font-medium">Descripción</th>
+                  <th className="py-1.5 text-right font-medium">Cant.</th>
+                  <th className="py-1.5 text-right font-medium">Precio</th>
+                  <th className="py-1.5 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {lineas.map((l, i) => (
+                  <tr key={`${l.codigo}-${i}`}>
+                    <td className="py-1.5 pr-2 text-text">{l.descripcion}</td>
+                    <td className="py-1.5 text-right tabular-nums text-muted">{l.cantidad}</td>
+                    <td className={`py-1.5 text-right tabular-nums ${l.precio > 0 ? "text-muted" : "text-danger"}`}>
+                      {l.precio > 0 ? fmtUsd(l.precio) : "falta"}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-text">
+                      {fmtUsd(l.cantidad * l.precio * (1 - l.descuento / 100))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t border-border">
+                <tr><td colSpan={3} className="py-1.5 text-right text-muted">Subtotal</td>
+                  <td className="py-1.5 text-right tabular-nums text-text">{fmtUsd(sub)}</td></tr>
+                <tr><td colSpan={3} className="py-1.5 text-right text-muted">IVA {ivaPct}%</td>
+                  <td className="py-1.5 text-right tabular-nums text-text">{fmtUsd(totalOp - sub)}</td></tr>
+                <tr className="font-semibold"><td colSpan={3} className="py-1.5 text-right text-text">Total</td>
+                  <td className="py-1.5 text-right tabular-nums text-text">{fmtUsd(totalOp)}</td></tr>
+              </tfoot>
+            </table>
+          )}
+
+          {f.nota && <p className="mt-3 border-t border-border pt-2 text-xs text-muted">{f.nota}</p>}
+        </div>
       </SectionCard>
     </div>
   );
