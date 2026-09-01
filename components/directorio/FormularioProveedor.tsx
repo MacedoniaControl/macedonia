@@ -11,9 +11,7 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { guardarProveedor, type Proveedor, type TipoPersona } from "@/lib/directorio/directorio-db";
 
-const campo =
-  "h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm text-text " +
-  "outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
+const campo = "sumi-campo";
 
 function Campo({ label, children, ancho = "" }: { label: string; children: React.ReactNode; ancho?: string }) {
   return (

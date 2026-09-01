@@ -81,29 +81,6 @@ export function CentroDeControl() {
             })}
           </div>
 
-          {/* Consolidado — solo Owner */}
-          <Link
-            href="/admin/dashboard"
-            className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-4 shadow-sm transition hover:bg-surface-2"
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy/10 text-navy dark:text-accent"><Icon name="matrix" size={18} /></span>
-              <div>
-                <p className="flex items-center gap-2 text-sm font-semibold text-text">
-                  Vista Consolidada
-                  <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">Solo Owner</span>
-                </p>
-                <p className="text-xs text-muted">Ambas empresas sumadas · {fmtUsd(consolidado.venta)} en ventas · ROI {consolidado.roi}%</p>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-brand">
-              Ver consolidado <Icon name="chevronRight" size={16} />
-            </span>
-          </Link>
-
-          <p className="mt-4 text-center text-xs text-muted">
-            El acceso al consolidado se restringirá a los Owner cuando se active la autenticación.
-          </p>
         </section>
       </div>
     </main>

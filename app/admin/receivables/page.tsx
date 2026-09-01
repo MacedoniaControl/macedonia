@@ -27,7 +27,7 @@ function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
   return { label: "Al día", tone: "info" };
 }
 
-const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+const inputClass = "sumi-campo";
 
 export default function ReceivablesPage() {
   const empresaKey = useEmpresaActiva();
@@ -79,7 +79,9 @@ export default function ReceivablesPage() {
       </label>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-muted">Abono (USD)</span>
-        <input type="number" min={0} value={abono}
+        {/* Vacío en vez de 0: con el 0 puesto, teclear 2500 daba "02500". */}
+        <input type="number" min={0} inputMode="decimal" placeholder="0.00"
+          value={abono || ""}
           onChange={(e) => setAbono(Number(e.target.value))} className={`${inputClass} tabular-nums`} />
       </label>
       {msg && (

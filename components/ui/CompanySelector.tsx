@@ -12,7 +12,6 @@ import { EMPRESA_IDS, EMPRESAS } from "@/lib/ux/empresas";
  */
 const OPCIONES = [
   ...EMPRESA_IDS.map((id) => ({ id, name: EMPRESAS[id].nombreCorto, href: `/admin/${id}/dashboard` })),
-  { id: "all", name: "Consolidado", href: "/admin/dashboard" },
 ];
 
 export function CompanySelector() {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SelectorRango } from "@/components/ui/SelectorRango";
-import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
+import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
@@ -28,7 +28,7 @@ const REPORTES: Reporte[] = [
 
 export default function ReportsPage() {
   const empresa = useEmpresaActiva();
-  const [rango, setRango] = useState<Rango>(RANGO_POR_DEFECTO);
+  const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
   const [sel, setSel] = useState<Reporte>(REPORTES[0]);
 
   const periodos = historicoEnRango(empresa, rango);

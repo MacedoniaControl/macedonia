@@ -27,7 +27,7 @@ import { useFiscal, stockValery, stockS, stockMaestro } from "@/lib/ux/inventory
 import { inventarioDe, type ItemInventario } from "@/lib/inventory/inventario-db";
 import { ventas12m, precioProm, estadoRotacion } from "@/lib/ux/inventory-rotation";
 
-const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 pl-9 pr-3 text-sm text-text";
+const inputClass = "sumi-campo sumi-campo--con-icono";
 
 type Tab = "master" | "movimientos" | "valery" | "productos";
 

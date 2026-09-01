@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SelectorRango } from "@/components/ui/SelectorRango";
-import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
+import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
@@ -12,7 +12,7 @@ import { fmtUsd } from "@/lib/ux/format";
 
 export default function MatricesPage() {
   const empresa = useEmpresaActiva();
-  const [rango, setRango] = useState<Rango>(RANGO_POR_DEFECTO);
+  const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
   // Sale del historico con mes y año, no de los doce meses sueltos de 2024:
   // con aquellos el selector de rango no podia significar nada.
   const periodos = historicoEnRango(empresa, rango);

@@ -9,9 +9,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { crearCuenta, type TipoCuenta } from "@/lib/finanzas/cuentas-db";
 
-const campo =
-  "h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm text-text " +
-  "outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
+const campo = "sumi-campo";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 

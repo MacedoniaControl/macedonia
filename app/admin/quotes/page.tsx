@@ -42,7 +42,7 @@ const MONEDAS = ["Dolar", "Bolívar"];
 const TIPOS_PRECIO = ["Precio Mayorista", "Precio Oferta", "Detal"];
 const UNIDADES = ["UNIDAD", "CILINDRO", "KG", "MT", "PAR", "CAJA"];
 const toneOf: Record<Estado, Tone> = { Borrador: "muted", Aprobada: "info", Rechazada: "danger", "Nota de entrega": "ok" };
-const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+const inputClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const dmy = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
@@ -127,7 +127,7 @@ export default function QuotesPage() {
 
       {tab === "registro" && verRegistros && (
         <SectionCard title="Registro de presupuestos" description="Filtra por período. Incluye presupuestos de Macedonia y de Valery."
-          action={<select className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text" value={period} onChange={(e) => setPeriod(e.target.value)}>
+          action={<select className="sumi-campo w-auto" value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option></select>}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">

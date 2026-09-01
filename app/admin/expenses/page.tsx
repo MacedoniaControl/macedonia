@@ -26,7 +26,7 @@ import {
   PARTIDAS, CATEGORIAS, TIPOS_TRANSACCION, categoriaDe, type Gasto,
 } from "@/lib/ux/gastos";
 
-const fieldClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+const fieldClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 

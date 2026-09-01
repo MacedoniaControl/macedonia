@@ -41,6 +41,17 @@ export const RANGO_POR_DEFECTO: Rango = {
 };
 
 /**
+ * Arranque de las pantallas históricas (Reportes, ROI, Matrices).
+ *
+ * El histórico cierra el mes anterior, así que abrir en «este mes» las dejaba
+ * vacías: se entra y no hay nada. Doce meses siempre tiene algo que mostrar.
+ */
+export const RANGO_HISTORICO: Rango = {
+  ...PRESETS.find((p) => p.id === "anio")!.rango(),
+  agrupacion: "mes",
+};
+
+/**
  * La clave del período al que cae una fecha, según la agrupación.
  * Se usa para juntar filas: todas las que devuelven la misma clave van juntas.
  */

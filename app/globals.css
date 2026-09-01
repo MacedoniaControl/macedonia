@@ -175,3 +175,71 @@ h1, h2, h3 {
   font-family: var(--font-display), var(--font-body), sans-serif;
   letter-spacing: -0.01em;
 }
+
+/* ---------------------------------------------------------------- CAMPOS
+ * Un solo lugar para los campos de formulario.
+ *
+ * Antes esta misma cadena estaba copiada en DOCE pantallas, ninguna con anillo
+ * de foco: quien navega con teclado no veía dónde estaba parado. Y medían 40px,
+ * por debajo del mínimo de 44 que hace falta para no errarle con el dedo.
+ *
+ * Al estar acá, corregirlo una vez lo corrige en todas.
+ */
+.sumi-campo {
+  block-size: 2.75rem;              /* 44px: mínimo táctil */
+  inline-size: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+/* En iOS, un input de menos de 16px hace que el navegador acerque la pantalla
+ * al enfocarlo. En pantallas chicas se sube el tamaño para evitarlo. */
+@media (max-width: 767px) {
+  .sumi-campo { font-size: 1rem; }
+}
+
+.sumi-campo:focus-visible,
+.sumi-campo:focus {
+  outline: none;
+  border-color: var(--brand);
+  /* Anillo de 3px: el criterio de foco pide área suficiente y 3:1 de contraste,
+   * y un borde de 1px que solo cambia de color no alcanza. */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent);
+}
+
+.sumi-campo:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Variante para el buscador con lupa a la izquierda. */
+.sumi-campo--con-icono { padding-inline-start: 2.25rem; }
+
+/* Los <select> nativos necesitan alto de línea explícito o el texto queda
+ * pegado arriba en Safari. */
+select.sumi-campo { line-height: 1.2; }
+
+/* ---------------------------------------------------- BARRAS DEL GRÁFICO
+ * La barra ya nace con su altura final en el atributo `transform`; esta
+ * animación solo la hace CRECER desde la base al aparecer.
+ *
+ * Se hace con keyframes y no con estado de React a propósito: antes la altura
+ * dependía de que un efecto se disparara, y cuando no se disparaba el gráfico
+ * quedaba invisible. Acá, si la animación no corre, la barra ya está bien.
+ */
+@keyframes sumi-crecer {
+  from { transform: scaleY(0); }
+}
+
+.sumi-barra {
+  animation: sumi-crecer 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sumi-barra { animation: none; }
+}

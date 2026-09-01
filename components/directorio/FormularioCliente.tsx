@@ -14,9 +14,7 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { guardarCliente, type Cliente, type TipoPersona } from "@/lib/directorio/directorio-db";
 
-const campo =
-  "h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm text-text " +
-  "outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
+const campo = "sumi-campo";
 
 const DENOMINACIONES = [
   "Contribuyente ORDINARIO",

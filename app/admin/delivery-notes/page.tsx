@@ -34,7 +34,7 @@ type Doc = {
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const GASES = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"];
-const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+const inputClass = "sumi-campo";
 const label = "mb-1 block text-xs font-medium text-muted";
 
 
@@ -149,7 +149,7 @@ export default function DeliveryNotesPage() {
       {tab === "registro" && verRegistros && (
         <SectionCard title="Registro de documentos" description="Filtra por período. Incluye NE y devoluciones, de Valery y de Macedonia."
           action={
-            <select className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text" value={period} onChange={(e) => setPeriod(e.target.value)}>
+            <select className="sumi-campo w-auto" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option>
             </select>
           }>
@@ -343,8 +343,8 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           {cil.map((c, i) => (
             <div key={c.gas} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
               <span className="text-sm text-text">{c.gas}</span>
-              <input type="number" min={0} className="h-9 w-16 rounded-lg border border-border-strong bg-surface-2 px-2 text-center text-sm text-text" value={c.llenos} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, llenos: Number(e.target.value) } : x))} placeholder="Ll" />
-              <input type="number" min={0} className="h-9 w-16 rounded-lg border border-border-strong bg-surface-2 px-2 text-center text-sm text-text" value={c.vacios} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, vacios: Number(e.target.value) } : x))} placeholder="Va" />
+              <input type="number" min={0} className="sumi-campo w-16 px-2 text-center" value={c.llenos} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, llenos: Number(e.target.value) } : x))} placeholder="Ll" />
+              <input type="number" min={0} className="sumi-campo w-16 px-2 text-center" value={c.vacios} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, vacios: Number(e.target.value) } : x))} placeholder="Va" />
             </div>
           ))}
         </div>

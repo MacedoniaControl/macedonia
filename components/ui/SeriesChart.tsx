@@ -12,7 +12,7 @@
 // Con `prefers-reduced-motion` no se anima nada. Un gráfico que se mueve solo
 // puede marear a quien tiene sensibilidad vestibular, y el dato es el mismo.
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 type Serie = { name: string; color: string; values: number[] };
 
@@ -41,27 +41,10 @@ export function SeriesChart({ labels, series, height = 240, formato = porDefecto
 
   const [encima, setEncima] = useState<number | null>(null);
 
-  // Arranca en cero y sube: sin esto la primera pintura ya sale en su altura
-  // final y no hay nada que animar.
-  const [entro, setEntro] = useState(false);
-  const quieto = useRef(false);
-  useEffect(() => {
-    quieto.current = typeof window !== "undefined"
-      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (quieto.current) { setEntro(true); return; }
-    const t = requestAnimationFrame(() => setEntro(true));
-    return () => cancelAnimationFrame(t);
-  }, []);
+  // Identifica el conjunto de datos. Al cambiar, las barras se reemplazan y la
+  // animación de entrada vuelve a correr.
+  const firma = `${labels.length}:${series.map((s) => s.values.join(",")).join("|")}`;
 
-  // Al cambiar el período, vuelve a crecer: el movimiento es lo que muestra
-  // que los datos son otros.
-  const firma = `${labels.join("|")}::${series.map((s) => s.values.join(",")).join("::")}`;
-  useEffect(() => {
-    if (quieto.current) return;
-    setEntro(false);
-    const t = requestAnimationFrame(() => setEntro(true));
-    return () => cancelAnimationFrame(t);
-  }, [firma]);
 
   if (labels.length === 0) {
     return <p className="py-10 text-center text-sm text-muted">Sin datos en este período.</p>;
@@ -108,10 +91,14 @@ export function SeriesChart({ labels, series, height = 240, formato = porDefecto
 
                 {series.map((s, si) => {
                   const v = s.values[i] ?? 0;
-                  const k = entro ? Math.max(0, v) / max : 0;
+                  const k = Math.max(0, v) / max;
                   return (
                     <rect
-                      key={s.name}
+                      // La clave incluye la firma de los datos: al cambiar el
+                      // período el elemento se reemplaza y la animación vuelve
+                      // a correr, que es lo que deja ver QUÉ cambió.
+                      key={`${s.name}-${firma}`}
+                      className="sumi-barra"
                       x={gx + si * barW}
                       y={padT}
                       width={barW * 0.84}
@@ -122,10 +109,9 @@ export function SeriesChart({ labels, series, height = 240, formato = porDefecto
                       style={{
                         transform: `scaleY(${k})`,
                         transformOrigin: `0px ${base}px`,
-                        transition: quieto.current
-                          ? "none"
-                          : `transform 620ms cubic-bezier(.22,1,.36,1) ${i * 22 + si * 40}ms, opacity 160ms ease`,
+                        animationDelay: `${i * 22 + si * 40}ms`,
                         opacity: activo ? 1 : 0.28,
+                        transition: "opacity 160ms ease",
                       }}
                     />
                   );
@@ -138,7 +124,7 @@ export function SeriesChart({ labels, series, height = 240, formato = porDefecto
                   fontSize="11"
                   fill={activo ? "var(--muted)" : "var(--border)"}
                   pointerEvents="none"
-                  style={{ transition: quieto.current ? "none" : "fill 160ms ease" }}
+                  style={{ transition: "fill 160ms ease" }}
                 >
                   {label}
                 </text>

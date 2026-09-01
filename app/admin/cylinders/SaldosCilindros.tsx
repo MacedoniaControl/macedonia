@@ -21,9 +21,7 @@ const ESTADOS: { id: string; label: string; tone: Tone }[] = [
   { id: "fuera_servicio", label: "Fuera de servicio", tone: "danger" },
 ];
 
-const campo =
-  "h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm text-text " +
-  "outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
+const campo = "sumi-campo";
 
 export function SaldosCilindros({
   empresa, recarga, onCambio,

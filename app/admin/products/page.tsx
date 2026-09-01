@@ -24,7 +24,7 @@ const CATS: Record<string, string> = {
 };
 
 
-const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+const inputClass = "sumi-campo";
 
 export default function ProductsPage() {
   const empresaKey = useEmpresaActiva();

@@ -4,7 +4,7 @@ import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SelectorRango } from "@/components/ui/SelectorRango";
-import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
+import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -33,7 +33,7 @@ const EMPRESAS = [
 ];
 
 export default function RoiPage() {
-  const [rango, setRango] = useState<Rango>(RANGO_POR_DEFECTO);
+  const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
   const [empresa, setEmpresa] = usePersistedState("roi:empresa", "sumigases");
   const h = getHistory(empresa);
   // Los indicadores siguen el rango elegido; antes eran siempre el total
@@ -66,7 +66,7 @@ export default function RoiPage() {
 
       <SectionCard
         title={`ROI histórico real · ${label}`}
-        action={<StatusBadge tone="ok">ROI {t.roi}%</StatusBadge>}
+        action={<StatusBadge tone="ok">ROI del período {t.roi}%</StatusBadge>}
       >
         <HistoryKpis empresa={empresa} />
         <div className="mt-5 border-t border-border pt-4">

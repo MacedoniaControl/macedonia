@@ -25,7 +25,7 @@ import {
 } from "@/lib/ux/dashboard-data";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 
-const selectClass = "h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text";
+const selectClass = "sumi-campo";
 
 // Las series mensuales provienen del histórico REAL de Sumigases. Sudematin no tiene
 // desglose mensual cargado: antes se estimaba multiplicando por 0,35 — un número
@@ -84,7 +84,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
     { label: "Ventas vs compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: sinSerie ? "sin datos" : "ratio 3,5x" },
   ];
 
-  const empresaLabel = empresa === "sumigases" ? "Sumigases" : empresa === "sudematin" ? "Sudematin" : "Consolidado";
+  const empresaLabel = empresa === "sudematin" ? "Sudematin" : "Sumigases";
 
   const bcv = useBcvRate();
   // Histórico real de la empresa seleccionada.
@@ -316,7 +316,8 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   );
 }
 
-// Entrada por defecto (/admin/dashboard): filtrable, incluye Consolidado (Owner/Admin).
+// Entrada por defecto (/admin/dashboard). Cada empresa por separado: no hay
+// consolidado, para no mezclar dos operaciones que no se mezclan.
 export default function DashboardPage() {
   return <DashboardView />;
 }

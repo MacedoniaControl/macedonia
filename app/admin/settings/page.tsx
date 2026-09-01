@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { leerConfig, guardarConfig, type Configuracion } from "@/lib/config/config-db";
 
-const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+const inputClass = "sumi-campo";
 
 type Config = {
   empresaDefecto: string;

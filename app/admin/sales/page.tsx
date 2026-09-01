@@ -20,7 +20,7 @@ const PRODUCTOS = [
   { n: "Electrodo 7018 5/32 Linconl", p: 5.86 },
   { n: "Manguera morocha 1/4 GNC", p: 5.78 },
 ];
-const inputClass = "h-10 w-full rounded-xl border border-border-strong bg-surface-2 px-3 text-sm text-text";
+const inputClass = "sumi-campo";
 
 export default function SalesPage() {
   const empresaKey = useEmpresaActiva();
