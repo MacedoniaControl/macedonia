@@ -15,8 +15,9 @@ import { PanelGases } from "./PanelGases";
 import { EntregaCilindros } from "./EntregaCilindros";
 import { SaldosCilindros } from "./SaldosCilindros";
 import { AltaCilindros } from "./AltaCilindros";
+import { ResumenParque } from "./ResumenParque";
 
-type Tab = "entrega" | "saldos" | "alta";
+type Tab = "entrega" | "parque" | "saldos" | "alta";
 
 export default function CylindersPage() {
   const empresa = useEmpresaActiva();
@@ -28,6 +29,9 @@ export default function CylindersPage() {
   const tabs: { id: Tab; label: string }[] = [
     // Entrega va primero: es lo que hacen seis técnicos todos los días.
     { id: "entrega", label: "Registrar entrega" },
+    // Parque va antes que Rampa: responde "cuantos tengo y donde estan", que es
+    // la pregunta de quien mira; Rampa es el detalle por gas y estado.
+    { id: "parque", label: "Parque" },
     { id: "saldos", label: "Rampa" },
     { id: "alta", label: "Dar de alta" },
   ];
@@ -60,6 +64,7 @@ export default function CylindersPage() {
       </div>
 
       {tab === "entrega" && <EntregaCilindros empresa={empresa} onRegistrada={refrescar} />}
+      {tab === "parque" && <ResumenParque empresa={empresa} recarga={recarga} />}
       {tab === "saldos" && <SaldosCilindros empresa={empresa} recarga={recarga} onCambio={refrescar} />}
       {tab === "alta" && <AltaCilindros empresa={empresa} onRegistrada={refrescar} />}
     </>
