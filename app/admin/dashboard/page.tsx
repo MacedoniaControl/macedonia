@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatCard } from "@/components/ui/StatCard";
@@ -12,15 +14,15 @@ import { getHistory } from "@/lib/ux/history-data";
 import { fmtUsd } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useBcvRate, useTasaViva } from "@/lib/ux/bcv-rate";
+import { EstadoDatos } from "@/components/ui/EstadoDatos";
+import { saldos, type SaldoCilindro } from "@/lib/cilindros/cilindros-db";
+import { useCarga } from "@/lib/ux/use-carga";
 import { SelectorRango } from "@/components/ui/SelectorRango";
 import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
 import { Icon } from "@/components/ui/Icon";
 import {
   productosMayorRetorno,
   categoriasMasRentables,
-  cilindrosPorEstado,
-  stockCriticoPorAlmacen,
-  importacionesRecientes,
   alertasOperativas,
 } from "@/lib/ux/dashboard-data";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
@@ -49,6 +51,33 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   // La tasa sale del BCV, no de una constante. Antes convertia con 49,5
   // mientras el BCV estaba en 787: los montos en Bs salian 16 veces abajo.
   const tasa = useTasaViva();
+
+  // Los cilindros salen de la base, y de LA EMPRESA ACTIVA. La tarjeta anterior
+  // usaba una lista en cero y multiplicaba por `factor`, que es un coeficiente
+  // de estimación: un número inventado sobre otro.
+  const cilindros = useCarga(empresa, () => saldos(empresa));
+  const porEstado = useMemo(() => {
+    const ETIQUETAS: Record<string, { etiqueta: string; tone: "ok" | "muted" | "info" | "warn" | "danger" }> = {
+      lleno:           { etiqueta: "Llenos",             tone: "ok" },
+      vacio:           { etiqueta: "Vacíos",             tone: "muted" },
+      en_cliente:      { etiqueta: "En cliente",         tone: "info" },
+      en_llenado:      { etiqueta: "En llenado",         tone: "warn" },
+      fuera_servicio:  { etiqueta: "Fuera de servicio",  tone: "danger" },
+    };
+    const suma = new Map<string, number>();
+    for (const s of (cilindros.datos ?? []) as SaldoCilindro[]) {
+      suma.set(s.estado, (suma.get(s.estado) ?? 0) + s.cantidad);
+    }
+    return [...suma.entries()]
+      .filter(([, n]) => n !== 0)
+      .map(([estado, cantidad]) => ({
+        estado,
+        cantidad,
+        etiqueta: ETIQUETAS[estado]?.etiqueta ?? estado,
+        tone: ETIQUETAS[estado]?.tone ?? ("muted" as const),
+      }));
+  }, [cilindros.datos]);
+  const totalCil = porEstado.reduce((a, c) => a + c.cantidad, 0);
   const frac = count / 12; // proporción del año para KPIs monetarios acumulados
 
   const money = (usd: number) => {
@@ -248,68 +277,53 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Cilindros por estado" description="Inventario operativo de cilindros.">
-          <ul className="space-y-3">
-            {cilindrosPorEstado.map((c) => {
-              const total = cilindrosPorEstado.reduce((a, b) => a + b.cantidad, 0);
-              const pct = Math.round((c.cantidad / total) * 100);
-              return (
-                <li key={c.estado}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <StatusBadge tone={c.tone}>{c.estado}</StatusBadge>
-                    <span className="font-medium text-text">{Math.round(c.cantidad * factor)}</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-                    <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </SectionCard>
-        <SectionCard title="Stock crítico por almacén" description="Productos bajo el mínimo definido.">
-          <ul className="divide-y divide-border">
-            {stockCriticoPorAlmacen.map((s) => (
-              <li key={s.almacen} className="flex items-center justify-between py-3 text-sm">
-                <span className="text-text">{s.almacen}</span>
-                <StatusBadge tone={s.criticos > 3 ? "danger" : "warn"}>{Math.max(1, Math.round(s.criticos * factor))} críticos</StatusBadge>
-              </li>
-            ))}
-          </ul>
+        <SectionCard title="Cilindros por estado" description="Calculado de los movimientos.">
+          {/* Sale de la base, no de una lista en cero: la vista cilindros_saldo
+              existe desde que se construyó el módulo. Antes se dibujaban cinco
+              filas en cero y cinco barras con width NaN%, porque el porcentaje
+              se calculaba dividiendo entre un total que era cero. */}
+          <EstadoDatos
+            cargando={cilindros.cargando}
+            error={cilindros.error}
+            vacio={porEstado.length === 0}
+            tituloVacio="Todavía no hay cilindros"
+            mensajeVacio="Cuando se den de alta en Cilindros, aparecen acá."
+            filas={4}
+          >
+            <ul className="space-y-3">
+              {porEstado.map((c) => {
+                const pct = totalCil > 0 ? Math.round((c.cantidad / totalCil) * 100) : 0;
+                return (
+                  <li key={c.estado}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <StatusBadge tone={c.tone}>{c.etiqueta}</StatusBadge>
+                      <span className="font-medium tabular-nums text-text">{c.cantidad}</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
+                      <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </EstadoDatos>
         </SectionCard>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Importaciones recientes" description="Últimas matrices cargadas.">
-          <div className="sumi-scroll max-w-full overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="py-2 pr-3 font-medium">Archivo</th>
-                  <th className="py-2 pr-3 font-medium">Fecha</th>
-                  <th className="py-2 pr-3 font-medium">Filas</th>
-                  <th className="py-2 font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {importacionesRecientes.map((imp) => (
-                  <tr key={imp.archivo}>
-                    <td className="max-w-[14rem] truncate py-2.5 pr-3 text-text">{imp.archivo}</td>
-                    <td className="py-2.5 pr-3 text-muted">{imp.fecha}</td>
-                    <td className="py-2.5 pr-3 text-muted">{imp.filas}</td>
-                    <td className="py-2.5"><StatusBadge tone="ok">{imp.estado}</StatusBadge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </SectionCard>
         <SectionCard title="Alertas operativas" description="Atención requerida.">
-          <div className="space-y-3">
-            {alertasOperativas.map((a) => (
-              <AlertCard key={a.titulo} tone={a.tone} titulo={a.titulo} mensaje={a.mensaje} />
-            ))}
-          </div>
+          {alertasOperativas.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">
+              Nada que atender. Las alertas aparecen cuando haya reglas cargadas
+              — mínimos de stock, cilindros sin retornar, cuentas vencidas.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {alertasOperativas.map((a) => (
+                <AlertCard key={a.titulo} tone={a.tone} titulo={a.titulo} mensaje={a.mensaje} />
+              ))}
+            </div>
+          )}
         </SectionCard>
       </div>
     </div>
