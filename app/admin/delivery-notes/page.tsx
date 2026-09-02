@@ -6,9 +6,9 @@ import { useRef, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 import { vendedoresDe } from "@/lib/auth/vendedores";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
 import { useCarga } from "@/lib/ux/use-carga";
+import { subirArchivo, listarArchivos, urlDeArchivo, type TipoArchivo } from "@/lib/documentos/archivos-db";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useTasaViva } from "@/lib/ux/bcv-rate";
 import { SubirArchivo } from "@/components/ui/SubirArchivo";
@@ -34,7 +34,7 @@ import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 type Tipo = "entrega" | "devolucion";
 type Doc = {
   id: string; tipo: Tipo; correlativo: string; cliente: string; fecha: string; total: number;
-  origen: "Macedonia" | "SumiControl" | "Valery"; fileName?: string; dataUrl?: string; ne?: NEDoc; dev?: DevDoc;
+  origen: "Macedonia" | "SumiControl" | "Valery"; fileName?: string; ruta?: string; ne?: NEDoc; dev?: DevDoc;
 };
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
@@ -69,7 +69,27 @@ export default function DeliveryNotesPage() {
   // Los PDF que se suben de Valery son archivos, no registros: se quedan en el
   // navegador porque no hay donde guardarlos todavia. Todo lo que GENERA
   // Macedonia sale de la base, que es la unica copia que ven los demas.
-  const [subidos, setSubidos] = usePersistedState<Doc[]>(`ne:subidos:${empresaKey}`, []);
+  // Los PDF de Valery salen de Storage. Antes vivían en localStorage: se perdían
+  // al limpiar el navegador y solo los veía quien los había subido.
+  const [recargaArchivos, setRecargaArchivos] = useState(0);
+  const [subiendo, setSubiendo] = useState(false);
+  const [avisoSubida, setAvisoSubida] = useState<string | null>(null);
+
+  const cargaArchivos = useCarga(
+    `${empresaKey}:${recargaArchivos}`,
+    () => listarArchivos(empresaKey, ["nota_entrega", "devolucion"]),
+  );
+  const subidos: Doc[] = (cargaArchivos.datos ?? []).map((a) => ({
+    id: `a${a.id}`,
+    tipo: a.tipo === "devolucion" ? "devolucion" : "entrega",
+    correlativo: a.correlativo ?? "—",
+    cliente: "(desde archivo)",
+    fecha: a.fecha,
+    total: 0,
+    origen: "Valery" as const,
+    fileName: a.nombre,
+    ruta: a.ruta,
+  }));
   const [recarga, setRecarga] = useState(0);
 
   const guardados = useCarga(`${empresaKey}:${recarga}`, async () => {
@@ -101,27 +121,42 @@ export default function DeliveryNotesPage() {
   const filtered = docs.filter((d) => inPeriod(d.fecha, period));
 
   function verDoc(d: Doc) {
-    if (d.origen === "Valery" && d.dataUrl) return window.open(d.dataUrl, "_blank");
+    if (d.origen === "Valery" && d.ruta) return void abrirArchivo(d.ruta);
     if (d.ne) return printDoc(notaEntregaHtml(d.ne, empresaKey));
     if (d.dev) return printDoc(devolucionHtml(d.dev, empresaKey));
     alert("Este documento de Valery no tiene archivo adjunto.");
   }
 
-  function onUpload(files: FileList | null) {
-    if (!files) return;
-    Array.from(files).forEach((f) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const name = f.name.toUpperCase();
-        const tipo: Tipo = /NC|CREDITO|DEVOL/.test(name) ? "devolucion" : "entrega";
-        const num = (f.name.match(/\d{4,}/) || ["—"])[0];
-        setSubidos((prev) => [
-          { id: `${Date.now()}-${f.name}`, tipo, correlativo: num, cliente: "(desde archivo)", fecha: hoyISO(), total: 0, origen: "Valery", fileName: f.name, dataUrl: String(reader.result) },
-          ...prev,
-        ]);
-      };
-      reader.readAsDataURL(f);
-    });
+  // Los PDF van a Supabase Storage, no al navegador. El tipo se deduce del
+  // nombre del archivo, que es como los exporta Valery.
+  async function onUpload(files: FileList | null) {
+    if (!files?.length) return;
+    setSubiendo(true);
+    const fallos: string[] = [];
+    try {
+      for (const f of Array.from(files)) {
+        const nombre = f.name.toUpperCase();
+        const tipo = /NC|CREDITO|DEVOL/.test(nombre) ? "devolucion" : "nota_entrega";
+        const r = await subirArchivo(f, tipo as TipoArchivo, empresaKey);
+        if (!r.ok) fallos.push(`${f.name}: ${r.error}`);
+      }
+      setRecargaArchivos((n) => n + 1);
+      setAvisoSubida(
+        fallos.length
+          ? `${files.length - fallos.length} de ${files.length} · ${fallos[0]}`
+          : `${files.length} archivo(s) guardados.`,
+      );
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  // Abre el PDF con un enlace temporal: el bucket es privado porque son
+  // documentos comerciales con nombres de clientes y montos.
+  async function abrirArchivo(ruta: string) {
+    const url = await urlDeArchivo(ruta);
+    if (url) window.open(url, "_blank");
+    else setAvisoSubida("No se pudo abrir el archivo.");
   }
 
   return (
@@ -133,7 +168,10 @@ export default function DeliveryNotesPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {verRegistros && <StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge>}
-            <SubirArchivo onArchivos={onUpload}
+            {avisoSubida && (
+              <span className="text-xs text-muted" role="status">{avisoSubida}</span>
+            )}
+            <SubirArchivo onArchivos={onUpload} etiqueta={subiendo ? "Subiendo…" : "Subir Archivo"}
               ayuda="NET/entrega → Nota de entrega · NC/crédito/devolución → Devolución." />
           </div>
         }

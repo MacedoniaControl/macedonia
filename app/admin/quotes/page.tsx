@@ -2,9 +2,9 @@
 
 import { useRef, useEffect, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
 import { useCarga } from "@/lib/ux/use-carga";
+import { subirArchivo, listarArchivos, urlDeArchivo } from "@/lib/documentos/archivos-db";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
@@ -28,7 +28,7 @@ type Estado = "Borrador" | "Aprobada" | "Rechazada" | "Nota de entrega";
 type Cotizacion = {
   id: number; correlativo: string; razonSocial: string; rif: string; direccion: string; telefonos: string;
   fechaEmision: string; fechaVenc: string; fechaISO: string; moneda: string; nota: string;
-  lineas: DevLinea[]; total: number; estado: Estado; origen: "Macedonia" | "SumiControl" | "Valery"; fileName?: string; dataUrl?: string;
+  lineas: DevLinea[]; total: number; estado: Estado; origen: "Macedonia" | "Valery"; fileName?: string; ruta?: string;
 };
 
 const CATALOGO = [
@@ -82,7 +82,23 @@ export default function QuotesPage() {
   // El registro sale de la BASE. Los PDF que se suben de Valery son archivos,
   // no registros, y siguen en el navegador porque todavía no hay dónde
   // guardarlos. Mismo criterio que en notas de entrega.
-  const [subidos, setSubidos] = usePersistedState<Cotizacion[]>(`cot:subidos:${empresaKey}`, []);
+  // Los PDF de Valery salen de Storage, no de localStorage.
+  const [recargaArchivos, setRecargaArchivos] = useState(0);
+  const [subiendo, setSubiendo] = useState(false);
+  const [avisoSubida, setAvisoSubida] = useState<string | null>(null);
+
+  const cargaArchivos = useCarga(
+    `${empresaKey}:${recargaArchivos}`,
+    () => listarArchivos(empresaKey, ["cotizacion"]),
+  );
+  const subidos: Cotizacion[] = (cargaArchivos.datos ?? []).map((a) => ({
+    id: a.id, correlativo: a.correlativo ?? "—", razonSocial: "(desde archivo)",
+    rif: "", direccion: "", telefonos: "",
+    fechaEmision: a.fecha, fechaVenc: "", fechaISO: a.fecha,
+    moneda: "Dolar", nota: "", lineas: [], total: 0,
+    estado: "Aprobada" as Estado, origen: "Valery" as const,
+    fileName: a.nombre, ruta: a.ruta,
+  }));
   const [recarga, setRecarga] = useState(0);
 
   const guardadas = useCarga(`${empresaKey}:${recarga}`, () => listarDocumentos(empresaKey, "cotizacion", 200));
@@ -107,22 +123,32 @@ export default function QuotesPage() {
   const filtered = cots.filter((c) => inPeriod(c.fechaISO, period));
 
   function generarPDF(c: Cotizacion) {
-    if (c.origen === "Valery" && c.dataUrl) return window.open(c.dataUrl, "_blank");
+    if (c.origen === "Valery" && c.ruta) return void abrirArchivo(c.ruta);
     printDoc(presupuestoHtml({ correlativo: c.correlativo, fechaEmision: c.fechaEmision, fechaVenc: c.fechaVenc, razonSocial: c.razonSocial, rif: c.rif, direccion: c.direccion, telefonos: c.telefonos, lineas: c.lineas, moneda: c.moneda, nota: c.nota }, empresaKey));
   }
-  function setEstado(id: number, estado: Estado) {
-    setSubidos((prev) => prev.map((c) => (c.id === id ? { ...c, estado } : c)));
+  async function abrirArchivo(ruta: string) {
+    const url = await urlDeArchivo(ruta);
+    if (url) window.open(url, "_blank");
+    else setAvisoSubida("No se pudo abrir el archivo.");
   }
-  function onUpload(files: FileList | null) {
-    if (!files) return;
-    Array.from(files).forEach((file) => {
-      const r = new FileReader();
-      r.onload = () => {
-        const num = (file.name.match(/\d{4,}/) || ["—"])[0];
-        setSubidos((p) => [{ id: Date.now() + Math.random(), correlativo: num, razonSocial: "(desde archivo)", rif: "", direccion: "", telefonos: "", fechaEmision: dmy(new Date()), fechaVenc: "", fechaISO: hoyISO(), moneda: "Dolar", nota: "", lineas: [], total: 0, estado: "Aprobada", origen: "Valery", fileName: file.name, dataUrl: String(r.result) }, ...p]);
-      };
-      r.readAsDataURL(file);
-    });
+  async function onUpload(files: FileList | null) {
+    if (!files?.length) return;
+    setSubiendo(true);
+    const fallos: string[] = [];
+    try {
+      for (const f of Array.from(files)) {
+        const r = await subirArchivo(f, "cotizacion", empresaKey);
+        if (!r.ok) fallos.push(`${f.name}: ${r.error}`);
+      }
+      setRecargaArchivos((n) => n + 1);
+      setAvisoSubida(
+        fallos.length
+          ? `${files.length - fallos.length} de ${files.length} · ${fallos[0]}`
+          : `${files.length} archivo(s) guardados.`,
+      );
+    } finally {
+      setSubiendo(false);
+    }
   }
 
   return (
@@ -134,7 +160,10 @@ export default function QuotesPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {verRegistros && <StatusBadge tone="brand">{cots.length} cotización(es)</StatusBadge>}
-            <SubirArchivo onArchivos={onUpload}
+            {avisoSubida && (
+              <span className="text-xs text-muted" role="status">{avisoSubida}</span>
+            )}
+            <SubirArchivo onArchivos={onUpload} etiqueta={subiendo ? "Subiendo…" : "Subir Archivo"}
               ayuda="Se registran por fecha y quedan disponibles para consultar." />
           </div>
         }
@@ -177,11 +206,12 @@ export default function QuotesPage() {
                     <td className="py-2.5">
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => generarPDF(c)} className="text-sm font-medium text-brand hover:underline">Ver / PDF</button>
-                        {c.origen === "SumiControl" && c.estado === "Borrador" && <>
-                          <button type="button" onClick={() => setEstado(c.id, "Aprobada")} className="text-sm text-info hover:underline">Aprobar</button>
-                          <button type="button" onClick={() => setEstado(c.id, "Rechazada")} className="text-sm text-muted hover:underline">Rechazar</button>
-                        </>}
-                        {c.origen === "SumiControl" && c.estado === "Aprobada" && <button type="button" onClick={() => setEstado(c.id, "Nota de entrega")} className="text-sm text-ok hover:underline">→ Nota de entrega</button>}
+                        {/* Aprobar / Rechazar / Convertir vivían acá para el
+                            origen "SumiControl", que ya nadie produce: los
+                            documentos vienen de la base o de Storage. Eran
+                            botones que no se dibujaban nunca. Cuando haga falta
+                            un flujo de aprobación, el estado tiene que vivir en
+                            la tabla `documentos`, no en el navegador. */}
                       </div>
                     </td>
                   </tr>
