@@ -132,3 +132,25 @@ describe("el rol no vuelve al navegador", () => {
     assert.doesNotMatch(sesion, /rol \?\? "owner"/);
   });
 });
+
+// `otra_empresa` no es una seccion mas: en puede_empresa() vale tanto como ser
+// owner. Venia encendida en la plantilla de admin, o sea que cada admin nuevo
+// nacia viendo las dos empresas. La separacion es la regla central del producto.
+describe("la pared entre empresas", () => {
+  test("ninguna plantilla salvo la del owner abre la otra empresa", () => {
+    for (const rol of ["admin", "vendedor", "tecnico"] as const) {
+      assert.equal(plantillaDeRol(rol).otra_empresa, false, `${rol} abre la pared`);
+    }
+  });
+
+  test("el owner no necesita la clave: la pared no le aplica", () => {
+    assert.equal(plantillaDeRol("owner").otra_empresa, true);
+  });
+
+  test("el admin conserva su empresa completa", () => {
+    const p = plantillaDeRol("admin");
+    for (const k of ["inventory", "cylinders", "expenses", "reports"]) {
+      assert.equal(p[k], true, `admin perdio ${k}`);
+    }
+  });
+});
