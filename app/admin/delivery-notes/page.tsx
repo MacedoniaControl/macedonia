@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { fmtUsd } from "@/lib/ux/format";
+import { TIPOS_PRECIO, DIVISAS, UNIDADES } from "@/lib/ux/catalogos";
 import {
   notaEntregaHtml, devolucionHtml, printDoc, neTotals,
   type NEDoc, type DevDoc, type NELinea, type DevLinea, type NECil,
@@ -240,10 +241,6 @@ export default function DeliveryNotesPage() {
   );
 }
 
-// ---- Generar Nota de Entrega (campos alineados con la pantalla de captura de Valery) ----
-const TIPOS_PRECIO = ["Precio Máximo", "Precio Mínimo", "Precio Especial"];
-const DIVISAS = ["Bolívar", "Dólar"];
-const UNIDADES = ["CILINDRO", "UNIDAD", "KG", "MT", "PAR", "CAJA"];
 
 /** Formulario en blanco. Se reutiliza al limpiar tras guardar. */
 const formularioVacio = () => ({
@@ -337,7 +334,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
   const tasa = useTasaViva();
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[1fr_1.2fr_1fr]">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1.2fr_1fr]">
       <SectionCard title="Datos de la nota de entrega" description={`N° ${seq}`}>
         <div className="space-y-3">
           {/* Se ELIGE de la cartera, no se escribe.

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { SubirArchivo } from "@/components/ui/SubirArchivo";
 import { fmtUsd } from "@/lib/ux/format";
+import { TIPOS_PRECIO, UNIDADES } from "@/lib/ux/catalogos";
 import { VentasExternas } from "./VentasExternas";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
 import { ScanBar } from "@/components/inventory/ScanBar";
@@ -39,8 +40,6 @@ const CATALOGO = [
   { codigo: "2001105", descripcion: "REGULADOR DE ARGON C/ FLUJOMETRO", precio: 63.87 },
 ];
 const MONEDAS = ["Dolar", "Bolívar"];
-const TIPOS_PRECIO = ["Precio Mayorista", "Precio Oferta", "Detal"];
-const UNIDADES = ["UNIDAD", "CILINDRO", "KG", "MT", "PAR", "CAJA"];
 const toneOf: Record<Estado, Tone> = { Borrador: "muted", Aprobada: "info", Rechazada: "danger", "Nota de entrega": "ok" };
 const inputClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -295,7 +294,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.2fr_1fr] lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1.2fr_1fr]">
       <SectionCard title="Nueva cotización" description={`N° ${String(seq).padStart(10, "0")}`}>
         <div className="space-y-3">
           <div><label className={lbl}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} placeholder="Empresa externa" /></div>

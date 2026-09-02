@@ -164,20 +164,26 @@ table th {
   scrollbar-width: none;
 
   /* Se oculta la barra de scroll, así que hace falta OTRA señal de que hay más
-   * pestañas a la derecha: sin esto, en el teléfono "Movimientos" y "Registro"
-   * simplemente no existen para quien mira.
+   * pestañas: sin esto, en el teléfono "Movimientos" y "Registro" no existen
+   * para quien mira.
    *
-   * El degradado se pega al borde derecho mientras haya contenido por delante y
-   * desaparece solo al llegar al final: `local` sigue el scroll, `scroll` se
-   * queda fijo. Sin el par de capas blancas, el degradado se vería siempre. */
-  background:
-    linear-gradient(to right, var(--surface) 30%, transparent) left / 2rem 100% no-repeat local,
-    linear-gradient(to left,  var(--surface) 30%, transparent) right / 2rem 100% no-repeat local,
-    linear-gradient(to right, color-mix(in srgb, var(--text) 14%, transparent), transparent) left / 1.25rem 100% no-repeat scroll,
-    linear-gradient(to left,  color-mix(in srgb, var(--text) 14%, transparent), transparent) right / 1.25rem 100% no-repeat scroll;
+   * Se usa mask-image y no un degradado de fondo: el fondo pintaba con el color
+   * de superficie sobre un contenedor que no siempre lo tiene, y dejaba un
+   * rectángulo blanco visible aunque no hubiera nada que desvanecer. La máscara
+   * atenúa el CONTENIDO, así que no se ve cuando no hay scroll. */
 }
 .sumi-tabs::-webkit-scrollbar {
   display: none;
+}
+
+/* La máscara solo por debajo de 768px, que es donde las pestañas desbordan de
+ * verdad. Aplicada siempre, atenuaba los bordes de la primera y la última
+ * pestaña aunque no hubiera nada que desvanecer. */
+@media (max-width: 767px) {
+  .sumi-tabs {
+    mask-image: linear-gradient(to right, transparent 0, #000 1.25rem,
+                                #000 calc(100% - 1.25rem), transparent 100%);
+  }
 }
 .sumi-tabs > * {
   flex-shrink: 0;

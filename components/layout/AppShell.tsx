@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar empresa={empresa} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:pl-64">
         <Header onMenu={() => setSidebarOpen(true)} />
-        <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 lg:pb-6">{children}</main>
+        <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 md:pb-6">{children}</main>
         <IslaInferior onMas={() => setSidebarOpen(true)} />
       </div>
     </div>

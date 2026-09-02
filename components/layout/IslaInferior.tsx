@@ -39,7 +39,7 @@ export function IslaInferior({ onMas, permisos }: { onMas: () => void; permisos?
 
   return (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 lg:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Secciones"
     >
