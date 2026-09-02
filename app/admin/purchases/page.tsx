@@ -174,7 +174,7 @@ export default function PurchasesPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="qty">Cantidad *</label>
                 <input id="qty" type="number" min={1} value={o.cantidad}
@@ -272,7 +272,7 @@ export default function PurchasesPage() {
                   onChange={(e) => setNuevoProd({ ...nuevoProd, nombre: e.target.value })} />
               </label>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-muted">Unidad</span>
                   <input className={inputClass} value={nuevoProd.unidad}

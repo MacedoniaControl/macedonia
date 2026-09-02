@@ -289,7 +289,7 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Cantidad</label>
             <input type="number" min={1} className={fieldClass} value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))} />

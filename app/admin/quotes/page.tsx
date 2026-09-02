@@ -299,12 +299,12 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
       <SectionCard title="Nueva cotización" description={`N° ${String(seq).padStart(10, "0")}`}>
         <div className="space-y-3">
           <div><label className={lbl}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} placeholder="Empresa externa" /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={lbl}>RIF</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
             <div><label className={lbl}>Teléfonos</label><input className={inputClass} value={f.telefonos} onChange={set("telefonos")} /></div>
           </div>
           <div><label className={lbl}>Dirección</label><input className={inputClass} value={f.direccion} onChange={set("direccion")} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={lbl}>Vendedor</label>
               <select className={inputClass} value={f.vendedor} onChange={set("vendedor")}>
                 <option value="">— elegir —</option>

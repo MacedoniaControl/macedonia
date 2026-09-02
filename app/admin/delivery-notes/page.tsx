@@ -326,6 +326,8 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
   const cargaVend = useCarga(empresaKey, () => vendedoresDe(empresaKey));
   const vendedores = cargaVend.datos ?? [];
 
+  const [escaneando, setEscaneando] = useState(false);
+
   const t = neTotals({ ...f, correlativo: "", fecha: "", deposito: depositoEmpresa, lineas, cilindros: cil } as NEDoc);
   const enBs = f.divisa === "Bolívar";
   // La tasa sale del BCV, no de una constante. Estaba en 49,5 mientras el BCV
@@ -366,12 +368,12 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
               5.028 clientes solo con el nombre— y el vendedor tiene el dato
               delante. Lo que escriba acá va al documento; completar la ficha
               es otra tarea, en su propia pantalla. */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={label}>Cédula / R.I.F.</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
             <div><label className={label}>Teléfonos</label><input className={inputClass} value={f.tlf} onChange={set("tlf")} /></div>
           </div>
           <div><label className={label}>Dirección</label><input className={inputClass} value={f.direccion} onChange={set("direccion")} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={label}>Vendedor</label>
               {/* Sale de la tabla usuarios, igual que en Cotizaciones. Era un
                   texto fijo, "01 - GERENTE" para todos: no se sabia quien
@@ -401,8 +403,29 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
         </div>
       </SectionCard>
 
-      <SectionCard title="Renglones" description="Escanea para agregar, o cárgalo a mano. Código · Nombre · Cantidad · Und · Precio · Dcto (como en Valery).">
-        <ScanBar onScan={onScan} hint="Dispara el lector: el producto se agrega como renglón." />
+      <SectionCard title="Renglones" description="">
+        {/* El escáner es OPCIONAL, detrás de una píldora — igual que en
+            Cotizaciones. Antes la barra estaba siempre visible y lo primero que
+            veía el vendedor en la calle era "PAUSADO · los escaneos NO se
+            registran": un error sobre una pistola lectora que no lleva encima. */}
+        <button
+          type="button"
+          onClick={() => setEscaneando((v) => !v)}
+          aria-pressed={escaneando}
+          className={`flex h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition
+            ${escaneando
+              ? "border-brand-strong bg-brand-soft text-brand"
+              : "border-border-strong bg-surface text-text hover:bg-surface-2"}`}
+        >
+          <Icon name="scan" size={16} />
+          {escaneando ? "Escaneando…" : "Escanear"}
+        </button>
+
+        {escaneando && (
+          <div className="mt-3">
+            <ScanBar onScan={onScan} hint="Dispará el lector: el producto se agrega como renglón." />
+          </div>
+        )}
         {scanMsg && (
           <p className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${scanMsg.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
             <Icon name={scanMsg.ok ? "check" : "alert"} size={14} /> {scanMsg.text}
@@ -659,7 +682,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: s
       <SectionCard title="Datos de la devolución (Nota de Crédito)" description={`N° ${seq}`}>
         <div className="space-y-3">
           <div><label className={label}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={label}>RIF</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
             <div><label className={label}>Teléfonos</label><input className={inputClass} value={f.telefonos} onChange={set("telefonos")} /></div>
           </div>

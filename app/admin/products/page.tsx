@@ -84,7 +84,7 @@ export default function ProductsPage() {
               </select>
               <p className="mt-1 text-[11px] text-muted">Próximo SKU: <span className="font-mono">{nextSku(cat)}</span></p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="pre">Precio (USD)</label>
                 <input id="pre" type="number" min={0} step="0.01" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} className={inputClass} />

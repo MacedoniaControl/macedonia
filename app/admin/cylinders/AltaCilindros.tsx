@@ -135,7 +135,7 @@ export function AltaCilindros({
               onChange={(e) => setCantMov(Math.max(0, Number(e.target.value) || 0))}
               className={`${campo} tabular-nums`} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label htmlFor="mov-desde" className="mb-1.5 block text-sm font-medium text-text">De</label>
               <select id="mov-desde" value={desde}

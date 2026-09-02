@@ -29,27 +29,36 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const totalBadge = pendientes.length + alertasOperativas.length;
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-surface/90 px-4 backdrop-blur">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-1.5 border-b border-border bg-surface/90 px-3 backdrop-blur sm:gap-2 sm:px-4">
       <button
         type="button"
         onClick={onMenu}
         aria-label="Abrir menú"
-        className="flex h-11 w-11 items-center justify-center rounded-xl border border-border text-text hover:bg-surface-2 lg:hidden"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border text-text hover:bg-surface-2 lg:hidden"
       >
         <Icon name="menu" />
       </button>
 
-      <p className="truncate text-sm font-medium text-text">{current?.label ?? "Macedonia"}</p>
+      <p className="hidden truncate text-sm font-medium text-text sm:block">
+        {current?.label ?? "Macedonia"}
+      </p>
 
       <button
         type="button"
         onClick={dolarPrice}
         disabled={bcvLoading}
         aria-label="Actualizar precio del dólar BCV"
-        className="ml-2 inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border-strong bg-surface px-3 text-sm font-medium text-text transition hover:bg-surface-2 disabled:opacity-60"
+        className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border-strong bg-surface px-3 text-sm font-medium text-text transition hover:bg-surface-2 disabled:opacity-60"
       >
         <Icon name="dollar" size={16} />
-        {bcvLoading ? "Consultando…" : <><span className="sm:hidden">Tasa</span><span className="hidden sm:inline">Tasa BCV</span></>}
+        {bcvLoading ? "Consultando…" : (
+          <>
+            {/* En el teléfono se muestra la CIFRA, no la palabra: es el dato que
+                se necesita, y ahorra el espacio que hacía falta para lo demás. */}
+            <span className="tabular-nums sm:hidden">{bcv ? bcv.tasa.toFixed(2) : "Tasa"}</span>
+            <span className="hidden sm:inline">Tasa BCV</span>
+          </>
+        )}
       </button>
 
       {/* Precio del dólar BCV, siempre visible junto al botón */}
@@ -74,7 +83,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
         <CompanySelector />
 
         <div className="relative">
@@ -83,7 +92,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
             aria-label={`Notificaciones (${totalBadge})`}
             aria-expanded={alertsOpen}
             onClick={() => setAlertsOpen((v) => !v)}
-            className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface text-text hover:bg-surface-2"
+            className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text hover:bg-surface-2"
           >
             <Icon name="bell" />
             {totalBadge > 0 && (

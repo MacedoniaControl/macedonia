@@ -82,7 +82,7 @@ export function SelectorCliente({
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-3 rounded-xl border border-border-strong bg-surface-2 px-3.5 py-2.5">
           <span className="min-w-0">
-            <span className="block truncate text-sm font-medium text-text">{seleccionado.nombre}</span>
+            <span className="block text-sm font-medium leading-snug text-text">{seleccionado.nombre}</span>
             <span className="font-mono text-xs text-muted">{seleccionado.rif ?? "sin RIF"}</span>
           </span>
           <button
@@ -106,7 +106,7 @@ export function SelectorCliente({
 
   return (
     <>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <label className="relative flex items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
@@ -115,7 +115,7 @@ export function SelectorCliente({
               onChange={(e) => { setQ(e.target.value); setAbierto(true); }}
               onFocus={() => setAbierto(true)}
               onBlur={() => setTimeout(() => setAbierto(false), 150)}
-              placeholder="Buscar cliente por nombre o RIF…"
+              placeholder="Buscar cliente…"
               aria-label="Buscar cliente"
               autoComplete="off"
               className="h-12 w-full rounded-xl border border-border-strong bg-surface pl-9 pr-3 text-base text-text
@@ -144,7 +144,7 @@ export function SelectorCliente({
                     onClick={() => elegir(c)}
                     className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-surface-2"
                   >
-                    <span className="truncate text-sm text-text">{c.nombre}</span>
+                    <span className="text-sm leading-snug text-text">{c.nombre}</span>
                     <span className="font-mono text-[11px] text-muted">{c.rif ?? "sin RIF"}</span>
                   </button>
                 </li>
@@ -156,8 +156,9 @@ export function SelectorCliente({
         <button
           type="button"
           onClick={() => setCreando(true)}
-          className="flex h-12 flex-none items-center gap-1.5 rounded-full border border-brand-strong px-4
-                     text-sm font-medium text-brand transition hover:bg-brand/10"
+          className="flex h-12 flex-none items-center justify-center gap-1.5 rounded-full
+                     border border-brand-strong px-4 text-sm font-medium text-brand
+                     transition hover:bg-brand/10"
         >
           <Icon name="plus" size={16} />
           Nuevo cliente

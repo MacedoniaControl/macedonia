@@ -162,6 +162,19 @@ table th {
   gap: 0.25rem;
   overflow-x: auto;
   scrollbar-width: none;
+
+  /* Se oculta la barra de scroll, así que hace falta OTRA señal de que hay más
+   * pestañas a la derecha: sin esto, en el teléfono "Movimientos" y "Registro"
+   * simplemente no existen para quien mira.
+   *
+   * El degradado se pega al borde derecho mientras haya contenido por delante y
+   * desaparece solo al llegar al final: `local` sigue el scroll, `scroll` se
+   * queda fijo. Sin el par de capas blancas, el degradado se vería siempre. */
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left,  var(--surface) 30%, transparent) right / 2rem 100% no-repeat local,
+    linear-gradient(to right, color-mix(in srgb, var(--text) 14%, transparent), transparent) left / 1.25rem 100% no-repeat scroll,
+    linear-gradient(to left,  color-mix(in srgb, var(--text) 14%, transparent), transparent) right / 1.25rem 100% no-repeat scroll;
 }
 .sumi-tabs::-webkit-scrollbar {
   display: none;
@@ -169,6 +182,10 @@ table th {
 .sumi-tabs > * {
   flex-shrink: 0;
   white-space: nowrap;
+  /* Medían 38px de alto: por debajo del mínimo táctil de 44. */
+  min-block-size: 2.75rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 h1, h2, h3 {
