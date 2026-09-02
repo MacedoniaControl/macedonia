@@ -229,9 +229,14 @@ export async function movimientoManual(
 /**
  * Alta o edición de un gas y su depósito en garantía.
  *
- * El depósito estaba en 0 para los ocho gases, así que `garantias_cliente`
- * devolvía siempre cero SIN AVISAR que el dato faltaba — que es la peor forma
- * de estar mal: parece una respuesta.
+ * Hoy el depósito es 0 en todos los gases y eso es CORRECTO: Greeg confirmo el
+ * 02-sep-2026 que no se cobra garantia. `garantias_cliente` devuelve vacio
+ * porque no hay garantias que mostrar, no porque falte cargar un dato.
+ *
+ * Si algun dia se cobra, ademas de cargar el monto aca hay que hacer que el
+ * movimiento lo registre: hoy `registrarEntrega` y `registrarSalida` insertan
+ * con `deposito_usd` en su valor por defecto, o sea cero. Cargar el monto solo
+ * en el gas no alcanzaria.
  *
  * Se edita desde la pantalla y no se carga por SQL porque el precio del gas
  * cambia, y cada cambio no puede depender de que alguien escriba una consulta.
