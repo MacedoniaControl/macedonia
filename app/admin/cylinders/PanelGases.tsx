@@ -127,6 +127,14 @@ export function PanelGases({ empresa, onCambio }: { empresa: string; onCambio?: 
                 />
                 Se rellena en planta
               </label>
+              {/* El caso normal es el contrario -el cilindro llega lleno del
+                  proveedor-, y sin decirlo la casilla desmarcada no se lee
+                  como una afirmacion sino como algo sin responder. */}
+              <p className="-mt-1 text-xs text-muted">
+                {edit.seRellena
+                  ? "Entra vacio y se llena aca: vacio → en llenado → lleno."
+                  : "Sin marcar: viene lleno del proveedor."}
+              </p>
 
               {msg && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
 

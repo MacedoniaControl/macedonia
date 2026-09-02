@@ -16,6 +16,7 @@ import { EntregaCilindros } from "./EntregaCilindros";
 import { SaldosCilindros } from "./SaldosCilindros";
 import { AltaCilindros } from "./AltaCilindros";
 import { ResumenParque } from "./ResumenParque";
+import { SalidaCilindros } from "./SalidaCilindros";
 
 type Tab = "entrega" | "parque" | "saldos" | "alta";
 
@@ -42,7 +43,12 @@ export default function CylindersPage() {
         title="Cilindros"
         description=""
         breadcrumbs={[{ label: "Inventario" }, { label: "Cilindros" }]}
-        actions={<PanelGases empresa={empresa} onCambio={refrescar} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <SalidaCilindros empresa={empresa} onRegistrada={refrescar} />
+            <PanelGases empresa={empresa} onCambio={refrescar} />
+          </div>
+        }
       />
 
       <div className="sumi-tabs mb-4 flex gap-1 overflow-x-auto">

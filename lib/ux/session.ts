@@ -1,11 +1,19 @@
 "use client";
 
-// Rol del usuario en sesión. PLACEHOLDER hasta que exista autenticación real:
-// hoy se guarda en el navegador y por defecto es "owner". Cuando entre el backend,
-// el rol vendrá del servidor (Supabase) y esto solo lo leerá.
-// Regla de negocio: los registros/logs (historial de documentos, auditoría) son solo del OWNER.
+// Rol del usuario en sesion.
+//
+// Vivia en localStorage y por defecto era "owner", con un setRol() que dejaba
+// a cualquiera ponerse el rol que quisiera desde la consola. Los datos nunca
+// estuvieron expuestos -RLS en Postgres es la barrera real y no lee el
+// navegador- pero la interfaz mostraba secciones que no correspondian.
+//
+// Ahora el rol lo resuelve el servidor contra la tabla `usuarios` y baja por
+// contexto (components/auth/SesionProvider). Aca solo se lee.
+//
+// Regla de negocio: los registros/logs (historial de documentos, auditoria) son
+// solo del OWNER.
 
-import { useEffect, useState } from "react";
+import { useRolSesion } from "@/components/auth/SesionProvider";
 
 export type Rol = "owner" | "admin" | "vendedor" | "tecnico";
 
@@ -13,46 +21,19 @@ export const ROLES: { id: Rol; label: string }[] = [
   { id: "owner", label: "Owner" },
   { id: "admin", label: "Administrador" },
   { id: "vendedor", label: "Vendedor" },
-  { id: "tecnico", label: "Técnico de recargas" },
+  { id: "tecnico", label: "Tecnico de recargas" },
 ];
 
-const KEY = "sumi:rol";
-const EV = "sumi:rol";
-
-export function getRol(): Rol {
-  if (typeof localStorage === "undefined") return "owner";
-  const r = localStorage.getItem(KEY);
-  return r === "admin" || r === "vendedor" || r === "tecnico" ? r : "owner";
-}
-
-export function setRol(r: Rol) {
-  try {
-    localStorage.setItem(KEY, r);
-  } catch {
-    /* ignore */
-  }
-  window.dispatchEvent(new Event(EV));
-}
-
-/** Rol actual, reactivo. `ready` evita parpadeo entre servidor y cliente. */
+/**
+ * Rol actual. `ready` sigue existiendo para no cambiar las pantallas, pero ya
+ * no hay parpadeo: el rol llega renderizado desde el servidor.
+ *
+ * Sin sesion cae a "tecnico", el rol de MENOS permisos. Antes caia a "owner",
+ * que es exactamente al reves de lo que conviene cuando algo falla.
+ */
 export function useRol(): { rol: Rol; ready: boolean } {
-  const [rol, setR] = useState<Rol>("owner");
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const load = () => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setR(getRol());
-      setReady(true);
-    };
-    load();
-    window.addEventListener(EV, load);
-    window.addEventListener("storage", load);
-    return () => {
-      window.removeEventListener(EV, load);
-      window.removeEventListener("storage", load);
-    };
-  }, []);
-  return { rol, ready };
+  const rol = useRolSesion();
+  return { rol: rol ?? "tecnico", ready: rol !== null };
 }
 
 /**

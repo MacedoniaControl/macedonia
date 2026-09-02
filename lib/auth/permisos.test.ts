@@ -4,6 +4,7 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { plantillaDeRol, claveDeRuta, puedeVer, CLAVES_MODULO, TODAS_LAS_CLAVES } from "./permisos.ts";
 
 describe("plantillaDeRol", () => {
@@ -104,5 +105,30 @@ describe("CLAVES_MODULO", () => {
 
   test("ninguna clave lleva barras", () => {
     for (const c of CLAVES_MODULO) assert.ok(!c.includes("/"), `${c} lleva barra`);
+  });
+});
+
+// El rol vivia en localStorage y por defecto era "owner": cualquiera podia
+// escribirse otro rol desde la consola y ver secciones que no le tocan. Los
+// datos nunca estuvieron expuestos -RLS es la barrera real- pero la interfaz
+// mostraba de mas. Ahora lo resuelve el servidor; esto vigila que no vuelva.
+describe("el rol no vuelve al navegador", () => {
+  const sesion = fs.readFileSync("lib/ux/session.ts", "utf8");
+
+  test("session.ts no lee ni escribe el navegador", () => {
+    // Busca el USO, no la palabra: el archivo explica en un comentario de donde
+    // viene el rol, y una prueba que mira vocabulario marca su propia
+    // explicacion en vez del defecto.
+    assert.doesNotMatch(sesion, /localStorage\s*\.\s*(getItem|setItem|removeItem)/);
+  });
+
+  test("no existe una forma de escribir el rol desde el cliente", () => {
+    assert.doesNotMatch(sesion, /export function setRol/);
+  });
+
+  test("sin sesion cae al rol de MENOS permisos, no al de mas", () => {
+    // El fallback estaba en "owner", que es al reves de lo que conviene.
+    assert.match(sesion, /rol \?\? "tecnico"/);
+    assert.doesNotMatch(sesion, /rol \?\? "owner"/);
   });
 });

@@ -280,3 +280,71 @@ export async function desactivarGas(nombre: string, empresa: string): Promise<{ 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+/** Un usuario que puede figurar como autorizante de una salida. */
+export type Autorizante = { id: string; nombre: string; rol: string };
+
+export async function autorizantes(empresa: string): Promise<Autorizante[]> {
+  const sb = await createClient();
+  // Solo owner y admin autorizan que un cilindro salga de la planta. Un tecnico
+  // registra el movimiento, pero no se autoriza a si mismo la salida.
+  const { data, error } = await sb
+    .from("usuarios")
+    .select("id, nombre, rol, empresa_id, activo")
+    .in("rol", ["owner", "admin"])
+    .eq("activo", true)
+    .order("nombre");
+
+  if (error) throw new Error(`No se pudieron leer los autorizantes: ${error.message}`);
+  type Fila = { id: string; nombre: string; rol: string; empresa_id: string | null };
+  return ((data as Fila[] | null) ?? [])
+    // empresa_id null = owner, entra a todas las empresas.
+    .filter((u) => u.empresa_id === null || u.empresa_id === empresa)
+    .map((u) => ({ id: u.id, nombre: u.nombre, rol: u.rol }));
+}
+
+/**
+ * Salida declarada de cilindros hacia un cliente.
+ *
+ * Se separa de `registrarEntrega` porque responde otra pregunta. La entrega
+ * cuenta cuantos cilindros cambiaron de manos; esto deja por escrito QUIEN
+ * autorizo que salieran y QUIEN se los llevo. Sin esos dos nombres, un cilindro
+ * que no vuelve no tiene a quien reclamarsele.
+ */
+export async function registrarSalida(s: {
+  gas: string;
+  cantidad: number;
+  cliente: string;
+  autorizadoPor: string;
+  retiradoPor: string;
+  documento?: string;
+  nota?: string;
+  empresa: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+  if (!s.gas) return { ok: false, error: "Elegí el gas." };
+  if (!(s.cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
+  if (!s.cliente.trim()) return { ok: false, error: "Decí a qué cliente van." };
+  if (!s.autorizadoPor) return { ok: false, error: "Elegí quién autoriza la salida." };
+  if (!s.retiradoPor.trim()) return { ok: false, error: "Decí quién se los lleva." };
+
+  const sb = await createClient();
+  const { error } = await sb.from("cilindros_mov").insert({
+    empresa_id: s.empresa,
+    gas: s.gas,
+    cantidad: s.cantidad,
+    estado_desde: "lleno",
+    estado_hacia: "en_cliente",
+    cliente: s.cliente.trim(),
+    autorizado_por: s.autorizadoPor,
+    retirado_por: s.retiradoPor.trim(),
+    documento: s.documento?.trim() || null,
+    nota: s.nota?.trim() || null,
+    // Quien REGISTRA. Distinto de quien autoriza y de quien retira.
+    usuario_id: usuario.id,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
