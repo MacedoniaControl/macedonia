@@ -150,3 +150,19 @@ test("una celda vacia auto-cerrada no se traga la celda siguiente", async () => 
   assert.equal(filas[0][2], "");
   assert.equal(filas[0][3], "71");
 });
+
+test("una fila vacia auto-cerrada no corre la fila siguiente", async () => {
+  // <row r="1" ht="30"/> es una fila con alto propio y sin celdas. Si el
+  // patron solo acepta <row ...>...</row>, esa fila se traga la siguiente y
+  // los encabezados aparecen un renglon mas arriba de donde estan.
+  const filas = await leerXlsx(
+    libroConHoja(
+      `<worksheet><sheetData>` +
+        `<row r="1" ht="30" customHeight="1"/>` +
+        `<row r="2"><c r="B2" t="inlineStr"><is><t>DESCRIPCION</t></is></c></row>` +
+        `</sheetData></worksheet>`,
+    ),
+  );
+  assert.deepEqual(filas[0], []);
+  assert.equal(filas[1][1], "DESCRIPCION");
+});

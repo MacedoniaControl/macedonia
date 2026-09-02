@@ -145,7 +145,10 @@ export async function leerXlsx(
   const xml = texto(hoja);
   const filas: string[][] = [];
 
-  for (const mf of xml.matchAll(/<row([^>]*)>([\s\S]*?)<\/row>/g)) {
+  // Igual que las celdas, una fila sin contenido se escribe auto-cerrada:
+  // <row r="1" ht="30"/>. Aceptar solo <row ...>...</row> hace que esa fila
+  // se trague la siguiente y sus datos queden un renglon mas arriba.
+  for (const mf of xml.matchAll(/<row([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
     // La fila se coloca en SU numero, no a continuacion de la anterior. Excel
     // omite del XML las filas vacias igual que las celdas: apilarlas en orden
     // corre todo hacia arriba, y entonces un rotulo pasa a leerse como si
@@ -157,7 +160,7 @@ export async function leerXlsx(
     // Si el patron solo contempla <c ...>...</c>, esa celda abre la coincidencia,
     // se traga la celda siguiente como cuerpo, y el valor termina una columna
     // antes y sin resolver su texto compartido. Hay que aceptar las dos formas.
-    for (const mc of mf[2].matchAll(/<c([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+    for (const mc of (mf[2] ?? "").matchAll(/<c([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const attrs = mc[1];
       const ref = attrs.match(/r="([A-Z]+\d+)"/)?.[1];
       const tipo = attrs.match(/t="([^"]+)"/)?.[1];
