@@ -14,17 +14,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
 import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
-import { registrarMovimiento, listarMovimientos, revertirMovimiento, type MovimientoGuardado } from "@/lib/inventory/movimientos-db";
+import { registrarMovimiento, listarMovimientos, revertirMovimiento, type MovimientoGuardado, type Direccion } from "@/lib/inventory/movimientos-db";
 import { beep } from "@/lib/inventory/scan-feedback";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
-import {
-  MOTIVOS_ENTRADA,
-  MOTIVOS_SALIDA,
-  type Direccion,
-  type Movimiento,
-} from "@/lib/ux/inventory-movements";
+import { MOTIVOS_ENTRADA, MOTIVOS_SALIDA } from "@/lib/ux/catalogos";
 
 const fieldClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -208,7 +203,8 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
   const motivos = direccion === "entrada" ? MOTIVOS_ENTRADA : MOTIVOS_SALIDA;
   const [prod, setProd] = useState<ProductoEscaneado | null>(null);
   const [cantidad, setCantidad] = useState(1);
-  const [motivo, setMotivo] = useState(motivos[0]);
+  // string, no el literal: el valor sale de un <select>, que devuelve string.
+  const [motivo, setMotivo] = useState<string>(motivos[0]);
   const [nota, setNota] = useState("");
   const [aviso, setAviso] = useState<{ ok: boolean; text: string } | null>(null);
   const [msg, setMsg] = useState("");

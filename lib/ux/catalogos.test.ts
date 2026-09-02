@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { TIPOS_PRECIO, DIVISAS, UNIDADES } from "./catalogos.ts";
+import { TIPOS_PRECIO, DIVISAS, UNIDADES, MOTIVOS_ENTRADA, MOTIVOS_SALIDA } from "./catalogos.ts";
 
 // TRES arreglos distintos se aplicaron en un archivo de pantalla y sobrevivieron
 // en el otro: la tasa del BCV, el vendedor fijo y los tipos de precio. La causa
@@ -61,3 +61,38 @@ describe("catálogos compartidos", () => {
     assert.deepEqual([...DIVISAS], ["Bolívar", "Dólar"]);
   });
 });
+
+// El kardex vivio en el navegador (lib/ux/inventory-movements). Ya vive en
+// Postgres, pero el modulo viejo siguio ahi meses: seguia exportando su propio
+// `Direccion`, y el panel importaba ESE, no el de la base. Es el mismo patron
+// que causo los tres arreglos perdidos de arriba, con un agravante: el tipo
+// duplicado compilaba igual, asi que nada avisaba.
+describe("el kardex vive en la base, no en el navegador", () => {
+  const panel = fs.readFileSync("app/admin/inventory/MovimientosPanel.tsx", "utf8");
+
+  test("los motivos salen del catálogo compartido", () => {
+    assert.deepEqual([...MOTIVOS_ENTRADA][0], "Ingreso manual por compra");
+    assert.deepEqual([...MOTIVOS_SALIDA][0], "Salida manual por venta");
+    assert.match(panel, /MOTIVOS_ENTRADA[\s\S]*from "@\/lib\/ux\/catalogos"/);
+  });
+
+  test("el panel de movimientos no guarda nada en el navegador", () => {
+    assert.doesNotMatch(panel, /localStorage/);
+  });
+
+  test("`Direccion` tiene una sola definición, y es la de la base", () => {
+    const definiciones = ["lib/inventory", "lib/ux", "lib/cilindros"]
+      .flatMap((dir) =>
+        fs
+          .readdirSync(dir)
+          .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+          .map((f) => `${dir}/${f}`),
+      )
+      .filter((ruta) => /^export type Direccion\b/m.test(fs.readFileSync(ruta, "utf8")));
+    assert.deepEqual(definiciones, ["lib/inventory/movimientos-db.ts"]);
+  });
+
+  test("el panel toma `Direccion` de la base", () => {
+    assert.match(panel, /type Direccion[\s\S]*?from "@\/lib\/inventory\/movimientos-db"/);
+  });
+})

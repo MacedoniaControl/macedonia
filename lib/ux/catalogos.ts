@@ -14,3 +14,24 @@ export const TIPOS_PRECIO = ["Precio Mayorista", "Precio Oferta", "Detal"] as co
 export const DIVISAS = ["Bolívar", "Dólar"] as const;
 
 export const UNIDADES = ["CILINDRO", "UNIDAD", "KG", "MT", "PAR", "CAJA"] as const;
+
+// Motivos de un movimiento de inventario. Vivian en lib/ux/inventory-movements,
+// un modulo que guardaba el kardex en el navegador; el kardex ya vive en
+// Postgres (movimientos_inventario) y ese modulo quedo muerto salvo estas dos
+// listas. Aca no dependen de un almacenamiento que ya no se usa.
+export const MOTIVOS_ENTRADA = [
+  "Ingreso manual por compra",
+  "Devolución de cliente",
+  "Traslado entre almacenes",
+  "Corrección de conteo",
+  "Otro",
+] as const;
+
+export const MOTIVOS_SALIDA = [
+  "Salida manual por venta",
+  "Merma / daño",
+  "Traslado entre almacenes",
+  "Consumo interno",
+  "Corrección de conteo",
+  "Otro",
+] as const;
