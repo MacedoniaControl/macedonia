@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
 import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
@@ -167,7 +168,14 @@ export default function ReceivablesPage() {
 
       <div className="mt-6">
       <SectionCard title="Cartera" description="Saldos y vencimientos por documento.">
-          <div className="sumi-scroll max-w-full overflow-x-auto">
+          <EstadoDatos
+            cargando={carga.cargando}
+            error={carga.error}
+            vacio={conSaldo.length === 0}
+            tituloVacio="Sin cuentas por cobrar"
+            mensajeVacio="Nadie debe nada todavía. Cargá una con «Nueva cuenta» o importá la cartera."
+          >
+            <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
@@ -196,6 +204,7 @@ export default function ReceivablesPage() {
               </tbody>
             </table>
           </div>
+          </EstadoDatos>
         </SectionCard>
       </div>
     </>

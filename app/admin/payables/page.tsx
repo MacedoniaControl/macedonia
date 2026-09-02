@@ -5,6 +5,7 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb } from "@/lib/finanzas/cuentas-db";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
 import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useCarga } from "@/lib/ux/use-carga";
@@ -152,7 +153,14 @@ export default function PayablesPage() {
       )}
       <div className="mt-6">
         <SectionCard title="Cuentas" description="Generadas automáticamente al recibir compras.">
-          <div className="sumi-scroll max-w-full overflow-x-auto">
+          <EstadoDatos
+            cargando={carga.cargando}
+            error={carga.error}
+            vacio={conSaldo.length === 0}
+            tituloVacio="Sin cuentas por pagar"
+            mensajeVacio="No hay deudas cargadas. Usá «Nueva cuenta» o importá la cartera."
+          >
+            <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
@@ -179,6 +187,7 @@ export default function PayablesPage() {
               </tbody>
             </table>
           </div>
+          </EstadoDatos>
         </SectionCard>
       </div>
     </>

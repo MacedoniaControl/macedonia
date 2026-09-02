@@ -6,6 +6,7 @@ import { listarOrdenes, crearOrden, recibir, type Orden as OrdenDb } from "@/lib
 import { buscarProveedores, type Proveedor } from "@/lib/directorio/directorio-db";
 import { inventarioDe, type ItemInventario } from "@/lib/inventory/inventario-db";
 import { crearProducto } from "@/lib/inventory/productos-db";
+import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PanelProveedores } from "./PanelProveedores";
@@ -211,9 +212,13 @@ export default function PurchasesPage() {
         </SectionCard>
 
         <SectionCard title="Órdenes" description="Registra recepciones totales o parciales.">
-          {ordenes.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted">Sin órdenes. Crea una a la izquierda.</p>
-          ) : (
+          <EstadoDatos
+            cargando={carga.cargando}
+            error={carga.error}
+            vacio={ordenes.length === 0}
+            tituloVacio="Sin órdenes de compra"
+            mensajeVacio="Creá una con el formulario de al lado."
+          >
             <ul className="space-y-2">
               {ordenes.map((o) => (
                 <li key={o.id} className="rounded-xl border border-border-strong bg-surface-2 p-3">
@@ -234,7 +239,7 @@ export default function PurchasesPage() {
                 </li>
               ))}
             </ul>
-          )}
+          </EstadoDatos>
         </SectionCard>
       </div>
       )}
