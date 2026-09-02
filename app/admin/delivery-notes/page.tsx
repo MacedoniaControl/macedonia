@@ -4,6 +4,8 @@ import { useEffect } from "react";
 
 import { useRef, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
+import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
+import { vendedoresDe } from "@/lib/auth/vendedores";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
 import { useCarga } from "@/lib/ux/use-carga";
@@ -239,7 +241,6 @@ export default function DeliveryNotesPage() {
 }
 
 // ---- Generar Nota de Entrega (campos alineados con la pantalla de captura de Valery) ----
-const DEPOSITOS = ["Lechería", "Cumaná"];
 const TIPOS_PRECIO = ["Precio Máximo", "Precio Mínimo", "Precio Especial"];
 const DIVISAS = ["Bolívar", "Dólar"];
 const UNIDADES = ["CILINDRO", "UNIDAD", "KG", "MT", "PAR", "CAJA"];
@@ -247,7 +248,7 @@ const UNIDADES = ["CILINDRO", "UNIDAD", "KG", "MT", "PAR", "CAJA"];
 /** Formulario en blanco. Se reutiliza al limpiar tras guardar. */
 const formularioVacio = () => ({
   cliente: "", rif: "", tlf: "", direccion: "", ordenCompra: "", notas: "",
-  vendedor: "01 - GERENTE", deposito: DEPOSITOS[0], tipoPrecio: TIPOS_PRECIO[0], divisa: DIVISAS[0],
+  vendedor: "", deposito: "", tipoPrecio: TIPOS_PRECIO[0], divisa: DIVISAS[0],
 });
 
 function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: string | null }>; seq: string }) {
@@ -319,7 +320,13 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
     setMsg(""); // el aviso de "renglones sin precio" quedaría obsoleto al corregirlo
     setLineas(lineas.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   };
-  const t = neTotals({ ...f, correlativo: "", fecha: "", lineas, cilindros: cil } as NEDoc);
+  // Una sede por empresa: el deposito no se elige, se sabe.
+  const depositoEmpresa = isEmpresaId(empresaKey) ? EMPRESAS[empresaKey].deposito : "";
+
+  const cargaVend = useCarga(empresaKey, () => vendedoresDe(empresaKey));
+  const vendedores = cargaVend.datos ?? [];
+
+  const t = neTotals({ ...f, correlativo: "", fecha: "", deposito: depositoEmpresa, lineas, cilindros: cil } as NEDoc);
   const enBs = f.divisa === "Bolívar";
   // La tasa sale del BCV, no de una constante. Estaba en 49,5 mientras el BCV
   // real está cerca de 798: el total en bolívares que se le leía al cliente
@@ -328,7 +335,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
   const tasa = useTasaViva();
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[1fr_1.2fr_1fr]">
       <SectionCard title="Datos de la nota de entrega" description={`N° ${seq}`}>
         <div className="space-y-3">
           {/* Se ELIGE de la cartera, no se escribe.
@@ -365,8 +372,19 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           </div>
           <div><label className={label}>Dirección</label><input className={inputClass} value={f.direccion} onChange={set("direccion")} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={label}>Vendedor</label><input className={inputClass} value={f.vendedor} onChange={set("vendedor")} /></div>
-            <div><label className={label}>Depósito</label><select className={inputClass} value={f.deposito} onChange={set("deposito")}>{DEPOSITOS.map((d) => <option key={d}>{d}</option>)}</select></div>
+            <div><label className={label}>Vendedor</label>
+              {/* Sale de la tabla usuarios, igual que en Cotizaciones. Era un
+                  texto fijo, "01 - GERENTE" para todos: no se sabia quien
+                  habia emitido cada nota. */}
+              <select className={inputClass} value={f.vendedor} onChange={set("vendedor")}>
+                <option value="">— elegir —</option>
+                {vendedores.map((v) => <option key={v.id} value={v.nombre}>{v.nombre} · {v.rol}</option>)}
+              </select></div>
+            <div><label className={label}>Depósito</label>
+              {/* Cada empresa tiene UNA sede: no es una eleccion. Ofrecer las
+                  dos ciudades dejaba emitir una nota de Sudematin desde
+                  "Lecheria". */}
+              <input className={inputClass} value={depositoEmpresa} readOnly aria-readonly="true" /></div>
             <div><label className={label}>Tipo de precio</label><select className={inputClass} value={f.tipoPrecio} onChange={set("tipoPrecio")}>{TIPOS_PRECIO.map((p) => <option key={p}>{p}</option>)}</select></div>
             <div><label className={label}>Divisa</label><select className={inputClass} value={f.divisa} onChange={set("divisa")}>{DIVISAS.map((d) => <option key={d}>{d}</option>)}</select></div>
           </div>
@@ -512,6 +530,109 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
             </Button>
           )}
         />
+      </SectionCard>
+
+      {/* Vista previa del documento mientras se arma.
+          Cotizaciones la tenía desde el principio y notas de entrega no, al
+          revés de lo que conviene: son 290 notas contra 59 facturas, y
+          corregir una ya emitida cuesta un correlativo quemado.
+          Se ve ANTES de emitir, que es el único momento en que sirve. */}
+      <SectionCard title="Vista previa" description="Así va a salir el documento.">
+        <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+            <div>
+              <p className="font-display text-base font-semibold text-text">Nota de entrega</p>
+              <p className="font-mono text-xs text-muted">N° {seq}</p>
+            </div>
+            <div className="text-right text-xs text-muted">
+              <p>{f.divisa}</p>
+              <p>{depositoEmpresa}</p>
+              {llevaIva && <p>Con IVA {ivaPct}%</p>}
+            </div>
+          </div>
+
+          <div className="grid gap-1 py-3 text-xs">
+            <p><span className="text-muted">Cliente: </span>
+              <span className="text-text">{f.cliente || <em className="text-muted">sin elegir</em>}</span></p>
+            {f.rif && <p><span className="text-muted">RIF: </span><span className="font-mono text-text">{f.rif}</span></p>}
+            {f.direccion && <p><span className="text-muted">Dirección: </span><span className="text-text">{f.direccion}</span></p>}
+            {f.ordenCompra && <p><span className="text-muted">Orden de compra: </span><span className="text-text">{f.ordenCompra}</span></p>}
+          </div>
+
+          {lineas.length === 0 ? (
+            <p className="border-t border-border py-6 text-center text-xs text-muted">
+              Todavía no hay renglones. Escaneá o buscá un producto.
+            </p>
+          ) : (
+            <table className="w-full border-t border-border text-xs">
+              <thead>
+                <tr className="text-left text-muted">
+                  <th className="py-1.5 font-medium">Descripción</th>
+                  <th className="py-1.5 text-right font-medium">Cant.</th>
+                  <th className="py-1.5 text-right font-medium">Precio</th>
+                  <th className="py-1.5 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {lineas.map((l, i) => (
+                  <tr key={`${l.codigo}-${i}`}>
+                    <td className="py-1.5 pr-2 text-text">{l.descripcion}</td>
+                    <td className="py-1.5 text-right tabular-nums text-muted">{l.cantidad}</td>
+                    <td className={`py-1.5 text-right tabular-nums ${l.precio > 0 ? "text-muted" : "text-danger"}`}>
+                      {l.precio > 0 ? fmtUsd(l.precio) : "falta"}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-text">
+                      {fmtUsd(l.cantidad * l.precio * (1 - (l.descuento ?? 0) / 100))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {/* Los cilindros van aparte del total: son de la empresa y vuelven,
+              no son mercadería vendida. */}
+          {cil.some((c) => c.llenos > 0 || c.vacios > 0) && (
+            <div className="mt-3 border-t border-border pt-2">
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted">Cilindros</p>
+              {cil.filter((c) => c.llenos > 0 || c.vacios > 0).map((c) => (
+                <p key={c.gas} className="flex justify-between text-xs">
+                  <span className="text-text">{c.gas}</span>
+                  <span className="tabular-nums text-muted">
+                    {c.llenos} lleno(s) · {c.vacios} vacío(s)
+                    {c.llenos !== c.vacios && (
+                      <span className="ml-1.5 text-warn">
+                        · queda con {Math.abs(c.llenos - c.vacios)} {c.llenos > c.vacios ? "más" : "menos"}
+                      </span>
+                    )}
+                  </span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          {lineas.length > 0 && (
+            <dl className="mt-3 space-y-1 border-t border-border pt-2 text-xs">
+              <div className="flex justify-between"><dt className="text-muted">Base</dt>
+                <dd className="tabular-nums text-text">{fmtUsd(t.base)}</dd></div>
+              {llevaIva && (
+                <div className="flex justify-between"><dt className="text-muted">IVA {ivaPct}%</dt>
+                  <dd className="tabular-nums text-text">{fmtUsd(t.iva)}</dd></div>
+              )}
+              <div className="flex justify-between font-semibold"><dt className="text-text">Total</dt>
+                <dd className="tabular-nums text-text">
+                  {enBs
+                    ? (tasa ? `${(t.total * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa")
+                    : fmtUsd(t.total)}
+                </dd></div>
+              {enBs && tasa && (
+                <p className="pt-1 text-[11px] text-muted">Tasa BCV {tasa.toFixed(2)} · {fmtUsd(t.total)}</p>
+              )}
+            </dl>
+          )}
+
+          {f.notas && <p className="mt-3 border-t border-border pt-2 text-xs text-muted">{f.notas}</p>}
+        </div>
       </SectionCard>
     </div>
   );

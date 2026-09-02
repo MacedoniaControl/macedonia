@@ -10,6 +10,8 @@ export type Empresa = {
   id: EmpresaId;
   nombre: string;
   nombreCorto: string;
+  /** Su único depósito. Cada empresa tiene una sola sede. */
+  deposito: string;
   rif: string;
   direccion: string;
   logo: string; // data URI
@@ -28,8 +30,9 @@ export const EMPRESAS: Record<EmpresaId, Empresa> = {
     id: "sumigases",
     nombre: "Sumigases Oriente, C.A.",
     nombreCorto: "Sumigases",
+    deposito: "Puerto La Cruz",
     rif: "J-502789510",
-    direccion: "Av. Bolívar, Lechería, Anzoátegui",
+    direccion: "Av. Bolívar, Puerto La Cruz 6023, Anzoátegui",
     logo: SUMIGASES_LOGO,
     color: "#b04e15", // naranja
     direccionImpresa: "AV BOLIVAR LOCAL NRO SN SECTOR BELLA VISTA PUERTO LA CRUZ ANZOATEGUI",
@@ -41,6 +44,7 @@ export const EMPRESAS: Record<EmpresaId, Empresa> = {
     id: "sudematin",
     nombre: "Sudematin & GM, C.A.",
     nombreCorto: "Sudematin",
+    deposito: "Cumaná",
     rif: "J-31697141-4",
     direccion: "Cumaná, Sucre",
     logo: SUDEMATIN_LOGO,
