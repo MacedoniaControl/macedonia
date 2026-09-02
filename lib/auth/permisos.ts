@@ -36,8 +36,18 @@ const VENDEDOR = ["dashboard", "quotes", "delivery-notes", "sales", "products", 
 /** El técnico entra desde el celular, registra la recarga y sale. */
 const TECNICO = ["cylinders"];
 
-/** El admin ve todo de SU empresa, salvo estas tres. */
-const ADMIN_APAGADOS = ["users", "ver_registros"];
+/**
+ * El admin ve todo de SU empresa, salvo estas.
+ *
+ * `otra_empresa` estaba encendido y no debia: esa clave no agrega una seccion,
+ * abre la pared. En puede_empresa() vale tanto como ser owner, asi que un admin
+ * de Puerto La Cruz veia Cumana entero. La regla de Greeg es separacion
+ * estricta, y "administrador de una empresa" no significa "de las dos".
+ *
+ * Sigue siendo un interruptor: el Owner puede encenderlo para alguien que de
+ * verdad trabaje en las dos. Lo que cambia es que ya no viene puesto de fabrica.
+ */
+const ADMIN_APAGADOS = ["users", "ver_registros", "otra_empresa"];
 
 /**
  * Permisos iniciales al crear un usuario.
