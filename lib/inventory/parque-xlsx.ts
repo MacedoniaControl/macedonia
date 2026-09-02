@@ -82,7 +82,9 @@ export async function leerParque(buf: ArrayBuffer): Promise<TotalGas[]> {
   const salida: TotalGas[] = [];
 
   for (const [hoja, gas] of Object.entries(HOJAS_GAS)) {
-    const i = hojas.indexOf(hoja);
+    // Los nombres de hoja vienen con espacios al final ("OXIG ") segun quien
+    // haya guardado el libro, asi que se comparan recortados.
+    const i = hojas.findIndex((n) => n.trim().toUpperCase() === hoja);
     if (i < 0) continue;
     const encontrado = totalDeHoja(await leerXlsx(buf, i));
     if (!encontrado) continue;

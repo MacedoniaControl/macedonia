@@ -129,3 +129,24 @@ test("coloca cada fila en su numero aunque Excel omita las vacias", async () => 
   assert.deepEqual(filas[1], []);
   assert.equal(filas[4][0], "valor");
 });
+
+test("una celda vacia auto-cerrada no se traga la celda siguiente", async () => {
+  // Excel escribe <c r="A6" s="18"/> para una celda con formato y sin valor.
+  // Un patron que solo acepta <c ...>...</c> hace que esa celda abra la
+  // coincidencia y consuma la siguiente: el valor cae una columna antes y su
+  // texto compartido queda sin resolver, apareciendo como el indice crudo.
+  const filas = await leerXlsx(
+    libroConHoja(
+      `<worksheet><sheetData><row r="1">` +
+        `<c r="A1" s="18"/>` +
+        `<c r="B1" t="inlineStr"><is><t>nitrogeno</t></is></c>` +
+        `<c r="C1" s="27"/>` +
+        `<c r="D1"><v>71</v></c>` +
+        `</row></sheetData></worksheet>`,
+    ),
+  );
+  assert.equal(filas[0][0], "");
+  assert.equal(filas[0][1], "nitrogeno");
+  assert.equal(filas[0][2], "");
+  assert.equal(filas[0][3], "71");
+});

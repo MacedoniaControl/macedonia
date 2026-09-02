@@ -153,11 +153,15 @@ export async function leerXlsx(
     // atribuyera "129" a la etiqueta equivocada.
     const nfila = Number(mf[1].match(/\br="(\d+)"/)?.[1] ?? 0) - 1;
     const celdas: string[] = [];
-    for (const mc of mf[2].matchAll(/<c([^>]*)>([\s\S]*?)<\/c>/g)) {
+    // Una celda con estilo pero sin valor se escribe auto-cerrada: <c r="A6" s="18"/>.
+    // Si el patron solo contempla <c ...>...</c>, esa celda abre la coincidencia,
+    // se traga la celda siguiente como cuerpo, y el valor termina una columna
+    // antes y sin resolver su texto compartido. Hay que aceptar las dos formas.
+    for (const mc of mf[2].matchAll(/<c([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const attrs = mc[1];
       const ref = attrs.match(/r="([A-Z]+\d+)"/)?.[1];
       const tipo = attrs.match(/t="([^"]+)"/)?.[1];
-      const cuerpo = mc[2];
+      const cuerpo = mc[2] ?? "";
 
       let valor: string;
       if (tipo === "inlineStr") {
