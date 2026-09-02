@@ -40,10 +40,9 @@ export function HistoryTrend({ empresa = "sumigases", height = 260 }: Props & { 
   const n = data.length;
   const x = (i: number) => padL + (n <= 1 ? 0 : (i / (n - 1)) * plotW);
   const y = (v: number) => padT + plotH - (v / max) * plotH;
-  // El ultimo mes del export de Valery viene cortado a mitad de mes, asi que
-  // vale unos tercios de lo normal. Dibujarlo igual que los demas hace que la
-  // linea se desplome al final y se lea como una caida del negocio. Ese tramo
-  // va punteado y avisado: es dato incompleto, no una caida.
+  // El ultimo mes ya no se punteaba por incompleto: el historico se recalculo
+  // hasta 2026-08, un mes cerrado. Antes cortaba a mitad de julio y la linea se
+  // desplomaba al final; puntear un mes que SI esta completo mentiria al reves.
   const tramo = (key: keyof HistMonth, desde: number, hasta: number) =>
     data.slice(desde, hasta).map((d, k) => `${x(desde + k)},${y(d[key] as number)}`).join(" ");
   const line = (key: keyof HistMonth) => tramo(key, 0, n);
@@ -74,20 +73,12 @@ export function HistoryTrend({ empresa = "sumigases", height = 260 }: Props & { 
             <text x={x(mk.i) + 3} y={H - 8} fontSize={11} fill="var(--color-muted)">{mk.ym.slice(0, 4)}</text>
           </g>
         ))}
-        {series.map((s) =>
-          n < 2 ? (
-            <polyline key={s.name} points={line(s.key)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          ) : (
-            <g key={s.name}>
-              <polyline points={tramo(s.key, 0, n - 1)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              <polyline points={tramo(s.key, n - 2, n)} fill="none" stroke={s.color} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" />
-            </g>
-          ),
-        )}
+        {series.map((s) => (
+          <polyline key={s.name} points={line(s.key)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        ))}
       </svg>
       <p className="mt-1 text-xs text-muted">
         {labelMes(data[0].ym)} – {labelMes(data[n - 1].ym)} · {n} meses · fuente: exports de Valery
-        {n >= 2 ? ` · el tramo punteado (${labelMes(data[n - 1].ym)}) es un mes incompleto` : ""}
       </p>
     </div>
   );
