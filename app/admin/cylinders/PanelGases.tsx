@@ -2,7 +2,9 @@
 
 // Gases y su depósito en garantía.
 //
-// El depósito estaba en 0 para los ocho gases, así que la vista de garantías
+// No se cobra depósito (confirmado por Greeg, 02-sep-2026): los ceros son la
+// respuesta, no un pendiente. Antes esta pantalla los reclamaba.
+// Nota historica: el depósito estaba en 0 para los ocho gases, así que la vista de garantías
 // devolvía siempre cero sin avisar que el dato faltaba. Un cero que parece una
 // respuesta es peor que un vacío que se ve.
 //
@@ -27,7 +29,11 @@ export function PanelGases({ empresa, onCambio }: { empresa: string; onCambio?: 
   const [msg, setMsg] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  const sinDeposito = lista.filter((g) => g.depositoUsd === 0).length;
+  // Greeg confirmo el 02-sep-2026 que NO se cobra deposito en garantia. Cero
+  // dejo de ser un pendiente y paso a ser la respuesta. Lo que si vale avisar
+  // es la mezcla: si algunos gases cobran y otros no, uno de los dos esta mal.
+  const conDeposito = lista.filter((g) => g.depositoUsd > 0).length;
+  const mezclado = conDeposito > 0 && conDeposito < lista.length;
 
   async function guardar() {
     if (!edit || guardando) return;
@@ -53,10 +59,16 @@ export function PanelGases({ empresa, onCambio }: { empresa: string; onCambio?: 
             </p>
           </div>
 
-          {sinDeposito > 0 && (
+          {lista.length > 0 && conDeposito === 0 && (
+            <p className="rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
+              Hoy no se cobra depósito en garantía. Si empiezan a cobrarlo, cargá
+              el monto acá y las garantías por cliente se calculan solas.
+            </p>
+          )}
+          {mezclado && (
             <p className="rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-xs text-warn">
-              {sinDeposito} gas(es) con depósito en cero: sus garantías van a
-              calcular cero, aunque el cilindro esté afuera.
+              {conDeposito} de {lista.length} gases cobran depósito y el resto no.
+              Si es a propósito, está bien; si no, alguno quedó sin cargar.
             </p>
           )}
 
