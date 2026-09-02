@@ -81,3 +81,88 @@ describe("aTexto", () => {
     assert.equal(aTexto([["a\nb", "c"]]), "a b\tc");
   });
 });
+
+/** Arma un .xlsx minimo en memoria: un ZIP con las entradas sin comprimir
+ *  (metodo 0), que es lo que el lector acepta ademas de deflate. Sirve para
+ *  probar formas de hoja que el libro base64 fijo no cubre. */
+function libroConHoja(hojaXml: string): ArrayBuffer {
+  const nombre = "xl/worksheets/sheet1.xml";
+  const cuerpo = new TextEncoder().encode(hojaXml);
+  const nom = new TextEncoder().encode(nombre);
+  const partes: number[] = [];
+  const push = (...b: number[]) => partes.push(...b);
+  const u16 = (n: number) => push(n & 255, (n >> 8) & 255);
+  const u32 = (n: number) => push(n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255);
+
+  const inicioLocal = 0;
+  u32(0x04034b50); u16(20); u16(0); u16(0); u16(0); u16(0);
+  u32(0); u32(cuerpo.length); u32(cuerpo.length); u16(nom.length); u16(0);
+  push(...nom, ...cuerpo);
+
+  const inicioCentral = partes.length;
+  u32(0x02014b50); u16(20); u16(20); u16(0); u16(0); u16(0); u16(0);
+  u32(0); u32(cuerpo.length); u32(cuerpo.length);
+  u16(nom.length); u16(0); u16(0); u16(0); u16(0); u32(0); u32(inicioLocal);
+  push(...nom);
+
+  const largoCentral = partes.length - inicioCentral;
+  u32(0x06054b50); u16(0); u16(0); u16(1); u16(1);
+  u32(largoCentral); u32(inicioCentral); u16(0);
+
+  return new Uint8Array(partes).buffer as ArrayBuffer;
+}
+
+test("coloca cada fila en su numero aunque Excel omita las vacias", async () => {
+  // Excel no escribe las filas vacias. Apilarlas en orden corre todo hacia
+  // arriba y hace que un rotulo se lea como si fuera el valor que tiene
+  // debajo: es lo que hizo leer mal el conteo de cilindros de septiembre.
+  const filas = await leerXlsx(
+    libroConHoja(
+      `<worksheet><sheetData>` +
+        `<row r="1"><c r="A1" t="inlineStr"><is><t>cabecera</t></is></c></row>` +
+        `<row r="5"><c r="A5" t="inlineStr"><is><t>valor</t></is></c></row>` +
+        `</sheetData></worksheet>`,
+    ),
+  );
+  assert.equal(filas.length, 5);
+  assert.equal(filas[0][0], "cabecera");
+  assert.deepEqual(filas[1], []);
+  assert.equal(filas[4][0], "valor");
+});
+
+test("una celda vacia auto-cerrada no se traga la celda siguiente", async () => {
+  // Excel escribe <c r="A6" s="18"/> para una celda con formato y sin valor.
+  // Un patron que solo acepta <c ...>...</c> hace que esa celda abra la
+  // coincidencia y consuma la siguiente: el valor cae una columna antes y su
+  // texto compartido queda sin resolver, apareciendo como el indice crudo.
+  const filas = await leerXlsx(
+    libroConHoja(
+      `<worksheet><sheetData><row r="1">` +
+        `<c r="A1" s="18"/>` +
+        `<c r="B1" t="inlineStr"><is><t>nitrogeno</t></is></c>` +
+        `<c r="C1" s="27"/>` +
+        `<c r="D1"><v>71</v></c>` +
+        `</row></sheetData></worksheet>`,
+    ),
+  );
+  assert.equal(filas[0][0], "");
+  assert.equal(filas[0][1], "nitrogeno");
+  assert.equal(filas[0][2], "");
+  assert.equal(filas[0][3], "71");
+});
+
+test("una fila vacia auto-cerrada no corre la fila siguiente", async () => {
+  // <row r="1" ht="30"/> es una fila con alto propio y sin celdas. Si el
+  // patron solo acepta <row ...>...</row>, esa fila se traga la siguiente y
+  // los encabezados aparecen un renglon mas arriba de donde estan.
+  const filas = await leerXlsx(
+    libroConHoja(
+      `<worksheet><sheetData>` +
+        `<row r="1" ht="30" customHeight="1"/>` +
+        `<row r="2"><c r="B2" t="inlineStr"><is><t>DESCRIPCION</t></is></c></row>` +
+        `</sheetData></worksheet>`,
+    ),
+  );
+  assert.deepEqual(filas[0], []);
+  assert.equal(filas[1][1], "DESCRIPCION");
+});

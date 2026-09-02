@@ -1,5 +1,3 @@
-"use client";
-
 // Gastos — alimentan el Estado de Resultado.
 // Catálogo de PARTIDAS y CATEGORÍAS extraído del EdR real de Sumigases 2024
 // ("III PARTE MATRIZ EDO DE RESULTADO.xlsx"). El mapeo partida→categoría se dedujo
@@ -7,7 +5,6 @@
 //
 //   VENTAS − COSTO DE VENTA = UTILIDAD BRUTA − GASTOS = UTILIDAD − BONO = UTILIDAD TOTAL
 
-import { useEffect, useState } from "react";
 
 export type CategoriaGasto =
   | "Alquileres"
@@ -91,43 +88,6 @@ export type Gasto = {
   usuario: string;
 };
 
-const KEY = "sumi:gastos";
-const EV = "sumi:gastos";
-
-export function getGastos(): Gasto[] {
-  if (typeof localStorage === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]") as Gasto[];
-  } catch {
-    return [];
-  }
-}
-
-function save(list: Gasto[]) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(list));
-  } catch {
-    /* ignore */
-  }
-  window.dispatchEvent(new Event(EV));
-}
-
-export function addGasto(g: Omit<Gasto, "id" | "categoria" | "montoUsd">): Gasto {
-  const montoUsd = g.moneda === "USD" ? g.monto : g.tasa && g.tasa > 0 ? g.monto / g.tasa : 0;
-  const nuevo: Gasto = {
-    ...g,
-    id: `gto-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    categoria: categoriaDe(g.partida),
-    montoUsd: Math.round(montoUsd * 100) / 100,
-  };
-  save([nuevo, ...getGastos()]);
-  return nuevo;
-}
-
-export function removeGasto(id: string) {
-  save(getGastos().filter((g) => g.id !== id));
-}
-
 /** Total en USD por categoría, para el bloque GASTOS del Estado de Resultado. */
 export function totalesPorCategoria(gastos: Gasto[]): Record<CategoriaGasto, number> {
   const out = Object.fromEntries(CATEGORIAS.map((c) => [c, 0])) as Record<CategoriaGasto, number>;
@@ -135,23 +95,4 @@ export function totalesPorCategoria(gastos: Gasto[]): Record<CategoriaGasto, num
     out[g.categoria] = (out[g.categoria] ?? 0) + g.montoUsd;
   });
   return out;
-}
-
-export function useGastos(empresa?: string) {
-  const [state, setState] = useState<{ gastos: Gasto[]; ready: boolean }>({ gastos: [], ready: false });
-  useEffect(() => {
-    const load = () => {
-      const all = getGastos();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setState({ gastos: empresa ? all.filter((g) => g.empresa === empresa) : all, ready: true });
-    };
-    load();
-    window.addEventListener(EV, load);
-    window.addEventListener("storage", load);
-    return () => {
-      window.removeEventListener(EV, load);
-      window.removeEventListener("storage", load);
-    };
-  }, [empresa]);
-  return state;
 }
