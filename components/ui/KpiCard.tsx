@@ -23,7 +23,11 @@ export function KpiCard({ label, value, sub, tone = "brand" }: KpiCardProps) {
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
       </div>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-text">{value}</p>
+      {/* Achica en movil y puede envolver: los montos en bolivares tienen
+          siete y ocho digitos, y truncar una cifra la vuelve mentira. */}
+      <p className="mt-2 text-lg font-semibold leading-tight tracking-tight tabular-nums text-text [overflow-wrap:anywhere] sm:text-2xl">
+        {value}
+      </p>
       {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
     </div>
   );

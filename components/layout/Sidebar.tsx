@@ -85,7 +85,7 @@ export function Sidebar({
             type="button"
             onClick={onClose}
             aria-label="Cerrar menú"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
           >
             <Icon name="close" size={18} />
           </button>

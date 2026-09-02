@@ -370,7 +370,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
                     { codigo: g.nombre, nombre: g.nombre, precio: 0, unidad: "CILINDRO" } as ProductoEscaneado,
                     "buscador",
                   )}
-                  className="min-h-9 rounded-full border border-border bg-surface px-3 text-sm text-muted transition hover:bg-surface-2 hover:text-text"
+                  className="min-h-11 rounded-full border border-border bg-surface px-3.5 text-sm text-muted transition hover:bg-surface-2 hover:text-text"
                 >
                   + {g.nombre}
                 </button>

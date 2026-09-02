@@ -8,9 +8,9 @@
 
 import { PRESETS, hoyISO, INICIO_OPERACIONES, type Rango, type Agrupacion } from "@/lib/ux/rango";
 
-const chip = "min-h-9 rounded-full border px-3 text-sm font-medium transition";
+const chip = "min-h-11 rounded-full border px-3.5 text-sm font-medium transition";
 const fecha =
-  "h-9 rounded-xl border border-border-strong bg-surface px-2 text-sm text-text " +
+  "h-11 rounded-xl border border-border-strong bg-surface px-2 text-sm text-text " +
   "outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
 
 const AGRUPACIONES: { id: Agrupacion; label: string }[] = [

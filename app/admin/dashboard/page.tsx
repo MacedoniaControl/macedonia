@@ -123,13 +123,21 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   return (
     <div className={emp ? `theme-${emp.id}` : ""}>
       {emp && (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-sm">
-          <img src={emp.logo} alt={emp.nombre} className="h-9 w-auto max-w-[160px] object-contain" />
-          <div className="min-w-0">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-sm">
+          {/* El logo cede ancho en el teléfono: a 320px, 160 fijos dejaban al
+              nombre y al RIF sin lugar y todo se montaba encima. */}
+          <img src={emp.logo} alt={emp.nombre}
+            className="h-8 w-auto max-w-[110px] shrink-0 object-contain sm:h-9 sm:max-w-[160px]" />
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-text">{emp.nombre}</p>
-            <p className="text-xs text-muted">RIF {emp.rif}</p>
+            <p className="truncate text-xs text-muted">RIF {emp.rif}</p>
           </div>
-          <StatusBadge tone="brand">Panel {emp.nombreCorto}</StatusBadge>
+          {/* La insignia se va en móvil: decía "Panel Sumigases" al lado del
+              logo de Sumigases, con "Sumigases" también en la cabecera. Tres
+              veces el mismo dato, y el que se comía el espacio de los otros. */}
+          <div className="hidden sm:block">
+            <StatusBadge tone="brand">Panel {emp.nombreCorto}</StatusBadge>
+          </div>
         </div>
       )}
       <PageHeader
@@ -190,14 +198,14 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           </div>
           {bcv ? (
             <>
-              <p className="mt-2 text-2xl font-semibold text-text">{bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs</p>
+              <p className="mt-2 text-xl font-semibold tabular-nums text-text sm:text-2xl">{bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs</p>
               <p className="mt-1 text-xs text-muted">
                 {bcv.fecha ? `Fecha valor BCV: ${bcv.fecha} · ` : ""}Consultado: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
               </p>
             </>
           ) : (
             <>
-              <p className="mt-2 text-2xl font-semibold text-muted">— Bs</p>
+              <p className="mt-2 text-xl font-semibold text-muted sm:text-2xl">— Bs</p>
               <p className="mt-1 text-xs text-muted">Sin consulta. Pulsa “Dolar Price” en la barra superior.</p>
             </>
           )}

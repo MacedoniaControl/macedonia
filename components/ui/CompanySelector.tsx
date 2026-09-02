@@ -40,17 +40,17 @@ export function CompanySelector() {
   const active = OPCIONES.find((o) => o.id === activeId) ?? OPCIONES[0];
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Empresa activa"
-        className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 sm:gap-2 sm:px-3 text-sm font-medium text-text hover:bg-surface-2"
+        className="flex h-11 min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 sm:gap-2 sm:px-3 text-sm font-medium text-text hover:bg-surface-2"
       >
         <Icon name="building" size={18} />
-        <span className="max-w-[4.5rem] truncate sm:max-w-[8rem]">{active.name}</span>
+        <span className="min-w-0 truncate sm:max-w-[8rem]">{active.name}</span>
         <Icon name="chevronDown" size={16} />
       </button>
 

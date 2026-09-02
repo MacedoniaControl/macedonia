@@ -171,10 +171,13 @@ export default function SettingsPage() {
 
         <SectionCard title="Métodos de pago" description="Requisito y verificación por método.">
           <ul className="divide-y divide-border text-sm">
+            {/* La fila envuelve en pantallas chicas: "Transferencia Bs" más el
+                requisito y la insignia no entran en 320px, y el nombre del
+                método quedaba cortado. */}
             {metodos.map((x) => (
-              <li key={x.m} className="flex items-center justify-between gap-2 py-2">
-                <span className="text-text">{x.m}</span>
-                <span className="flex items-center gap-2">
+              <li key={x.m} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-2">
+                <span className="min-w-0 text-text">{x.m}</span>
+                <span className="flex shrink-0 items-center gap-2">
                   <span className="text-xs text-muted">{x.req}</span>
                   <StatusBadge tone={x.tone}>{x.verif}</StatusBadge>
                 </span>
