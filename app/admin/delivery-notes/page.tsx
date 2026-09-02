@@ -331,7 +331,34 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <SectionCard title="Datos de la nota de entrega" description={`N° ${seq}`}>
         <div className="space-y-3">
-          <div><label className={label}>Cliente</label><input className={inputClass} value={f.cliente} onChange={set("cliente")} placeholder="Nombre / Razón social" /></div>
+          {/* Se ELIGE de la cartera, no se escribe.
+              Escribir a mano convertia "Ferreteria Los Andes" y "FERRETERIA LOS
+              ANDES" en dos clientes distintos, y el modulo que tiene que decir
+              QUIEN TIENE LOS CILINDROS de la empresa se llenaba de duplicados.
+              Al elegir se traen RIF y direccion: son datos de la ficha, no del
+              documento, y retipearlos es otra forma de que difieran. */}
+          <div>
+            <label className={label}>Cliente</label>
+            <SelectorCliente
+              empresa={empresaKey}
+              seleccionado={cliente}
+              onSelect={(c) => {
+                setCliente(c);
+                setF((v) => ({
+                  ...v,
+                  cliente: c?.nombre ?? "",
+                  rif: c?.rif ?? "",
+                  direccion: c?.direccion ?? "",
+                  tlf: c?.telefonos ?? "",
+                }));
+              }}
+            />
+          </div>
+
+          {/* Quedan editables: la ficha puede estar incompleta —se cargaron
+              5.028 clientes solo con el nombre— y el vendedor tiene el dato
+              delante. Lo que escriba acá va al documento; completar la ficha
+              es otra tarea, en su propia pantalla. */}
           <div className="grid grid-cols-2 gap-3">
             <div><label className={label}>Cédula / R.I.F.</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
             <div><label className={label}>Teléfonos</label><input className={inputClass} value={f.tlf} onChange={set("tlf")} /></div>
@@ -462,7 +489,9 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
               // Si la base rechazó, hay que decirlo: antes el documento "se
               // generaba" en pantalla aunque no quedara guardado en ningún lado.
               if (r.error) setMsg(r.error);
-              else { setLineas([]); setF(formularioVacio()); }
+              // Tambien se suelta el cliente elegido: si queda seleccionado,
+              // la siguiente nota sale al mismo sin que nadie lo haya pedido.
+              else { setLineas([]); setF(formularioVacio()); setCliente(null); }
             } finally {
               setGuardando(false);
             }
