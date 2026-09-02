@@ -5,7 +5,6 @@ import { EMPRESAS, EMPRESA_IDS } from "@/lib/ux/empresas";
 import { getHistory } from "@/lib/ux/history-data";
 import { fmtUsd } from "@/lib/ux/format";
 
-const consolidado = getHistory("all").totals;
 
 export function CentroDeControl() {
   return (
@@ -39,7 +38,8 @@ export function CentroDeControl() {
           <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2">
             {EMPRESA_IDS.map((id) => {
               const emp = EMPRESAS[id];
-              const t = getHistory(id).totals;
+              const h = getHistory(id);
+              const t = h.totals;
               return (
                 <Link
                   key={id}
@@ -58,8 +58,12 @@ export function CentroDeControl() {
 
                   <dl className="mt-5 grid grid-cols-3 gap-3">
                     <div className="min-w-0">
+                      {/* La ventana va escrita: el historico de Valery se corta
+                          en 2026-07 y sin esa nota el numero se lee como si
+                          llegara hasta hoy. */}
                       <dt className="text-[11px] uppercase tracking-wide text-muted">Ventas hist.</dt>
                       <dd className="truncate text-base font-semibold tabular-nums text-text">{fmtUsd(t.venta)}</dd>
+                      <dd className="text-[11px] text-muted">{h.meta.desde} → {h.meta.hasta}</dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-[11px] uppercase tracking-wide text-muted">Margen</dt>
