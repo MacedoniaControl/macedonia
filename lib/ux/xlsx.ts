@@ -89,6 +89,22 @@ function columnaDe(ref: string): number {
   return n - 1;
 }
 
+/**
+ * Las combinaciones de celdas de una hoja.
+ *
+ * En un .xlsx el valor de una combinación vive SOLO en su celda superior
+ * izquierda; el resto del rango queda vacío. Sin resolverlas, un rótulo que
+ * visualmente abarca cuatro columnas se lee en una sola, y las otras tres
+ * parecen no tener título — que es como termina uno atribuyendo un número a la
+ * etiqueta equivocada.
+ */
+function combinaciones(xml: string): { r1: number; c1: number; r2: number; c2: number }[] {
+  return [...xml.matchAll(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/g)].map((m) => ({
+    c1: columnaDe(m[1] + "1"), r1: Number(m[2]) - 1,
+    c2: columnaDe(m[3] + "1"), r2: Number(m[4]) - 1,
+  }));
+}
+
 /** Los nombres de las hojas, en el orden en que están en el libro. */
 function nombresDeHojas(xml: string): string[] {
   return [...xml.matchAll(/<sheet[^>]*name="([^"]*)"/g)].map((m) => desescapar(m[1]));
@@ -110,7 +126,12 @@ function limpiarNumero(v: string): string {
  * Las celdas vacías vienen como cadena vacía: Excel omite del XML las celdas
  * sin valor, así que hay que rellenar los huecos o las columnas se corren.
  */
-export async function leerXlsx(buf: ArrayBuffer, cualHoja = 0): Promise<string[][]> {
+export async function leerXlsx(
+  buf: ArrayBuffer,
+  cualHoja = 0,
+  /** Repetir el valor de una combinación en todo su rango. */
+  resolverCombinaciones = true,
+): Promise<string[][]> {
   const zip = await abrirZip(buf);
 
   const hojas = [...zip.entries()]
@@ -124,9 +145,15 @@ export async function leerXlsx(buf: ArrayBuffer, cualHoja = 0): Promise<string[]
   const xml = texto(hoja);
   const filas: string[][] = [];
 
-  for (const mf of xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
+  for (const mf of xml.matchAll(/<row([^>]*)>([\s\S]*?)<\/row>/g)) {
+    // La fila se coloca en SU numero, no a continuacion de la anterior. Excel
+    // omite del XML las filas vacias igual que las celdas: apilarlas en orden
+    // corre todo hacia arriba, y entonces un rotulo pasa a leerse como si
+    // fuera el valor que tiene debajo. Es exactamente el error que hizo que yo
+    // atribuyera "129" a la etiqueta equivocada.
+    const nfila = Number(mf[1].match(/\br="(\d+)"/)?.[1] ?? 0) - 1;
     const celdas: string[] = [];
-    for (const mc of mf[1].matchAll(/<c([^>]*)>([\s\S]*?)<\/c>/g)) {
+    for (const mc of mf[2].matchAll(/<c([^>]*)>([\s\S]*?)<\/c>/g)) {
       const attrs = mc[1];
       const ref = attrs.match(/r="([A-Z]+\d+)"/)?.[1];
       const tipo = attrs.match(/t="([^"]+)"/)?.[1];
@@ -144,9 +171,53 @@ export async function leerXlsx(buf: ArrayBuffer, cualHoja = 0): Promise<string[]
       while (celdas.length < i) celdas.push("");   // huecos que Excel no escribe
       celdas[i] = valor;
     }
-    filas.push(celdas);
+    if (nfila >= 0) {
+      while (filas.length < nfila) filas.push([]);
+      filas[nfila] = celdas;
+    } else {
+      filas.push(celdas);
+    }
   }
+  if (resolverCombinaciones) {
+    for (const m of combinaciones(xml)) {
+      const valor = filas[m.r1]?.[m.c1] ?? "";
+      if (!valor) continue;
+      for (let r = m.r1; r <= m.r2; r++) {
+        if (!filas[r]) continue;
+        for (let c = m.c1; c <= m.c2; c++) {
+          while (filas[r].length <= c) filas[r].push("");
+          if (!filas[r][c]) filas[r][c] = valor;
+        }
+      }
+    }
+  }
+
   return filas;
+}
+
+/**
+ * Busca un rótulo y devuelve el valor que tiene DEBAJO.
+ *
+ * En una planilla hecha a mano, la posición de un número no es estable pero su
+ * rótulo sí. Buscar por rótulo es lo único que aguanta que alguien inserte una
+ * columna — y es lo que evita leer el número de al lado.
+ *
+ * Devuelve también el rótulo encontrado: en planillas copiadas de hoja en hoja,
+ * el título suele quedar del original, y hay que poder verlo para dudar de él.
+ */
+export function valorBajoRotulo(
+  filas: string[][],
+  rotulo: RegExp,
+): { valor: string; rotulo: string; fila: number; columna: number } | null {
+  for (let r = 0; r < filas.length; r++) {
+    for (let c = 0; c < (filas[r]?.length ?? 0); c++) {
+      const t = (filas[r][c] || "").replace(/\s+/g, " ").trim();
+      if (!t || !rotulo.test(t)) continue;
+      const abajo = (filas[r + 1]?.[c] || "").trim();
+      if (abajo) return { valor: abajo, rotulo: t, fila: r + 1, columna: c };
+    }
+  }
+  return null;
 }
 
 /** Un .xlsx siempre empieza con "PK": sirve para distinguirlo del .xls viejo. */
