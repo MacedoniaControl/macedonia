@@ -5,6 +5,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { inicialesDe } from "./identidad.ts";
 import { plantillaDeRol, claveDeRuta, puedeVer, CLAVES_MODULO, TODAS_LAS_CLAVES } from "./permisos.ts";
 
 describe("plantillaDeRol", () => {
@@ -169,4 +170,47 @@ test("el tecnico puede contar: el conteo fisico vive en inventory", () => {
   // pantalla de conteo queda vacia aunque `inventory` este encendido.
   assert.equal(p.products, true);
   assert.equal(p.expenses, false, "el tecnico no debe ver finanzas");
+});
+
+// El chip de usuario tenia "GV / Greeg V. / Owner" escrito a mano: no
+// respondia al clic y le mostraba el nombre del dueño a cualquiera que
+// entrara. Y `salir()` existia desde hacia tiempo sin que nadie la llamara,
+// asi que no habia forma de cerrar sesion en toda la app.
+describe("el menú de usuario", () => {
+  const menu = fs.readFileSync("components/layout/MenuUsuario.tsx", "utf8");
+  const header = fs.readFileSync("components/layout/Header.tsx", "utf8");
+
+  test("no queda ningún nombre ni rol escrito a mano en la cabecera", () => {
+    assert.doesNotMatch(header, /Greeg|">GV<|>Owner</);
+  });
+
+  test("la identidad sale de la sesión", () => {
+    assert.match(menu, /useSesion\(\)/);
+  });
+
+  test("se puede cerrar sesión, y por el servidor", () => {
+    assert.match(menu, /from "@\/app\/login\/actions"/);
+    assert.match(menu, /<form action=\{salir\}>/);
+  });
+
+  test("sin sesión no dibuja un chip inventado", () => {
+    assert.match(menu, /if \(!u\) return null;/);
+  });
+});
+
+// Las iniciales van en el chip: si dos personas comparten las suyas, el chip
+// deja de identificar a nadie.
+describe("inicialesDe", () => {
+  test("toma la inicial de las dos primeras palabras", () => {
+    assert.equal(inicialesDe("Greeg Vizcaino"), "GV");
+    assert.equal(inicialesDe("Administración PLC"), "AP");
+  });
+  test("con una sola palabra usa sus dos primeras letras", () => {
+    // Una inicial sola no distingue: Angie y Almacén serían la misma "A".
+    assert.equal(inicialesDe("Angie"), "AN");
+    assert.equal(inicialesDe("Leonardo"), "LE");
+  });
+  test("un nombre vacío no revienta el chip", () => {
+    assert.equal(inicialesDe("   "), "?");
+  });
 });

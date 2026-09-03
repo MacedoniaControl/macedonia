@@ -28,6 +28,7 @@ export type IconName =
   | "scan"
   | "plus"
   | "chevronDown"
+  | "logout"
   | "chevronRight"
   | "building"
   | "close"
@@ -195,6 +196,15 @@ const paths: Record<IconName, JSX.Element> = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   chevronDown: <path d="M6 9l6 6 6-6" />,
+  // Puerta con flecha saliendo. El trazo va suelto, sin `fill`, igual que el
+  // resto del catalogo, para que herede color y grosor.
+  logout: (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </>
+  ),
   chevronRight: <path d="M9 6l6 6-6 6" />,
   building: (
     <>

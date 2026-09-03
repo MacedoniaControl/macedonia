@@ -1,26 +1,43 @@
 "use client";
 
-// El rol del usuario, bajado desde el servidor.
+// Quién es el usuario en sesión, bajado desde el servidor.
 //
-// Antes salia de localStorage y por defecto era "owner": cualquiera podia
-// abrir la consola, escribir su propio rol y ver secciones que no le tocan.
-// Los datos nunca estuvieron expuestos -RLS en Postgres es la barrera real y
-// no lee el navegador- pero la interfaz mostraba de mas, que para quien la usa
-// es lo mismo que estar abierta.
+// Antes solo bajaba el rol, y el rol salía de localStorage con "owner" por
+// defecto: cualquiera podía abrir la consola y escribir el suyo. Los datos
+// nunca estuvieron expuestos -RLS en Postgres es la barrera real y no lee el
+// navegador- pero la interfaz mostraba de más.
 //
-// Ahora el rol viene de la tabla `usuarios`, resuelto en el servidor, y el
-// cliente solo lo lee. No hay forma de cambiarlo desde el navegador.
+// Ahora baja la identidad completa desde la tabla `usuarios`, resuelta en el
+// servidor, y el cliente solo la lee.
 
 import { createContext, useContext, type ReactNode } from "react";
 import type { Rol } from "@/lib/ux/session";
 
-const Ctx = createContext<Rol | null>(null);
+export type Identidad = {
+  nombre: string;
+  usuario: string;
+  rol: Rol;
+  empresaId: string | null;
+};
 
-export function SesionProvider({ rol, children }: { rol: Rol | null; children: ReactNode }) {
-  return <Ctx.Provider value={rol}>{children}</Ctx.Provider>;
+const Ctx = createContext<Identidad | null>(null);
+
+export function SesionProvider({
+  identidad,
+  children,
+}: {
+  identidad: Identidad | null;
+  children: ReactNode;
+}) {
+  return <Ctx.Provider value={identidad}>{children}</Ctx.Provider>;
 }
 
-/** El rol de la sesion. `null` mientras no haya sesion resuelta. */
-export function useRolSesion(): Rol | null {
+/** La sesión completa, o `null` si todavía no hay ninguna. */
+export function useSesion(): Identidad | null {
   return useContext(Ctx);
+}
+
+/** Solo el rol. `null` mientras no haya sesión resuelta. */
+export function useRolSesion(): Rol | null {
+  return useContext(Ctx)?.rol ?? null;
 }

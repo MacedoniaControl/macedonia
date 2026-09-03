@@ -51,3 +51,20 @@ export function errorDeUsuario(entrada: string): string | null {
   if (!VALIDO.test(u)) return "Solo letras, números, punto, guion y guion bajo.";
   return null;
 }
+
+/**
+ * Iniciales para el chip de sesion. Toma la primera letra de las dos primeras
+ * palabras: "Administracion PLC" -> "AP".
+ *
+ * Con una sola palabra usa sus DOS primeras letras. Una inicial sola no
+ * distingue a nadie: Angie y Almacen serian las dos una "A".
+ *
+ * Vive aca y no en el componente porque es una funcion pura, y Node no puede
+ * cargar un .tsx para probarla.
+ */
+export function inicialesDe(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return "?";
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[1][0]).toUpperCase();
+}
