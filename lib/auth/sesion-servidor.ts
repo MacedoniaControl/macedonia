@@ -7,7 +7,8 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/ux/session";
 import type { EmpresaId } from "@/lib/ux/empresas";
-import { CLAVES_MODULO, type Permisos } from "./permisos.ts";
+import { type Permisos } from "./permisos.ts";
+import { primeraClaveVisible } from "./acceso.ts";
 
 export type UsuarioSesion = {
   id: string;
@@ -65,9 +66,16 @@ export function sesionPuede(u: UsuarioSesion, clave: string): boolean {
  * intenta entrar a algo sin permiso: nunca debe quedar en una pantalla vacía
  * sin saber qué hacer.
  */
+/**
+ * A que seccion entra alguien.
+ *
+ * La decision vivia escrita DOS veces -aqui y en acceso.ts- con el mismo
+ * cuerpo. Al cambiar una, la otra sobrevivio y el tecnico aterrizaba distinto
+ * segun por donde entrara. Ahora hay una sola: esta llama a aquella.
+ */
 export function primeraSeccion(u: UsuarioSesion): string {
   const base = u.empresaId ? `/admin/${u.empresaId}` : "/admin";
-  const clave = CLAVES_MODULO.find((c) => sesionPuede(u, c));
+  const clave = primeraClaveVisible({ id: u.id, nombre: u.nombre, rol: u.rol, empresaId: u.empresaId, permisos: u.permisos });
   return clave ? `${base}/${clave}` : "/sin-acceso";
 }
 

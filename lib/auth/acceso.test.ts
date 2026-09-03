@@ -40,11 +40,14 @@ describe("decidirAcceso", () => {
     }
   });
 
-  test("el tecnico solo pasa a cilindros", () => {
+  test("el tecnico pasa a cilindros e inventario, y a nada mas", () => {
+    // Inventario entro a la plantilla porque el conteo fisico vive ahi y lo
+    // hace el almacen. Finanzas sigue cerrada.
     const u = sesion("tecnico");
     assert.equal(decidirAcceso(u, "/admin/sumigases/cylinders").tipo, "permitir");
-    assert.equal(decidirAcceso(u, "/admin/sumigases/inventory").tipo, "denegar");
+    assert.equal(decidirAcceso(u, "/admin/sumigases/inventory").tipo, "permitir");
     assert.equal(decidirAcceso(u, "/admin/sumigases/expenses").tipo, "denegar");
+    assert.equal(decidirAcceso(u, "/admin/sumigases/reports").tipo, "denegar");
   });
 
   test("el admin no entra a usuarios", () => {

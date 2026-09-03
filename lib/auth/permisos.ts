@@ -33,8 +33,15 @@ const todas = (valor: boolean): Permisos =>
 /** Secciones del vendedor: vende y consulta existencias. Sin finanzas. */
 const VENDEDOR = ["dashboard", "quotes", "delivery-notes", "sales", "products", "inventory"];
 
-/** El técnico entra desde el celular, registra la recarga y sale. */
-const TECNICO = ["cylinders"];
+/**
+ * El técnico entra desde el celular, registra la recarga y sale.
+ *
+ * Lleva `inventory` porque el conteo fisico vive ahi, y el conteo lo hace
+ * el almacen: la plantilla se escribio antes que el conteo y lo dejo del otro
+ * lado de la pared. Las dos personas de almacen abrian la pantalla en blanco.
+ * Sigue siendo una plantilla: el Owner apaga o enciende cada interruptor.
+ */
+const TECNICO = ["cylinders", "inventory"];
 
 /**
  * El admin ve todo de SU empresa, salvo estas.
