@@ -23,7 +23,22 @@ export function sesionPuede(u: Sesion, clave: string): boolean {
 }
 
 /** Primera sección visible para esta persona, o null si no tiene ninguna. */
+/**
+ * Seccion preferida por rol, antes de caer al orden del menu.
+ *
+ * El orden del menu no sabe a que vino cada quien: al darle `inventory` al
+ * tecnico -porque el conteo fisico vive ahi- el tecnico paso a aterrizar en
+ * Inventario en vez de Cilindros, que es lo que hace todos los dias.
+ */
+export const ATERRIZAJE: Partial<Record<Sesion["rol"], string>> = {
+  tecnico: "cylinders",
+  vendedor: "dashboard",
+  admin: "dashboard",
+};
+
 export function primeraClaveVisible(u: Sesion): string | null {
+  const preferida = ATERRIZAJE[u.rol];
+  if (preferida && sesionPuede(u, preferida)) return preferida;
   return CLAVES_MODULO.find((c) => sesionPuede(u, c)) ?? null;
 }
 
