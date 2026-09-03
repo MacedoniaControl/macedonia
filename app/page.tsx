@@ -14,6 +14,7 @@ import { backendActivo } from "@/lib/supabase/server";
 import { getUsuarioSesion, rutaPostLogin } from "@/lib/auth/sesion-servidor";
 import { LoginForm } from "./login/LoginForm";
 import { CentroDeControl } from "./CentroDeControl";
+import { SesionProvider } from "@/components/auth/SesionProvider";
 
 export const metadata: Metadata = { title: "Macedonia" };
 
@@ -49,5 +50,18 @@ export default async function Portada() {
   // Quien no es Owner no elige empresa: va directo a la suya.
   if (usuario.rol !== "owner") redirect(rutaPostLogin(usuario));
 
-  return <CentroDeControl />;
+  // La identidad baja igual que en /admin: el Centro de Control tambien
+  // necesita el menu de sesion, o quien entra aca se queda sin salida.
+  return (
+    <SesionProvider
+      identidad={{
+        nombre: usuario.nombre,
+        usuario: usuario.usuario,
+        rol: usuario.rol,
+        empresaId: usuario.empresaId,
+      }}
+    >
+      <CentroDeControl />
+    </SesionProvider>
+  );
 }

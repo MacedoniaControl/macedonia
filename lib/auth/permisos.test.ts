@@ -196,6 +196,26 @@ describe("el menú de usuario", () => {
   test("sin sesión no dibuja un chip inventado", () => {
     assert.match(menu, /if \(!u\) return null;/);
   });
+
+  // Una pantalla con sesion y sin salida deja a la persona encerrada: no puede
+  // trabajar ni cambiar de usuario. El Centro de Control estuvo asi.
+  test("toda pantalla con sesión ofrece una salida", () => {
+    for (const ruta of [
+      "app/CentroDeControl.tsx",
+      "app/sin-acceso/page.tsx",
+      "components/layout/Header.tsx",
+    ]) {
+      assert.match(fs.readFileSync(ruta, "utf8"), /MenuUsuario/, `${ruta} no tiene salida`);
+    }
+  });
+
+  // `primeraSeccion` manda aqui a quien no puede ver nada. Si la ruta no
+  // existe, esa persona cae en un 404 y ahi si que no hay salida.
+  test("la ruta /sin-acceso existe de verdad", () => {
+    assert.ok(fs.existsSync("app/sin-acceso/page.tsx"));
+    const src = fs.readFileSync("lib/auth/sesion-servidor.ts", "utf8");
+    assert.match(src, /"\/sin-acceso"/);
+  });
 });
 
 // Las iniciales van en el chip: si dos personas comparten las suyas, el chip

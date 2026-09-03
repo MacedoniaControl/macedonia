@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon";
 import { EMPRESAS, EMPRESA_IDS } from "@/lib/ux/empresas";
 import { getHistory } from "@/lib/ux/history-data";
 import { fmtUsd } from "@/lib/ux/format";
+import { MenuUsuario } from "@/components/layout/MenuUsuario";
 
 
 export function CentroDeControl() {
@@ -18,8 +19,13 @@ export function CentroDeControl() {
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-bold text-white">M</span>
             <span className="font-semibold text-text">Macedonia</span>
           </span>
-          <span className="hidden rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted sm:block">
-            Sumigases Oriente · Sudematin
+          <span className="flex items-center gap-3">
+            <span className="hidden rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted lg:block">
+              Sumigases Oriente · Sudematin
+            </span>
+            {/* Sin esto, quien entra al Centro de Control no tiene por donde
+                salir: esta pantalla no lleva el Header del panel. */}
+            <MenuUsuario />
           </span>
         </header>
 
