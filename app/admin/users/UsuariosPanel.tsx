@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { crearUsuario, cambiarActivo, type Resultado, type UsuarioFila } from "./actions";
 import { FichaPermisos } from "./FichaPermisos";
+import { RestablecerClave } from "./RestablecerClave";
 import { EMPRESAS } from "@/lib/ux/empresas";
 
 const inicial: Resultado = { error: null, ok: null };
@@ -85,9 +86,14 @@ export function UsuariosPanel({ usuarios }: { usuarios: UsuarioFila[] }) {
                       </StatusBadge>
                     </td>
                     <td className="py-2.5 text-right">
-                      <Button variant="secondary" onClick={() => alternar(u)}>
-                        {u.activo ? "Desactivar" : "Reactivar"}
-                      </Button>
+                      {/* Envuelto para que en el telefono los dos botones se
+                          apilen en vez de salirse de la celda. */}
+                      <span className="flex flex-wrap items-center justify-end gap-2">
+                        <RestablecerClave usuario={u} />
+                        <Button variant="secondary" onClick={() => alternar(u)}>
+                          {u.activo ? "Desactivar" : "Reactivar"}
+                        </Button>
+                      </span>
                     </td>
                   </tr>
                   {abierto === u.id && (
