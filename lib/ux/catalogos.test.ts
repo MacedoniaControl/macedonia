@@ -96,3 +96,47 @@ describe("el kardex vive en la base, no en el navegador", () => {
     assert.match(panel, /type Direccion[\s\S]*?from "@\/lib\/inventory\/movimientos-db"/);
   });
 })
+
+// El navegador dibuja en tres etapas: layout -> pintado -> composicion.
+// `transform` y `opacity` se resuelven en la ultima; `box-shadow`, `width` o
+// `top` obligan a rehacer las anteriores en CADA cuadro. Esta prueba vigila que
+// las utilidades de movimiento no vuelvan a las caras.
+describe("el movimiento se queda en composición", () => {
+  const css = fs.readFileSync("app/globals.css", "utf8");
+  const bloque = (sel: string) => {
+    const i = css.indexOf(sel + " {");
+    return i < 0 ? "" : css.slice(i, css.indexOf("}", i));
+  };
+
+  test("la tarjeta no anima la sombra: la sombra vive en el pseudo-elemento", () => {
+    assert.doesNotMatch(bloque(".sumi-realce"), /transition:[^;]*box-shadow/);
+    assert.match(bloque(".sumi-realce"), /transition:[^;]*transform/);
+    assert.match(bloque(".sumi-realce::after"), /box-shadow/);
+    assert.match(bloque(".sumi-realce::after"), /transition:\s*opacity/);
+  });
+
+  test("ninguna utilidad anima propiedades que recalculan el layout", () => {
+    for (const sel of [".sumi-realce", ".sumi-realce::after", ".sumi-campo"]) {
+      assert.doesNotMatch(
+        bloque(sel),
+        /transition:[^;]*\b(width|height|top|left|right|bottom|margin|padding)\b/,
+        `${sel} anima una propiedad de layout`,
+      );
+    }
+  });
+
+  test("el anillo de foco sigue existiendo, solo perdió la transición", () => {
+    // Un <input> no admite pseudo-elementos, asi que el anillo tiene que
+    // seguir siendo box-shadow. Lo que se quito es animarlo.
+    assert.match(css, /\.sumi-campo:focus[\s\S]{0,200}box-shadow:\s*0 0 0 3px/);
+    assert.doesNotMatch(bloque(".sumi-campo"), /transition:[^;]*box-shadow/);
+  });
+
+  test("todo lo que se mueve respeta prefers-reduced-motion", () => {
+    const bloques = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\}/g) ?? [];
+    const texto = bloques.join("");
+    for (const clase of ["sumi-realce", "sumi-entra", "sumi-barra"]) {
+      assert.ok(texto.includes(clase), `${clase} no está cubierta`);
+    }
+  });
+});

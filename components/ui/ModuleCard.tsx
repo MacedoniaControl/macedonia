@@ -12,7 +12,7 @@ export function ModuleCard({ href, title, description, icon }: ModuleCardProps) 
   return (
     <Link
       href={href}
-      className="group flex items-start gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm transition hover:border-brand/50 hover:shadow-md"
+      className="sumi-realce group flex items-start gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm hover:border-brand/50"
     >
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
         <Icon name={icon} />
