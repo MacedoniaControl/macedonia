@@ -234,3 +234,27 @@ describe("inicialesDe", () => {
     assert.equal(inicialesDe("   "), "?");
   });
 });
+
+// `restablecerPassword()` y `salir()` existieron mucho tiempo sin que ninguna
+// pantalla las llamara. Una accion de servidor sin boton no existe para quien
+// usa el sistema: Greeg no pudo arrancar el piloto por eso.
+describe("las acciones de servidor llegan hasta la pantalla", () => {
+  // No alcanza con que ALGUIEN llame a la accion: el componente que la llama
+  // tiene que estar montado. Un componente escrito y nunca renderizado es lo
+  // mismo que no tenerlo, y era justo lo que pasaba.
+  const cadena = (accion: string, componente: string, montadoEn: string) => {
+    const src = fs.readFileSync(componente, "utf8");
+    assert.match(src, new RegExp(`\\b${accion}\\(`), `${componente} no llama a ${accion}`);
+    const host = fs.readFileSync(montadoEn, "utf8");
+    const nombre = componente.split("/").pop()!.replace(".tsx", "");
+    assert.match(host, new RegExp(`<${nombre}[\\s/>]`), `${montadoEn} no monta <${nombre}>`);
+  };
+
+  test("restablecer contraseña llega hasta la tabla de usuarios", () => {
+    cadena("restablecerPassword", "app/admin/users/RestablecerClave.tsx", "app/admin/users/UsuariosPanel.tsx");
+  });
+
+  test("cerrar sesión llega hasta la cabecera", () => {
+    cadena("salir", "components/layout/MenuUsuario.tsx", "components/layout/Header.tsx");
+  });
+});
