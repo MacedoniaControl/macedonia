@@ -217,7 +217,11 @@ h1, h2, h3 {
   padding-inline: 0.75rem;
   font-size: 0.875rem;
   color: var(--text);
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  /* El anillo de foco es `box-shadow` y así se queda: un <input> no admite
+   * pseudo-elementos, así que no hay dónde moverlo. Lo que sale es la
+   * transición: animar una sombra repinta, y además el foco debe responder
+   * de inmediato, no desvanecerse durante 140 ms. */
+  transition: border-color 140ms ease;
 }
 
 /* En iOS, un input de menos de 16px hace que el navegador acerque la pantalla
@@ -265,4 +269,60 @@ select.sumi-campo { line-height: 1.2; }
 
 @media (prefers-reduced-motion: reduce) {
   .sumi-barra { animation: none; }
+}
+
+/* ------------------------------------------------- MOVIMIENTO BARATO
+ * El navegador dibuja en tres etapas: layout -> pintado -> composición.
+ * `transform` y `opacity` se resuelven en la última, sin recalcular nada;
+ * `box-shadow`, `width` o `top` obligan a rehacer las anteriores en CADA
+ * cuadro. Todo lo de aquí abajo se queda en composición a propósito.
+ */
+
+/* Realce al pasar el cursor sobre una tarjeta.
+ *
+ * La sombra NO se anima. Animar `box-shadow` repinta un área borrosa grande
+ * sesenta veces por segundo; en cambio se dibuja una sola vez sobre un
+ * pseudo-elemento y lo que cambia es su opacidad, que es trabajo de
+ * composición. El desplazamiento va por `transform`, no por `top`.
+ */
+.sumi-realce {
+  position: relative;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 220ms ease;
+}
+.sumi-realce::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--text) 26%, transparent);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .sumi-realce:hover { transform: translateY(-2px); }
+  .sumi-realce:hover::after { opacity: 1; }
+}
+/* El teclado merece la misma respuesta que el ratón. */
+.sumi-realce:focus-visible { transform: translateY(-2px); }
+.sumi-realce:focus-visible::after { opacity: 1; }
+.sumi-realce:active { transform: translateY(0); }
+
+/* Entrada de tarjetas y secciones: sube y aparece.
+ * `backwards` deja el estado inicial aplicado antes de arrancar, para que no
+ * haya un cuadro con el elemento ya colocado. */
+@keyframes sumi-entrar {
+  from { opacity: 0; transform: translateY(8px); }
+}
+.sumi-entra {
+  animation: sumi-entrar 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sumi-realce,
+  .sumi-realce::after { transition: none; }
+  .sumi-realce:hover,
+  .sumi-realce:focus-visible { transform: none; }
+  .sumi-entra { animation: none; }
 }

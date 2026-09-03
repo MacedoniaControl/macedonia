@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon";
 import { EMPRESAS, EMPRESA_IDS } from "@/lib/ux/empresas";
 import { getHistory } from "@/lib/ux/history-data";
 import { fmtUsd } from "@/lib/ux/format";
+import { MenuUsuario } from "@/components/layout/MenuUsuario";
 
 
 export function CentroDeControl() {
@@ -18,8 +19,13 @@ export function CentroDeControl() {
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-bold text-white">M</span>
             <span className="font-semibold text-text">Macedonia</span>
           </span>
-          <span className="hidden rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted sm:block">
-            Sumigases Oriente · Sudematin
+          <span className="flex items-center gap-3">
+            <span className="hidden rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted lg:block">
+              Sumigases Oriente · Sudematin
+            </span>
+            {/* Sin esto, quien entra al Centro de Control no tiene por donde
+                salir: esta pantalla no lleva el Header del panel. */}
+            <MenuUsuario />
           </span>
         </header>
 
@@ -44,7 +50,8 @@ export function CentroDeControl() {
                 <Link
                   key={id}
                   href={`/admin/${id}/dashboard`}
-                  className={`theme-${id} group flex flex-col rounded-2xl border-2 border-border bg-surface p-6 shadow-sm transition hover:border-brand hover:shadow-md focus-visible:border-brand`}
+                  className={`theme-${id} sumi-realce sumi-entra group flex flex-col rounded-2xl border-2 border-border bg-surface p-6 shadow-sm hover:border-brand focus-visible:border-brand`}
+                  style={{ animationDelay: `${EMPRESA_IDS.indexOf(id) * 70}ms` }}
                 >
                   <div className="flex items-center gap-3">
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--color-brand-soft)" }}>
@@ -78,7 +85,7 @@ export function CentroDeControl() {
                   <span className="mt-6 inline-flex items-center gap-2 self-start rounded-xl bg-brand-strong px-4 py-2.5 text-sm font-medium text-white transition group-hover:brightness-90">
                     <Icon name="dashboard" size={16} />
                     Entrar al Dashboard de {emp.nombreCorto}
-                    <span className="transition group-hover:translate-x-0.5"><Icon name="chevronRight" size={16} /></span>
+                    <span className="transition-transform duration-200 group-hover:translate-x-0.5"><Icon name="chevronRight" size={16} /></span>
                   </span>
                 </Link>
               );

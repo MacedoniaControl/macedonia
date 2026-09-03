@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
+import { MenuUsuario } from "@/components/layout/MenuUsuario";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { CompanySelector } from "@/components/ui/CompanySelector";
 import { findNavItem } from "@/lib/ux/nav";
@@ -149,13 +150,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         </div>
 
         <div className="hidden sm:block"><ThemeToggle /></div>
-        <div className="hidden items-center gap-2 rounded-xl border border-border bg-surface px-2 py-1.5 sm:flex">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-navy text-xs font-semibold text-white">GV</span>
-          <div className="hidden leading-tight md:block">
-            <p className="text-xs font-medium text-text">Greeg V.</p>
-            <p className="text-[10px] text-muted">Owner</p>
-          </div>
-        </div>
+        <MenuUsuario />
       </div>
     </header>
   );
