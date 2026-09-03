@@ -120,7 +120,6 @@ export default function PayablesPage() {
     <>
       <PageHeader
         title="Cuentas por pagar"
-        description=""
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por pagar" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">

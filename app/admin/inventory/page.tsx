@@ -60,7 +60,6 @@ export default function InventoryPage() {
     <>
       <PageHeader
         title="Inventario"
-        description=""
         breadcrumbs={[{ label: "Inventario" }, { label: "Inventario" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -122,8 +121,7 @@ export default function InventoryPage() {
 
 
       {tab === "valery" && (
-        <SectionCard title="Inventario Valery"
-          description="Lo que dicen los papeles. Solo lectura.">
+        <SectionCard title="Inventario Valery">
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">

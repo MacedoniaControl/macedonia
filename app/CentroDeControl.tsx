@@ -1,4 +1,4 @@
-// Centro de Control Estratégico: elegir empresa. Solo se ve CON sesión.
+// Centro de Control: elegir empresa. Solo se ve CON sesión.
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { EMPRESAS, EMPRESA_IDS } from "@/lib/ux/empresas";
@@ -32,12 +32,8 @@ export function CentroDeControl() {
         <section className="flex flex-1 flex-col justify-center py-12">
           <div className="text-center">
             <h1 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-text sm:text-5xl">
-              Centro de Control Estratégico
+              Centro de Control
             </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted sm:text-lg">
-              Elige la empresa para entrar a su panel. Cada una opera por separado — inventario,
-              cilindros, ventas, cotizaciones y rentabilidad — con sus propios números.
-            </p>
           </div>
 
           {/* Dos puertas: una por empresa */}

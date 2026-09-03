@@ -36,7 +36,7 @@ export default async function Portada() {
             <h1 className="font-display text-3xl font-semibold tracking-tight text-text">
               Macedonia
             </h1>
-            <p className="mt-1.5 text-sm text-muted">Centro de Control Estratégico</p>
+            <p className="mt-1.5 text-sm text-muted">Centro de Control</p>
           </div>
 
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">

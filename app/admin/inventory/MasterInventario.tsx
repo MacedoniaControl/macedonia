@@ -63,7 +63,6 @@ export function MasterInventario({
   return (
     <SectionCard
       title="Master"
-      description="Lo que dice Valery contra lo que alguien contó en el galpón."
       action={
         contados > 0
           ? <StatusBadge tone={conDiferencia > 0 ? "warn" : "ok"}>

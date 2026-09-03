@@ -222,7 +222,6 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       <div className="mt-6">
         <SectionCard
           title="Histórico de ventas y compras"
-          description={`Datos reales de Valery · ${histLabel} (USD).`}
           action={<StatusBadge tone="brand">Real {hist.meta.desde.slice(0, 4)}–{hist.meta.hasta.slice(0, 4)}</StatusBadge>}
         >
           <HistoryKpis empresa={empresa} />
@@ -233,7 +232,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       </div>
 
       <div className="mt-6">
-        <SectionCard title="Rentabilidad / ROI" description={`Indicadores del período (${count} mes(es)). Base real 2024.`}
+        <SectionCard title="Rentabilidad"
           action={<StatusBadge tone="brand">Métrica clave</StatusBadge>}>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {roiCards.map((c) => (
@@ -270,13 +269,13 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       </div>
 
       <div className="mt-6">
-        <SectionCard title="Ventas vs utilidad" description={`${empresaLabel} · ${count} mes(es) · ${bs ? "Bs" : "USD"}. Interactivo.`}>
+        <SectionCard title="Ventas vs utilidad">
           <BiVentasUtilidad factor={factor} bs={bs} count={count} />
         </SectionCard>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Ventas vs compras" description="Responde a los filtros. Interactivo.">
+        <SectionCard title="Ventas vs compras">
           <BiVentasCompras factor={factor} bs={bs} count={count} />
         </SectionCard>
         <SectionCard title="Categorías más rentables" description="Margen por categoría.">

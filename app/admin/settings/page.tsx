@@ -114,7 +114,6 @@ export default function SettingsPage() {
     <>
       <PageHeader
         title="Configuración"
-        description=""
         breadcrumbs={[{ label: "Sistema" }, { label: "Configuración" }]}
         actions={<Button icon="check" onClick={guardar} disabled={guardando || cargando} cargando={guardando} textoCargando="Guardando…">Guardar cambios</Button>}
       />

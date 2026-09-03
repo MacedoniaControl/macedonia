@@ -30,7 +30,6 @@ export default function MatricesPage() {
     <>
       <PageHeader
         title="Matrices administrativas"
-        description=""
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Matrices administrativas" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">

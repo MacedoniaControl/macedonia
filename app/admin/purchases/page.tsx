@@ -118,7 +118,6 @@ export default function PurchasesPage() {
     <>
       <PageHeader
         title="Compras"
-        description=""
         breadcrumbs={[{ label: "Finanzas" }, { label: "Compras" }]}
         actions={<StatusBadge tone="brand">{ordenes.length} orden(es)</StatusBadge>}
       />

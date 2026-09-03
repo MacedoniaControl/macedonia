@@ -41,7 +41,6 @@ export default function CylindersPage() {
     <>
       <PageHeader
         title="Cilindros"
-        description=""
         breadcrumbs={[{ label: "Inventario" }, { label: "Cilindros" }]}
         actions={
           <div className="flex flex-wrap gap-2">
