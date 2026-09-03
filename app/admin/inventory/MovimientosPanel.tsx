@@ -105,7 +105,6 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
       {/* Alta de movimiento manual */}
       <SectionCard
         title="Registrar movimiento manual"
-        description="Para lo que no viene de un documento: ajustes de conteo, mermas, traslados o devoluciones."
         action={
           <div className="flex gap-2">
             <Button variant={alta === "entrada" ? "primary" : "secondary"} icon="plus" onClick={() => setAlta(alta === "entrada" ? null : "entrada")}>

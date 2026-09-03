@@ -163,7 +163,6 @@ export default function DeliveryNotesPage() {
     <>
       <PageHeader
         title="Notas de entrega y devoluciones"
-        description=""
         breadcrumbs={[{ label: "Operación" }, { label: "Notas de entrega" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -190,7 +189,7 @@ export default function DeliveryNotesPage() {
       </div>
 
       {tab === "registro" && verRegistros && (
-        <SectionCard title="Registro de documentos" description="Filtra por período. Incluye NE y devoluciones, de Valery y de Macedonia."
+        <SectionCard title="Registro de documentos"
           action={
             <select className="sumi-campo w-auto" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option>
@@ -438,7 +437,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
         </div>
       </SectionCard>
 
-      <SectionCard title="Renglones" description="">
+      <SectionCard title="Renglones">
         {/* El escáner es OPCIONAL, detrás de una píldora — igual que en
             Cotizaciones. Antes la barra estaba siempre visible y lo primero que
             veía el vendedor en la calle era "PAUSADO · los escaneos NO se

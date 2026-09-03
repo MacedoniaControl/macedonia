@@ -66,7 +66,6 @@ export default function ProductsPage() {
     <>
       <PageHeader
         title="Productos y catálogo"
-        description="Maestro de productos con SKU por categoría (§16). Base real del catálogo 2024."
         breadcrumbs={[{ label: "Inventario" }, { label: "Productos y catálogo" }]}
         actions={<StatusBadge tone="brand">{prods.length} producto(s)</StatusBadge>}
       />
@@ -99,7 +98,7 @@ export default function ProductsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Catálogo" description="Costo/margen visible solo para roles autorizados.">
+        <SectionCard title="Catálogo">
           <label className="relative mb-3 flex items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
             <input className={`${inputClass} pl-9`} placeholder="Buscar por SKU, nombre o categoría…" value={q} onChange={(e) => setQ(e.target.value)} />

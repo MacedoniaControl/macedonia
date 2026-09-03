@@ -45,9 +45,8 @@ export default function RoiPage() {
   return (
     <>
       <PageHeader
-        title="ROI / Rentabilidad"
-        description=""
-        breadcrumbs={[{ label: "Inteligencia" }, { label: "ROI / Rentabilidad" }]}
+        title="Rentabilidad"
+        breadcrumbs={[{ label: "Inteligencia" }, { label: "Rentabilidad" }]}
         filters={
           <>
             <label className="sr-only" htmlFor="roi-empresa">Empresa</label>

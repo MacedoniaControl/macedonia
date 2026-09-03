@@ -122,7 +122,6 @@ export function EntregaCilindros({
   return (
     <SectionCard
       title="Registrar entrega"
-      description="Cuántos llenos dejas y cuántos vacíos traes. No tienen que ser iguales."
     >
       <div className="space-y-4">
         <div>

@@ -131,7 +131,6 @@ export default function ReceivablesPage() {
     <>
       <PageHeader
         title="Cuentas por cobrar"
-        description=""
         breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por cobrar" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">

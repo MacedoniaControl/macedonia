@@ -62,7 +62,6 @@ export default function ReportsPage() {
     <>
       <PageHeader
         title="Reportes"
-        description=""
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Reportes" }]}
         actions={<Button variant="secondary" icon="report" onClick={descargarPdf}>Descargar PDF</Button>}
       />

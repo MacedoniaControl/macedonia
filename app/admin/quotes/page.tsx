@@ -155,7 +155,6 @@ export default function QuotesPage() {
     <>
       <PageHeader
         title="Cotizaciones"
-        description=""
         breadcrumbs={[{ label: "Operación" }, { label: "Cotizaciones" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -183,7 +182,7 @@ export default function QuotesPage() {
       </div>
 
       {tab === "registro" && verRegistros && (
-        <SectionCard title="Registro de presupuestos" description="Filtra por período. Incluye presupuestos de Macedonia y de Valery."
+        <SectionCard title="Registro de presupuestos"
           action={<select className="sumi-campo w-auto" value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option></select>}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
@@ -358,7 +357,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
         </div>
       </SectionCard>
 
-      <SectionCard title="Renglones" description="">
+      <SectionCard title="Renglones">
         {/* Buscar por texto, o escanear. El escáner vive en una píldora al lado
             del buscador: se usa con el lector en la mano, no siempre. */}
         <div className="flex items-end gap-2">
