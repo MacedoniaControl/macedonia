@@ -25,13 +25,13 @@ describe("plantillaDeRol", () => {
     assert.equal(p["receivables"], false);
   });
 
-  test("el tecnico ve cilindros e inventario, y nada mas", () => {
+  test("el tecnico ve cilindros, inventario y catalogo, y nada mas", () => {
     // Antes decia SOLO cilindros. El conteo fisico -que es el trabajo del
     // almacen- vive detras del permiso `inventory`, asi que con la plantilla
     // vieja las dos personas de almacen abrian la pantalla en blanco.
     const p = plantillaDeRol("tecnico");
     const encendidos = Object.entries(p).filter(([, v]) => v).map(([k]) => k).sort();
-    assert.deepEqual(encendidos, ["cylinders", "inventory"]);
+    assert.deepEqual(encendidos, ["cylinders", "inventory", "products"]);
   });
 
   test("el admin ve todo de su empresa menos registros y usuarios", () => {
@@ -165,5 +165,8 @@ test("el tecnico puede contar: el conteo fisico vive en inventory", () => {
   const p = plantillaDeRol("tecnico");
   assert.equal(p.inventory, true);
   assert.equal(p.cylinders, true);
+  // Contar es elegir de un catalogo: sin `products`, master() no lee nada y la
+  // pantalla de conteo queda vacia aunque `inventory` este encendido.
+  assert.equal(p.products, true);
   assert.equal(p.expenses, false, "el tecnico no debe ver finanzas");
 });

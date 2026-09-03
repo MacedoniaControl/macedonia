@@ -39,9 +39,15 @@ const VENDEDOR = ["dashboard", "quotes", "delivery-notes", "sales", "products", 
  * Lleva `inventory` porque el conteo fisico vive ahi, y el conteo lo hace
  * el almacen: la plantilla se escribio antes que el conteo y lo dejo del otro
  * lado de la pared. Las dos personas de almacen abrian la pantalla en blanco.
+ *
+ * Y lleva `products` porque contar es elegir de un catalogo: master() lee la
+ * tabla productos, asi que sin ese permiso la pantalla de conteo sigue vacia
+ * aunque `inventory` este encendido. Se vio probando con la sesion real de
+ * Almacen PLC, no leyendo el SQL.
+ *
  * Sigue siendo una plantilla: el Owner apaga o enciende cada interruptor.
  */
-const TECNICO = ["cylinders", "inventory"];
+const TECNICO = ["cylinders", "inventory", "products"];
 
 /**
  * El admin ve todo de SU empresa, salvo estas.
