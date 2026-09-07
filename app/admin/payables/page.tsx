@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb } from "@/lib/finanzas/cuentas-db";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
+import { CampoMonto } from "@/components/ui/CampoMonto";
+import { parseMonto, fmtMonto } from "@/lib/ux/monto";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
@@ -32,15 +34,21 @@ export default function PayablesPage() {
   const carga = useCarga(`${empresaKey}:${recarga}`, () => listarCuentas(empresaKey, "pagar"));
   const ctas: CuentaDb[] = carga.datos ?? [];
   const [docSel, setDocSel] = useState("");
-  const [abono, setAbono] = useState(0);
+  // Texto, no numero: parseMonto decide que significa. Guardar un numero
+  // obligaba a convertir en cada tecla y perdia lo que se estaba escribiendo.
+  const [abono, setAbono] = useState("");
   const [msg, setMsg] = useState("");
+  // El exito NO puede vivir dentro del panel: al confirmar, el panel se cierra
+  // y el mensaje se iba con el. Quien abonaba no veia ninguna respuesta.
+  const [exito, setExito] = useState("");
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
-    const a = Number(abono);
+    const a = parseMonto(abono);
     const c = ctas.find((x) => x.documento === docSel);
     if (!c) { setMsg("ERR:Selecciona un documento."); return false; }
-    if (!a || a <= 0) { setMsg("ERR:Ingresa un abono mayor a 0."); return false; }
+    if (a === null) { setMsg("ERR:No se entiende ese monto. Ejemplo: 1.500,50"); return false; }
+    if (a <= 0) { setMsg("ERR:Ingresa un abono mayor a 0."); return false; }
 
     // La base vuelve a comprobar que el abono no supere el saldo: dos personas
     // abonando a la vez podrian pasarse si solo se validara aqui.
@@ -48,8 +56,9 @@ export default function PayablesPage() {
     if (!r.ok) { setMsg(`ERR:${r.error}`); return false; }
 
     setRecarga((n) => n + 1);
-    setMsg(`Abono de ${fmtUsd(a)} aplicado a ${docSel}.`);
-    setAbono(0);
+    setExito(`Abono de ${fmtUsd(a)} aplicado a ${docSel}.`);
+    setAbono("");
+    setDocSel("");
     return true;
   }
 
@@ -73,13 +82,7 @@ export default function PayablesPage() {
           ))}
         </select>
       </label>
-      <label className="block">
-        <span className="mb-1 block text-xs font-medium text-muted">Abono (USD)</span>
-        {/* Vacío en vez de 0: con el 0 puesto, teclear 2500 daba "02500". */}
-        <input type="number" min={0} inputMode="decimal" placeholder="0.00"
-          value={abono || ""}
-          onChange={(e) => setAbono(Number(e.target.value))} className={`${inputClass} tabular-nums`} />
-      </label>
+      <CampoMonto etiqueta="Abono" valor={abono} onChange={setAbono} />
       {msg && (
         <p role="alert" className={`rounded-xl px-3 py-2 text-sm ${msg.startsWith("ERR:") ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>
           {msg.replace("ERR:", "")}
@@ -92,7 +95,7 @@ export default function PayablesPage() {
             verificar antes de que quede asentado. */}
         <ConfirmDialog
           title="¿Registrar el abono?"
-          message={`${fmtUsd(Number(abono) || 0)} a ${docSel || "(sin documento)"}. Queda asentado y no se puede deshacer.`}
+          message={`${fmtUsd(parseMonto(abono) ?? 0)} a ${docSel || "(sin documento)"}. Queda asentado y no se puede deshacer.`}
           confirmLabel="Sí, registrar"
           onConfirm={async () => { if (await registrarAbono()) cerrar(); }}
           trigger={(abrir) => (
@@ -102,7 +105,9 @@ export default function PayablesPage() {
                 // que falta el documento es peor que no confirmar.
                 setMsg("");
                 if (!docSel) return setMsg("ERR:Selecciona un documento.");
-                if (!Number(abono) || Number(abono) <= 0) return setMsg("ERR:Ingresa un abono mayor a 0.");
+                const a = parseMonto(abono);
+                if (a === null) return setMsg("ERR:No se entiende ese monto. Ejemplo: 1.500,50");
+                if (a <= 0) return setMsg("ERR:Ingresa un abono mayor a 0.");
                 abrir();
               }}>Registrar abono</Button>
           )}
@@ -137,6 +142,11 @@ export default function PayablesPage() {
           </div>
         }
       />
+      {exito && (
+        <div className="mb-4">
+          <AlertCard tone="ok" titulo="Abono registrado" mensaje={exito} />
+        </div>
+      )}
       <SectionCard title="Resumen">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Total por pagar" value={fmtUsd(total)} accent />

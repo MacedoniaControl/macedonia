@@ -13,6 +13,8 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
+import { CampoMonto } from "@/components/ui/CampoMonto";
+import { parseMonto } from "@/lib/ux/monto";
 import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fmtUsd } from "@/lib/ux/format";
@@ -170,8 +172,8 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF({ ...f, [k]: e.target.value });
 
-  const monto = Number(f.monto) || 0;
-  const tasa = Number(f.tasa) || 0;
+  const monto = parseMonto(String(f.monto)) ?? 0;
+  const tasa = parseMonto(String(f.tasa)) ?? 0;
   const enUsd = f.moneda === "USD" ? monto : tasa > 0 ? monto / tasa : 0;
 
   async function guardar() {
@@ -219,8 +221,10 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
         </div>
 
         <div>
-          <label className={lbl}>Monto *</label>
-          <input type="number" min={0} step="0.01" className={fieldClass} value={f.monto} onChange={set("monto")} placeholder="0.00" />
+          {/* Sin `type=number`: ese control no acepta la coma decimal y
+              devolvia vacio, o convertia "1.500" en 1,5 sin avisar. */}
+          <CampoMonto etiqueta="Monto *" valor={String(f.monto)} moneda=""
+            onChange={(v) => setF((x) => ({ ...x, monto: v }))} />
         </div>
         <div>
           <label className={lbl}>Moneda</label>
@@ -231,7 +235,8 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
         </div>
         <div>
           <label className={lbl}>Tasa de cambio {f.moneda === "BS" && "*"}</label>
-          <input type="number" min={0} step="0.01" className={fieldClass} value={f.tasa} onChange={set("tasa")}
+          <input type="text" inputMode="decimal" className={fieldClass} value={f.tasa}
+            onChange={(e) => setF((x) => ({ ...x, tasa: e.target.value }))}
             disabled={f.moneda === "USD"} placeholder={tasaBcv ? `BCV ${tasaBcv}` : "Bs por $"} />
         </div>
 

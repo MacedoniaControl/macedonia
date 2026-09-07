@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { Button } from "@/components/ui/Button";
+import { parseMonto } from "@/lib/ux/monto";
 import { Icon } from "@/components/ui/Icon";
 import { useCarga } from "@/lib/ux/use-carga";
 import { gases, guardarGas, desactivarGas, type Gas } from "@/lib/cilindros/cilindros-db";
@@ -123,11 +124,11 @@ export function PanelGases({ empresa, onCambio }: { empresa: string; onCambio?: 
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted">Depósito en garantía (USD)</span>
                 <input
-                  type="number" min={0} step="0.01" inputMode="decimal"
+                  type="text" inputMode="decimal"
                   className="sumi-campo tabular-nums"
                   value={edit.depositoUsd || ""}
-                  placeholder="0.00"
-                  onChange={(e) => setEdit({ ...edit, depositoUsd: Math.max(0, Number(e.target.value) || 0) })}
+                  placeholder="0,00"
+                  onChange={(e) => setEdit({ ...edit, depositoUsd: parseMonto(e.target.value) ?? 0 })}
                 />
               </label>
               <label className="flex min-h-11 items-center gap-2 text-sm text-text">

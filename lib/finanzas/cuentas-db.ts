@@ -29,9 +29,15 @@ export type CuentaNueva = {
   tipo: TipoCuenta;
   contraparte: string;
   documento: string;
+  /** Lo que se debe. Con desglose sale de BI + IVA - retencion. */
   monto: number;
   vence: string;
   nota?: string;
+  // Desglose fiscal, opcional: una cuenta sin factura -un anticipo, un
+  // prestamo entre empresas- no tiene ninguno de los tres.
+  baseImponible?: number | null;
+  iva?: number | null;
+  ivaRetenido?: number | null;
 };
 
 export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<Cuenta[]> {
@@ -68,6 +74,11 @@ export async function crearCuenta(
   }
   if (!(c.monto > 0)) return { ok: false, error: "El monto debe ser mayor que cero." };
   if (!c.vence) return { ok: false, error: "Falta la fecha de vencimiento." };
+  // Se comprueba aca ademas de en la pantalla: la pantalla se puede saltar.
+  const total = (c.baseImponible ?? 0) + (c.iva ?? 0);
+  if (c.ivaRetenido != null && total > 0 && c.ivaRetenido > total) {
+    return { ok: false, error: "La retención no puede ser mayor que el total de la operación." };
+  }
 
   const sb = await createClient();
   const { error } = await sb.from("cuentas").insert({
@@ -76,6 +87,9 @@ export async function crearCuenta(
     contraparte: c.contraparte.trim(),
     documento: c.documento.trim() || "—",
     monto: c.monto,
+    base_imponible: c.baseImponible ?? null,
+    iva: c.iva ?? null,
+    iva_retenido: c.ivaRetenido ?? null,
     vence: c.vence,
     nota: c.nota?.trim() || null,
     usuario_id: usuario.id,
