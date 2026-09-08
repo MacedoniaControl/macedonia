@@ -83,6 +83,10 @@ describe("las pantallas de dinero no usan el control nativo", () => {
     "components/finanzas/FormularioCuenta.tsx",
     "app/admin/expenses/page.tsx",
     "app/admin/cylinders/PanelGases.tsx",
+    "app/admin/quotes/page.tsx",
+    "app/admin/delivery-notes/page.tsx",
+    "app/admin/purchases/page.tsx",
+    "app/admin/products/page.tsx",
   ];
 
   test("ningún campo de dinero vuelve a type=number", () => {
@@ -93,5 +97,30 @@ describe("las pantallas de dinero no usan el control nativo", () => {
       );
       assert.deepEqual(sospechosos, [], `${f} volvió a usar type="number" para dinero`);
     }
+  });
+});
+
+// Escribir "1.500" pasa por estados intermedios: "1", "1.", "1.5", "1.50".
+// Si alguno se interpretara mal, el campo saltaria solo mientras se teclea.
+describe("escribir progresivamente no rompe el numero", () => {
+  test('teclear "1.500,50" da valores sensatos en cada paso', () => {
+    const pasos: [string, number | null][] = [
+      ["1", 1],
+      ["1.", 1],            // punto suelto: todavia vale uno
+      ["1.5", 1.5],
+      ["1.50", 1.5],
+      ["1.500", 1500],      // el tercer digito lo vuelve millar
+      ["1.500,", 1500],
+      ["1.500,5", 1500.5],
+      ["1.500,50", 1500.5],
+    ];
+    for (const [txt, esperado] of pasos) {
+      assert.equal(parseMonto(txt), esperado, `"${txt}"`);
+    }
+  });
+
+  test("un cero a la izquierda no arruina el monto", () => {
+    assert.equal(parseMonto("0250"), 250);
+    assert.equal(parseMonto("0,50"), 0.5);
   });
 });
