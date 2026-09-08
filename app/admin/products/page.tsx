@@ -35,8 +35,10 @@ export default function ProductsPage() {
   const [q, setQ] = useState("");
   const [nombre, setNombre] = useState("");
   const [cat, setCat] = useState(Object.keys(CATS)[0]);
-  const [precio, setPrecio] = useState(0);
-  const [costo, setCosto] = useState(0);
+  // Texto: el control nativo no acepta la coma decimal y convertia "1.500"
+  // en 1,5 sin avisar. Ver lib/ux/monto.ts.
+  const [precio, setPrecio] = useState("");
+  const [costo, setCosto] = useState("");
   const [msg, setMsg] = useState("");
 
   const filtrados = useMemo(() => {
@@ -86,11 +88,11 @@ export default function ProductsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="pre">Precio (USD)</label>
-                <input id="pre" type="number" min={0} step="0.01" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} className={inputClass} />
+                <input id="pre" type="text" inputMode="decimal" placeholder="0,00" value={precio} onChange={(e) => setPrecio(e.target.value)} className={`${inputClass} tabular-nums`} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="cos">Costo (USD)</label>
-                <input id="cos" type="number" min={0} step="0.01" value={costo} onChange={(e) => setCosto(Number(e.target.value))} className={inputClass} />
+                <input id="cos" type="text" inputMode="decimal" placeholder="0,00" value={costo} onChange={(e) => setCosto(e.target.value)} className={`${inputClass} tabular-nums`} />
               </div>
             </div>
             {msg && <p className={`rounded-xl px-3 py-2 text-sm ${msg.startsWith("ERR:") ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>{msg.replace("ERR:", "")}</p>}

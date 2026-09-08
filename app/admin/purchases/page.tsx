@@ -13,6 +13,7 @@ import { PanelProveedores } from "./PanelProveedores";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
+import { InputMonto } from "@/components/ui/InputMonto";
 import { fmtUsd } from "@/lib/ux/format";
 
 
@@ -182,9 +183,9 @@ export default function PurchasesPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="costo">Costo unitario USD</label>
-                <input id="costo" type="number" min={0} step="0.0001" value={o.costo}
-                  onChange={(e) => setO({ ...o, costo: Math.max(0, Number(e.target.value) || 0) })}
-                  className={`${inputClass} tabular-nums`} />
+                <InputMonto id="costo" valor={o.costo}
+                  onChange={(n) => setO({ ...o, costo: Math.max(0, n) })}
+                  className={inputClass} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="fecha">Fecha</label>
@@ -279,9 +280,8 @@ export default function PurchasesPage() {
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-muted">Costo USD</span>
-                  <input type="number" min={0} step="0.0001" className={`${inputClass} tabular-nums`}
-                    value={nuevoProd.costo}
-                    onChange={(e) => setNuevoProd({ ...nuevoProd, costo: Math.max(0, Number(e.target.value) || 0) })} />
+                  <InputMonto className={inputClass} valor={nuevoProd.costo}
+                    onChange={(n) => setNuevoProd({ ...nuevoProd, costo: Math.max(0, n) })} />
                 </label>
               </div>
             </div>

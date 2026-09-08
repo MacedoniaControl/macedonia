@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
+import { InputMonto } from "@/components/ui/InputMonto";
 import { Icon } from "@/components/ui/Icon";
 import { fmtUsd } from "@/lib/ux/format";
 import { TIPOS_PRECIO, DIVISAS, UNIDADES } from "@/lib/ux/catalogos";
@@ -472,7 +473,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           <div><label className={label}>Unidad</label><select className={inputClass} value={ln.unidad} onChange={(e) => setLn({ ...ln, unidad: e.target.value })}>{UNIDADES.map((u) => <option key={u}>{u}</option>)}</select></div>
           <div className="col-span-2"><label className={label}>Nombre / Descripción</label><input className={inputClass} value={ln.descripcion} onChange={(e) => setLn({ ...ln, descripcion: e.target.value })} placeholder="ARGON CIL 6 M3" /></div>
           <div><label className={label}>Cantidad</label><input type="number" min={1} className={inputClass} value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>
-          <div><label className={label}>Precio</label><input type="number" min={0} step="0.01" className={inputClass} value={ln.precio} onChange={(e) => setLn({ ...ln, precio: Number(e.target.value) })} /></div>
+          <div><label className={label}>Precio</label><InputMonto className={inputClass} valor={ln.precio} onChange={(n) => setLn({ ...ln, precio: n })} /></div>
           <div><label className={label}>Dcto %</label><input type="number" min={0} max={50} className={inputClass} value={ln.descuento} onChange={(e) => setLn({ ...ln, descuento: Number(e.target.value) })} /></div>
         </div>
         <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", cantidad: 1, unidad: ln.unidad, descripcion: "", precio: 0, descuento: 0 }); } }}>Agregar renglón</Button>
@@ -501,9 +502,9 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
                       <span className="block font-mono text-[11px] text-muted">{l.codigo}{l.descuento ? ` · -${l.descuento}%` : ""}</span>
                     </td>
                     <td className="py-1.5 pr-2 text-right">
-                      <input type="number" min={0} step="0.01" aria-label={`Precio ${l.descripcion}`}
-                        className={`h-8 w-20 rounded-lg border bg-surface-2 px-2 text-right text-sm text-text ${l.precio <= 0 ? "border-danger" : "border-border"}`}
-                        value={l.precio} onChange={(e) => updLinea(i, { precio: Number(e.target.value) })} />
+                      <InputMonto aria-label={`Precio ${l.descripcion}`}
+                        className={`h-8 w-24 rounded-lg border bg-surface-2 px-2 text-right text-sm text-text ${l.precio <= 0 ? "border-danger" : "border-border"}`}
+                        valor={l.precio} onChange={(n) => updLinea(i, { precio: n })} />
                     </td>
                     <td className="py-1.5 pr-2 text-right text-muted">{fmtUsd(l.cantidad * l.precio * (1 - (l.descuento || 0) / 100))}</td>
                     <td className="py-1.5 text-right">
@@ -732,7 +733,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: s
           <div><label className={label}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} /></div>
           <div><label className={label}>Cantidad</label><input type="number" min={1} className={inputClass} value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>
           <div className="col-span-2"><label className={label}>Descripción</label><input className={inputClass} value={ln.descripcion} onChange={(e) => setLn({ ...ln, descripcion: e.target.value })} /></div>
-          <div><label className={label}>Precio unit.</label><input type="number" min={0} step="0.01" className={inputClass} value={ln.precio} onChange={(e) => setLn({ ...ln, precio: Number(e.target.value) })} /></div>
+          <div><label className={label}>Precio unit.</label><InputMonto className={inputClass} valor={ln.precio} onChange={(n) => setLn({ ...ln, precio: n })} /></div>
           <div><label className={label}>Descuento %</label><input type="number" min={0} max={100} className={inputClass} value={ln.descuento} onChange={(e) => setLn({ ...ln, descuento: Number(e.target.value) })} /></div>
         </div>
         <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0 }); } }}>Agregar línea</Button>
