@@ -38,9 +38,15 @@ export function EditarCuenta({
   const nBi = parseMonto(bi);
   const nIva = parseMonto(iva);
   const ret = retencionDe(nIva, f.aplicaRetencion);
-  // Con desglose el total sale solo; sin el, se escribe a mano como hasta ahora.
-  const totalCalc = nBi !== null || nIva !== null ? (nBi ?? 0) + (nIva ?? 0) : null;
-  const monto = totalCalc ?? parseMonto(montoManual);
+  const suma = nBi !== null || nIva !== null ? (nBi ?? 0) + (nIva ?? 0) : null;
+
+  // El MONTO manda, siempre. Antes se recalculaba desde BI + IVA y pisaba el
+  // total cargado: en una cuenta de 195 que viene de Valery, teclear BI 100 e
+  // IVA 16 la dejaba en 116 y se perdia la cifra buena. Greeg pidio que las 40
+  // ya cargadas conserven su total y que el IVA se agregue a mano.
+  const monto = parseMonto(montoManual);
+  // Si el desglose no suma el total, se avisa — no se corrige solo.
+  const descuadre = monto !== null && suma !== null ? Math.round((suma - monto) * 100) / 100 : 0;
 
   async function guardar() {
     setMsg(null);
@@ -105,26 +111,31 @@ export function EditarCuenta({
           Esta cuenta lleva IVA retenido
         </label>
 
-        {totalCalc !== null && (
+        {suma !== null && (
           <div className="mt-2 space-y-0.5 border-t border-border pt-2 text-xs">
             <p className="flex justify-between text-muted">
-              <span>Total del documento</span><span className="tabular-nums">{fmtMonto(totalCalc)}</span>
+              <span>Base imponible + IVA</span><span className="tabular-nums">{fmtMonto(suma)}</span>
             </p>
+            {Math.abs(descuadre) > 0.009 && (
+              <p role="alert" className="mt-1 rounded-lg border border-warn/35 bg-warn/10 px-2 py-1.5 text-warn">
+                No suma el monto total ({fmtMonto(monto ?? 0)}):{" "}
+                {descuadre > 0 ? "sobran" : "faltan"} {fmtMonto(Math.abs(descuadre))}. El
+                total no se toca — revisá el desglose.
+              </p>
+            )}
             <p className="flex justify-between text-muted">
               <span>{f.aplicaRetencion ? "IVA retenido (75%)" : "IVA retenido"}</span>
               <span className="tabular-nums">{f.aplicaRetencion ? `−${fmtMonto(ret)}` : "no aplica"}</span>
             </p>
             <p className="flex justify-between font-semibold text-text">
               <span>A pagar al proveedor</span>
-              <span className="tabular-nums">{fmtMonto(totalCalc - ret)}</span>
+              <span className="tabular-nums">{fmtMonto((monto ?? 0) - ret)}</span>
             </p>
           </div>
         )}
       </fieldset>
 
-      {totalCalc === null && (
-        <CampoMonto etiqueta="Monto *" valor={montoManual} onChange={setMontoManual} />
-      )}
+      <CampoMonto etiqueta="Monto total *" valor={montoManual} onChange={setMontoManual} />
 
       <label className="block">
         <span className={lbl}>Nota</span>

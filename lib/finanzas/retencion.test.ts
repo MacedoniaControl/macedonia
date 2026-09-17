@@ -67,3 +67,30 @@ describe("cerrar una cuenta", () => {
     assert.match(src, /c\.monto < abonado/);
   });
 });
+
+// Greeg: "las 40 cuentas que existen dejalas asi como estan en total y deja
+// para poder editarlas si necesitan colocar el iva que lo coloquen manual".
+//
+// El formulario recalculaba el monto desde BI + IVA, asi que al agregarle el
+// IVA a una cuenta de Valery se le cambiaba el total. Esa cifra es la que
+// mando Angy: es la unica que no se toca.
+describe("editar una cuenta no le cambia el total", () => {
+  const src = fs.readFileSync("components/finanzas/EditarCuenta.tsx", "utf8");
+
+  test("el monto sale del campo, no de la suma del desglose", () => {
+    assert.match(src, /const monto = parseMonto\(montoManual\)/);
+    assert.doesNotMatch(src, /const monto = totalCalc \?\?/);
+  });
+
+  test("el campo del monto se ve siempre, haya desglose o no", () => {
+    // Antes se escondia cuando habia BI e IVA, y entonces el total cambiaba
+    // sin que nadie lo viera.
+    assert.doesNotMatch(src, /totalCalc === null && \(\s*<CampoMonto etiqueta="Monto/);
+    assert.match(src, /<CampoMonto etiqueta="Monto total \*"/);
+  });
+
+  test("si el desglose no cuadra con el total, avisa en vez de corregirlo", () => {
+    assert.match(src, /No suma el monto total/);
+    assert.match(src, /const descuadre =/);
+  });
+});
