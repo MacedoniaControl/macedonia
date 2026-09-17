@@ -244,6 +244,14 @@ h1, h2, h3 {
   cursor: not-allowed;
 }
 
+/* Variante que NO ocupa todo el ancho.
+ *
+ * `.sumi-campo` fija `inline-size: 100%`, y esa regla gana sobre las utilidades
+ * de Tailwind porque vive fuera de su capa: poner `w-auto` al lado no hace
+ * nada. Para un desplegable de dos opciones en una cabecera, el 100% deja una
+ * caja cruzando la pantalla entera. */
+.sumi-campo--auto { inline-size: auto; }
+
 /* Variante para el buscador con lupa a la izquierda. */
 .sumi-campo--con-icono { padding-inline-start: 2.25rem; }
 
