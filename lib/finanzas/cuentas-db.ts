@@ -7,7 +7,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
-import { retencionDe } from "./retencion.ts";
+import { retencionDe, claseDeDocumento } from "./retencion.ts";
 import type { ClaseCuenta } from "./retencion.ts";
 // Las constantes NO se reexportan desde aqui: este archivo es "use server" y
 // solo admite exportar funciones asincronas. Quien las necesite importa
@@ -52,14 +52,14 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
   const sb = await createClient();
   const { data, error } = await sb
     .from("cuentas_saldo")
-    .select("id, tipo, clase, estado, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota")
+    .select("id, tipo, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota")
     .eq("empresa_id", empresa)
     .eq("tipo", tipo)
     .order("vence");
 
   if (error) throw new Error(`No se pudieron leer las cuentas: ${error.message}`);
 
-  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias"> & {
+  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias" | "clase" | "estado"> & {
     monto: number; abonado: number; saldo: number; dias: number;
   };
   return ((data as Fila[] | null) ?? []).map((c) => ({
@@ -68,6 +68,12 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
     abonado: Number(c.abonado),
     saldo: Number(c.saldo),
     dias: Number(c.dias),
+    // La vista `cuentas_saldo` enumera sus columnas, asi que no expone `clase`
+    // ni `estado` hasta que la migracion 21 la recree. Mientras tanto la clase
+    // se deduce del prefijo -misma regla que la migracion- y la cuenta se
+    // muestra abierta, que es su estado por defecto.
+    clase: claseDeDocumento(c.documento),
+    estado: "abierta" as EstadoCuenta,
   }));
 }
 
@@ -189,14 +195,23 @@ export type CuentaDetalle = {
 export async function detalleCuenta(id: number): Promise<CuentaDetalle | null> {
   const sb = await createClient();
 
-  const { data: c, error } = await sb
-    .from("cuentas")
-    .select("id, tipo, clase, contraparte, documento, monto, base_imponible, iva, iva_retenido, aplica_retencion, emitida, vence, nota, estado, liquidada_en, liquidada_como, liquidada_nota")
-    .eq("id", id)
-    .maybeSingle();
+  const BASE = "id, tipo, contraparte, documento, monto, base_imponible, iva, iva_retenido, emitida, vence, nota";
+  const NUEVAS = "clase, aplica_retencion, estado, liquidada_en, liquidada_como, liquidada_nota";
+
+  // eslint-disable-next-line prefer-const
+  let { data: c, error } = await sb
+    .from("cuentas").select(`${BASE}, ${NUEVAS}`).eq("id", id).maybeSingle();
+
+  // 42703 = la columna no existe. Pasa mientras no se corra la migracion 21:
+  // la pantalla tiene que poder verse igual, con los valores por defecto.
+  if (error?.code === "42703") {
+    ({ data: c, error } = await sb.from("cuentas").select(BASE).eq("id", id).maybeSingle());
+  }
 
   if (error) throw new Error(`No se pudo leer la cuenta: ${error.message}`);
   if (!c) return null;
+
+  const sinMigrar = !("clase" in c);
 
   const { data: ab } = await sb
     .from("abonos")
@@ -219,20 +234,20 @@ export async function detalleCuenta(id: number): Promise<CuentaDetalle | null> {
   const iva = c.iva === null ? null : Number(c.iva);
   // Si la cuenta trae retencion guardada se respeta: una cuenta vieja tiene
   // que seguir diciendo lo que se retuvo entonces, aunque cambie el porcentaje.
-  const ret = c.iva_retenido !== null ? Number(c.iva_retenido)
-                                      : retencionDe(iva, Boolean(c.aplica_retencion));
+  const aplica = sinMigrar ? true : Boolean(c.aplica_retencion);
+  const ret = c.iva_retenido != null ? Number(c.iva_retenido) : retencionDe(iva, aplica);
 
   return {
     id: c.id as number,
     tipo: c.tipo as TipoCuenta,
-    clase: (c.clase as ClaseCuenta) ?? "factura",
+    clase: (c.clase as ClaseCuenta) ?? claseDeDocumento(c.documento as string),
     contraparte: c.contraparte as string,
     documento: c.documento as string,
     monto,
     baseImponible: c.base_imponible === null ? null : Number(c.base_imponible),
     iva,
-    ivaRetenido: c.iva_retenido === null ? null : Number(c.iva_retenido),
-    aplicaRetencion: Boolean(c.aplica_retencion),
+    ivaRetenido: c.iva_retenido == null ? null : Number(c.iva_retenido),
+    aplicaRetencion: aplica,
     emitida: c.emitida as string,
     vence: c.vence as string,
     nota: (c.nota as string) ?? null,

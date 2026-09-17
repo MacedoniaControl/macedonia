@@ -28,3 +28,22 @@ export function retencionDe(iva: number | null, aplica: boolean): number {
   // A centimos: un tercer decimal no existe en dinero.
   return Math.round(iva * PCT_RETENCION * 100) / 100;
 }
+
+/**
+ * Que clase de documento es, deducida de su prefijo.
+ *
+ * Es la MISMA regla que usa la migracion 21 para clasificar lo ya cargado, y
+ * vive aqui para que la pantalla pueda mostrar la clase antes de que exista la
+ * columna. Cuando la columna este, se usa esa; esto queda como respaldo para
+ * las cuentas que se carguen sin clasificar.
+ *
+ * NDE es nota de DEBITO: en las cuentas por cobrar el prefijo de nota de
+ * entrega es NE. Confundirlas clasificaria mal las 11 que ya estan cargadas.
+ */
+export function claseDeDocumento(documento: string): ClaseCuenta {
+  const d = documento.trim().toUpperCase();
+  if (d.startsWith("NDE-") || d.startsWith("NDE ")) return "nota_debito";
+  if (d.startsWith("NDC-")) return "nota_credito";
+  if (d.startsWith("NE-") || d.startsWith("NE ")) return "nota_entrega";
+  return "factura";
+}

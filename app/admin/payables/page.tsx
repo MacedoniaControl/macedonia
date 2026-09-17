@@ -72,7 +72,14 @@ export default function PayablesPage() {
   }
 
     // saldo y dias los calcula la BASE, contra la fecha de hoy real.
-  const conSaldo = ctas.map((c) => ({ ...c, d: c.dias }));
+  const conSaldo = ctas
+    .filter((c) => filtroClase === "todas" || c.clase === filtroClase)
+    .map((c) => ({ ...c, d: c.dias }));
+
+  // Cuantas hay de cada clase, para no ofrecer un filtro que deja la tabla
+  // vacia: un filtro con cero resultados parece que el sistema perdio datos.
+  const porClase = ctas.reduce<Record<string, number>>(
+    (a, c) => ({ ...a, [c.clase]: (a[c.clase] ?? 0) + 1 }), {});
 
   // Funcion que devuelve JSX, no componente: un componente definido adentro de
   // otro es un tipo nuevo en cada render, React lo remonta y el input pierde
@@ -156,6 +163,22 @@ export default function PayablesPage() {
           <AlertCard tone="ok" titulo="Abono registrado" mensaje={exito} />
         </div>
       )}
+      {/* Separar facturas de notas: lo pidio Greeg, y ademas cada clase se
+          cobra distinto. Solo se ofrecen las clases que existen. */}
+      <div className="sumi-tabs mb-4 flex flex-wrap gap-1">
+        {[["todas", `Todas (${ctas.length})`] as const,
+          ...CLASES.filter((c) => porClase[c.id]).map((c) => [c.id, `${c.label} (${porClase[c.id]})`] as const),
+        ].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setFiltroClase(id)}
+            aria-current={filtroClase === id ? "true" : undefined}
+            className={`min-h-11 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition-colors ${
+              filtroClase === id ? "bg-brand-strong text-white" : "border border-border text-muted hover:text-text"
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       <SectionCard title="Resumen">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Total por pagar" value={fmtUsd(total)} accent />

@@ -5,7 +5,8 @@
 -- propia historia -cuanto se abono, cuando, con que comprobante, cuanto queda-
 -- y poder cerrarse indicando si fue abono parcial o pago total.
 
-set search_path to public;
+-- Todo va calificado con `public.`: en el editor de Supabase el search_path
+-- no siempre llega, y sin el prefijo falla con 'relation cuentas does not exist'.
 
 -- ---------------------------------------------------------------------------
 -- CLASE DE DOCUMENTO
@@ -16,19 +17,19 @@ set search_path to public;
 -- las cuatro clases para no tener que migrar otra vez cuando aparezcan.
 -- ---------------------------------------------------------------------------
 do $$ begin
-  create type clase_cuenta as enum ('factura', 'nota_entrega', 'nota_debito', 'nota_credito');
+  create type public.clase_cuenta as enum ('factura', 'nota_entrega', 'nota_debito', 'nota_credito');
 exception when duplicate_object then null; end $$;
 
-alter table cuentas add column if not exists clase clase_cuenta;
+alter table public.cuentas add column if not exists clase public.clase_cuenta;
 
 -- Lo ya cargado se clasifica por su prefijo, que es de donde salio.
-update cuentas set clase = 'factura'      where clase is null and documento like 'FCM-%';
-update cuentas set clase = 'nota_debito'  where clase is null and documento like 'NDE-%';
-update cuentas set clase = 'nota_entrega' where clase is null and documento like 'NE-%';
-update cuentas set clase = 'factura'      where clase is null;
+update public.cuentas set clase = 'factura'      where clase is null and documento like 'FCM-%';
+update public.cuentas set clase = 'nota_debito'  where clase is null and documento like 'NDE-%';
+update public.cuentas set clase = 'nota_entrega' where clase is null and documento like 'NE-%';
+update public.cuentas set clase = 'factura'      where clase is null;
 
-alter table cuentas alter column clase set default 'factura';
-alter table cuentas alter column clase set not null;
+alter table public.cuentas alter column clase set default 'factura';
+alter table public.cuentas alter column clase set not null;
 
 -- ---------------------------------------------------------------------------
 -- RETENCION
@@ -40,7 +41,7 @@ alter table cuentas alter column clase set not null;
 -- `aplica_retencion` existe porque una nota de entrega no es documento fiscal:
 -- Greeg pidio poder decir, cuenta por cuenta, si lleva retencion o no.
 -- ---------------------------------------------------------------------------
-alter table cuentas add column if not exists aplica_retencion boolean not null default true;
+alter table public.cuentas add column if not exists aplica_retencion boolean not null default true;
 
 -- ---------------------------------------------------------------------------
 -- ESTADO
@@ -51,19 +52,19 @@ alter table cuentas add column if not exists aplica_retencion boolean not null d
 -- firmada.
 -- ---------------------------------------------------------------------------
 do $$ begin
-  create type estado_cuenta as enum ('abierta', 'liquidada');
+  create type public.estado_cuenta as enum ('abierta', 'liquidada');
 exception when duplicate_object then null; end $$;
 
-alter table cuentas
-  add column if not exists estado        estado_cuenta not null default 'abierta',
+alter table public.cuentas
+  add column if not exists estado        public.estado_cuenta not null default 'abierta',
   add column if not exists liquidada_en  timestamptz,
-  add column if not exists liquidada_por uuid references usuarios(id),
+  add column if not exists liquidada_por uuid references public.usuarios(id),
   -- 'abono' = se cerro sin pagarlo todo. 'total' = se pago completo.
   add column if not exists liquidada_como text,
   add column if not exists liquidada_nota text;
 
-alter table cuentas drop constraint if exists liquidada_coherente;
-alter table cuentas add constraint liquidada_coherente check (
+alter table public.cuentas drop constraint if exists liquidada_coherente;
+alter table public.cuentas add constraint liquidada_coherente check (
   (estado = 'abierta'  and liquidada_en is null and liquidada_como is null)
   or (estado = 'liquidada' and liquidada_en is not null and liquidada_como in ('abono','total'))
 );
@@ -74,7 +75,7 @@ alter table cuentas add constraint liquidada_coherente check (
 -- La imagen vive en Storage; aqui queda su ruta. Igual que con los PDF de
 -- Valery: el bucket guarda el binario, la tabla guarda que es.
 -- ---------------------------------------------------------------------------
-alter table abonos add column if not exists imagen_ruta text;
+alter table public.abonos add column if not exists imagen_ruta text;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('comprobantes', 'comprobantes', false, 10485760,
@@ -107,9 +108,30 @@ create policy comprobantes_borra on storage.objects
     and auth_rol() in ('owner','admin')
   );
 
-create index if not exists cuentas_estado on cuentas (empresa_id, tipo, estado);
+create index if not exists cuentas_estado on public.cuentas (empresa_id, tipo, estado);
 
-comment on column cuentas.clase is 'Que documento es. NDE cargado de Valery es nota de DEBITO, no de entrega.';
-comment on column cuentas.aplica_retencion is 'Falso para documentos no fiscales. El usuario lo decide por cuenta.';
-comment on column cuentas.estado is 'Liquidar es una decision de una persona, no una consecuencia del saldo.';
-comment on column abonos.imagen_ruta is 'Comprobante dentro del bucket privado comprobantes/<empresa>/...';
+-- ---------------------------------------------------------------------------
+-- LA VISTA TAMBIEN
+--
+-- `cuentas_saldo` enumera sus columnas una por una, asi que agregarlas a la
+-- tabla NO las hace aparecer aqui: la pantalla lee de la vista y seguiria sin
+-- verlas. Sin este bloque la migracion corre sin quejarse y no cambia nada de
+-- lo que se ve.
+-- ---------------------------------------------------------------------------
+drop view if exists public.cuentas_saldo;
+create view public.cuentas_saldo with (security_invoker = on) as
+select c.id, c.empresa_id, c.tipo, c.contraparte, c.documento,
+       c.monto, c.moneda, c.emitida, c.vence, c.nota,
+       c.clase, c.estado, c.aplica_retencion,
+       c.base_imponible, c.iva, c.iva_retenido,
+       coalesce(sum(a.monto), 0)::numeric(14,2)             as abonado,
+       (c.monto - coalesce(sum(a.monto), 0))::numeric(14,2) as saldo,
+       (c.vence - current_date)::integer                    as dias
+from public.cuentas c
+left join public.abonos a on a.cuenta_id = c.id
+group by c.id;
+
+comment on column public.cuentas.clase is 'Que documento es. NDE cargado de Valery es nota de DEBITO, no de entrega.';
+comment on column public.cuentas.aplica_retencion is 'Falso para documentos no fiscales. El usuario lo decide por cuenta.';
+comment on column public.cuentas.estado is 'Liquidar es una decision de una persona, no una consecuencia del saldo.';
+comment on column public.abonos.imagen_ruta is 'Comprobante dentro del bucket privado comprobantes/<empresa>/...';

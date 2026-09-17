@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { retencionDe, PCT_RETENCION, CLASES } from "./retencion.ts";
+import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento } from "./retencion.ts";
 
 // El IVA retenido es el 75% del IVA de la cuenta: el comprador lo retiene y se
 // lo entera al SENIAT, asi que al proveedor le paga el total MENOS eso.
@@ -92,5 +92,32 @@ describe("editar una cuenta no le cambia el total", () => {
   test("si el desglose no cuadra con el total, avisa en vez de corregirlo", () => {
     assert.match(src, /No suma el monto total/);
     assert.match(src, /const descuadre =/);
+  });
+});
+
+// La misma regla que usa la migracion 21. Vive en el codigo para que la
+// pantalla pueda mostrar la clase antes de que exista la columna.
+describe("claseDeDocumento", () => {
+  test("NDE es nota de débito, NE es nota de entrega", () => {
+    // Es la distincion que Greeg confirmo. Si se confunden, las 11 cuentas
+    // NDE ya cargadas quedan clasificadas mal.
+    assert.equal(claseDeDocumento("NDE-46992"), "nota_debito");
+    assert.equal(claseDeDocumento("NE-0000017809·AVANTI"), "nota_entrega");
+  });
+
+  test("FCM es factura, y lo desconocido también", () => {
+    assert.equal(claseDeDocumento("FCM-2192"), "factura");
+    // Una cuenta escrita a mano sin prefijo es una factura: es lo mas comun,
+    // y de todas formas se puede corregir al editarla.
+    assert.equal(claseDeDocumento("12345"), "factura");
+  });
+
+  test("no se confunde con un nombre que empiece igual", () => {
+    // "NEGOCIO-1" empieza por NE pero no es una nota de entrega.
+    assert.equal(claseDeDocumento("NEGOCIO-1"), "factura");
+  });
+
+  test("ignora mayúsculas y espacios", () => {
+    assert.equal(claseDeDocumento("  nde-500 "), "nota_debito");
   });
 });
