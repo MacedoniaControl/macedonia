@@ -27,7 +27,7 @@ import {
 } from "@/lib/ux/dashboard-data";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 
-const selectClass = "sumi-campo";
+const selectClass = "sumi-campo sumi-campo--auto min-w-[9rem]";
 
 // Las series mensuales provienen del histórico REAL de Sumigases. Sudematin no tiene
 // desglose mensual cargado: antes se estimaba multiplicando por 0,35 — un número
