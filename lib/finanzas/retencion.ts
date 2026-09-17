@@ -51,3 +51,24 @@ export function claseDeDocumento(documento: string): ClaseCuenta {
   if (d.startsWith("AJUSTE-")) return "ajuste";
   return "factura";
 }
+
+/**
+ * Clases que comparten pestaña en el filtro.
+ *
+ * Greeg pidio que en cuentas por pagar las notas de debito salgan bajo «Nota
+ * de entrega». La distincion que le importa al usar la pantalla es factura
+ * contra todo lo demas: la factura es el documento fiscal, las notas no.
+ *
+ * Agrupa la PESTAÑA, no reclasifica: cada cuenta conserva su clase real, que
+ * se sigue viendo en su fila y en su detalle. Cambiar la clase seria perder el
+ * dato de que esas once son notas de debito, que el propio Greeg confirmo.
+ */
+const AGRUPADAS: Partial<Record<ClaseCuenta, ClaseCuenta>> = {
+  nota_debito: "nota_entrega",
+  nota_credito: "nota_entrega",
+};
+
+/** Bajo que pestaña cae una clase. */
+export function grupoDeClase(clase: ClaseCuenta): ClaseCuenta {
+  return AGRUPADAS[clase] ?? clase;
+}

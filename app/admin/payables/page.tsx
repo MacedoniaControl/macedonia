@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
 import { FiltroClase } from "@/components/finanzas/FiltroClase";
-import { CLASES } from "@/lib/finanzas/retencion";
+import { CLASES, grupoDeClase } from "@/lib/finanzas/retencion";
 import { DetalleCuenta } from "@/components/finanzas/DetalleCuenta";
 import { EditarCuenta } from "@/components/finanzas/EditarCuenta";
 import { Modal } from "@/components/ui/Modal";
@@ -74,13 +74,15 @@ export default function PayablesPage() {
 
     // saldo y dias los calcula la BASE, contra la fecha de hoy real.
   const conSaldo = ctas
-    .filter((c) => filtroClase === "todas" || c.clase === filtroClase)
+    .filter((c) => filtroClase === "todas" || grupoDeClase(c.clase) === filtroClase)
     .map((c) => ({ ...c, d: c.dias }));
 
   // Cuantas hay de cada clase, para no ofrecer un filtro que deja la tabla
   // vacia: un filtro con cero resultados parece que el sistema perdio datos.
+  // Se cuenta por GRUPO, no por clase: la pestaña «Nota de entrega» tiene que
+  // decir cuantas cuentas va a mostrar, y muestra tambien las de debito.
   const porClase = ctas.reduce<Record<string, number>>(
-    (a, c) => ({ ...a, [c.clase]: (a[c.clase] ?? 0) + 1 }), {});
+    (a, c) => { const g = grupoDeClase(c.clase); return { ...a, [g]: (a[g] ?? 0) + 1 }; }, {});
 
   // Funcion que devuelve JSX, no componente: un componente definido adentro de
   // otro es un tipo nuevo en cada render, React lo remonta y el input pierde
