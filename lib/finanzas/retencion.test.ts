@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento } from "./retencion.ts";
+import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento, grupoDeClase } from "./retencion.ts";
 
 // El IVA retenido es el 75% del IVA de la cuenta: el comprador lo retiene y se
 // lo entera al SENIAT, asi que al proveedor le paga el total MENOS eso.
@@ -216,5 +216,30 @@ describe("el filtro por clase", () => {
       assert.match(s, /filtroClase === "todas"\s*\?/, `${f} no distingue el vacío por filtro`);
       assert.match(s, /No hay ninguna cuenta de esa clase/, `${f} no lo explica`);
     }
+  });
+});
+
+// Greeg: "en cuenta por pagar las notas de entrega y nota de debito tienen que
+// estar en el apartado Nota de Entrega".
+describe("grupoDeClase", () => {
+  test("las notas comparten pestaña", () => {
+    assert.equal(grupoDeClase("nota_debito"), "nota_entrega");
+    assert.equal(grupoDeClase("nota_credito"), "nota_entrega");
+    assert.equal(grupoDeClase("nota_entrega"), "nota_entrega");
+  });
+
+  test("la factura no se agrupa con nada", () => {
+    // Es la distincion que importa: la factura es el documento fiscal.
+    assert.equal(grupoDeClase("factura"), "factura");
+  });
+
+  test("el ajuste tampoco: no es una nota, es un saldo sin papel", () => {
+    assert.equal(grupoDeClase("ajuste"), "ajuste");
+  });
+
+  test("agrupa la pestaña, no reclasifica la cuenta", () => {
+    // Cambiar la clase perderia el dato de que esas once son notas de debito.
+    const src = fs.readFileSync("lib/finanzas/retencion.ts", "utf8");
+    assert.match(src, /Agrupa la PESTAÑA, no reclasifica/);
   });
 });

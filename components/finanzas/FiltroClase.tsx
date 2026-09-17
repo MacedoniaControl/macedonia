@@ -11,7 +11,7 @@
 // oculta. Las demas clases solo aparecen si existen: son casos raros y
 // llenarian la barra de opciones vacias.
 
-import { CLASES, type ClaseCuenta } from "@/lib/finanzas/retencion";
+import { CLASES, grupoDeClase, type ClaseCuenta } from "@/lib/finanzas/retencion";
 
 const FIJAS: ClaseCuenta[] = ["factura", "nota_entrega"];
 
@@ -27,7 +27,11 @@ export function FiltroClase({
   valor: string;
   onCambio: (clase: string) => void;
 }) {
-  const visibles = CLASES.filter((c) => FIJAS.includes(c.id) || conteo[c.id]);
+  // Solo se ofrece la pestaña del GRUPO: las notas de debito se cuentan bajo
+  // «Nota de entrega», asi que no tienen pestaña propia.
+  const visibles = CLASES.filter(
+    (c) => grupoDeClase(c.id) === c.id && (FIJAS.includes(c.id) || conteo[c.id]),
+  );
 
   return (
     <div className="sumi-tabs -mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1"
