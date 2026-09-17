@@ -72,3 +72,30 @@ const AGRUPADAS: Partial<Record<ClaseCuenta, ClaseCuenta>> = {
 export function grupoDeClase(clase: ClaseCuenta): ClaseCuenta {
   return AGRUPADAS[clase] ?? clase;
 }
+
+/** IVA general en Venezuela. Si cambia por ley, cambia aqui. */
+export const PCT_IVA = 0.16;
+
+export type Desglose = { base: number; iva: number; total: number; retencion: number };
+
+/**
+ * Desglosa un monto.
+ *
+ * El monto que se escribe es el TOTAL del documento: es la cifra que aparece
+ * en la factura y la que se debe. Con IVA, la base sale de dividir por 1,16 y
+ * el IVA es el resto; sin IVA -una compra exenta- la base ES el total.
+ *
+ * Se calcula asi y no multiplicando por 0,16 porque el total es el dato duro:
+ * si se sumara el IVA encima, el monto dejaria de ser el que dice el papel.
+ */
+export function desglosar(total: number, conIva: boolean, retiene: boolean): Desglose {
+  const cent = (n: number) => Math.round(n * 100) / 100;
+  if (!conIva || total <= 0) {
+    return { base: cent(total), iva: 0, total: cent(total), retencion: 0 };
+  }
+  const base = cent(total / (1 + PCT_IVA));
+  // El IVA es el resto, no base * 0,16: al redondear cada uno por separado,
+  // base + iva podia dar un centimo distinto del total.
+  const iva = cent(total - base);
+  return { base, iva, total: cent(total), retencion: retencionDe(iva, retiene) };
+}
