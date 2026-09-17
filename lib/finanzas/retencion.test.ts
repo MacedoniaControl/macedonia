@@ -188,3 +188,33 @@ describe("la app funciona sin la migración", () => {
     assert.ok(i > 0 && j > 0 && i < j, "la comprobación tiene que ir antes del upload");
   });
 });
+
+// Greeg: "tiene que haber una solo facturas en cuentas por cobrar y cuentas
+// por pagar". Yo escondia las clases sin registros para no ofrecer un filtro
+// que deja la tabla vacia. Pero que no haya facturas es un DATO -no estas
+// facturando- y esconder la pestaña lo oculta.
+describe("el filtro por clase", () => {
+  const src = fs.readFileSync("components/finanzas/FiltroClase.tsx", "utf8");
+
+  test("factura y nota de entrega se muestran siempre, tengan o no registros", () => {
+    assert.match(src, /const FIJAS: ClaseCuenta\[\] = \["factura", "nota_entrega"\]/);
+    assert.match(src, /FIJAS\.includes\(c\.id\) \|\| conteo\[c\.id\]/);
+  });
+
+  test("vive en un solo sitio: las dos pantallas usan el mismo", () => {
+    // Tres veces ya se nos separaron dos copias de la misma decision.
+    for (const f of ["app/admin/payables/page.tsx", "app/admin/receivables/page.tsx"]) {
+      assert.match(fs.readFileSync(f, "utf8"), /<FiltroClase/, `${f} no usa el filtro compartido`);
+    }
+  });
+
+  test("con un filtro puesto, la tabla vacía no dice que no hay cuentas", () => {
+    // Hay 328; lo que no hay es de esa clase. Decir "no hay deudas cargadas"
+    // seria mentir sobre el estado del negocio.
+    for (const f of ["app/admin/payables/page.tsx", "app/admin/receivables/page.tsx"]) {
+      const s = fs.readFileSync(f, "utf8");
+      assert.match(s, /filtroClase === "todas"\s*\?/, `${f} no distingue el vacío por filtro`);
+      assert.match(s, /No hay ninguna cuenta de esa clase/, `${f} no lo explica`);
+    }
+  });
+});
