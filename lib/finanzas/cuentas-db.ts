@@ -105,49 +105,63 @@ export type CuentaNueva = {
   imagen?: File | null;
 };
 
-export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<Cuenta[]> {
-  const sb = await createClient();
-  let { data, error } = await sb
-    .from("cuentas_saldo")
-    .select("id, tipo, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota, iva_retenido")
+/**
+ * La retencion por cuenta, leida de la tabla.
+ *
+ * `cuentas_saldo` enumera sus columnas, asi que no expone `iva_retenido`
+ * hasta que la migracion 21 la recree. Mientras tanto se lee aparte y se
+ * cruza por id: es una consulta mas, no una por cuenta.
+ */
+async function retencionesDe(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  empresa: string,
+  tipo: TipoCuenta,
+): Promise<Map<number, number>> {
+  const { data, error } = await sb
+    .from("cuentas")
+    .select("id, iva_retenido")
     .eq("empresa_id", empresa)
     .eq("tipo", tipo)
-    .order("vence");
+    .not("iva_retenido", "is", null);
+  // Sin la columna la retencion es desconocida y el neto queda igual al total.
+  if (error) return new Map();
+  return new Map((data ?? []).map((c) => [Number(c.id), Number(c.iva_retenido)]));
+}
 
-  // La vista no expone `iva_retenido` hasta que la migracion 21 la recree.
-  // Sin el, el neto es el total: hoy casi todas las cuentas no tienen retencion.
-  if (faltaColumna(error)) {
-    const r = await sb
+export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<Cuenta[]> {
+  const sb = await createClient();
+  const [vista, retenciones] = await Promise.all([
+    sb
       .from("cuentas_saldo")
       .select("id, tipo, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota")
       .eq("empresa_id", empresa)
       .eq("tipo", tipo)
-      .order("vence");
-    error = r.error;
-    // Sin la columna, la retencion es desconocida y el neto es el total.
-    data = (r.data ?? []).map((x) => ({ ...x, iva_retenido: null }));
-  }
-  if (error) throw new Error(`No se pudieron leer las cuentas: ${error.message}`);
+      .order("vence"),
+    retencionesDe(sb, empresa, tipo),
+  ]);
+  if (vista.error) throw new Error(`No se pudieron leer las cuentas: ${vista.error.message}`);
 
   type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias" | "clase" | "estado" | "ivaRetenido" | "neto" | "saldoNeto"> & {
-    monto: number; abonado: number; saldo: number; dias: number; iva_retenido: number | null;
+    monto: number; abonado: number; saldo: number; dias: number;
   };
-  return ((data as Fila[] | null) ?? []).map((c) => ({
-    ...c,
-    monto: Number(c.monto),
-    abonado: Number(c.abonado),
-    saldo: Number(c.saldo),
-    dias: Number(c.dias),
-    // La vista `cuentas_saldo` enumera sus columnas, asi que no expone `clase`
-    // ni `estado` hasta que la migracion 21 la recree. Mientras tanto la clase
-    // se deduce del prefijo -misma regla que la migracion- y la cuenta se
-    // muestra abierta, que es su estado por defecto.
-    clase: claseDeDocumento(c.documento),
-    estado: "abierta" as EstadoCuenta,
-    ivaRetenido: c.iva_retenido == null ? null : Number(c.iva_retenido),
-    neto: redondear(Number(c.monto) - Number(c.iva_retenido ?? 0)),
-    saldoNeto: redondear(Number(c.monto) - Number(c.iva_retenido ?? 0) - Number(c.abonado)),
-  }));
+  return ((vista.data as Fila[] | null) ?? []).map((c) => {
+    const retenido = retenciones.get(Number(c.id)) ?? null;
+    return {
+      ...c,
+      monto: Number(c.monto),
+      abonado: Number(c.abonado),
+      saldo: Number(c.saldo),
+      dias: Number(c.dias),
+      // La vista tampoco expone `clase` ni `estado`: la clase se deduce del
+      // prefijo -misma regla que la migracion- y la cuenta se muestra abierta,
+      // que es su estado por defecto.
+      clase: claseDeDocumento(c.documento),
+      estado: "abierta" as EstadoCuenta,
+      ivaRetenido: retenido,
+      neto: redondear(Number(c.monto) - (retenido ?? 0)),
+      saldoNeto: redondear(Number(c.monto) - (retenido ?? 0) - Number(c.abonado)),
+    };
+  });
 }
 
 export async function crearCuenta(

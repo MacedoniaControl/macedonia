@@ -332,3 +332,58 @@ describe("el panel muestra lo que hay que pagar, no el valor de cara", () => {
     assert.doesNotMatch(db, /from\("cuentas_saldo"\)\.select\("saldo"\)/);
   });
 });
+
+/**
+ * Filas reales de la "Relacion de Cuentas por Pagar a Proveedores" de
+ * Sumigases al 26-08-2026. Si el desglose que calcula el sistema deja de
+ * reproducir el de la hoja, la conciliacion con el proveedor se rompe.
+ */
+describe("el desglose reproduce la relación de cuentas por pagar", () => {
+  // Las 32 facturas 100% gravadas de las dos relaciones se reproducen exacto.
+  // Las 11 de FEBECA y LA FUENTE llevan renglones exentos y no (ver mas abajo).
+  const filas = [
+    { prov: "FERREX", doc: "206557", total: 416.56, bi: 359.1, iva: 57.46, ret: 43.1 },
+    { prov: "CODINTER", doc: "16200", total: 3881.36, bi: 3346, iva: 535.36, ret: 401.52 },
+    { prov: "STAR GAS", doc: "80036", total: 5349.92, bi: 4612, iva: 737.92, ret: 553.44 },
+    { prov: "STAR GAS", doc: "79739", total: 6.39, bi: 5.51, iva: 0.88, ret: 0.66 },
+  ];
+
+  for (const f of filas) {
+    test(`${f.prov} ${f.doc}: de $${f.total} salen BI $${f.bi} e IVA $${f.iva}`, () => {
+      const d = desglosar(f.total, true, true);
+      assert.equal(d.base, f.bi);
+      assert.equal(d.iva, f.iva);
+      assert.equal(d.retencion, f.ret);
+      // La hoja cuadra columna a columna: BI + IVA tiene que dar el total.
+      assert.equal(Math.round((d.base + d.iva) * 100) / 100, f.total);
+    });
+  }
+
+  test("lo que se le paga al proveedor es el total menos la retención", () => {
+    // CODINTER: factura $3.881,36, se le retienen $401,52 y ya se le abonaron
+    // $1.550. Le quedan debiendo $1.929,84, que es lo que declara la hoja.
+    const d = desglosar(3881.36, true, true);
+    const aPagar = Math.round((d.total - d.retencion) * 100) / 100;
+    assert.equal(aPagar, 3479.84);
+    assert.equal(Math.round((aPagar - 1550) * 100) / 100, 1929.84);
+  });
+
+  test("una factura con renglones exentos no la reproduce el 16% automático", () => {
+    // FEBECA y LA FUENTE venden alimentos: parte de la factura va exenta, asi
+    // que el IVA no es el 16% del total sino de la porcion gravada. El calculo
+    // automatico sirve para la mayoria, pero estas hay que cargarlas a mano.
+    const d = desglosar(758.65, true, true);
+    assert.notEqual(d.base, 656.11); // lo que dice la relacion
+    assert.equal(d.base, 654.01); // lo que da suponer todo gravado
+    // La diferencia es chica, pero cae directo sobre el IVA y la retencion.
+    assert.notEqual(d.retencion, 76.91);
+  });
+
+  test("una nota de entrega sin retención se paga completa", () => {
+    // OXIORIENTE NDE-0000-0965: la hoja de notas no trae BI ni IVA.
+    const d = desglosar(616, false, false);
+    assert.equal(d.total, 616);
+    assert.equal(d.iva, 0);
+    assert.equal(d.retencion, 0);
+  });
+});
