@@ -78,6 +78,11 @@ alter table public.cuentas add constraint liquidada_coherente check (
 -- ---------------------------------------------------------------------------
 alter table public.abonos add column if not exists imagen_ruta text;
 
+-- La cuenta tambien guarda su documento: la foto de la factura o de la nota.
+-- Va al mismo bucket que los comprobantes de abono, bajo la misma ruta por
+-- empresa, asi que lo separa el mismo RLS.
+alter table public.cuentas add column if not exists imagen_ruta text;
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('comprobantes', 'comprobantes', false, 10485760,
         array['image/jpeg','image/png','image/webp','image/heic','application/pdf'])
@@ -124,7 +129,7 @@ create view public.cuentas_saldo with (security_invoker = on) as
 select c.id, c.empresa_id, c.tipo, c.contraparte, c.documento,
        c.monto, c.moneda, c.emitida, c.vence, c.nota,
        c.clase, c.estado, c.aplica_retencion,
-       c.base_imponible, c.iva, c.iva_retenido,
+       c.base_imponible, c.iva, c.iva_retenido, c.imagen_ruta,
        coalesce(sum(a.monto), 0)::numeric(14,2)             as abonado,
        (c.monto - coalesce(sum(a.monto), 0))::numeric(14,2) as saldo,
        (c.vence - current_date)::integer                    as dias
@@ -135,4 +140,5 @@ group by c.id;
 comment on column public.cuentas.clase is 'Que documento es. NDE cargado de Valery es nota de DEBITO, no de entrega.';
 comment on column public.cuentas.aplica_retencion is 'Falso para documentos no fiscales. El usuario lo decide por cuenta.';
 comment on column public.cuentas.estado is 'Liquidar es una decision de una persona, no una consecuencia del saldo.';
+comment on column public.cuentas.imagen_ruta is 'Foto del documento (factura o nota) dentro de comprobantes/<empresa>/...';
 comment on column public.abonos.imagen_ruta is 'Comprobante dentro del bucket privado comprobantes/<empresa>/...';

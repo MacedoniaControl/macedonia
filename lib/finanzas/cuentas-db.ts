@@ -64,6 +64,10 @@ export type CuentaNueva = {
   baseImponible?: number | null;
   iva?: number | null;
   ivaRetenido?: number | null;
+  clase?: ClaseCuenta;
+  aplicaRetencion?: boolean;
+  /** Foto del documento. Va al bucket privado, igual que los comprobantes. */
+  imagen?: File | null;
 };
 
 export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<Cuenta[]> {
@@ -98,7 +102,7 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
 export async function crearCuenta(
   c: CuentaNueva,
   empresa: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; aviso?: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
   if (!c.contraparte.trim()) {
@@ -113,7 +117,8 @@ export async function crearCuenta(
   }
 
   const sb = await createClient();
-  const { error } = await sb.from("cuentas").insert({
+
+  const base = {
     empresa_id: empresa,
     tipo: c.tipo,
     contraparte: c.contraparte.trim(),
@@ -125,9 +130,49 @@ export async function crearCuenta(
     vence: c.vence,
     nota: c.nota?.trim() || null,
     usuario_id: usuario.id,
-  });
+  };
+  const nuevas = { clase: c.clase ?? "factura", aplica_retencion: c.aplicaRetencion ?? true };
 
+  // Se pide el id de vuelta: la imagen se guarda en una ruta que lo incluye,
+  // asi que no se puede subir antes de que la cuenta exista.
+  let { data, error } = await sb
+    .from("cuentas").insert({ ...base, ...nuevas }).select("id").single();
+
+  let sinMigrar = false;
+  if (faltaColumna(error)) {
+    sinMigrar = true;
+    ({ data, error } = await sb.from("cuentas").insert(base).select("id").single());
+  }
   if (error) return { ok: false, error: error.message };
+
+  if (!c.imagen) {
+    return sinMigrar
+      ? { ok: true, aviso: `La cuenta se creó, pero no se guardó su clase. ${AVISO_MIGRACION}` }
+      : { ok: true };
+  }
+
+  if (sinMigrar) {
+    // La cuenta ya existe: decirlo, y decir que la imagen se quedo fuera.
+    return { ok: true, aviso: `La cuenta se creó, pero no se pudo guardar su imagen ni su clase. ${AVISO_MIGRACION}` };
+  }
+
+  const id = (data as { id: number }).id;
+  const ext = c.imagen.name.split(".").pop()?.toLowerCase() || "jpg";
+  const ruta = `${empresa}/cuenta-${id}/${Date.now()}.${ext}`;
+  const { error: errSubida } = await sb.storage
+    .from(BUCKET_COMPROBANTES)
+    .upload(ruta, c.imagen, { contentType: c.imagen.type, upsert: false });
+
+  if (errSubida) {
+    // La cuenta ya quedo creada; borrarla por una imagen seria peor. Se avisa.
+    return { ok: true, aviso: `La cuenta se creó, pero la imagen no subió: ${errSubida.message}` };
+  }
+
+  const { error: errRuta } = await sb.from("cuentas").update({ imagen_ruta: ruta }).eq("id", id);
+  if (errRuta) {
+    await sb.storage.from(BUCKET_COMPROBANTES).remove([ruta]);
+    return { ok: true, aviso: "La cuenta se creó, pero la imagen no quedó enlazada." };
+  }
   return { ok: true };
 }
 

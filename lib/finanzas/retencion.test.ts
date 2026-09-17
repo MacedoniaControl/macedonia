@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento, grupoDeClase } from "./retencion.ts";
+import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento, grupoDeClase, desglosar } from "./retencion.ts";
 
 // El IVA retenido es el 75% del IVA de la cuenta: el comprador lo retiene y se
 // lo entera al SENIAT, asi que al proveedor le paga el total MENOS eso.
@@ -180,12 +180,29 @@ describe("la app funciona sin la migración", () => {
     assert.match(src, /aviso: `Se guardó todo menos la clase y la retención/);
   });
 
-  test("el comprobante se rechaza ANTES de subirlo", () => {
+  test("ninguna función sube un archivo que despues no va a poder enlazar", () => {
     // Si se sube y despues falla el insert, el archivo queda en el bucket sin
-    // nada que lo relacione con una cuenta.
-    const i = src.indexOf("faltaColumna(sinCol)");
-    const j = src.indexOf(".upload(");
-    assert.ok(i > 0 && j > 0 && i < j, "la comprobación tiene que ir antes del upload");
+    // nada que lo relacione con una cuenta. Se mira DENTRO de cada funcion:
+    // comparar posiciones en todo el archivo daba un falso negativo en cuanto
+    // aparecio un segundo upload.
+    const cuerpo = (nombre: string) => {
+      const i = src.indexOf(`export async function ${nombre}`);
+      assert.ok(i > 0, `no existe ${nombre}`);
+      const j = src.indexOf("\nexport ", i + 10);
+      return src.slice(i, j > 0 ? j : undefined);
+    };
+
+    const abono = cuerpo("abonarConComprobante");
+    assert.ok(
+      abono.indexOf("faltaColumna(sinCol)") < abono.indexOf(".upload("),
+      "el abono sube antes de comprobar",
+    );
+
+    const alta = cuerpo("crearCuenta");
+    assert.ok(
+      alta.indexOf("if (sinMigrar)") < alta.indexOf(".upload("),
+      "el alta sube antes de comprobar",
+    );
   });
 });
 
@@ -241,5 +258,45 @@ describe("grupoDeClase", () => {
     // Cambiar la clase perderia el dato de que esas once son notas de debito.
     const src = fs.readFileSync("lib/finanzas/retencion.ts", "utf8");
     assert.match(src, /Agrupa la PESTAÑA, no reclasifica/);
+  });
+});
+
+// Greeg: "el calculo de el iva en cuentas por pagar hazlo automatico al cargar
+// el monto coloca el 16% de Iva y deja un check para incluirlo o no".
+describe("desglosar un monto", () => {
+  test("el monto escrito es el TOTAL, y de ahi sale la base", () => {
+    // 116 con IVA son 100 + 16, no 116 + 18,56. El total es el dato duro:
+    // es la cifra que dice el papel y la que se debe.
+    const d = desglosar(116, true, false);
+    assert.equal(d.base, 100);
+    assert.equal(d.iva, 16);
+    assert.equal(d.total, 116);
+  });
+
+  test("base + IVA siempre da el total exacto, al centimo", () => {
+    // Calcular el IVA como base * 0,16 y redondear cada uno por separado
+    // daba un centimo de diferencia en montos como estos.
+    for (const t of [0.99, 1, 33.33, 195, 840.3, 1652, 15657.8, 224575]) {
+      const d = desglosar(t, true, false);
+      assert.equal(d.base + d.iva, d.total, `${t} no cuadra`);
+    }
+  });
+
+  test("sin IVA la base es el total: una compra exenta no lo tiene", () => {
+    const d = desglosar(500, false, true);
+    assert.deepEqual(d, { base: 500, iva: 0, total: 500, retencion: 0 });
+  });
+
+  test("la retención sale del IVA calculado, no del total", () => {
+    const d = desglosar(116, true, true);
+    assert.equal(d.retencion, 12);      // 75% de 16
+  });
+
+  test("sin IVA no hay retención aunque se pida", () => {
+    assert.equal(desglosar(500, false, true).retencion, 0);
+  });
+
+  test("un monto en cero no revienta ni inventa impuestos", () => {
+    assert.deepEqual(desglosar(0, true, true), { base: 0, iva: 0, total: 0, retencion: 0 });
   });
 });
