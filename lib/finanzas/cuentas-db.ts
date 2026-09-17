@@ -26,6 +26,30 @@ export type EstadoCuenta = "abierta" | "liquidada";
  * se corra, cada operacion tiene que decir QUE no pudo hacer, en vez de fallar
  * con un mensaje de Postgres que no le sirve a nadie.
  */
+const redondear = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Lo que queda por pagarle a la contraparte: el total, menos lo retenido,
+ * menos lo ya abonado.
+ *
+ * La retencion no se le paga al proveedor sino al SENIAT, asi que la deuda CON
+ * EL es el neto. Si la pantalla mostrara el neto y la base validara contra el
+ * bruto, una cuenta pagada por completo nunca terminaria de cerrarse.
+ */
+async function saldoNetoDe(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  id: number,
+): Promise<number | null> {
+  const { data: s } = await sb.from("cuentas_saldo").select("monto, abonado").eq("id", id).maybeSingle();
+  if (!s) return null;
+
+  // `iva_retenido` vive en la tabla: la vista no lo expone hasta que la
+  // migracion 21 la recree. Sin el, el neto es el total.
+  const { data: c } = await sb.from("cuentas").select("iva_retenido").eq("id", id).maybeSingle();
+  const ret = Number(c?.iva_retenido ?? 0);
+  return redondear(Number(s.monto) - ret - Number(s.abonado));
+}
+
 function faltaColumna(error: { code?: string } | null): boolean {
   return error?.code === "42703" || error?.code === "PGRST204";
 }
@@ -49,6 +73,17 @@ export type Cuenta = {
   nota: string | null;
   clase: ClaseCuenta;
   estado: EstadoCuenta;
+  ivaRetenido: number | null;
+  /**
+   * Lo que de verdad cambia de manos: el total menos lo retenido.
+   *
+   * La retencion no se le paga al proveedor, se le entera al SENIAT. La deuda
+   * CON EL es el neto; el total es el valor de cara de la factura. Greeg pidio
+   * que el panel muestre el neto, que es la plata que hay que mover.
+   */
+  neto: number;
+  /** Neto menos lo abonado. Es lo que queda por pagarle. */
+  saldoNeto: number;
 };
 
 export type CuentaNueva = {
@@ -72,17 +107,30 @@ export type CuentaNueva = {
 
 export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<Cuenta[]> {
   const sb = await createClient();
-  const { data, error } = await sb
+  let { data, error } = await sb
     .from("cuentas_saldo")
-    .select("id, tipo, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota")
+    .select("id, tipo, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota, iva_retenido")
     .eq("empresa_id", empresa)
     .eq("tipo", tipo)
     .order("vence");
 
+  // La vista no expone `iva_retenido` hasta que la migracion 21 la recree.
+  // Sin el, el neto es el total: hoy casi todas las cuentas no tienen retencion.
+  if (faltaColumna(error)) {
+    const r = await sb
+      .from("cuentas_saldo")
+      .select("id, tipo, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota")
+      .eq("empresa_id", empresa)
+      .eq("tipo", tipo)
+      .order("vence");
+    error = r.error;
+    // Sin la columna, la retencion es desconocida y el neto es el total.
+    data = (r.data ?? []).map((x) => ({ ...x, iva_retenido: null }));
+  }
   if (error) throw new Error(`No se pudieron leer las cuentas: ${error.message}`);
 
-  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias" | "clase" | "estado"> & {
-    monto: number; abonado: number; saldo: number; dias: number;
+  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias" | "clase" | "estado" | "ivaRetenido" | "neto" | "saldoNeto"> & {
+    monto: number; abonado: number; saldo: number; dias: number; iva_retenido: number | null;
   };
   return ((data as Fila[] | null) ?? []).map((c) => ({
     ...c,
@@ -96,6 +144,9 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
     // muestra abierta, que es su estado por defecto.
     clase: claseDeDocumento(c.documento),
     estado: "abierta" as EstadoCuenta,
+    ivaRetenido: c.iva_retenido == null ? null : Number(c.iva_retenido),
+    neto: redondear(Number(c.monto) - Number(c.iva_retenido ?? 0)),
+    saldoNeto: redondear(Number(c.monto) - Number(c.iva_retenido ?? 0) - Number(c.abonado)),
   }));
 }
 
@@ -193,12 +244,10 @@ export async function abonar(
   if (!(monto > 0)) return { ok: false, error: "El abono debe ser mayor que cero." };
 
   const sb = await createClient();
-  const { data: c } = await sb
-    .from("cuentas_saldo").select("saldo").eq("id", cuentaId).maybeSingle();
-
-  if (!c) return { ok: false, error: "No se encontró la cuenta." };
-  if (monto > Number(c.saldo)) {
-    return { ok: false, error: `El abono supera el saldo pendiente ($${Number(c.saldo).toFixed(2)}).` };
+  const saldo = await saldoNetoDe(sb, cuentaId);
+  if (saldo === null) return { ok: false, error: "No se encontró la cuenta." };
+  if (monto > saldo + 0.009) {
+    return { ok: false, error: `El abono supera el saldo pendiente ($${saldo.toFixed(2)}).` };
   }
 
   const { error } = await sb.from("abonos").insert({
@@ -324,9 +373,12 @@ export async function detalleCuenta(id: number): Promise<CuentaDetalle | null> {
     liquidadaComo: (c.liquidada_como as "abono" | "total") ?? null,
     liquidadaNota: (c.liquidada_nota as string) ?? null,
     abonos,
-    abonado: Math.round(abonado * 100) / 100,
-    saldo: Math.round((monto - abonado) * 100) / 100,
-    neto: Math.round((monto - ret) * 100) / 100,
+    abonado: redondear(abonado),
+    // Neto menos abonado: lo que queda por pagarle. Coincide con lo que
+    // validan abonar() y liquidarCuenta(), para que la pantalla y la base no
+    // digan cosas distintas sobre la misma cuenta.
+    saldo: redondear(monto - ret - abonado),
+    neto: redondear(monto - ret),
   };
 }
 
@@ -408,8 +460,7 @@ export async function liquidarCuenta(
   if (!usuario) return { ok: false, error: "Sin sesión." };
 
   const sb = await createClient();
-  const { data: s } = await sb.from("cuentas_saldo").select("saldo").eq("id", id).maybeSingle();
-  const saldo = s ? Number(s.saldo) : 0;
+  const saldo = (await saldoNetoDe(sb, id)) ?? 0;
 
   if (como === "total" && saldo > 0.009) {
     return { ok: false, error: `Todavía quedan $${saldo.toFixed(2)}. Cerrala como abono parcial o registrá el resto.` };
@@ -469,10 +520,10 @@ export async function abonarConComprobante(
   if (!(monto > 0)) return { ok: false, error: "El abono debe ser mayor que cero." };
 
   const sb = await createClient();
-  const { data: c } = await sb.from("cuentas_saldo").select("saldo").eq("id", cuentaId).maybeSingle();
-  if (!c) return { ok: false, error: "No se encontró la cuenta." };
-  if (monto > Number(c.saldo) + 0.009) {
-    return { ok: false, error: `El abono supera el saldo pendiente ($${Number(c.saldo).toFixed(2)}).` };
+  const saldo = await saldoNetoDe(sb, cuentaId);
+  if (saldo === null) return { ok: false, error: "No se encontró la cuenta." };
+  if (monto > saldo + 0.009) {
+    return { ok: false, error: `El abono supera el saldo pendiente ($${saldo.toFixed(2)}).` };
   }
 
   if (opciones.imagen) {

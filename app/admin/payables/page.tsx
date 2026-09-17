@@ -94,9 +94,9 @@ export default function PayablesPage() {
         <span className="mb-1 block text-xs font-medium text-muted">Documento</span>
         <select className={inputClass} value={docSel} onChange={(e) => setDocSel(e.target.value)}>
           <option value="">Elegí un documento…</option>
-          {conSaldo.filter((c) => c.saldo > 0).map((c) => (
+          {conSaldo.filter((c) => c.saldoNeto > 0).map((c) => (
             <option key={c.documento} value={c.documento}>
-              {c.documento} · {c.contraparte} · saldo {fmtUsd(c.saldo)}
+              {c.documento} · {c.contraparte} · saldo {fmtUsd(c.saldoNeto)}
             </option>
           ))}
         </select>
@@ -135,10 +135,13 @@ export default function PayablesPage() {
       </div>
     </div>
   );
-  const total = conSaldo.reduce((a, c) => a + c.saldo, 0);
-  const vencido = conSaldo.filter((c) => c.saldo > 0 && c.d < 0).reduce((a, c) => a + c.saldo, 0);
-  const alerta = conSaldo.filter((c) => c.saldo > 0 && c.d >= 0 && c.d <= 7).reduce((a, c) => a + c.saldo, 0);
-  const nVenc = conSaldo.filter((c) => c.saldo > 0 && c.d < 0).length;
+  // Todo en NETO. La retencion no se le paga al proveedor -se le entera al
+  // SENIAT-, asi que la deuda con el es el total menos lo retenido. Greeg pidio
+  // que el panel muestre esa cifra, que es la que hay que mover.
+  const total = conSaldo.reduce((a, c) => a + c.saldoNeto, 0);
+  const vencido = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).reduce((a, c) => a + c.saldoNeto, 0);
+  const alerta = conSaldo.filter((c) => c.saldoNeto > 0 && c.d >= 0 && c.d <= 7).reduce((a, c) => a + c.saldoNeto, 0);
+  const nVenc = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).length;
 
   return (
     <>
@@ -157,7 +160,7 @@ export default function PayablesPage() {
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
-            <Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.abonado, c.saldo, c.vence])])}>Exportar CSV</Button>
+            <Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Total factura", "IVA retenido", "A pagar", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.ivaRetenido ?? 0, c.neto, c.abonado, c.saldoNeto, c.vence])])}>Exportar CSV</Button>
           </div>
         }
       />
@@ -171,7 +174,7 @@ export default function PayablesPage() {
 
       <SectionCard title="Resumen">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Total por pagar" value={fmtUsd(total)} accent />
+          <StatCard label="Total a pagar" value={fmtUsd(total)} accent />
           <StatCard label="Vencido" value={fmtUsd(vencido)} />
           <StatCard label="Alerta (≤7d)" value={fmtUsd(alerta)} />
           <StatCard label="Cuentas vencidas" value={String(nVenc)} />
@@ -205,14 +208,14 @@ export default function PayablesPage() {
                   <th className="py-2.5 pr-3 font-medium">Proveedor</th>
                   <th className="py-2.5 pr-3 font-medium">Documento</th>
                   <th className="py-2.5 pr-3 font-medium">Clase</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Monto</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">A pagar</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Saldo</th>
                   <th className="py-2.5 font-medium">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {conSaldo.map((c) => {
-                  const e = estadoDe(c.saldo, c.d);
+                  const e = estadoDe(c.saldoNeto, c.d);
                   return (
                     <tr key={c.id} onClick={() => setAbierta(c.id)}
                       className="cursor-pointer hover:bg-surface-2"
@@ -223,8 +226,17 @@ export default function PayablesPage() {
                       <td className="py-2.5 pr-3 text-xs text-muted">
                         {CLASES.find((x) => x.id === c.clase)?.label ?? "—"}
                       </td>
-                      <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(c.monto)}</td>
-                      <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.saldo)}</td>
+                      <td className="py-2.5 pr-3 text-right text-muted">
+                        {fmtUsd(c.neto)}
+                        {/* Si hay retencion, el total de la factura es otro.
+                            Se deja a la vista para poder conciliar con el papel. */}
+                        {c.ivaRetenido ? (
+                          <span className="block text-[11px] text-muted/80">
+                            factura {fmtUsd(c.monto)}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.saldoNeto)}</td>
                       <td className="py-2.5">
                         {/* Liquidada gana sobre vencida: una cuenta cerrada ya
                             no le debe nada a nadie, aunque su fecha pasara. */}

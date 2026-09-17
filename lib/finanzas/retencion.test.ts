@@ -300,3 +300,35 @@ describe("desglosar un monto", () => {
     assert.deepEqual(desglosar(0, true, true), { base: 0, iva: 0, total: 0, retencion: 0 });
   });
 });
+
+// Greeg: "el monto que debe mostrarse en el panel debe ser el A pagar al
+// proveedor". La retencion no se le paga al proveedor sino al SENIAT, asi que
+// la deuda CON EL es el neto.
+describe("el panel muestra lo que hay que pagar, no el valor de cara", () => {
+  const db = fs.readFileSync("lib/finanzas/cuentas-db.ts", "utf8");
+  const pant = fs.readFileSync("app/admin/payables/page.tsx", "utf8");
+
+  test("la pantalla suma en neto, no en bruto", () => {
+    assert.match(pant, /const total = conSaldo\.reduce\(\(a, c\) => a \+ c\.saldoNeto, 0\)/);
+    assert.doesNotMatch(pant, /reduce\(\(a, c\) => a \+ c\.saldo,/);
+  });
+
+  test("la columna se llama «A pagar», no «Monto»", () => {
+    // Si el numero es el neto, llamarlo Monto hace creer que es el de la
+    // factura, y no cuadraria con el papel.
+    assert.match(pant, />A pagar</);
+  });
+
+  test("cuando hay retención, el total de la factura sigue a la vista", () => {
+    // Sin el, no se puede conciliar la pantalla con el documento.
+    assert.match(pant, /factura \{fmtUsd\(c\.monto\)\}/);
+  });
+
+  test("abonar, liquidar y el detalle validan contra el MISMO saldo", () => {
+    // Si la pantalla mostrara el neto y la base validara contra el bruto, una
+    // cuenta pagada por completo nunca terminaria de cerrarse.
+    const usos = db.match(/saldoNetoDe\(sb, /g) ?? [];
+    assert.ok(usos.length >= 3, `solo ${usos.length} funciones usan el saldo neto`);
+    assert.doesNotMatch(db, /from\("cuentas_saldo"\)\.select\("saldo"\)/);
+  });
+});
