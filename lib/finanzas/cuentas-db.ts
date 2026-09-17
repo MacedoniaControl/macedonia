@@ -7,6 +7,30 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { retencionDe, claseDeDocumento } from "./retencion.ts";
+import type { ClaseCuenta } from "./retencion.ts";
+// Las constantes NO se reexportan desde aqui: este archivo es "use server" y
+// solo admite exportar funciones asincronas. Quien las necesite importa
+// directamente de ./retencion.
+export type EstadoCuenta = "abierta" | "liquidada";
+
+/**
+ * "La columna no existe", dicho de dos formas distintas.
+ *
+ * Al LEER contesta Postgres: 42703. Al ESCRIBIR contesta PostgREST antes de
+ * llegar a Postgres, con su propio codigo PGRST204, porque valida contra su
+ * cache de esquema. Comprobado contra la base real: mirar solo 42703 dejaba
+ * pasar el caso de escritura, que es justo el que hay que degradar.
+ *
+ * La migracion 21 agrega clase, estado, retencion y el comprobante. Mientras no
+ * se corra, cada operacion tiene que decir QUE no pudo hacer, en vez de fallar
+ * con un mensaje de Postgres que no le sirve a nadie.
+ */
+function faltaColumna(error: { code?: string } | null): boolean {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+const AVISO_MIGRACION =
+  "Falta correr la actualización de la base (21-cuentas-historial.sql).";
 
 export type TipoCuenta = "cobrar" | "pagar";
 
@@ -23,6 +47,8 @@ export type Cuenta = {
   /** Días hasta el vencimiento. Negativo = vencida. Sale de la fecha de HOY. */
   dias: number;
   nota: string | null;
+  clase: ClaseCuenta;
+  estado: EstadoCuenta;
 };
 
 export type CuentaNueva = {
@@ -51,7 +77,7 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
 
   if (error) throw new Error(`No se pudieron leer las cuentas: ${error.message}`);
 
-  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias"> & {
+  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias" | "clase" | "estado"> & {
     monto: number; abonado: number; saldo: number; dias: number;
   };
   return ((data as Fila[] | null) ?? []).map((c) => ({
@@ -60,6 +86,12 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
     abonado: Number(c.abonado),
     saldo: Number(c.saldo),
     dias: Number(c.dias),
+    // La vista `cuentas_saldo` enumera sus columnas, asi que no expone `clase`
+    // ni `estado` hasta que la migracion 21 la recree. Mientras tanto la clase
+    // se deduce del prefijo -misma regla que la migracion- y la cuenta se
+    // muestra abierta, que es su estado por defecto.
+    clase: claseDeDocumento(c.documento),
+    estado: "abierta" as EstadoCuenta,
   }));
 }
 
@@ -134,4 +166,314 @@ export async function abonar(
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// HISTORIAL DE UNA CUENTA
+//
+// Pedido por Greeg: cada cuenta tiene que poder abrirse y contar su propia
+// historia. Cuanto se abono, cuando, con que comprobante, cuanto queda, y si
+// esta cerrada, quien la cerro y por que.
+// ---------------------------------------------------------------------------
+
+export type AbonoHist = {
+  id: number;
+  fecha: string;
+  monto: number;
+  metodo: string | null;
+  referencia: string | null;
+  imagenRuta: string | null;
+};
+
+export type CuentaDetalle = {
+  id: number;
+  tipo: TipoCuenta;
+  clase: ClaseCuenta;
+  contraparte: string;
+  documento: string;
+  monto: number;
+  baseImponible: number | null;
+  iva: number | null;
+  ivaRetenido: number | null;
+  aplicaRetencion: boolean;
+  emitida: string;
+  vence: string;
+  nota: string | null;
+  estado: EstadoCuenta;
+  liquidadaEn: string | null;
+  liquidadaComo: "abono" | "total" | null;
+  liquidadaNota: string | null;
+  abonos: AbonoHist[];
+  abonado: number;
+  saldo: number;
+  /**
+   * El total menos lo retenido. Es la plata que de verdad cambia de manos:
+   * lo que se le entrega al proveedor si la cuenta es por pagar, o lo que
+   * entra del cliente si es por cobrar -en ese caso el que retiene es el
+   * cliente, y ese IVA se lo entera el al SENIAT, no tu-.
+   */
+  neto: number;
+};
+
+export async function detalleCuenta(id: number): Promise<CuentaDetalle | null> {
+  const sb = await createClient();
+
+  const BASE = "id, tipo, contraparte, documento, monto, base_imponible, iva, iva_retenido, emitida, vence, nota";
+  const NUEVAS = "clase, aplica_retencion, estado, liquidada_en, liquidada_como, liquidada_nota";
+
+  // eslint-disable-next-line prefer-const
+  let { data: c, error } = await sb
+    .from("cuentas").select(`${BASE}, ${NUEVAS}`).eq("id", id).maybeSingle();
+
+  // 42703 = la columna no existe. Pasa mientras no se corra la migracion 21:
+  // la pantalla tiene que poder verse igual, con los valores por defecto.
+  if (error?.code === "42703") {
+    ({ data: c, error } = await sb.from("cuentas").select(BASE).eq("id", id).maybeSingle());
+  }
+
+  if (error) throw new Error(`No se pudo leer la cuenta: ${error.message}`);
+  if (!c) return null;
+
+  const sinMigrar = !("clase" in c);
+
+  const { data: ab } = await sb
+    .from("abonos")
+    .select("id, fecha, monto, metodo, referencia, imagen_ruta")
+    .eq("cuenta_id", id)
+    .order("fecha", { ascending: true })
+    .order("id", { ascending: true });
+
+  const abonos: AbonoHist[] = (ab ?? []).map((a) => ({
+    id: a.id as number,
+    fecha: a.fecha as string,
+    monto: Number(a.monto),
+    metodo: (a.metodo as string) ?? null,
+    referencia: (a.referencia as string) ?? null,
+    imagenRuta: (a.imagen_ruta as string) ?? null,
+  }));
+
+  const monto = Number(c.monto);
+  const abonado = abonos.reduce((t, a) => t + a.monto, 0);
+  const iva = c.iva === null ? null : Number(c.iva);
+  // Si la cuenta trae retencion guardada se respeta: una cuenta vieja tiene
+  // que seguir diciendo lo que se retuvo entonces, aunque cambie el porcentaje.
+  const aplica = sinMigrar ? true : Boolean(c.aplica_retencion);
+  const ret = c.iva_retenido != null ? Number(c.iva_retenido) : retencionDe(iva, aplica);
+
+  return {
+    id: c.id as number,
+    tipo: c.tipo as TipoCuenta,
+    clase: (c.clase as ClaseCuenta) ?? claseDeDocumento(c.documento as string),
+    contraparte: c.contraparte as string,
+    documento: c.documento as string,
+    monto,
+    baseImponible: c.base_imponible === null ? null : Number(c.base_imponible),
+    iva,
+    ivaRetenido: c.iva_retenido == null ? null : Number(c.iva_retenido),
+    aplicaRetencion: aplica,
+    emitida: c.emitida as string,
+    vence: c.vence as string,
+    nota: (c.nota as string) ?? null,
+    estado: (c.estado as EstadoCuenta) ?? "abierta",
+    liquidadaEn: (c.liquidada_en as string) ?? null,
+    liquidadaComo: (c.liquidada_como as "abono" | "total") ?? null,
+    liquidadaNota: (c.liquidada_nota as string) ?? null,
+    abonos,
+    abonado: Math.round(abonado * 100) / 100,
+    saldo: Math.round((monto - abonado) * 100) / 100,
+    neto: Math.round((monto - ret) * 100) / 100,
+  };
+}
+
+/** Corrige una cuenta ya cargada. Existe porque la gente se equivoca al teclear. */
+export async function editarCuenta(
+  id: number,
+  c: {
+    contraparte: string;
+    documento: string;
+    clase: ClaseCuenta;
+    monto: number;
+    baseImponible: number | null;
+    iva: number | null;
+    ivaRetenido: number | null;
+    aplicaRetencion: boolean;
+    emitida: string;
+    vence: string;
+    nota?: string | null;
+  },
+): Promise<{ ok: boolean; error?: string; aviso?: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+  if (!c.contraparte.trim()) return { ok: false, error: "Falta el nombre." };
+  if (!(c.monto > 0)) return { ok: false, error: "El monto debe ser mayor que cero." };
+  if (c.vence < c.emitida) return { ok: false, error: "No puede vencer antes de emitirse." };
+
+  const sb = await createClient();
+
+  // Bajar el monto por debajo de lo ya abonado dejaria un saldo negativo, que
+  // no significa nada y esconde el error en vez de mostrarlo.
+  const { data: saldo } = await sb
+    .from("cuentas_saldo").select("abonado").eq("id", id).maybeSingle();
+  const abonado = saldo ? Number(saldo.abonado) : 0;
+  if (c.monto < abonado) {
+    return { ok: false, error: `Ya se abonaron $${abonado.toFixed(2)}: el monto no puede ser menor.` };
+  }
+
+  const base = {
+    contraparte: c.contraparte.trim(),
+    documento: c.documento.trim() || "—",
+    monto: c.monto,
+    base_imponible: c.baseImponible,
+    iva: c.iva,
+    iva_retenido: c.ivaRetenido,
+    emitida: c.emitida,
+    vence: c.vence,
+    nota: c.nota?.trim() || null,
+  };
+
+  const { error } = await sb
+    .from("cuentas")
+    .update({ ...base, clase: c.clase, aplica_retencion: c.aplicaRetencion })
+    .eq("id", id);
+
+  if (!error) return { ok: true };
+  if (!faltaColumna(error)) return { ok: false, error: error.message };
+
+  // Sin la migracion se guarda todo lo demas, que es casi todo, y se DICE que
+  // la clase y la retencion no se guardaron. Callarlo dejaria a alguien
+  // creyendo que cambio algo que sigue igual.
+  const { error: err2 } = await sb.from("cuentas").update(base).eq("id", id);
+  if (err2) return { ok: false, error: err2.message };
+  return { ok: true, aviso: `Se guardó todo menos la clase y la retención. ${AVISO_MIGRACION}` };
+}
+
+/**
+ * Cierra una cuenta.
+ *
+ * `como` dice si se pago completo o si se cierra con un abono parcial: se
+ * negocio, se condono, se cruzo con otra deuda. El saldo por si solo no sabe
+ * eso, y por eso cerrar es una decision de una persona y queda firmada.
+ */
+export async function liquidarCuenta(
+  id: number,
+  como: "abono" | "total",
+  nota?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+
+  const sb = await createClient();
+  const { data: s } = await sb.from("cuentas_saldo").select("saldo").eq("id", id).maybeSingle();
+  const saldo = s ? Number(s.saldo) : 0;
+
+  if (como === "total" && saldo > 0.009) {
+    return { ok: false, error: `Todavía quedan $${saldo.toFixed(2)}. Cerrala como abono parcial o registrá el resto.` };
+  }
+  if (como === "abono" && !nota?.trim()) {
+    // Cerrar debiendo pide explicacion: dentro de seis meses nadie se acuerda.
+    return { ok: false, error: "Explicá por qué se cierra con saldo pendiente." };
+  }
+
+  const { error } = await sb.from("cuentas").update({
+    estado: "liquidada",
+    liquidada_en: new Date().toISOString(),
+    liquidada_por: usuario.id,
+    liquidada_como: como,
+    liquidada_nota: nota?.trim() || null,
+  }).eq("id", id);
+
+  if (error) {
+    if (faltaColumna(error)) {
+      return { ok: false, error: `Todavía no se pueden liquidar cuentas. ${AVISO_MIGRACION}` };
+    }
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+/** Vuelve a abrir una cuenta cerrada por error. */
+export async function reabrirCuenta(id: number): Promise<{ ok: boolean; error?: string }> {
+  const sb = await createClient();
+  const { error } = await sb.from("cuentas").update({
+    estado: "abierta", liquidada_en: null, liquidada_por: null,
+    liquidada_como: null, liquidada_nota: null,
+  }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// ABONO CON COMPROBANTE
+//
+// La imagen va a un bucket PRIVADO cuya ruta arranca con el id de empresa, asi
+// que el RLS de Storage la separa igual que el resto. Se lee con una URL
+// firmada de corta vida, nunca con un enlace publico: es un comprobante de pago
+// con montos y nombres.
+// ---------------------------------------------------------------------------
+
+const BUCKET_COMPROBANTES = "comprobantes";
+
+export async function abonarConComprobante(
+  cuentaId: number,
+  empresa: string,
+  monto: number,
+  opciones: { fecha?: string; metodo?: string; referencia?: string; imagen?: File | null },
+): Promise<{ ok: boolean; error?: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+  if (!(monto > 0)) return { ok: false, error: "El abono debe ser mayor que cero." };
+
+  const sb = await createClient();
+  const { data: c } = await sb.from("cuentas_saldo").select("saldo").eq("id", cuentaId).maybeSingle();
+  if (!c) return { ok: false, error: "No se encontró la cuenta." };
+  if (monto > Number(c.saldo) + 0.009) {
+    return { ok: false, error: `El abono supera el saldo pendiente ($${Number(c.saldo).toFixed(2)}).` };
+  }
+
+  if (opciones.imagen) {
+    const { error: sinCol } = await sb.from("abonos").select("imagen_ruta").limit(1);
+    if (faltaColumna(sinCol)) {
+      // Se comprueba ANTES de subir: si se sube y despues falla el insert, el
+      // archivo queda en el bucket sin nada que lo relacione con una cuenta.
+      return {
+        ok: false,
+        error: `Todavía no se pueden guardar comprobantes. ${AVISO_MIGRACION} Podés registrar el abono sin imagen.`,
+      };
+    }
+  }
+
+  let ruta: string | null = null;
+  if (opciones.imagen) {
+    const ext = opciones.imagen.name.split(".").pop()?.toLowerCase() || "jpg";
+    ruta = `${empresa}/${cuentaId}/${Date.now()}.${ext}`;
+    const { error: errSubida } = await sb.storage
+      .from(BUCKET_COMPROBANTES)
+      .upload(ruta, opciones.imagen, { contentType: opciones.imagen.type, upsert: false });
+    if (errSubida) return { ok: false, error: `No se pudo subir el comprobante: ${errSubida.message}` };
+  }
+
+  const { error } = await sb.from("abonos").insert({
+    cuenta_id: cuentaId,
+    monto,
+    fecha: opciones.fecha || undefined,
+    metodo: opciones.metodo?.trim() || null,
+    referencia: opciones.referencia?.trim() || null,
+    imagen_ruta: ruta,
+    usuario_id: usuario.id,
+  });
+
+  if (error) {
+    // Si el abono no entro, la imagen sobra: dejarla crea un comprobante
+    // huerfano que nadie va a poder relacionar con nada.
+    if (ruta) await sb.storage.from(BUCKET_COMPROBANTES).remove([ruta]);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+/** URL firmada de corta vida. El bucket es privado: no hay enlace permanente. */
+export async function urlComprobante(ruta: string): Promise<string | null> {
+  const sb = await createClient();
+  const { data } = await sb.storage.from(BUCKET_COMPROBANTES).createSignedUrl(ruta, 60 * 5);
+  return data?.signedUrl ?? null;
 }
