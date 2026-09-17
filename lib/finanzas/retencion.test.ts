@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento, grupoDeClase, desglosar } from "./retencion.ts";
+import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento, grupoDeClase, desglosar, revisarDesglose, parteExenta } from "./retencion.ts";
 
 // El IVA retenido es el 75% del IVA de la cuenta: el comprador lo retiene y se
 // lo entera al SENIAT, asi que al proveedor le paga el total MENOS eso.
@@ -385,5 +385,76 @@ describe("el desglose reproduce la relación de cuentas por pagar", () => {
     assert.equal(d.total, 616);
     assert.equal(d.iva, 0);
     assert.equal(d.retencion, 0);
+  });
+});
+
+describe("marcar las cuentas cuyo desglose no es el 16% plano", () => {
+  test("una factura íntegramente gravada no se marca", () => {
+    // FERREX 206557, tal como esta cargada.
+    assert.deepEqual(revisarDesglose(416.56, 359.1, 57.46), { atipico: false });
+  });
+
+  test("un céntimo de redondeo no alcanza para marcar", () => {
+    // Las relaciones traen base e IVA con cuatro decimales. FERRENUESTRO
+    // 37375: 943,44 + 150,95 da 1094,39 contra un total de 1094,40.
+    assert.deepEqual(revisarDesglose(1094.4, 943.44, 150.95), { atipico: false });
+  });
+
+  test("se marca la factura con renglones exentos", () => {
+    // FEBECA 7056721: $40,05 del total no llevan IVA.
+    const r = revisarDesglose(1996.05, 1686.21, 269.79);
+    assert.equal(r.atipico, true);
+    assert.equal(r.atipico && r.motivo, "exento");
+    assert.equal(r.atipico && r.motivo === "exento" && r.exento, 40.05);
+  });
+
+  test("se marca cuando lo exento viene sumado dentro de la base", () => {
+    // La hoja de agosto no trae columna de exento, asi que en LA FUENTE
+    // 90407344 lo exento quedo dentro de la base y lo que delata es la tasa:
+    // $73,56 de IVA sobre una base de $547,69 no es el 16%.
+    const r = revisarDesglose(621.25, 547.69, 73.56);
+    assert.equal(r.atipico, true);
+    assert.equal(r.atipico && r.motivo, "tasa");
+    assert.ok(r.atipico && r.motivo === "tasa" && r.tasa < 0.16);
+  });
+
+  test("una nota de entrega sin desglose no se marca", () => {
+    // No tener base no es una anomalia: las notas no la traen.
+    assert.deepEqual(revisarDesglose(616, null, null), { atipico: false });
+  });
+
+  test("la parte exenta es la que falta para llegar al total", () => {
+    assert.equal(parteExenta(1996.05, 1686.21, 269.79), 40.05);
+    assert.equal(parteExenta(416.56, 359.1, 57.46), 0);
+    assert.equal(parteExenta(616, null, null), 0);
+  });
+});
+
+describe("la marca llega hasta la pantalla", () => {
+  const pagar = fs.readFileSync("app/admin/payables/page.tsx", "utf8");
+  const marca = fs.readFileSync("components/finanzas/MarcaRevision.tsx", "utf8");
+  const db = fs.readFileSync("lib/finanzas/cuentas-db.ts", "utf8");
+
+  test("el panel monta la marca, no solo la importa", () => {
+    // Una prueba que solo buscara el import pasaria con el componente muerto.
+    assert.match(pagar, /<MarcaRevision revision=\{c\.revision\}/);
+  });
+
+  test("además de la marca por fila hay un aviso arriba", () => {
+    // Greeg pidio que se le NOTIFIQUE. Una marca chica en una fila entre
+    // sesenta no notifica a nadie: hay que verla al entrar.
+    assert.match(pagar, /const aRevisar = conSaldo\.filter\(\(c\) => c\.revision\.atipico\)/);
+    assert.match(pagar, /tone="warn"/);
+  });
+
+  test("la marca dice qué hacer, no solo que algo pasa", () => {
+    // Sin el «cargá la base y el IVA a mano», la marca no evita el error.
+    assert.match(marca, /a mano/);
+  });
+
+  test("listarCuentas trae la base y el IVA que la vista no expone", () => {
+    // Sin ellos no hay con que revisar el desglose y nada se marcaria nunca.
+    assert.match(db, /select\("id, base_imponible, iva, iva_retenido"\)/);
+    assert.match(db, /revision: revisarDesglose\(/);
   });
 });
