@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { listarCuentas, abonar, type Cuenta as CuentaDb } from "@/lib/finanzas/cuentas-db";
+import { listarCuentas, abonar, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
+import { CLASES } from "@/lib/finanzas/retencion";
+import { DetalleCuenta } from "@/components/finanzas/DetalleCuenta";
+import { EditarCuenta } from "@/components/finanzas/EditarCuenta";
+import { Modal } from "@/components/ui/Modal";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { CampoMonto } from "@/components/ui/CampoMonto";
 import { parseMonto, fmtMonto } from "@/lib/ux/monto";
@@ -41,6 +45,11 @@ export default function PayablesPage() {
   // El exito NO puede vivir dentro del panel: al confirmar, el panel se cierra
   // y el mensaje se iba con el. Quien abonaba no veia ninguna respuesta.
   const [exito, setExito] = useState("");
+  // Que cuenta se esta mirando, y si esta en modo edicion. Son dos estados
+  // distintos: se puede abrir el detalle sin editar.
+  const [abierta, setAbierta] = useState<number | null>(null);
+  const [editando, setEditando] = useState<CuentaDetalle | null>(null);
+  const [filtroClase, setFiltroClase] = useState<string>("todas");
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -175,6 +184,7 @@ export default function PayablesPage() {
                 <tr className="border-b border-border">
                   <th className="py-2.5 pr-3 font-medium">Proveedor</th>
                   <th className="py-2.5 pr-3 font-medium">Documento</th>
+                  <th className="py-2.5 pr-3 font-medium">Clase</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Monto</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Saldo</th>
                   <th className="py-2.5 font-medium">Estado</th>
@@ -184,12 +194,24 @@ export default function PayablesPage() {
                 {conSaldo.map((c) => {
                   const e = estadoDe(c.saldo, c.d);
                   return (
-                    <tr key={c.id} className="hover:bg-surface-2">
+                    <tr key={c.id} onClick={() => setAbierta(c.id)}
+                      className="cursor-pointer hover:bg-surface-2"
+                      tabIndex={0}
+                      onKeyDown={(ev) => { if (ev.key === "Enter") setAbierta(c.id); }}>
                       <td className="py-2.5 pr-3 text-text">{c.contraparte}</td>
                       <td className="py-2.5 pr-3 font-mono text-xs text-muted">{c.documento}</td>
+                      <td className="py-2.5 pr-3 text-xs text-muted">
+                        {CLASES.find((x) => x.id === c.clase)?.label ?? "—"}
+                      </td>
                       <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(c.monto)}</td>
                       <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.saldo)}</td>
-                      <td className="py-2.5"><StatusBadge tone={e.tone}>{e.label}</StatusBadge></td>
+                      <td className="py-2.5">
+                        {/* Liquidada gana sobre vencida: una cuenta cerrada ya
+                            no le debe nada a nadie, aunque su fecha pasara. */}
+                        {c.estado === "liquidada"
+                          ? <StatusBadge tone="ok">Liquidada</StatusBadge>
+                          : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                      </td>
                     </tr>
                   );
                 })}
@@ -199,6 +221,25 @@ export default function PayablesPage() {
           </EstadoDatos>
         </SectionCard>
       </div>
+
+      {abierta !== null && (
+        <Modal titulo="Cuenta por pagar" onCerrar={() => { setAbierta(null); setEditando(null); }}>
+          {editando ? (
+            <EditarCuenta
+              cuenta={editando}
+              onGuardada={() => { setEditando(null); setRecarga((n) => n + 1); }}
+              onCancelar={() => setEditando(null)}
+            />
+          ) : (
+            <DetalleCuenta
+              cuentaId={abierta}
+              empresa={empresaKey}
+              onCambio={() => setRecarga((n) => n + 1)}
+              onEditar={(d) => setEditando(d)}
+            />
+          )}
+        </Modal>
+      )}
     </>
   );
 }
