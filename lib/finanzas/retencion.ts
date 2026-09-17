@@ -99,3 +99,58 @@ export function desglosar(total: number, conIva: boolean, retiene: boolean): Des
   const iva = cent(total - base);
   return { base, iva, total: cent(total), retencion: retencionDe(iva, retiene) };
 }
+
+/**
+ * Tolerancia al comparar el desglose contra el monto.
+ *
+ * Las relaciones traen la base y el IVA con cuatro decimales; al pasarlos a
+ * centimos, base + IVA puede quedar a un centimo del total sin que nada este
+ * mal. Sin esta holgura, casi toda factura normal saldria marcada y la marca
+ * dejaria de significar algo.
+ */
+const HOLGURA = 0.02;
+
+const cent = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * La parte de la factura que no lleva IVA.
+ *
+ * FEBECA y LA FUENTE venden alimentos: parte de cada factura va exenta. Esa
+ * porcion no se calcula, se lee -es el hueco entre el total y lo que suman la
+ * base y el IVA-, porque el sistema no guarda el renglon exento aparte.
+ */
+export function parteExenta(monto: number, base: number | null, iva: number | null): number {
+  if (base == null) return 0;
+  const hueco = cent(monto - base - (iva ?? 0));
+  return Math.abs(hueco) <= HOLGURA ? 0 : hueco;
+}
+
+export type Revision =
+  | { atipico: false }
+  | { atipico: true; motivo: "exento"; exento: number }
+  | { atipico: true; motivo: "tasa"; tasa: number };
+
+/**
+ * Si el desglose de una cuenta se aparta del 16% plano, y por que.
+ *
+ * Greeg pidio que estas cuentas queden marcadas. El calculo automatico asume
+ * que toda la factura esta gravada, y para las 32 facturas gravadas al 16% de
+ * las relaciones da exacto. Para las de alimentos no, y cargarlas con el
+ * automatico inflaria el IVA y con el la retencion, que es plata que se entera
+ * al SENIAT: un error ahi no es cosmetico.
+ *
+ * Son dos formas de la misma anomalia, segun como venga la hoja. Cuando trae
+ * columna de exento, la base es solo lo gravado y el hueco aparece contra el
+ * total. Cuando no la trae, lo exento queda sumado dentro de la base y lo que
+ * delata es la tasa: el IVA no llega al 16% de esa base.
+ */
+export function revisarDesglose(monto: number, base: number | null, iva: number | null): Revision {
+  if (base == null || !iva) return { atipico: false };
+
+  const exento = parteExenta(monto, base, iva);
+  if (exento > 0) return { atipico: true, motivo: "exento", exento };
+
+  const esperado = cent(base * PCT_IVA);
+  if (Math.abs(esperado - iva) <= HOLGURA) return { atipico: false };
+  return { atipico: true, motivo: "tasa", tasa: base > 0 ? iva / base : 0 };
+}

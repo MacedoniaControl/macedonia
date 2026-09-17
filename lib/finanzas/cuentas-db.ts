@@ -7,8 +7,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
-import { retencionDe, claseDeDocumento } from "./retencion.ts";
-import type { ClaseCuenta } from "./retencion.ts";
+import { retencionDe, claseDeDocumento, revisarDesglose } from "./retencion.ts";
+import type { ClaseCuenta, Revision } from "./retencion.ts";
 // Las constantes NO se reexportan desde aqui: este archivo es "use server" y
 // solo admite exportar funciones asincronas. Quien las necesite importa
 // directamente de ./retencion.
@@ -73,7 +73,15 @@ export type Cuenta = {
   nota: string | null;
   clase: ClaseCuenta;
   estado: EstadoCuenta;
+  baseImponible: number | null;
+  iva: number | null;
   ivaRetenido: number | null;
+  /**
+   * Si el desglose se aparta del 16% plano, y por que. Greeg pidio que estas
+   * cuentas queden marcadas en el panel: cargarlas con el IVA automatico
+   * inflaria la retencion, que es plata que se entera al SENIAT.
+   */
+  revision: Revision;
   /**
    * Lo que de verdad cambia de manos: el total menos lo retenido.
    *
@@ -105,47 +113,57 @@ export type CuentaNueva = {
   imagen?: File | null;
 };
 
+/** Lo que la vista no expone: el desglose fiscal de cada cuenta. */
+type DesgloseFila = { base: number | null; iva: number | null; retenido: number | null };
+
 /**
- * La retencion por cuenta, leida de la tabla.
+ * El desglose por cuenta, leido de la tabla.
  *
- * `cuentas_saldo` enumera sus columnas, asi que no expone `iva_retenido`
- * hasta que la migracion 21 la recree. Mientras tanto se lee aparte y se
- * cruza por id: es una consulta mas, no una por cuenta.
+ * `cuentas_saldo` enumera sus columnas, asi que no expone `base_imponible`,
+ * `iva` ni `iva_retenido` hasta que la migracion 21 la recree. Mientras tanto
+ * se leen aparte y se cruzan por id: es una consulta mas, no una por cuenta.
  */
-async function retencionesDe(
+async function desgloseDe(
   sb: Awaited<ReturnType<typeof createClient>>,
   empresa: string,
   tipo: TipoCuenta,
-): Promise<Map<number, number>> {
+): Promise<Map<number, DesgloseFila>> {
   const { data, error } = await sb
     .from("cuentas")
-    .select("id, iva_retenido")
+    .select("id, base_imponible, iva, iva_retenido")
     .eq("empresa_id", empresa)
-    .eq("tipo", tipo)
-    .not("iva_retenido", "is", null);
-  // Sin la columna la retencion es desconocida y el neto queda igual al total.
+    .eq("tipo", tipo);
+  // Sin las columnas el desglose es desconocido: el neto queda igual al total
+  // y ninguna cuenta se marca, que es como se comportaba antes de existir.
   if (error) return new Map();
-  return new Map((data ?? []).map((c) => [Number(c.id), Number(c.iva_retenido)]));
+  const num = (v: unknown) => (v == null ? null : Number(v));
+  return new Map(
+    (data ?? []).map((c) => [
+      Number(c.id),
+      { base: num(c.base_imponible), iva: num(c.iva), retenido: num(c.iva_retenido) },
+    ]),
+  );
 }
 
 export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<Cuenta[]> {
   const sb = await createClient();
-  const [vista, retenciones] = await Promise.all([
+  const [vista, desgloses] = await Promise.all([
     sb
       .from("cuentas_saldo")
       .select("id, tipo, contraparte, documento, monto, abonado, saldo, emitida, vence, dias, nota")
       .eq("empresa_id", empresa)
       .eq("tipo", tipo)
       .order("vence"),
-    retencionesDe(sb, empresa, tipo),
+    desgloseDe(sb, empresa, tipo),
   ]);
   if (vista.error) throw new Error(`No se pudieron leer las cuentas: ${vista.error.message}`);
 
-  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias" | "clase" | "estado" | "ivaRetenido" | "neto" | "saldoNeto"> & {
+  type Fila = Omit<Cuenta, "monto" | "abonado" | "saldo" | "dias" | "clase" | "estado" | "baseImponible" | "iva" | "ivaRetenido" | "revision" | "neto" | "saldoNeto"> & {
     monto: number; abonado: number; saldo: number; dias: number;
   };
   return ((vista.data as Fila[] | null) ?? []).map((c) => {
-    const retenido = retenciones.get(Number(c.id)) ?? null;
+    const d = desgloses.get(Number(c.id));
+    const retenido = d?.retenido ?? null;
     return {
       ...c,
       monto: Number(c.monto),
@@ -157,7 +175,10 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
       // que es su estado por defecto.
       clase: claseDeDocumento(c.documento),
       estado: "abierta" as EstadoCuenta,
+      baseImponible: d?.base ?? null,
+      iva: d?.iva ?? null,
       ivaRetenido: retenido,
+      revision: revisarDesglose(Number(c.monto), d?.base ?? null, d?.iva ?? null),
       neto: redondear(Number(c.monto) - (retenido ?? 0)),
       saldoNeto: redondear(Number(c.monto) - (retenido ?? 0) - Number(c.abonado)),
     };

@@ -23,6 +23,7 @@ import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { Button } from "@/components/ui/Button";
 import { fmtUsd } from "@/lib/ux/format";
+import { MarcaRevision } from "@/components/finanzas/MarcaRevision";
 import { downloadCsv } from "@/lib/ux/export-csv";
 
 type Cta = { id: number; proveedor: string; doc: string; monto: number; abonado: number; venc: string };
@@ -139,6 +140,16 @@ export default function PayablesPage() {
   // SENIAT-, asi que la deuda con el es el total menos lo retenido. Greeg pidio
   // que el panel muestre esa cifra, que es la que hay que mover.
   const total = conSaldo.reduce((a, c) => a + c.saldoNeto, 0);
+  // Cuentas cuyo desglose no es el 16% plano: facturas con renglones exentos.
+  // Greeg pidio que se le avise, porque si se recalculan con el IVA automatico
+  // sube la retencion, y eso es plata que se entera al SENIAT.
+  const aRevisar = conSaldo.filter((c) => c.revision.atipico);
+  // En unas el exento viene como columna aparte y se puede sumar; en otras
+  // quedo metido dentro de la base y solo se nota por la tasa. Se cuentan
+  // aparte para no dar a entender que el monto cubre todas.
+  const conExento = aRevisar.filter((c) => c.revision.atipico && c.revision.motivo === "exento");
+  const exento = conExento.reduce(
+    (a, c) => a + (c.revision.atipico && c.revision.motivo === "exento" ? c.revision.exento : 0), 0);
   const vencido = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).reduce((a, c) => a + c.saldoNeto, 0);
   const alerta = conSaldo.filter((c) => c.saldoNeto > 0 && c.d >= 0 && c.d <= 7).reduce((a, c) => a + c.saldoNeto, 0);
   const nVenc = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).length;
@@ -185,6 +196,23 @@ export default function PayablesPage() {
           <AlertCard tone="danger" titulo="Pagos vencidos" mensaje={`${nVenc} cuenta(s) vencida(s) por ${fmtUsd(vencido)}.`} />
         </div>
       )}
+      {aRevisar.length > 0 && (
+        <div className="mt-4">
+          <AlertCard
+            tone="warn"
+            titulo="Facturas que no están gravadas al 16%"
+            mensaje={
+              `${aRevisar.length} cuenta(s) llevan renglones exentos. ` +
+              (conExento.length
+                ? `En ${conExento.length} son ${fmtUsd(exento)} sin IVA; ` +
+                  `en las otras ${aRevisar.length - conExento.length} lo exento viene sumado dentro de la base. `
+                : "") +
+              "Están marcadas en la tabla. Si las editás, cargá la base y el IVA a mano: " +
+              "el 16% automático los gravaría de más y subiría la retención."
+            }
+          />
+        </div>
+      )}
       <div className="mt-6">
         <SectionCard title="Cuentas" description="Generadas automáticamente al recibir compras.">
           <EstadoDatos
@@ -222,7 +250,10 @@ export default function PayablesPage() {
                       tabIndex={0}
                       onKeyDown={(ev) => { if (ev.key === "Enter") setAbierta(c.id); }}>
                       <td className="py-2.5 pr-3 text-text">{c.contraparte}</td>
-                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{c.documento}</td>
+                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">
+                        {c.documento}
+                        <MarcaRevision revision={c.revision} />
+                      </td>
                       <td className="py-2.5 pr-3 text-xs text-muted">
                         {CLASES.find((x) => x.id === c.clase)?.label ?? "—"}
                       </td>
