@@ -10,6 +10,7 @@ import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
 import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
+import { FiltroClase } from "@/components/finanzas/FiltroClase";
 import { CLASES } from "@/lib/finanzas/retencion";
 import { DetalleCuenta } from "@/components/finanzas/DetalleCuenta";
 import { EditarCuenta } from "@/components/finanzas/EditarCuenta";
@@ -168,21 +169,8 @@ export default function ReceivablesPage() {
         }
       />
 
-      {/* Separar por clase: la mayoria de esta cartera son notas de entrega,
-          que no son documento fiscal. Solo se ofrecen las clases que existen. */}
-      <div className="sumi-tabs mb-4 flex flex-wrap gap-1">
-        {[["todas", `Todas (${cuentas.length})`] as const,
-          ...CLASES.filter((c) => porClase[c.id]).map((c) => [c.id, `${c.label} (${porClase[c.id]})`] as const),
-        ].map(([id, label]) => (
-          <button key={id} type="button" onClick={() => setFiltroClase(id)}
-            aria-current={filtroClase === id ? "true" : undefined}
-            className={`min-h-11 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition-colors ${
-              filtroClase === id ? "bg-brand-strong text-white" : "border border-border text-muted hover:text-text"
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <FiltroClase conteo={porClase} total={cuentas.length}
+        valor={filtroClase} onCambio={setFiltroClase} />
 
       <SectionCard title="Resumen de cartera">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -207,7 +195,11 @@ export default function ReceivablesPage() {
             error={carga.error}
             vacio={conSaldo.length === 0}
             tituloVacio="Sin cuentas por cobrar"
-            mensajeVacio="Nadie debe nada todavía. Cargá una con «Nueva cuenta» o importá la cartera."
+            mensajeVacio={
+              filtroClase === "todas"
+                ? "Nadie debe nada todavía. Cargá una con «Nueva cuenta» o importá la cartera."
+                : `No hay ninguna cuenta de esa clase. Hay ${cuentas.length} en total: tocá «Todas».`
+            }
           >
             <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">

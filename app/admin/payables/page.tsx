@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
+import { FiltroClase } from "@/components/finanzas/FiltroClase";
 import { CLASES } from "@/lib/finanzas/retencion";
 import { DetalleCuenta } from "@/components/finanzas/DetalleCuenta";
 import { EditarCuenta } from "@/components/finanzas/EditarCuenta";
@@ -163,21 +164,8 @@ export default function PayablesPage() {
           <AlertCard tone="ok" titulo="Abono registrado" mensaje={exito} />
         </div>
       )}
-      {/* Separar facturas de notas: lo pidio Greeg, y ademas cada clase se
-          cobra distinto. Solo se ofrecen las clases que existen. */}
-      <div className="sumi-tabs mb-4 flex flex-wrap gap-1">
-        {[["todas", `Todas (${ctas.length})`] as const,
-          ...CLASES.filter((c) => porClase[c.id]).map((c) => [c.id, `${c.label} (${porClase[c.id]})`] as const),
-        ].map(([id, label]) => (
-          <button key={id} type="button" onClick={() => setFiltroClase(id)}
-            aria-current={filtroClase === id ? "true" : undefined}
-            className={`min-h-11 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition-colors ${
-              filtroClase === id ? "bg-brand-strong text-white" : "border border-border text-muted hover:text-text"
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <FiltroClase conteo={porClase} total={ctas.length}
+        valor={filtroClase} onCambio={setFiltroClase} />
 
       <SectionCard title="Resumen">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -199,7 +187,14 @@ export default function PayablesPage() {
             error={carga.error}
             vacio={conSaldo.length === 0}
             tituloVacio="Sin cuentas por pagar"
-            mensajeVacio="No hay deudas cargadas. Usá «Nueva cuenta» o importá la cartera."
+            mensajeVacio={
+              // Con un filtro puesto la tabla puede estar vacia AUNQUE haya
+              // cuentas. Decir "no hay deudas" seria mentir: hay, pero no de
+              // esa clase.
+              filtroClase === "todas"
+                ? "No hay deudas cargadas. Usá «Nueva cuenta» o importá la cartera."
+                : `No hay ninguna cuenta de esa clase. Hay ${ctas.length} en total: tocá «Todas».`
+            }
           >
             <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[600px] text-left text-sm">
