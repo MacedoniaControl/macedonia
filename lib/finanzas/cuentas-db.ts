@@ -14,6 +14,24 @@ import type { ClaseCuenta } from "./retencion.ts";
 // directamente de ./retencion.
 export type EstadoCuenta = "abierta" | "liquidada";
 
+/**
+ * "La columna no existe", dicho de dos formas distintas.
+ *
+ * Al LEER contesta Postgres: 42703. Al ESCRIBIR contesta PostgREST antes de
+ * llegar a Postgres, con su propio codigo PGRST204, porque valida contra su
+ * cache de esquema. Comprobado contra la base real: mirar solo 42703 dejaba
+ * pasar el caso de escritura, que es justo el que hay que degradar.
+ *
+ * La migracion 21 agrega clase, estado, retencion y el comprobante. Mientras no
+ * se corra, cada operacion tiene que decir QUE no pudo hacer, en vez de fallar
+ * con un mensaje de Postgres que no le sirve a nadie.
+ */
+function faltaColumna(error: { code?: string } | null): boolean {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+const AVISO_MIGRACION =
+  "Falta correr la actualización de la base (21-cuentas-historial.sql).";
+
 export type TipoCuenta = "cobrar" | "pagar";
 
 export type Cuenta = {
@@ -283,7 +301,7 @@ export async function editarCuenta(
     vence: string;
     nota?: string | null;
   },
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; aviso?: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
   if (!c.contraparte.trim()) return { ok: false, error: "Falta el nombre." };
@@ -301,25 +319,32 @@ export async function editarCuenta(
     return { ok: false, error: `Ya se abonaron $${abonado.toFixed(2)}: el monto no puede ser menor.` };
   }
 
+  const base = {
+    contraparte: c.contraparte.trim(),
+    documento: c.documento.trim() || "—",
+    monto: c.monto,
+    base_imponible: c.baseImponible,
+    iva: c.iva,
+    iva_retenido: c.ivaRetenido,
+    emitida: c.emitida,
+    vence: c.vence,
+    nota: c.nota?.trim() || null,
+  };
+
   const { error } = await sb
     .from("cuentas")
-    .update({
-      contraparte: c.contraparte.trim(),
-      documento: c.documento.trim() || "—",
-      clase: c.clase,
-      monto: c.monto,
-      base_imponible: c.baseImponible,
-      iva: c.iva,
-      iva_retenido: c.ivaRetenido,
-      aplica_retencion: c.aplicaRetencion,
-      emitida: c.emitida,
-      vence: c.vence,
-      nota: c.nota?.trim() || null,
-    })
+    .update({ ...base, clase: c.clase, aplica_retencion: c.aplicaRetencion })
     .eq("id", id);
 
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  if (!error) return { ok: true };
+  if (!faltaColumna(error)) return { ok: false, error: error.message };
+
+  // Sin la migracion se guarda todo lo demas, que es casi todo, y se DICE que
+  // la clase y la retencion no se guardaron. Callarlo dejaria a alguien
+  // creyendo que cambio algo que sigue igual.
+  const { error: err2 } = await sb.from("cuentas").update(base).eq("id", id);
+  if (err2) return { ok: false, error: err2.message };
+  return { ok: true, aviso: `Se guardó todo menos la clase y la retención. ${AVISO_MIGRACION}` };
 }
 
 /**
@@ -357,7 +382,12 @@ export async function liquidarCuenta(
     liquidada_nota: nota?.trim() || null,
   }).eq("id", id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    if (faltaColumna(error)) {
+      return { ok: false, error: `Todavía no se pueden liquidar cuentas. ${AVISO_MIGRACION}` };
+    }
+    return { ok: false, error: error.message };
+  }
   return { ok: true };
 }
 
@@ -398,6 +428,18 @@ export async function abonarConComprobante(
   if (!c) return { ok: false, error: "No se encontró la cuenta." };
   if (monto > Number(c.saldo) + 0.009) {
     return { ok: false, error: `El abono supera el saldo pendiente ($${Number(c.saldo).toFixed(2)}).` };
+  }
+
+  if (opciones.imagen) {
+    const { error: sinCol } = await sb.from("abonos").select("imagen_ruta").limit(1);
+    if (faltaColumna(sinCol)) {
+      // Se comprueba ANTES de subir: si se sube y despues falla el insert, el
+      // archivo queda en el bucket sin nada que lo relacione con una cuenta.
+      return {
+        ok: false,
+        error: `Todavía no se pueden guardar comprobantes. ${AVISO_MIGRACION} Podés registrar el abono sin imagen.`,
+      };
+    }
   }
 
   let ruta: string | null = null;

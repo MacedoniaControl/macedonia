@@ -33,6 +33,7 @@ export function EditarCuenta({
   const [iva, setIva] = useState(txt(cuenta.iva));
   const [montoManual, setMontoManual] = useState(txt(cuenta.monto));
   const [msg, setMsg] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
   const nBi = parseMonto(bi);
@@ -61,6 +62,9 @@ export function EditarCuenta({
         emitida: f.emitida, vence: f.vence, nota: f.nota,
       });
       if (!r.ok) return setMsg(r.error ?? "No se pudo guardar.");
+      // Se guardo, pero puede haber quedado algo fuera. Decirlo antes de
+      // cerrar: si se cierra en silencio, quien edito cree que quedo todo.
+      if (r.aviso) return setAviso(r.aviso);
       onGuardada();
     } finally { setGuardando(false); }
   }

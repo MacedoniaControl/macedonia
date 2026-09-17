@@ -161,3 +161,30 @@ test("un saldo anterior sin documento es un ajuste, no una factura", () => {
   // seria inventar un documento que no existe.
   assert.equal(claseDeDocumento("AJUSTE-SALDO-ANTERIOR·TAGUICHO"), "ajuste");
 });
+
+// Greeg todavia no puede correr la migracion 21. La app tiene que funcionar
+// igual y DECIR que no pudo hacer, en vez de fallar con un mensaje de Postgres.
+describe("la app funciona sin la migración", () => {
+  const src = fs.readFileSync("lib/finanzas/cuentas-db.ts", "utf8");
+
+  test("reconoce las DOS formas de decir que falta una columna", () => {
+    // Al leer contesta Postgres (42703); al escribir contesta PostgREST antes
+    // de llegar a Postgres (PGRST204), porque valida contra su cache. Mirar
+    // solo 42703 dejaba pasar el caso de escritura, que es el que hay que
+    // degradar. Se vio probando contra la base real, no leyendo la doc.
+    assert.match(src, /"42703"/);
+    assert.match(src, /"PGRST204"/);
+  });
+
+  test("editar guarda lo que puede y avisa lo que no", () => {
+    assert.match(src, /aviso: `Se guardó todo menos la clase y la retención/);
+  });
+
+  test("el comprobante se rechaza ANTES de subirlo", () => {
+    // Si se sube y despues falla el insert, el archivo queda en el bucket sin
+    // nada que lo relacione con una cuenta.
+    const i = src.indexOf("faltaColumna(sinCol)");
+    const j = src.indexOf(".upload(");
+    assert.ok(i > 0 && j > 0 && i < j, "la comprobación tiene que ir antes del upload");
+  });
+});
