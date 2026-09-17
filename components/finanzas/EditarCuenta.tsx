@@ -70,7 +70,7 @@ export function EditarCuenta({
       <p className="text-sm font-semibold text-text">Editar cuenta</p>
 
       <label className="block">
-        <span className={lbl}>Proveedor / Cliente *</span>
+        <span className={lbl}>{cuenta.tipo === "cobrar" ? "Cliente" : "Proveedor"} *</span>
         <input value={f.contraparte} onChange={(e) => setF({ ...f, contraparte: e.target.value })} className={campo} />
       </label>
 
@@ -124,11 +124,15 @@ export function EditarCuenta({
               </p>
             )}
             <p className="flex justify-between text-muted">
-              <span>{f.aplicaRetencion ? "IVA retenido (75%)" : "IVA retenido"}</span>
+              <span>
+                {f.aplicaRetencion
+                  ? (cuenta.tipo === "cobrar" ? "IVA que retiene el cliente (75%)" : "IVA retenido (75%)")
+                  : "IVA retenido"}
+              </span>
               <span className="tabular-nums">{f.aplicaRetencion ? `−${fmtMonto(ret)}` : "no aplica"}</span>
             </p>
             <p className="flex justify-between font-semibold text-text">
-              <span>A pagar al proveedor</span>
+              <span>{cuenta.tipo === "cobrar" ? "A cobrar al cliente" : "A pagar al proveedor"}</span>
               <span className="tabular-nums">{fmtMonto((monto ?? 0) - ret)}</span>
             </p>
           </div>

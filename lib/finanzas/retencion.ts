@@ -4,13 +4,16 @@
 // se puede probar. cuentas-db importa el cliente de Supabase, y Node no puede
 // cargar eso para una prueba.
 
-export type ClaseCuenta = "factura" | "nota_entrega" | "nota_debito" | "nota_credito";
+export type ClaseCuenta = "factura" | "nota_entrega" | "nota_debito" | "nota_credito" | "ajuste";
 
 export const CLASES: { id: ClaseCuenta; label: string }[] = [
   { id: "factura", label: "Factura" },
   { id: "nota_entrega", label: "Nota de entrega" },
   { id: "nota_debito", label: "Nota de débito" },
   { id: "nota_credito", label: "Nota de crédito" },
+  // Un saldo anterior que el estado de cuenta declara sin documento detras.
+  // Llamarlo "factura" seria mentir sobre un papel que no existe.
+  { id: "ajuste", label: "Ajuste" },
 ];
 
 /**
@@ -45,5 +48,6 @@ export function claseDeDocumento(documento: string): ClaseCuenta {
   if (d.startsWith("NDE-") || d.startsWith("NDE ")) return "nota_debito";
   if (d.startsWith("NDC-")) return "nota_credito";
   if (d.startsWith("NE-") || d.startsWith("NE ")) return "nota_entrega";
+  if (d.startsWith("AJUSTE-")) return "ajuste";
   return "factura";
 }

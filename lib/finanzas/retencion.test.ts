@@ -41,9 +41,11 @@ describe("clases de documento", () => {
     assert.doesNotMatch(sql, /clase = 'nota_entrega'\s+where clase is null and documento like 'NDE-%'/);
   });
 
-  test("están las cuatro clases que pueden aparecer", () => {
+  test("están las clases que pueden aparecer", () => {
+    // `ajuste` entro despues: hay dos filas cargadas que son un saldo anterior
+    // sin documento, y llamarlas factura seria inventar un papel.
     assert.deepEqual(CLASES.map((c) => c.id),
-      ["factura", "nota_entrega", "nota_debito", "nota_credito"]);
+      ["factura", "nota_entrega", "nota_debito", "nota_credito", "ajuste"]);
   });
 });
 
@@ -120,4 +122,42 @@ describe("claseDeDocumento", () => {
   test("ignora mayúsculas y espacios", () => {
     assert.equal(claseDeDocumento("  nde-500 "), "nota_debito");
   });
+});
+
+// Cobrar y pagar usan las MISMAS funciones, pero la retencion cambia de dueño:
+// en una cuenta por pagar la retienes tu; en una por cobrar la retiene el
+// cliente y se la entera el al SENIAT. Si el rotulo no lo dice, quien mira la
+// pantalla entiende al reves quien le debe ese IVA al fisco.
+describe("las dos pantallas comparten el motor", () => {
+  const detalle = fs.readFileSync("components/finanzas/DetalleCuenta.tsx", "utf8");
+  const editar = fs.readFileSync("components/finanzas/EditarCuenta.tsx", "utf8");
+
+  test("el rótulo del neto cambia según el tipo", () => {
+    for (const src of [detalle, editar]) {
+      assert.match(src, /A cobrar al cliente/);
+      assert.match(src, /A pagar al proveedor/);
+    }
+  });
+
+  test("dice quién retiene cuando la cuenta es por cobrar", () => {
+    for (const src of [detalle, editar]) {
+      assert.match(src, /IVA que retiene el cliente/);
+    }
+  });
+
+  test("las dos pantallas abren el mismo detalle y la misma edición", () => {
+    for (const f of ["app/admin/payables/page.tsx", "app/admin/receivables/page.tsx"]) {
+      const src = fs.readFileSync(f, "utf8");
+      assert.match(src, /<DetalleCuenta/, `${f} no abre el detalle`);
+      assert.match(src, /<EditarCuenta/, `${f} no permite editar`);
+      assert.match(src, /setAbierta\(c\.id\)/, `${f} no abre la fila`);
+    }
+  });
+});
+
+test("un saldo anterior sin documento es un ajuste, no una factura", () => {
+  // Son las filas que cargue para TAGUICHO y CONTRACTOR 2000: el estado de
+  // cuenta declara un saldo de arranque sin papel detras. Llamarlo factura
+  // seria inventar un documento que no existe.
+  assert.equal(claseDeDocumento("AJUSTE-SALDO-ANTERIOR·TAGUICHO"), "ajuste");
 });

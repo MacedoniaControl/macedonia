@@ -121,13 +121,20 @@ export function DetalleCuenta({
                 <Fila k="Base imponible" v={fmtUsd(d.baseImponible ?? 0)} />
                 <Fila k="IVA" v={fmtUsd(d.iva)} />
                 <Fila
-                  k={d.aplicaRetencion ? "IVA retenido (75%)" : "IVA retenido"}
+                  k={d.aplicaRetencion
+                    ? (d.tipo === "cobrar" ? "IVA que retiene el cliente (75%)" : "IVA retenido (75%)")
+                    : "IVA retenido"}
                   v={d.aplicaRetencion ? `−${fmtUsd(d.ivaRetenido ?? 0)}` : "no aplica"}
                 />
-                {/* Greeg pidio ver AMBAS: el total del documento y lo que de
-                    verdad se le entrega al proveedor. */}
+                {/* Greeg pidio ver AMBAS: el total del documento y la plata
+                    que de verdad cambia de manos. Quien retiene cambia segun
+                    el tipo, asi que el rotulo tambien. */}
                 <div className="mt-1 border-t border-border pt-1">
-                  <Fila k="A pagar al proveedor" v={fmtUsd(d.aPagarProveedor)} fuerte />
+                  <Fila
+                    k={d.tipo === "cobrar" ? "A cobrar al cliente" : "A pagar al proveedor"}
+                    v={fmtUsd(d.neto)}
+                    fuerte
+                  />
                 </div>
               </dl>
             )}

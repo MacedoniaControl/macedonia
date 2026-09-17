@@ -188,8 +188,13 @@ export type CuentaDetalle = {
   abonos: AbonoHist[];
   abonado: number;
   saldo: number;
-  /** Lo que de verdad se le entrega al proveedor: el total menos lo retenido. */
-  aPagarProveedor: number;
+  /**
+   * El total menos lo retenido. Es la plata que de verdad cambia de manos:
+   * lo que se le entrega al proveedor si la cuenta es por pagar, o lo que
+   * entra del cliente si es por cobrar -en ese caso el que retiene es el
+   * cliente, y ese IVA se lo entera el al SENIAT, no tu-.
+   */
+  neto: number;
 };
 
 export async function detalleCuenta(id: number): Promise<CuentaDetalle | null> {
@@ -258,7 +263,7 @@ export async function detalleCuenta(id: number): Promise<CuentaDetalle | null> {
     abonos,
     abonado: Math.round(abonado * 100) / 100,
     saldo: Math.round((monto - abonado) * 100) / 100,
-    aPagarProveedor: Math.round((monto - ret) * 100) / 100,
+    neto: Math.round((monto - ret) * 100) / 100,
   };
 }
 

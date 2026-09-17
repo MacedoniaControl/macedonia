@@ -17,12 +17,13 @@
 -- las cuatro clases para no tener que migrar otra vez cuando aparezcan.
 -- ---------------------------------------------------------------------------
 do $$ begin
-  create type public.clase_cuenta as enum ('factura', 'nota_entrega', 'nota_debito', 'nota_credito');
+  create type public.clase_cuenta as enum ('factura', 'nota_entrega', 'nota_debito', 'nota_credito', 'ajuste');
 exception when duplicate_object then null; end $$;
 
 alter table public.cuentas add column if not exists clase public.clase_cuenta;
 
 -- Lo ya cargado se clasifica por su prefijo, que es de donde salio.
+update public.cuentas set clase = 'ajuste'       where clase is null and documento like 'AJUSTE-%';
 update public.cuentas set clase = 'factura'      where clase is null and documento like 'FCM-%';
 update public.cuentas set clase = 'nota_debito'  where clase is null and documento like 'NDE-%';
 update public.cuentas set clase = 'nota_entrega' where clase is null and documento like 'NE-%';
