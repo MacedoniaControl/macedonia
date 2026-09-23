@@ -100,7 +100,7 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
         modelo: f.modelo, referencia: f.referencia, cantidad, observacion: f.obs,
       });
       if (!r.ok) return setError(r.error);
-      onNuevo({ renglon: null, codigo: r.codigo, nombre: f.nombre.trim().toUpperCase(), unidad: f.unidad, sistema: 0, extra: true,
+      onNuevo({ renglon: null, codigo: r.codigo, nombre: f.nombre.trim().toUpperCase(), unidad: f.unidad, sistema: 0, departamento: f.depto, extra: true,
         texto: fmtCantidad(cantidad), obs: f.obs, guardado: { cantidad, obs: f.obs.trim() }, estado: "" });
     } finally { setYendo(false); }
   }

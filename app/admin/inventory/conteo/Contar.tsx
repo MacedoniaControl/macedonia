@@ -12,9 +12,13 @@
 //     pierde lo contado.
 //   · El lector de codigos del panel viejo se conserva, para contar con el
 //     telefono en el galpon.
+//   · El Departamento de arriba es un selector: en un conteo de varios
+//     departamentos (el general, o la planilla de 75) muestra uno a la vez con
+//     su avance, y desde ahi se amplia un conteo a todos los departamentos.
 
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
@@ -25,7 +29,7 @@ import { beep } from "@/lib/inventory/scan-feedback";
 import { leerCantidad, vaEntera, fmtCantidad } from "@/lib/inventory/cantidad";
 import { esSkuMacedonia, fmtDif, fmtNum } from "@/lib/inventory/acta";
 import {
-  abrirConteo, anotar, borrarRenglon, conteoAbierto, departamentosDe, lineasDe, planillaDe,
+  abrirConteo, anotar, borrarRenglon, cambiarAlcance, conteoAbierto, departamentosDe, lineasDe, planillaDe,
   type Conteo, type ItemPlanilla,
 } from "@/lib/inventory/conteos-db";
 import { AgregarArticulo } from "./AgregarArticulo";
@@ -37,6 +41,8 @@ export type Fila = {
   nombre: string;
   unidad: string;
   sistema: number;
+  /** Codigo del departamento de Valery; null si no se sabe (agregado del catalogo). */
+  departamento: string | null;
   /** Agregado fuera de la planilla. */
   extra: boolean;
   texto: string;
@@ -54,7 +60,8 @@ export function Contar({ empresa, onCerrado }: { empresa: string; onCerrado: (id
   if (carga.cargando) return <EstadoDatos cargando vacio={false}>{null}</EstadoDatos>;
   if (carga.error) return <AlertCard tone="danger" titulo="No se pudo leer el conteo" mensaje={carga.error} />;
   if (!carga.datos) return <NuevoConteo empresa={empresa} onAbierto={() => setRecarga((n) => n + 1)} />;
-  return <Planilla empresa={empresa} conteo={carga.datos} onCerrado={onCerrado} />;
+  const c = carga.datos;
+  return <Planilla key={`${c.id}:${c.departamento}:${c.zona}`} empresa={empresa} conteo={c} onCerrado={onCerrado} onCambio={() => setRecarga((n) => n + 1)} />;
 }
 
 // ---------------------------------------------------------------- abrir
@@ -71,27 +78,32 @@ function NuevoConteo({ empresa, onAbierto }: { empresa: string; onAbierto: () =>
       <div>
         <h2 className="text-base font-semibold text-text">Nuevo conteo</h2>
         <p className="mt-1 text-sm text-muted">
-          Se cuenta por departamento, como en Valery. Lo que no se cuente queda <b>sin contar</b>, no en cero, y
-          conserva su existencia.
+          Se cuenta por departamento, como en Valery, o todo junto para un consolidado. Lo que no se cuente queda
+          <b> sin contar</b>, no en cero, y conserva su existencia.
         </p>
       </div>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-muted">Qué se va a contar</span>
         <select className="sumi-campo" value={elegido} onChange={(e) => setElegido(e.target.value)}>
           <option value="">Elegí un departamento…</option>
+          <option value="__general">Todos los departamentos (consolidado)</option>
           <option value="__planilla75">Planilla impresa de 75 productos</option>
           <optgroup label="Departamentos de Valery">
             {contables.map((d) => <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>)}
           </optgroup>
         </select>
-        <span className="mt-1 block text-[11px] text-muted">DIRECTO y ACTIVOS SUDEMATIN no se cuentan.</span>
+        <span className="mt-1 block text-[11px] text-muted">
+          {elegido === "__general"
+            ? "Un solo conteo con una sola acta. Se recorre departamento por departamento, y lo que no se llegue a contar queda sin contar."
+            : "DIRECTO y ACTIVOS SUDEMATIN no se cuentan."}
+        </span>
       </label>
       {msg && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
       <Button icon="inventory" cargando={yendo} textoCargando="Abriendo…" disabled={!elegido || yendo}
         onClick={async () => {
           setMsg(null); setYendo(true);
           try {
-            const r = await abrirConteo(empresa, elegido === "__planilla75" ? { planilla: true } : { departamento: elegido });
+            const r = await abrirConteo(empresa, elegido === "__planilla75" ? { planilla: true } : elegido === "__general" ? { general: true } : { departamento: elegido });
             if (!r.ok) return setMsg(r.error);
             onAbierto();
           } finally { setYendo(false); }
@@ -106,8 +118,18 @@ function NuevoConteo({ empresa, onAbierto }: { empresa: string; onAbierto: () =>
 
 type Filtro = "todos" | "sin" | "contados" | "cero";
 
-function Planilla({ empresa, conteo, onCerrado }: { empresa: string; conteo: Conteo; onCerrado: (id: number) => void }) {
-  const datos = useCarga(`planilla:${conteo.id}`, async () => {
+// Grupos del selector de Departamento que no son un departamento de Valery.
+const SIN_DEPTO = "__sin";
+const AGREGADOS = "__agregados";
+const grupoDe = (f: Fila) => f.departamento ?? (f.extra ? AGREGADOS : SIN_DEPTO);
+// Departamentos por codigo; "sin departamento" y los agregados, al final.
+const ordenGrupo = (k: string) => (k === SIN_DEPTO ? "\uffff1" : k === AGREGADOS ? "\uffff2" : k);
+const porGrupo = (a: string, b: string) => (ordenGrupo(a) < ordenGrupo(b) ? -1 : ordenGrupo(a) > ordenGrupo(b) ? 1 : 0);
+
+type Propuesta = { tipo: "ampliar" } | { tipo: "cambiar"; departamento: string; nombre: string };
+
+function Planilla({ empresa, conteo, onCerrado, onCambio }: { empresa: string; conteo: Conteo; onCerrado: (id: number) => void; onCambio: () => void }) {
+  const datos = useCarga(`planilla:${conteo.id}:${conteo.departamento}:${conteo.zona}`, async () => {
     const [items, lineas] = await Promise.all([planillaDe(empresa, conteo), lineasDe(conteo.id)]);
     return { items, lineas };
   });
@@ -115,11 +137,24 @@ function Planilla({ empresa, conteo, onCerrado }: { empresa: string; conteo: Con
   if (datos.error || !datos.datos) return <AlertCard tone="danger" titulo="No se pudo leer la planilla" mensaje={datos.error ?? ""} />;
   // Se monta recien con los datos: asi arranca con sus filas, sin un efecto que
   // las copie despues.
-  return <PlanillaLista empresa={empresa} conteo={conteo} onCerrado={onCerrado} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
+  return <PlanillaLista empresa={empresa} conteo={conteo} onCerrado={onCerrado} onCambio={onCambio} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
 }
 
-function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: string; conteo: Conteo; onCerrado: (id: number) => void; inicial: Fila[] }) {
+function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
+  empresa: string; conteo: Conteo; onCerrado: (id: number) => void; onCambio: () => void; inicial: Fila[];
+}) {
   const [filas, setFilas] = useState<Fila[]>(inicial);
+  // El departamento que se esta mirando ("" = todos). Se recuerda en este
+  // navegador; el general arranca en el primero, no con 2.000 renglones.
+  const claveDepto = `sumi:conteo:${conteo.id}:depto`;
+  const [depto, setDepto] = useState(() => {
+    const grupos = new Set(inicial.map(grupoDe));
+    try { const g = localStorage.getItem(claveDepto); if (g !== null && (g === "" || grupos.has(g))) return g; } catch { /* sin almacenamiento */ }
+    return conteo.origen === "general" ? [...grupos].sort(porGrupo)[0] ?? "" : "";
+  });
+  const cambiarDepto = (g: string) => { setDepto(g); try { localStorage.setItem(claveDepto, g); } catch { /* idem */ } };
+  const [propuesta, setPropuesta] = useState<Propuesta | null>(null);
+  const deps = useCarga(`dep:${empresa}`, () => departamentosDe(empresa));
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [q, setQ] = useState("");
   const [verSistema, setVerSistema] = useState(false);
@@ -145,15 +180,46 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
   }, [filas]);
 
 
+  // Avance por departamento, para el selector.
+  const grupos = useMemo(() => {
+    const m = new Map<string, { total: number; contados: number }>();
+    for (const f of filas) {
+      const g = m.get(grupoDe(f)) ?? { total: 0, contados: 0 };
+      const e = leerCantidad(f.texto).estado;
+      g.total++; if (e === "ok" || e === "cero") g.contados++;
+      m.set(grupoDe(f), g);
+    }
+    return [...m.entries()].sort(([a], [b]) => porGrupo(a, b));
+  }, [filas]);
+  const nombreDep = new Map((deps.datos ?? []).map((d) => [d.codigo, d.nombre]));
+  const etiqueta = (g: string) => (g === SIN_DEPTO ? "Sin departamento" : g === AGREGADOS ? "Agregados al conteo" : `${g} - ${nombreDep.get(g) ?? ""}`);
+  const verDepto = grupos.some(([g]) => g === depto) ? depto : "";
+  const enDepto = verDepto ? filas.filter((f) => grupoDe(f) === verDepto) : filas;
+  const cuentaVista = useMemo(() => {
+    const k = { total: enDepto.length, ok: 0, cero: 0, sin: 0 };
+    for (const f of enDepto) {
+      const e = leerCantidad(f.texto).estado;
+      if (e === "ok") k.ok++; else if (e === "cero") k.cero++; else k.sin++;
+    }
+    return k;
+  }, [enDepto]);
+  const nadaAnotado = !filas.some((f) => f.guardado);
+
   const total = filas.length;
   const t = q.trim().toLowerCase();
-  const visibles = filas.filter((f) => {
+  const visibles = enDepto.filter((f) => {
     const l = leerCantidad(f.texto).estado;
     if (filtro === "sin" && l !== "vacio" && l !== "error") return false;
     if (filtro === "contados" && l !== "ok" && l !== "cero") return false;
     if (filtro === "cero" && l !== "cero") return false;
     return !t || String(f.renglon ?? "") === t || f.codigo.toLowerCase().includes(t) || f.nombre.toLowerCase().includes(t);
   });
+
+  // Los renglones no se vuelven a dibujar si no cambian (el general tiene miles):
+  // lo que necesitan del resto de la planilla lo leen de aca.
+  const filasRef = useRef(filas);
+  const visiblesRef = useRef(visibles);
+  useEffect(() => { filasRef.current = filas; visiblesRef.current = visibles; });
 
   const cambiar = (codigo: string, parche: Partial<Fila>) =>
     setFilas((fs) => fs.map((f) => (f.codigo === codigo ? { ...f, ...parche } : f)));
@@ -176,14 +242,18 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
   }
 
   function mover(codigo: string, paso: 1 | -1) {
-    const i = visibles.findIndex((f) => f.codigo === codigo);
-    const destino = visibles[i + paso];
+    const vs = visiblesRef.current;
+    const i = vs.findIndex((f) => f.codigo === codigo);
+    const destino = vs[i + paso];
     if (!destino) return;
     const el = refs.current.get(destino.codigo);
     el?.focus(); el?.select();
   }
 
-  function irA(codigo: string) {
+  function irA(codigo: string, grupo?: string) {
+    const f = filasRef.current.find((x) => x.codigo.toUpperCase() === codigo.toUpperCase());
+    const g = grupo ?? (f ? grupoDe(f) : AGREGADOS);
+    if (verDepto && verDepto !== g) cambiarDepto(g);
     setFiltro("todos"); setQ("");
     requestAnimationFrame(() => {
       const el = refs.current.get(codigo);
@@ -193,7 +263,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
 
   function agregarFila(p: { codigo: string; nombre: string; unidad: string | null }) {
     const ya = filas.find((f) => f.codigo.toUpperCase() === p.codigo.toUpperCase());
-    if (!ya) setFilas((fs) => [...fs, { renglon: null, codigo: p.codigo, nombre: p.nombre, unidad: p.unidad ?? "", sistema: 0, extra: true, texto: "", obs: "", guardado: null, estado: "" }]);
+    if (!ya) setFilas((fs) => [...fs, { renglon: null, codigo: p.codigo, nombre: p.nombre, unidad: p.unidad ?? "", sistema: 0, departamento: null, extra: true, texto: "", obs: "", guardado: null, estado: "" }]);
     irA(ya?.codigo ?? p.codigo);
   }
 
@@ -223,10 +293,40 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
             <span className="mb-1 block text-xs font-medium text-muted">Contó <span className="text-danger">*</span></span>
             <input className="sumi-campo" value={conto} onChange={(e) => cambiarConto(e.target.value)} placeholder="Quién hizo el conteo" autoComplete="off" />
           </label>
-          <div>
+          <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted">Departamento</span>
-            <p className="flex h-11 items-center rounded-xl border border-border bg-surface-2 px-3 text-sm font-medium">{titulo}</p>
-          </div>
+            <select className="sumi-campo font-medium" value={verDepto} aria-describedby="depto-ayuda"
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__ampliar") return setPropuesta({ tipo: "ampliar" });
+                if (v.startsWith("__cambiar:")) {
+                  const d = v.slice("__cambiar:".length);
+                  return setPropuesta({ tipo: "cambiar", departamento: d, nombre: `${d} - ${nombreDep.get(d) ?? ""}` });
+                }
+                cambiarDepto(v);
+              }}>
+              {grupos.length > 1 && (
+                <option value="">
+                  {conteo.origen === "general" ? "Todos los departamentos (consolidado)" : titulo} · {contados} de {total}
+                </option>
+              )}
+              {grupos.map(([g, n]) => (
+                <option key={g} value={g}>{etiqueta(g)} · {n.contados} de {n.total}{n.contados === n.total ? " ✓" : ""}</option>
+              ))}
+              {grupos.length === 0 && <option value="">{titulo}</option>}
+              {(conteo.origen !== "general" || nadaAnotado) && (
+                <optgroup label="Cambiar lo que se cuenta">
+                  {conteo.origen !== "general" && <option value="__ampliar">Ampliar a todos los departamentos (consolidado)…</option>}
+                  {nadaAnotado && (deps.datos ?? []).filter((d) => d.seCuenta && d.codigo !== conteo.departamento).map((d) => (
+                    <option key={d.codigo} value={`__cambiar:${d.codigo}`}>Cambiar a {d.codigo} - {d.nombre}…</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <span id="depto-ayuda" className="mt-1 block text-[11px] text-muted">
+              {conteo.origen === "general" ? "Consolidado: elegí qué departamento estás contando." : grupos.length > 1 ? "Elegí qué parte de la planilla ver." : "Para contar otro departamento o todo junto, elegilo en esta lista."}
+            </span>
+          </label>
         </div>
       </section>
 
@@ -240,6 +340,11 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
           <p className="text-xl font-semibold tabular-nums text-text">{contados} <span className="text-sm font-medium text-muted">de {total} contados</span></p>
           <p className="text-xs text-muted tabular-nums">{cuenta.ok} con cantidad · {cuenta.cero} en cero · {cuenta.sin + cuenta.error} sin contar</p>
+          {verDepto && (
+            <p className="text-xs font-medium text-text tabular-nums">
+              {etiqueta(verDepto)}: {cuentaVista.ok + cuentaVista.cero} de {cuentaVista.total}
+            </p>
+          )}
         </div>
         <div className="mt-2 flex h-2 overflow-hidden rounded-full border border-border bg-surface-2" aria-hidden>
           <span className="block h-full bg-ok transition-[width]" style={{ width: `${(cuenta.ok / Math.max(total, 1)) * 100}%` }} />
@@ -250,7 +355,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
       {/* Herramientas */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar renglones">
-          {([["todos", "Todos", total], ["sin", "Sin contar", cuenta.sin + cuenta.error], ["contados", "Contados", contados], ["cero", "En cero", cuenta.cero]] as const).map(([id, label, n]) => (
+          {([["todos", "Todos", cuentaVista.total], ["sin", "Sin contar", cuentaVista.sin], ["contados", "Contados", cuentaVista.ok + cuentaVista.cero], ["cero", "En cero", cuentaVista.cero]] as const).map(([id, label, n]) => (
             <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)}
               className={`min-h-9 rounded-full border px-3 text-xs font-medium ${filtro === id ? "border-navy bg-navy text-white" : "border-border bg-surface text-muted hover:text-text"}`}>
               {label} <b className="tabular-nums">{n}</b>
@@ -295,7 +400,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
         </div>
         {visibles.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted">
-            {t ? `Ningún renglón coincide con «${q}».` : "No hay renglones en este filtro."}
+            {t ? `Ningún renglón coincide con «${q}»${verDepto ? ` en ${etiqueta(verDepto)}` : ""}.` : "No hay renglones en este filtro."}
           </p>
         ) : (
           <ul className="divide-y divide-border">
@@ -304,7 +409,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
                 refInput={(el) => { if (el) refs.current.set(f.codigo, el); else refs.current.delete(f.codigo); }}
                 onTexto={(v) => cambiar(f.codigo, { texto: v, estado: "", error: undefined })}
                 onObs={(v) => cambiar(f.codigo, { obs: v })}
-                onGuardar={() => guardar(filas.find((x) => x.codigo === f.codigo)!)}
+                onGuardar={() => { const x = filasRef.current.find((y) => y.codigo === f.codigo); if (x) guardar(x); }}
                 onMover={(p) => mover(f.codigo, p)} />
             ))}
           </ul>
@@ -336,7 +441,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
 
       {agregar && (
         <AgregarArticulo
-          empresa={empresa} conteoId={conteo.id} departamento={conteo.departamento}
+          empresa={empresa} conteoId={conteo.id} departamento={conteo.departamento ?? (verDepto.startsWith("__") ? null : verDepto || null)}
           enPlanilla={(cod) => filas.some((f) => f.codigo.toUpperCase() === cod.toUpperCase())}
           onCerrar={() => setAgregar(false)}
           onValery={(p) => { setAgregar(false); agregarFila(p); }}
@@ -344,9 +449,14 @@ function PlanillaLista({ empresa, conteo, onCerrado, inicial }: { empresa: strin
             setAgregar(false);
             setFilas((fs) => [...fs, fila]);
             setAviso({ ok: true, text: `${fila.codigo} asignado y agregado al conteo.` });
-            irA(fila.codigo);
+            irA(fila.codigo, grupoDe(fila));
           }}
         />
+      )}
+      {propuesta && (
+        <CambiarAlcance conteoId={conteo.id} empresa={empresa} propuesta={propuesta} anotados={filas.filter((f) => f.guardado).length}
+          antes={async () => { for (const f of pendientes) await guardar(f); }}
+          onCerrar={() => setPropuesta(null)} onHecho={onCambio} />
       )}
       {revisar && (
         <RevisarCierre
@@ -365,7 +475,7 @@ function armarFilas(items: ItemPlanilla[], lineas: Awaited<ReturnType<typeof lin
   const filas: Fila[] = items.map((it) => {
     const l = L.get(it.codigo);
     return {
-      renglon: it.renglon, codigo: it.codigo, nombre: it.nombre, unidad: it.unidad, sistema: it.sistema, extra: false,
+      renglon: it.renglon, codigo: it.codigo, nombre: it.nombre, unidad: it.unidad, sistema: it.sistema, departamento: it.departamento, extra: false,
       texto: l ? fmtCantidad(l.cantidad) : "", obs: l?.observacion ?? "",
       guardado: l ? { cantidad: l.cantidad, obs: l.observacion ?? "" } : null, estado: "",
     };
@@ -375,16 +485,64 @@ function armarFilas(items: ItemPlanilla[], lineas: Awaited<ReturnType<typeof lin
   for (const l of lineas) {
     if (enPlanilla.has(l.codigo)) continue;
     filas.push({
-      renglon: null, codigo: l.codigo, nombre: l.nombre ?? l.codigo, unidad: l.unidad ?? "", sistema: 0, extra: true,
+      renglon: null, codigo: l.codigo, nombre: l.nombre ?? l.codigo, unidad: l.unidad ?? "", sistema: 0, departamento: null, extra: true,
       texto: fmtCantidad(l.cantidad), obs: l.observacion ?? "", guardado: { cantidad: l.cantidad, obs: l.observacion ?? "" }, estado: "",
     });
   }
   return filas;
 }
 
+// ---------------------------------------------------------------- ampliar o cambiar
+
+function CambiarAlcance({ conteoId, empresa, propuesta, anotados, antes, onCerrar, onHecho }: {
+  conteoId: number; empresa: string; propuesta: Propuesta; anotados: number;
+  antes: () => Promise<void>; onCerrar: () => void; onHecho: () => void;
+}) {
+  const [yendo, setYendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ampliar = propuesta.tipo === "ampliar";
+  return (
+    <Modal titulo={ampliar ? "Ampliar a todos los departamentos" : `Cambiar a ${propuesta.nombre}`} onCerrar={onCerrar}>
+      <div className="space-y-3 text-sm text-text">
+        {ampliar ? (
+          <>
+            <p>El conteo pasa a abarcar <b>todos los departamentos que se cuentan</b>, y al cerrar sale una sola acta consolidada.</p>
+            <ul className="list-disc space-y-1 pl-5 text-muted">
+              <li>{anotados ? `Los ${anotados} renglón(es) ya anotados se conservan.` : "Todavía no hay nada anotado."}</li>
+              <li>Con este mismo selector recorrés un departamento a la vez, con su avance.</li>
+              <li>Lo que no se llegue a contar queda <b>sin contar</b>, no en cero: conserva su existencia.</li>
+            </ul>
+          </>
+        ) : (
+          <p>Todavía no hay nada anotado en este conteo, así que no se pierde nada: la planilla pasa a ser la de {propuesta.nombre}.</p>
+        )}
+        {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-danger">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCerrar}>Cancelar</Button>
+          <Button icon="inventory" cargando={yendo} textoCargando="Cambiando…" onClick={async () => {
+            setError(null); setYendo(true);
+            try {
+              await antes();
+              const r = await cambiarAlcance(conteoId, empresa, ampliar ? { general: true } : { departamento: propuesta.departamento });
+              if (!r.ok) return setError(r.error);
+              onHecho();
+            } finally { setYendo(false); }
+          }}>
+            {ampliar ? "Ampliar el conteo" : "Cambiar"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ---------------------------------------------------------------- un renglon
 
-function Renglon({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMover }: {
+// Solo se vuelve a dibujar si cambia su fila: los avisos que recibe leen el
+// estado al momento de usarse, no al dibujarse.
+const Renglon = memo(RenglonBase, (a, b) => a.f === b.f && a.verSistema === b.verSistema);
+
+function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMover }: {
   f: Fila; verSistema: boolean;
   refInput: (el: HTMLInputElement | null) => void;
   onTexto: (v: string) => void; onObs: (v: string) => void; onGuardar: () => void; onMover: (p: 1 | -1) => void;
