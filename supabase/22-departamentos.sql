@@ -47,6 +47,11 @@ create index if not exists productos_departamento_idx on public.productos (empre
 -- falla para todo usuario que no sea el servicio.
 grant select (departamento) on public.productos to authenticated;
 
+-- Productos que no son mercancia fisica y no se cuentan aunque su departamento
+-- si. Un producto entra al conteo solo si EL y SU departamento se cuentan.
+alter table public.productos add column if not exists se_cuenta boolean not null default true;
+grant select (se_cuenta) on public.productos to authenticated;
+
 -- ---------------------------------------------------------------- los 26
 insert into public.departamentos (empresa_id, codigo, nombre) values
   ('sumigases', '01', 'DIRECTO'),
@@ -79,6 +84,13 @@ on conflict (empresa_id, codigo) do update set nombre = excluded.nombre;
 
 update public.departamentos set se_cuenta = false
 where empresa_id = 'sumigases' and codigo in ('01', '17');
+
+-- Decision del owner (23-09-2026): no son mercancia fisica.
+--   010203  FLETE                                  (depto 22 OXICORTE)
+--   GASP01  RECARGA GAS PROPANO MONTACARGAS 35KG   (depto 10 GASES)
+--   GAS02   RECARGA GAS MONTACARGA 45 KG           (depto 10 GASES)
+update public.productos set se_cuenta = false
+where empresa_id = 'sumigases' and codigo in ('010203', 'GASP01', 'GAS02');
 
 -- ---------------------------------------------------------------- a que departamento va cada producto
 update public.productos p set departamento = v.dpto
@@ -2294,9 +2306,11 @@ from (values
 where p.empresa_id = 'sumigases' and p.codigo = v.codigo;
 
 -- ---------------------------------------------------------------- comprobacion
--- Debe devolver: 26 departamentos · 2207 productos con departamento · 1 sin (BRAGA) · 2 que no se cuentan.
+-- Debe devolver: 26 departamentos · 2207 productos con departamento · 1 sin (BRAGA)
+-- · 2 departamentos y 3 productos que no se cuentan.
 select
   (select count(*) from public.departamentos where empresa_id = 'sumigases') as departamentos,
   (select count(*) from public.productos where empresa_id = 'sumigases' and departamento is not null) as con_departamento,
   (select count(*) from public.productos where empresa_id = 'sumigases' and departamento is null) as sin_departamento,
-  (select count(*) from public.departamentos where empresa_id = 'sumigases' and not se_cuenta) as no_se_cuentan;
+  (select count(*) from public.departamentos where empresa_id = 'sumigases' and not se_cuenta) as departamentos_no_se_cuentan,
+  (select count(*) from public.productos where empresa_id = 'sumigases' and not se_cuenta) as productos_no_se_cuentan;
