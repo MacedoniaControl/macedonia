@@ -43,4 +43,12 @@ describe("migración 22: departamentos de Valery", () => {
     assert.match(sql, /se_cuenta\s+boolean not null default true/);
     assert.match(sql, /update public\.departamentos set se_cuenta = false\s+where empresa_id = 'sumigases' and codigo in \('01', '17'\)/);
   });
+
+  test("FLETE y las dos recargas de gas no entran al conteo", () => {
+    // No son mercancia fisica, y sus departamentos (OXICORTE, GASES) si se
+    // cuentan: la marca tiene que ser del producto, no del departamento.
+    assert.match(sql, /add column if not exists se_cuenta boolean not null default true/);
+    assert.match(sql, /grant select \(se_cuenta\) on public\.productos to authenticated/);
+    assert.match(sql, /update public\.productos set se_cuenta = false\s+where empresa_id = 'sumigases' and codigo in \('010203', 'GASP01', 'GAS02'\)/);
+  });
 });
