@@ -11,9 +11,15 @@ describe("migración 24: permisos calculados una vez por consulta", () => {
   test("las cuatro políticas usan las empresas permitidas, una vez por consulta", () => {
     for (const p of ["movimientos_lectura", "movimientos_inserta", "productos_lectura", "productos_escribe"]) {
       const cuerpo = codigo.slice(codigo.indexOf(`create policy ${p}`), codigo.indexOf(";", codigo.indexOf(`create policy ${p}`)));
-      assert.match(cuerpo, /empresa_id = any \(\(select public\.empresas_permitidas\(\)\)\)/, `${p} no usa empresas_permitidas`);
+      assert.match(cuerpo, /empresa_id = any \(\(select public\.empresas_permitidas\(\)\)::text\[\]\)/, `${p} no usa empresas_permitidas`);
       assert.match(cuerpo, /\(select public\.puede\('\w+'\)\)/, `${p} evalúa puede() por fila`);
     }
+  });
+
+  test("la lista de empresas se compara como lista, no como subconsulta", () => {
+    // Sin el ::text[], Postgres lo lee como subconsulta y falla con
+    // «operator does not exist: text = text[]» (le paso al correrla el 23-09).
+    assert.doesNotMatch(codigo, /any \(\(select public\.empresas_permitidas\(\)\)\)/);
   });
 
   test("no queda ningún permiso evaluado por fila", () => {

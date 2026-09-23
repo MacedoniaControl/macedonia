@@ -76,14 +76,19 @@ export async function buscarProductos(
   if (q.length < 2) return [];
 
   const sb = await createClient();
-  // `or` con ilike: coincide por código o por nombre en una sola consulta.
-  const patron = `%${q.replace(/[%_]/g, "")}%`;
-  const { data, error } = await sb
-    .from("productos")
-    .select(COLUMNAS)
-    .eq("empresa_id", empresa)
-    .or(`codigo.ilike.${patron},nombre.ilike.${patron}`)
-    .limit(limite);
+  const palabras = q.split(/\s+/).map((w) => w.replace(/[%_,()]/g, "")).filter(Boolean);
+  let pedido = sb.from("productos").select(COLUMNAS).eq("empresa_id", empresa);
+  if (palabras.length > 1) {
+    // Varias palabras: el nombre tiene que tenerlas TODAS, en cualquier orden.
+    // «careta soldador» encuentra «CARETA P/ SOLDADOR MOVIL WELDTECH», que como
+    // frase pegada no aparecia.
+    for (const w of palabras) pedido = pedido.ilike("nombre", `%${w}%`);
+  } else {
+    // Una palabra: por codigo o por nombre, en una sola consulta.
+    const patron = `%${palabras[0] ?? ""}%`;
+    pedido = pedido.or(`codigo.ilike.${patron},nombre.ilike.${patron}`);
+  }
+  const { data, error } = await pedido.limit(limite);
 
   if (error) throw new Error(`No se pudo buscar en el catálogo: ${error.message}`);
   return (data as Fila[] | null)?.map(aProducto) ?? [];
