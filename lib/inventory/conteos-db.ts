@@ -15,6 +15,7 @@ import { getEmpresa } from "@/lib/ux/empresas";
 import { armarActa, valorizar, type Acta, type EventoActa } from "./acta.ts";
 import { actaExcel, actaPdf, valorizadaExcel, valorizadaPdf } from "./acta-archivos.ts";
 import { PLANILLA_75, ZONA_PLANILLA_75 } from "./planilla-75.ts";
+import { ZONA_GENERAL } from "./alcance.ts";
 import { todasLasFilas } from "../supabase/paginar.ts";
 
 /** "23-09-2026 15:40", en hora de Venezuela. */
@@ -37,13 +38,13 @@ export type Conteo = {
   departamento: string | null;
   departamentoNombre: string | null;
   zona: string | null;
-  /** Que se cuenta: un departamento, la planilla impresa, o nada definido. */
-  origen: "departamento" | "planilla" | "libre";
+  /** Que se cuenta: un departamento, la planilla impresa, todo (consolidado), o nada definido. */
+  origen: "departamento" | "planilla" | "general" | "libre";
   abiertoEn: string;
   renglones: number;
 };
 
-export type ItemPlanilla = { renglon: number; codigo: string; nombre: string; unidad: string; sistema: number };
+export type ItemPlanilla = { renglon: number; codigo: string; nombre: string; unidad: string; sistema: number; departamento: string | null };
 
 export type LineaConteo = {
   codigo: string;
@@ -85,7 +86,12 @@ export type TipoArchivo = "acta_pdf" | "acta_xlsx" | "valorizada_pdf" | "valoriz
 const ETIQUETA_EVENTO: Record<string, string> = {
   abierto: "Conteo abierto", articulo_nuevo: "Artículo nuevo agregado", cerrado: "Conteo cerrado",
   acta_generada: "Acta generada", ajuste_aprobado: "Ajuste aprobado", ajuste_rechazado: "Ajuste rechazado",
+  alcance: "Cambió lo que se cuenta",
 };
+
+function origenDe(departamento: string | null, zona: string | null): Conteo["origen"] {
+  return departamento ? "departamento" : zona === ZONA_PLANILLA_75 ? "planilla" : zona === ZONA_GENERAL ? "general" : "libre";
+}
 
 // ---------------------------------------------------------------- permisos y catalogos
 
@@ -119,14 +125,14 @@ export async function conteoAbierto(empresa: string): Promise<Conteo | null> {
   return {
     id: data.id, fecha: data.fecha, departamento: data.departamento, departamentoNombre: data.departamento_nombre,
     zona: data.zona, abiertoEn: fechaHora(data.abierto_en), renglones: data.renglones,
-    origen: data.departamento ? "departamento" : data.zona === ZONA_PLANILLA_75 ? "planilla" : "libre",
+    origen: origenDe(data.departamento, data.zona),
   };
 }
 
-/** Abre un conteo de un departamento, o de la planilla impresa de 75. */
+/** Abre un conteo de un departamento, de la planilla impresa de 75, o de todo (consolidado). */
 export async function abrirConteo(
   empresa: string,
-  que: { departamento: string } | { planilla: true },
+  que: { departamento: string } | { planilla: true } | { general: true },
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
@@ -137,7 +143,7 @@ export async function abrirConteo(
     .insert({
       empresa_id: empresa,
       departamento: "departamento" in que ? que.departamento : null,
-      zona: "planilla" in que ? ZONA_PLANILLA_75 : null,
+      zona: "planilla" in que ? ZONA_PLANILLA_75 : "general" in que ? ZONA_GENERAL : null,
       usuario_id: usuario.id,
     })
     .select("id")
@@ -146,41 +152,128 @@ export async function abrirConteo(
   return { ok: true, id: data.id };
 }
 
+type Cliente = Awaited<ReturnType<typeof createClient>>;
+type ProdConteo = { codigo: string; nombre: string; unidad: string | null; departamento: string | null };
+
 /**
- * Lo que hay que contar, con el N° de renglon.
+ * Los productos que abarca un conteo, en el orden de la planilla.
  *
- * Por departamento: sus productos, sin los que no se cuentan (servicios, fletes,
- * recargas, y los departamentos marcados). Por planilla: los 75 del papel, en
- * su orden. La existencia viaja para el «ver lo que dice el sistema», pero la
- * pantalla la esconde por defecto: quien cuenta no deberia verla.
+ * Nunca entran los que no se cuentan: servicios, fletes, recargas, y los
+ * departamentos marcados (DIRECTO, ACTIVOS SUDEMATIN). El general va por
+ * departamento y, dentro, por nombre: se recorre el galpon departamento por
+ * departamento.
+ */
+async function productosDelConteo(cliente: Cliente | ReturnType<typeof createAdminClient>, empresa: string, c: { departamento: string | null; zona: string | null }): Promise<ProdConteo[]> {
+  const sb = cliente as Cliente;
+  const campos = "codigo, nombre, unidad, departamento";
+  if (c.departamento) {
+    return todasLasFilas<ProdConteo>((d, h, cuenta) =>
+      sb.from("productos").select(campos, cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa)
+        .eq("departamento", c.departamento!).eq("se_cuenta", true).order("nombre").order("codigo").range(d, h));
+  }
+  if (c.zona === ZONA_PLANILLA_75) {
+    const { data } = await sb.from("productos").select(campos).eq("empresa_id", empresa).in("codigo", [...PLANILLA_75]);
+    const P = new Map((data ?? []).map((p) => [p.codigo, p as ProdConteo]));
+    return PLANILLA_75.map((cod) => P.get(cod) ?? { codigo: cod, nombre: cod, unidad: "", departamento: null });
+  }
+  if (c.zona === ZONA_GENERAL) {
+    const [prods, fuera] = await Promise.all([
+      todasLasFilas<ProdConteo>((d, h, cuenta) =>
+        sb.from("productos").select(campos, cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa).eq("se_cuenta", true)
+          .order("departamento", { nullsFirst: false }).order("nombre").order("codigo").range(d, h)),
+      sb.from("departamentos").select("codigo").eq("empresa_id", empresa).eq("se_cuenta", false),
+    ]);
+    const no = new Set((fuera.data ?? []).map((x) => x.codigo));
+    return prods.filter((p) => !p.departamento || !no.has(p.departamento));
+  }
+  return [];
+}
+
+/**
+ * Lo que hay que contar, con el N° de renglon. La existencia viaja para el
+ * «ver lo que dice el sistema», pero la pantalla la esconde por defecto: quien
+ * cuenta no deberia verla.
  */
 export async function planillaDe(empresa: string, conteo: Conteo): Promise<ItemPlanilla[]> {
   const sb = await createClient();
-  let prods: { codigo: string; nombre: string; unidad: string | null }[] = [];
-  if (conteo.origen === "departamento") {
-    prods = await todasLasFilas((d, h, cuenta) =>
-      sb.from("productos").select("codigo, nombre, unidad", cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa)
-        .eq("departamento", conteo.departamento!).eq("se_cuenta", true).order("nombre").range(d, h));
-  } else if (conteo.origen === "planilla") {
-    const { data } = await sb.from("productos").select("codigo, nombre, unidad").eq("empresa_id", empresa).in("codigo", [...PLANILLA_75]);
-    const P = new Map((data ?? []).map((p) => [p.codigo, p]));
-    prods = PLANILLA_75.map((c) => P.get(c) ?? { codigo: c, nombre: c, unidad: "" });
-  }
-  // La existencia solo de lo que se cuenta: la vista suma movimientos, y
-  // pedirla para los 2.208 productos para mostrar 340 es trabajo tirado.
+  const prods = await productosDelConteo(sb, empresa, conteo);
   const E = await existenciasDe(sb, empresa, prods.map((p) => p.codigo));
-  return prods.map((p, i) => ({ renglon: i + 1, codigo: p.codigo, nombre: p.nombre, unidad: p.unidad ?? "", sistema: E.get(p.codigo) ?? 0 }));
+  return prods.map((p, i) => ({ renglon: i + 1, codigo: p.codigo, nombre: p.nombre, unidad: p.unidad ?? "", sistema: E.get(p.codigo) ?? 0, departamento: p.departamento }));
 }
 
-/** Existencia de unos codigos, en tandas que caben en la direccion del pedido. */
-async function existenciasDe(sb: Awaited<ReturnType<typeof createClient>>, empresa: string, codigos: string[]): Promise<Map<string, number>> {
+/**
+ * Existencia de unos codigos. La vista suma movimientos: pedirla para los
+ * 2.208 productos para mostrar 40 es trabajo tirado, asi que va en tandas que
+ * caben en la direccion del pedido, todas a la vez. Para el general (casi todo
+ * el catalogo) sale mas barato leerla entera.
+ */
+async function existenciasDe(sb: Cliente, empresa: string, codigos: string[]): Promise<Map<string, number>> {
   const E = new Map<string, number>();
-  for (let i = 0; i < codigos.length; i += 150) {
-    const { data, error } = await sb.from("existencias").select("codigo, existencia").eq("empresa_id", empresa).in("codigo", codigos.slice(i, i + 150));
+  if (codigos.length > 600) {
+    const quiero = new Set(codigos);
+    const todo = await todasLasFilas<{ codigo: string; existencia: number }>((d, h, cuenta) =>
+      sb.from("existencias").select("codigo, existencia", cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa).order("codigo").range(d, h));
+    for (const e of todo) if (quiero.has(e.codigo)) E.set(e.codigo, Number(e.existencia));
+    return E;
+  }
+  const tandas = [];
+  for (let i = 0; i < codigos.length; i += 150) tandas.push(codigos.slice(i, i + 150));
+  const r = await Promise.all(tandas.map((t) => sb.from("existencias").select("codigo, existencia").eq("empresa_id", empresa).in("codigo", t)));
+  for (const { data, error } of r) {
     if (error) throw new Error(`No se pudo leer la existencia: ${error.message}`);
     for (const e of data ?? []) E.set(e.codigo, Number(e.existencia));
   }
   return E;
+}
+
+/**
+ * Cambia lo que abarca un conteo abierto.
+ *
+ * Ampliar a todos los departamentos se puede siempre: lo ya anotado sigue ahi,
+ * y se renumera para seguir el orden de la planilla general. Cambiar a OTRO
+ * departamento solo si no hay nada anotado: lo contado del primero quedaria
+ * como "fuera de planilla" en un conteo que no es el suyo.
+ */
+export async function cambiarAlcance(
+  conteoId: number,
+  empresa: string,
+  a: { general: true } | { departamento: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data: c } = await sb.from("conteos").select("departamento, zona, cerrado").eq("id", conteoId).eq("empresa_id", empresa).maybeSingle();
+  if (!c) return { ok: false, error: "No existe ese conteo." };
+  if (c.cerrado) return { ok: false, error: "El conteo ya está cerrado." };
+  const { data: lineas, error: el } = await sb.from("conteo_lineas").select("codigo, renglon").eq("conteo_id", conteoId);
+  if (el) return { ok: false, error: el.message };
+  if ("departamento" in a && (lineas ?? []).length > 0) {
+    return { ok: false, error: "Este conteo ya tiene cantidades anotadas: no se cambia de departamento. Ampliálo a todos los departamentos, o cerralo y abrí otro." };
+  }
+  const nuevo = "general" in a ? { departamento: null, zona: ZONA_GENERAL } : { departamento: a.departamento, zona: null };
+  const { error } = await sb.from("conteos").update(nuevo).eq("id", conteoId);
+  if (error) return { ok: false, error: `No se pudo cambiar: ${error.message}` };
+
+  // Los renglones ya anotados toman su N° en la planilla nueva.
+  if (lineas?.length) {
+    const prods = await productosDelConteo(sb, empresa, nuevo);
+    const N = new Map(prods.map((p, i) => [p.codigo, i + 1]));
+    const cambian = lineas.filter((l) => (N.get(l.codigo) ?? null) !== l.renglon);
+    const r = await Promise.all(cambian.map((l) => sb.from("conteo_lineas").update({ renglon: N.get(l.codigo) ?? null }).eq("conteo_id", conteoId).eq("codigo", l.codigo)));
+    const mal = r.find((x) => x.error);
+    if (mal) return { ok: false, error: `Se cambió, pero no se pudieron renumerar los renglones: ${mal.error!.message}` };
+  }
+
+  const codigos = [c.departamento, nuevo.departamento].filter((x): x is string => !!x);
+  const { data: deps } = codigos.length
+    ? await sb.from("departamentos").select("codigo, nombre").eq("empresa_id", empresa).in("codigo", codigos)
+    : { data: [] as { codigo: string; nombre: string }[] };
+  const D = new Map((deps ?? []).map((d) => [d.codigo, `${d.codigo} - ${d.nombre}`]));
+  const nombre = (x: { departamento: string | null; zona: string | null }) => (x.departamento ? D.get(x.departamento) ?? x.departamento : x.zona ?? "Sin departamento");
+  const usuario = await getUsuarioSesion();
+  await createAdminClient().from("conteo_eventos").insert({
+    conteo_id: conteoId, tipo: "alcance", usuario_id: usuario?.id ?? null,
+    detalle: `Pasó de «${nombre(c)}» a «${nombre(nuevo)}».${lineas?.length ? ` Se conservan los ${lineas.length} renglón(es) ya anotados.` : ""}`,
+  });
+  return { ok: true };
 }
 
 export async function lineasDe(conteoId: number): Promise<LineaConteo[]> {
@@ -307,19 +400,11 @@ async function actaDe(admin: ReturnType<typeof createAdminClient>, id: number) {
   const contados = new Set((lin.data ?? []).map((l) => l.codigo));
 
   // Lo que quedo sin contar, para la hoja "Sin contar" del Excel.
-  let sinContar: { codigo: string; nombre: string; unidad: string | null; sistema: number }[] = [];
   const ex = await todasLasFilas<{ codigo: string; existencia: number }>((d, h, cuenta) =>
     admin.from("existencias").select("codigo, existencia", cuenta ? { count: "exact" } : undefined).eq("empresa_id", c.empresa_id).order("codigo").range(d, h));
   const E = new Map(ex.map((e) => [e.codigo, Number(e.existencia)]));
-  if (c.departamento) {
-    const prods = await todasLasFilas<{ codigo: string; nombre: string; unidad: string | null }>((d, h, cuenta) =>
-      admin.from("productos").select("codigo, nombre, unidad", cuenta ? { count: "exact" } : undefined).eq("empresa_id", c.empresa_id)
-        .eq("departamento", c.departamento).eq("se_cuenta", true).order("nombre").range(d, h));
-    sinContar = prods.filter((p) => !contados.has(p.codigo)).map((p) => ({ ...p, sistema: E.get(p.codigo) ?? 0 }));
-  } else if (c.zona === ZONA_PLANILLA_75) {
-    const { data } = await admin.from("productos").select("codigo, nombre, unidad").eq("empresa_id", c.empresa_id).in("codigo", [...PLANILLA_75]);
-    sinContar = (data ?? []).filter((p) => !contados.has(p.codigo)).map((p) => ({ ...p, sistema: E.get(p.codigo) ?? 0 }));
-  }
+  const prods = await productosDelConteo(admin, c.empresa_id, c);
+  const sinContar = prods.filter((p) => !contados.has(p.codigo)).map((p) => ({ codigo: p.codigo, nombre: p.nombre, unidad: p.unidad, sistema: E.get(p.codigo) ?? 0 }));
 
   const eventos: EventoActa[] = (ev.data ?? []).map((e) => ({ en: fechaHora(e.en), tipo: ETIQUETA_EVENTO[e.tipo] ?? e.tipo, detalle: e.detalle ?? "" }));
   if (c.ajuste === "pendiente") {
