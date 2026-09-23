@@ -85,11 +85,22 @@ export async function borrarRenglon(conteoId: number, codigo: string): Promise<{
  * Un conteo a medias mostrando ceros donde todavía nadie pasó sería peor que no
  * tener conteo: haría ver faltantes que no existen.
  */
-export async function cerrarConteo(id: number): Promise<{ ok: boolean; error?: string }> {
+export async function cerrarConteo(
+  id: number,
+  conto?: string,
+): Promise<{ ok: boolean; error?: string; numero?: string }> {
   const sb = await createClient();
 
   const { data: lineas } = await sb.from("conteo_lineas").select("id").eq("conteo_id", id).limit(1);
   if (!lineas?.length) return { ok: false, error: "No se contó ningún producto todavía." };
+
+  // Con la migracion 23, cerrar es cerrar_conteo(): asigna el numero CF, toma
+  // la existencia del sistema en ese momento y deja el evento en el historial.
+  // La base ya no deja cerrar cambiando el campo a mano.
+  const r = await sb.rpc("cerrar_conteo", { p_conteo: id, p_conto: conto?.trim() || null });
+  if (!r.error) return { ok: true, numero: r.data as string };
+  // PGRST202 = la funcion no existe: la 23 no corrio todavia, se cierra como antes.
+  if (r.error.code !== "PGRST202") return { ok: false, error: r.error.message };
 
   const { error } = await sb.from("conteos").update({ cerrado: true }).eq("id", id);
   if (error) return { ok: false, error: error.message };
