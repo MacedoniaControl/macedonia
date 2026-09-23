@@ -20,8 +20,15 @@ create table if not exists public.departamentos (
   -- los reportes y el que hay que usar para cruzar con el proximo listado.
   codigo     text not null,
   nombre     text not null,
+  -- false = sus productos no entran al conteo fisico. Decision del owner
+  -- (23-09-2026): 01 DIRECTO (servicios, un producto de prueba, compras
+  -- puntuales) y 17 ACTIVOS SUDEMATIN (envases de Sudematin, que se controlan
+  -- en el parque de cilindros de Sudematin).
+  se_cuenta  boolean not null default true,
   primary key (empresa_id, codigo)
 );
+-- Por si la tabla ya existia de una corrida anterior sin esta columna.
+alter table public.departamentos add column if not exists se_cuenta boolean not null default true;
 
 alter table public.departamentos enable row level security;
 drop policy if exists departamentos_leer on public.departamentos;
@@ -69,6 +76,9 @@ insert into public.departamentos (empresa_id, codigo, nombre) values
   ('sumigases', '25', 'CERRADURAS'),
   ('sumigases', '26', 'MECHAS')
 on conflict (empresa_id, codigo) do update set nombre = excluded.nombre;
+
+update public.departamentos set se_cuenta = false
+where empresa_id = 'sumigases' and codigo in ('01', '17');
 
 -- ---------------------------------------------------------------- a que departamento va cada producto
 update public.productos p set departamento = v.dpto
@@ -2284,8 +2294,9 @@ from (values
 where p.empresa_id = 'sumigases' and p.codigo = v.codigo;
 
 -- ---------------------------------------------------------------- comprobacion
--- Debe devolver: 26 departamentos · 2207 productos con departamento · 1 sin (BRAGA).
+-- Debe devolver: 26 departamentos · 2207 productos con departamento · 1 sin (BRAGA) · 2 que no se cuentan.
 select
   (select count(*) from public.departamentos where empresa_id = 'sumigases') as departamentos,
   (select count(*) from public.productos where empresa_id = 'sumigases' and departamento is not null) as con_departamento,
-  (select count(*) from public.productos where empresa_id = 'sumigases' and departamento is null) as sin_departamento;
+  (select count(*) from public.productos where empresa_id = 'sumigases' and departamento is null) as sin_departamento,
+  (select count(*) from public.departamentos where empresa_id = 'sumigases' and not se_cuenta) as no_se_cuentan;
