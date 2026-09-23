@@ -8,6 +8,7 @@
 // existencia sale de los movimientos y cambia sola cuando alguien registra uno.
 
 import { createClient } from "@/lib/supabase/server";
+import { todasLasFilas } from "@/lib/supabase/paginar";
 
 export type ItemInventario = {
   codigo: string;
@@ -32,28 +33,13 @@ export async function inventarioDe(empresa: string): Promise<ItemInventario[]> {
   type FilaProd = { codigo: string; nombre: string; unidad: string | null; unidad_alt: string | null; precio_unitario: number };
   type FilaExis = { codigo: string; existencia: number };
 
-  // ⚠️ Supabase corta las consultas en 1.000 filas POR DEFECTO y NO avisa: de
-  // 1.704 productos devuelve 1.000 y el resto simplemente deja de existir para
-  // la aplicación. Hay que pedir por tramos explícitos hasta que se acabe.
-  const TRAMO = 1000;
-
-  const todo = async <T>(tabla: string, columnas: string): Promise<T[]> => {
-    const acumulado: T[] = [];
-    for (let desde = 0; ; desde += TRAMO) {
-      const { data, error } = await sb
-        .from(tabla)
-        .select(columnas)
-        .eq("empresa_id", empresa)
-        .order("codigo")
-        .range(desde, desde + TRAMO - 1);
-
-      if (error) throw new Error(`No se pudo leer ${tabla}: ${error.message}`);
-      const lote = (data as T[] | null) ?? [];
-      acumulado.push(...lote);
-      if (lote.length < TRAMO) return acumulado;   // último tramo
-    }
-  };
-
+  // ⚠️ Supabase corta las consultas en 1.000 filas POR DEFECTO y NO avisa: hay
+  // que pedir por tramos. todasLasFilas() los pide a la vez (ver paginar.ts).
+  const todo = <T>(tabla: string, columnas: string): Promise<T[]> =>
+    todasLasFilas<T>((desde, hasta, contar) =>
+      sb.from(tabla).select(columnas, contar ? { count: "exact" } : undefined)
+        .eq("empresa_id", empresa).order("codigo").range(desde, hasta) as never)
+      .catch((e: Error) => { throw new Error(`No se pudo leer ${tabla}: ${e.message}`); });
   const [filasProd, filasExis] = await Promise.all([
     todo<FilaProd>("productos", "codigo, nombre, unidad, unidad_alt, precio_unitario"),
     todo<FilaExis>("existencias", "codigo, existencia"),

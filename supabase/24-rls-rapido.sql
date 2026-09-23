@@ -17,6 +17,10 @@
 -- una sola vez; las empresas permitidas se calculan con la MISMA regla de
 -- siempre, puede_empresa(), asi que nadie gana ni pierde acceso.
 --
+-- El `::text[]` no es decorativo: sin el, `= any ((select f()))` se lee como
+-- "comparar contra cada fila de una subconsulta", la fila es la lista entera,
+-- y falla con `operator does not exist: text = text[]`.
+--
 -- Por que una funcion y no `empresa_id in (select id from empresas ...)`: la
 -- politica de lectura de `empresas` no contempla el permiso "otra_empresa", y
 -- esa subconsulta le quitaria a quien lo tiene los datos de la otra empresa.
@@ -34,14 +38,14 @@ $$;
 drop policy if exists movimientos_lectura on public.movimientos_inventario;
 create policy movimientos_lectura on public.movimientos_inventario
   for select using (
-    empresa_id = any ((select public.empresas_permitidas()))
+    empresa_id = any ((select public.empresas_permitidas())::text[])
     and (select public.puede('inventory'))
   );
 
 drop policy if exists movimientos_inserta on public.movimientos_inventario;
 create policy movimientos_inserta on public.movimientos_inventario
   for insert with check (
-    empresa_id = any ((select public.empresas_permitidas()))
+    empresa_id = any ((select public.empresas_permitidas())::text[])
     and (select public.puede('inventory'))
   );
 
@@ -49,19 +53,19 @@ create policy movimientos_inserta on public.movimientos_inventario
 drop policy if exists productos_lectura on public.productos;
 create policy productos_lectura on public.productos
   for select using (
-    empresa_id = any ((select public.empresas_permitidas()))
+    empresa_id = any ((select public.empresas_permitidas())::text[])
     and (select public.puede('products'))
   );
 
 drop policy if exists productos_escribe on public.productos;
 create policy productos_escribe on public.productos
   for all using (
-    empresa_id = any ((select public.empresas_permitidas()))
+    empresa_id = any ((select public.empresas_permitidas())::text[])
     and (select public.puede('products'))
     and (select public.auth_rol()) in ('owner', 'admin')
   )
   with check (
-    empresa_id = any ((select public.empresas_permitidas()))
+    empresa_id = any ((select public.empresas_permitidas())::text[])
     and (select public.puede('products'))
     and (select public.auth_rol()) in ('owner', 'admin')
   );

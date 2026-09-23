@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { downloadCsv } from "@/lib/ux/export-csv";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { MasterInventario } from "./MasterInventario";
-import { PanelConteo } from "./PanelConteo";
+import { ConteoFisico } from "./conteo/ConteoFisico";
 import ProductosPage from "@/app/admin/products/page";
 import { MovimientosPanel } from "./MovimientosPanel";
 import { useTableView } from "@/lib/ux/use-table-view";
@@ -20,7 +20,7 @@ import { inventarioDe, type ItemInventario } from "@/lib/inventory/inventario-db
 
 const inputClass = "sumi-campo sumi-campo--con-icono";
 
-type Tab = "master" | "movimientos" | "valery" | "productos";
+type Tab = "master" | "conteo" | "movimientos" | "valery" | "productos";
 
 export default function InventoryPage() {
   // Empresa activa según la ruta (consolidado -> sumigases).
@@ -65,7 +65,7 @@ export default function InventoryPage() {
           <div className="flex flex-wrap items-center gap-2">
             {/* Cargar conteo va primero: es la acción principal de esta
                 pantalla, y la razón por la que el Master significa algo. */}
-            <PanelConteo empresa={empresa} onCerrado={() => setRecargaMaster((n) => n + 1)} />
+            <Button icon="inventory" onClick={() => setTab("conteo")}>Cargar conteo</Button>
             <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-valery",
               [["Código", "Nombre", "Unidad", "Existencia"], ...fisicoF.map((f) => [f.codigo, f.nombre, f.undPpal, f.existPpal])])}>
               Exportar CSV
@@ -78,6 +78,7 @@ export default function InventoryPage() {
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
         {([
           ["master", "Master"],
+          ["conteo", "Conteo"],
           ["valery", `Valery (${fisico.length})`],
           // Productos y catalogo pasa a subdepartamento del inventario.
           ["productos", "Productos y catálogo"],
@@ -90,7 +91,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {tab !== "movimientos" && (
+      {tab !== "movimientos" && tab !== "conteo" && (
         <div className="mb-3">
           <label className="relative flex max-w-md items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
@@ -104,6 +105,9 @@ export default function InventoryPage() {
       {tab === "productos" && <ProductosPage />}
 
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
+
+      {/* El conteo fisico: planilla, historial y actas. */}
+      {tab === "conteo" && <ConteoFisico empresa={empresa} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
 
 
       {/* -------- MASTER dividido en 3 apartados -------- */}
