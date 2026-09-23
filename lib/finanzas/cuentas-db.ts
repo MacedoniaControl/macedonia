@@ -114,7 +114,11 @@ export type CuentaNueva = {
 };
 
 /** Lo que la vista no expone: el desglose fiscal de cada cuenta. */
-type DesgloseFila = { base: number | null; iva: number | null; retenido: number | null };
+type DesgloseFila = {
+  base: number | null; iva: number | null; retenido: number | null;
+  /** null = la migracion 21 no corrio todavia y la columna no existe. */
+  clase: ClaseCuenta | null; estado: EstadoCuenta | null;
+};
 
 /**
  * El desglose por cuenta, leido de la tabla.
@@ -128,19 +132,25 @@ async function desgloseDe(
   empresa: string,
   tipo: TipoCuenta,
 ): Promise<Map<number, DesgloseFila>> {
-  const { data, error } = await sb
-    .from("cuentas")
-    .select("id, base_imponible, iva, iva_retenido")
-    .eq("empresa_id", empresa)
-    .eq("tipo", tipo);
+  const consulta = (columnas: string) =>
+    sb.from("cuentas").select(columnas).eq("empresa_id", empresa).eq("tipo", tipo);
+  // Con la 21 corrida, la clase y el estado se leen de la tabla: una cuenta
+  // liquidada tiene que verse liquidada. Sin ella, se piden sin esas columnas.
+  let r = await consulta("id, base_imponible, iva, iva_retenido, clase, estado");
+  if (faltaColumna(r.error)) r = await consulta("id, base_imponible, iva, iva_retenido");
   // Sin las columnas el desglose es desconocido: el neto queda igual al total
   // y ninguna cuenta se marca, que es como se comportaba antes de existir.
-  if (error) return new Map();
+  if (r.error) return new Map();
   const num = (v: unknown) => (v == null ? null : Number(v));
+  const filas = (r.data ?? []) as unknown as Record<string, unknown>[];
   return new Map(
-    (data ?? []).map((c) => [
+    filas.map((c) => [
       Number(c.id),
-      { base: num(c.base_imponible), iva: num(c.iva), retenido: num(c.iva_retenido) },
+      {
+        base: num(c.base_imponible), iva: num(c.iva), retenido: num(c.iva_retenido),
+        clase: (c.clase as ClaseCuenta | undefined) ?? null,
+        estado: (c.estado as EstadoCuenta | undefined) ?? null,
+      },
     ]),
   );
 }
@@ -170,11 +180,11 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
       abonado: Number(c.abonado),
       saldo: Number(c.saldo),
       dias: Number(c.dias),
-      // La vista tampoco expone `clase` ni `estado`: la clase se deduce del
-      // prefijo -misma regla que la migracion- y la cuenta se muestra abierta,
+      // Sin la migracion 21 no hay columna: la clase se deduce del prefijo
+      // -misma regla que usa la migracion- y la cuenta se muestra abierta,
       // que es su estado por defecto.
-      clase: claseDeDocumento(c.documento),
-      estado: "abierta" as EstadoCuenta,
+      clase: d?.clase ?? claseDeDocumento(c.documento),
+      estado: d?.estado ?? ("abierta" as EstadoCuenta),
       baseImponible: d?.base ?? null,
       iva: d?.iva ?? null,
       ivaRetenido: retenido,

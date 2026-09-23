@@ -454,7 +454,24 @@ describe("la marca llega hasta la pantalla", () => {
 
   test("listarCuentas trae la base y el IVA que la vista no expone", () => {
     // Sin ellos no hay con que revisar el desglose y nada se marcaria nunca.
-    assert.match(db, /select\("id, base_imponible, iva, iva_retenido"\)/);
+    assert.match(db, /consulta\("id, base_imponible, iva, iva_retenido[^"]*"\)/);
     assert.match(db, /revision: revisarDesglose\(/);
+  });
+});
+
+describe("la lista de cuentas lee la clase y el estado de la migración 21", () => {
+  const db = fs.readFileSync("lib/finanzas/cuentas-db.ts", "utf8");
+
+  test("pide clase y estado a la tabla, y si no existen sigue sin ellas", () => {
+    // Antes la lista mostraba TODA cuenta como abierta: una liquidada seguia
+    // apareciendo en el total a pagar despues de correr la 21.
+    assert.match(db, /consulta\("id, base_imponible, iva, iva_retenido, clase, estado"\)/);
+    assert.match(db, /if \(faltaColumna\(r\.error\)\) r = await consulta\("id, base_imponible, iva, iva_retenido"\)/);
+  });
+
+  test("usa el estado guardado antes que el de por defecto", () => {
+    assert.match(db, /estado: d\?\.estado \?\? \("abierta" as EstadoCuenta\)/);
+    assert.match(db, /clase: d\?\.clase \?\? claseDeDocumento\(c\.documento\)/);
+    assert.doesNotMatch(db, /^\s+estado: "abierta" as EstadoCuenta,$/m);
   });
 });
