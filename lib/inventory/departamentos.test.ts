@@ -36,4 +36,11 @@ describe("migración 22: departamentos de Valery", () => {
     assert.match(sql, /drop policy if exists departamentos_leer/);
     assert.match(sql, /on conflict \(empresa_id, codigo\) do update/);
   });
+
+  test("01 DIRECTO y 17 ACTIVOS SUDEMATIN no entran al conteo", () => {
+    // Decision del owner del 23-09-2026. Queda como dato, no escrito en el
+    // codigo: si mañana cambia, se cambia una fila.
+    assert.match(sql, /se_cuenta\s+boolean not null default true/);
+    assert.match(sql, /update public\.departamentos set se_cuenta = false\s+where empresa_id = 'sumigases' and codigo in \('01', '17'\)/);
+  });
 });

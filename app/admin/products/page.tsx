@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { fmtUsd } from "@/lib/ux/format";
+import { margenSobreVenta } from "@/lib/inventory/margen";
 
 type Prod = { codigo: string; nombre: string; cat: string; precio: number; costo: number; nuevo?: boolean };
 
@@ -59,10 +60,10 @@ export default function ProductsPage() {
     setMsg("ERR:Los productos vienen del catálogo de Valery. Crear uno a mano todavía no está disponible.");
   }
 
-  // Sin costo no hay margen que calcular — ni para quien no puede verlo, ni
-  // para un producto que nunca se compró.
-  const margen = (p: ProductoLista) =>
-    p.costo !== null && p.costo > 0 ? Math.round(((p.precio - p.costo) / p.costo) * 100) : null;
+  // Igual que el "% Util." de Valery: sobre la venta y los dos sin IVA. Sin
+  // costo no hay margen que calcular — ni para quien no puede verlo, ni para un
+  // producto que nunca se compró.
+  const margen = (p: ProductoLista) => margenSobreVenta(p.costo, p.precio);
 
   return (
     <>
@@ -129,7 +130,10 @@ export default function ProductsPage() {
                           seria mentir; el guion dice "no te toca verlo". */}
                       {p.costo === null ? "—" : fmtUsd(p.costo)}
                     </td>
-                    <td className="py-2.5 text-right">{margen(p) !== null ? <span className="font-medium text-ok">{margen(p)}%</span> : <span className="text-muted">—</span>}</td>
+                    <td className="py-2.5 text-right">{margen(p) !== null
+                      // Negativo = se vende por debajo del costo: no puede salir en verde.
+                      ? <span className={`font-medium ${(margen(p) as number) < 0 ? "text-danger" : "text-ok"}`}>{margen(p)}%</span>
+                      : <span className="text-muted">—</span>}</td>
                   </tr>
                 ))}
               </tbody>
