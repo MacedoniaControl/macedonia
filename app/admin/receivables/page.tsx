@@ -23,7 +23,9 @@ import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { Button } from "@/components/ui/Button";
 import { fmtUsd } from "@/lib/ux/format";
-import { downloadCsv } from "@/lib/ux/export-csv";
+import { BotonDescargar } from "@/components/ui/BotonDescargar";
+import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
+import { textoCelda } from "@/lib/ux/tabla-export";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
 
@@ -38,7 +40,12 @@ function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
 
 const inputClass = "sumi-campo";
 
+// «Descargar» baja la cartera tal como se ve, con su filtro de clase.
 export default function ReceivablesPage() {
+  return <ProveedorExportar><CuentasPorCobrar /></ProveedorExportar>;
+}
+
+function CuentasPorCobrar() {
   const empresaKey = useEmpresaActiva();
   // Las cuentas viven en la base y el saldo lo calcula la vista sumando abonos.
   const [recarga, setRecarga] = useState(0);
@@ -149,6 +156,29 @@ export default function ReceivablesPage() {
   const porVencer = conSaldo.filter((c) => c.saldo > 0 && c.dias >= 0 && c.dias <= 8).reduce((a, c) => a + c.saldo, 0);
   const nVencidas = conSaldo.filter((c) => c.saldo > 0 && c.dias < 0).length;
 
+  useExportable(() => ({
+    modulo: "",
+    seccion: "Cuentas por Cobrar",
+    titulo: "Cuentas por Cobrar",
+    detalle: [
+      filtroClase === "todas" ? "Todas las clases" : `Clase: ${CLASES.find((x) => x.id === filtroClase)?.label ?? filtroClase}`,
+      `Por cobrar ${textoCelda(totalSaldo, "usd")} · Vencido ${textoCelda(vencido, "usd")} · Por vencer ${textoCelda(porVencer, "usd")}`,
+    ],
+    columnas: [
+      { titulo: "Cliente" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Clase" }, { titulo: "Monto", tipo: "usd" },
+      { titulo: "Abonado", tipo: "usd" }, { titulo: "Saldo", tipo: "usd" }, { titulo: "Vence", tipo: "fecha" }, { titulo: "Estado" },
+    ],
+    filas: conSaldo.map((c) => [
+      c.contraparte, c.documento, CLASES.find((x) => x.id === c.clase)?.label ?? null, c.monto, c.abonado, c.saldo, c.vence,
+      c.estado === "liquidada" ? "Liquidada" : estadoDe(c.saldo, c.dias).label,
+    ]),
+    totales: [
+      `Total · ${conSaldo.length} cuenta(s)`, "", "", conSaldo.reduce((a, c) => a + c.monto, 0),
+      conSaldo.reduce((a, c) => a + c.abonado, 0), totalSaldo, "", "",
+    ],
+    nota: "Montos en USD. El saldo es el monto menos lo abonado.",
+  }));
+
   return (
     <>
       <PageHeader
@@ -166,7 +196,7 @@ export default function ReceivablesPage() {
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
-            <Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-cobrar", [["Cliente", "Documento", "Monto", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.abonado, c.saldo, c.vence])])}>Exportar CSV</Button>
+            <BotonDescargar empresa={empresaKey} />
           </div>
         }
       />
