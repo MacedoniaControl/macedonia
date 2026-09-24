@@ -16,7 +16,9 @@ import { esSkuMacedonia, fmtDif, fmtNum } from "@/lib/inventory/acta";
 import { cerrarConteo, urlActa, type TipoArchivo } from "@/lib/inventory/conteos-db";
 import type { Fila } from "./Contar";
 
-export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, sinContar, errores, onCerrar, onCerrado }: {
+export function RevisarCierre({ conteoId, titulo, gerencia, fecha, conto, onConto, filas, sinContar, errores, onCerrar, onCerrado }: {
+  /** Owner o Administrador: ven las actas y el historial. El Técnico, no. */
+  gerencia: boolean;
   conteoId: number; titulo: string; fecha: string; conto: string; onConto: (v: string) => void;
   filas: Fila[]; sinContar: number; errores: Fila[];
   onCerrar: () => void; onCerrado: () => void;
@@ -43,7 +45,11 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
             <p className="font-mono text-lg font-bold text-brand">{hecho.numero ?? "Cerrado"}</p>
             <p className="mt-1 text-sm text-muted">{contados.length} renglón(es) de {titulo}. El inventario no cambió.</p>
           </div>
-          {hecho.actas ? (
+          {!gerencia ? (
+            <p className="rounded-xl bg-info/10 px-3 py-2 text-left text-sm text-info">
+              Quedó en el historial con sus actas. El Owner o un Administrador revisa las diferencias.
+            </p>
+          ) : hecho.actas ? (
             <div className="flex flex-wrap justify-center gap-2">
               <Descarga id={conteoId} tipo="acta_pdf" label="Acta en PDF" />
               <Descarga id={conteoId} tipo="acta_xlsx" label="Acta en Excel" />
@@ -53,10 +59,12 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
               El conteo quedó cerrado, pero las actas no se pudieron generar{hecho.errorActas ? `: ${hecho.errorActas}` : ""}. Se pueden volver a generar desde el historial.
             </p>
           ) : null}
-          <p className="rounded-xl bg-warn/10 px-3 py-2 text-left text-sm text-warn">
-            Las diferencias esperan la aprobación del Owner o de un Administrador, en el historial.
-          </p>
-          <Button className="w-full" onClick={onCerrado}>Ver en el historial</Button>
+          {gerencia && (
+            <p className="rounded-xl bg-warn/10 px-3 py-2 text-left text-sm text-warn">
+              Las diferencias esperan la aprobación del Owner o de un Administrador, en el historial.
+            </p>
+          )}
+          <Button className="w-full" onClick={onCerrado}>{gerencia ? "Ver en el historial" : "Listo"}</Button>
         </div>
       </Modal>
     );

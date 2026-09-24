@@ -72,6 +72,8 @@ export type ResumenConteo = {
   articulosNuevos: number;
   tieneActas: boolean;
   tieneValorizada: boolean;
+  /** Eliminado: la fila queda como la línea «eliminado por … el …». */
+  eliminado: { en: string; por: string; resumen: string } | null;
 };
 
 export type DetalleConteo = {
@@ -86,7 +88,7 @@ export type TipoArchivo = "acta_pdf" | "acta_xlsx" | "valorizada_pdf" | "valoriz
 const ETIQUETA_EVENTO: Record<string, string> = {
   abierto: "Conteo abierto", articulo_nuevo: "Artículo nuevo agregado", cerrado: "Conteo cerrado",
   acta_generada: "Acta generada", ajuste_aprobado: "Ajuste aprobado", ajuste_rechazado: "Ajuste rechazado",
-  alcance: "Cambió lo que se cuenta",
+  alcance: "Cambió lo que se cuenta", editado: "Conteo corregido",
 };
 
 function origenDe(departamento: string | null, zona: string | null): Conteo["origen"] {
@@ -118,6 +120,7 @@ export async function conteoAbierto(empresa: string): Promise<Conteo | null> {
     .select("id, fecha, departamento, departamento_nombre, zona, abierto_en, renglones")
     .eq("empresa_id", empresa)
     .eq("cerrado", false)
+    .is("eliminado_en", null)
     .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -375,7 +378,10 @@ export async function cerrarConteo(
   // La base ya no deja cerrar cambiando el campo a mano.
   const r = await sb.rpc("cerrar_conteo", { p_conteo: id, p_conto: conto?.trim() || null });
   if (!r.error) {
-    const g = await generarActas(id);
+    // El técnico cierra, pero ya no ve el conteo cerrado (el historial es del
+    // Owner y el Administrador): las actas se archivan sin pasar por su vista.
+    // cerrar_conteo() ya comprobó que podía cerrarlo.
+    const g = await archivarActas(id);
     return { ok: true, numero: r.data as string, actas: g.ok, errorActas: g.error };
   }
   // PGRST202 = la funcion no existe: la 23 no corrio todavia, se cierra como antes.
@@ -432,11 +438,19 @@ export async function generarActas(id: number): Promise<{ ok: boolean; error?: s
   const { data: visible } = await sb.from("conteos").select("id, cerrado").eq("id", id).maybeSingle();
   if (!visible) return { ok: false, error: "No existe el conteo o no tienes acceso." };
   if (!visible.cerrado) return { ok: false, error: "El conteo sigue abierto: el acta se genera al cerrarlo." };
+  return archivarActas(id);
+}
 
+/**
+ * Arma y sube las cuatro actas. `rehacer`: después de corregir un conteo, las
+ * actas se vuelven a generar con los números nuevos y reemplazan a las viejas
+ * (mismas rutas); la corrección queda en su historial.
+ */
+async function archivarActas(id: number, rehacer = false): Promise<{ ok: boolean; error?: string }> {
   const admin = createAdminClient();
   try {
     const { conteo: c, acta, costos } = await actaDe(admin, id);
-    if (c.acta_pdf && c.acta_xlsx && c.valorizada_pdf && c.valorizada_xlsx) return { ok: true };
+    if (!rehacer && c.acta_pdf && c.acta_xlsx && c.valorizada_pdf && c.valorizada_xlsx) return { ok: true };
     const v = valorizar(acta, costos);
     const base = `${c.empresa_id}/${c.numero}`;
     const archivos: [TipoArchivo, string, Buffer, string][] = [
@@ -447,17 +461,20 @@ export async function generarActas(id: number): Promise<{ ok: boolean; error?: s
     ];
     const rutas: Partial<Record<TipoArchivo, string>> = {};
     for (const [tipo, ruta, buf, mime] of archivos) {
-      if (c[tipo]) continue;
-      const up = await admin.storage.from("actas").upload(ruta, buf, { contentType: mime, upsert: false });
+      if (c[tipo] && !rehacer) continue;
+      const up = await admin.storage.from("actas").upload(ruta, buf, { contentType: mime, upsert: rehacer });
       // "ya existe" = un intento anterior lo subio y fallo despues: se usa ese.
       if (up.error && !/exists|duplicate/i.test(up.error.message)) throw new Error(`No se pudo archivar ${ruta}: ${up.error.message}`);
       rutas[tipo] = ruta;
     }
-    const { error: eu } = await admin.from("conteos").update(rutas).eq("id", id);
-    if (eu) throw new Error(eu.message);
+    // Al rehacer, las rutas no cambian: no hay nada que actualizar en la fila.
+    if (Object.keys(rutas).length && !rehacer) {
+      const { error: eu } = await admin.from("conteos").update(rutas).eq("id", id);
+      if (eu) throw new Error(eu.message);
+    }
     await admin.from("conteo_eventos").insert({
       conteo_id: id, tipo: "acta_generada",
-      detalle: "Excel y PDF archivados, común y valorizada. No se modifican: un error se corrige con un conteo nuevo.",
+      detalle: rehacer ? "Actas generadas de nuevo con la corrección." : "Excel y PDF archivados, común y valorizada.",
     });
     return { ok: true };
   } catch (e) {
@@ -476,6 +493,9 @@ function aResumen(r: Record<string, unknown>): ResumenConteo {
     ajuste: r.ajuste as ResumenConteo["ajuste"], ajusteNota: r.ajuste_nota as string | null,
     renglones: r.renglones as number, diferencias: r.diferencias as number, articulosNuevos: r.articulos_nuevos as number,
     tieneActas: !!(r.acta_pdf && r.acta_xlsx), tieneValorizada: !!(r.valorizada_pdf && r.valorizada_xlsx),
+    eliminado: r.eliminado_en
+      ? { en: fechaHora(r.eliminado_en as string), por: (r.eliminado_nombre as string) ?? "Un usuario", resumen: (r.eliminado_resumen as string) ?? "" }
+      : null,
   };
 }
 
@@ -589,4 +609,39 @@ export async function master(empresa: string): Promise<FilaMaster[]> {
       diferencia: c ? c.n - valery : null,
     };
   });
+}
+
+// ---------------------------------------------------------------- corregir y eliminar (Owner o Administrador)
+
+/**
+ * Corrige renglones de un conteo. La base lo deja solo al Owner y al
+ * Administrador, anota cada cambio en el historial del conteo y, si el ajuste
+ * ya estaba aprobado, lleva la diferencia al inventario. Las actas se rehacen.
+ */
+export async function editarConteo(
+  id: number,
+  cambios: { codigo: string; cantidad: number; observacion: string | null }[],
+): Promise<{ ok: boolean; error?: string; cambiados?: number; errorActas?: string }> {
+  if (!cambios.length) return { ok: true, cambiados: 0 };
+  const sb = await createClient();
+  const r = await sb.rpc("editar_conteo", { p_conteo: id, p_cambios: cambios });
+  if (r.error) return { ok: false, error: r.error.message };
+  const cambiados = Number(r.data ?? 0);
+  const { data: c } = await sb.from("conteos").select("cerrado").eq("id", id).maybeSingle();
+  if (!cambiados || !c?.cerrado) return { ok: true, cambiados };
+  const g = await archivarActas(id, true);
+  return { ok: true, cambiados, errorActas: g.ok ? undefined : g.error };
+}
+
+/**
+ * Elimina un conteo: la base borra sus renglones e historial y deja la línea
+ * «eliminado por … el …». Después se borran sus actas del archivo.
+ */
+export async function eliminarConteo(id: number): Promise<{ ok: boolean; error?: string }> {
+  const sb = await createClient();
+  const r = await sb.rpc("eliminar_conteo", { p_conteo: id });
+  if (r.error) return { ok: false, error: r.error.message };
+  const actas = ((r.data as { actas?: (string | null)[] } | null)?.actas ?? []).filter((x): x is string => !!x);
+  if (actas.length) await createAdminClient().storage.from("actas").remove(actas);
+  return { ok: true };
 }

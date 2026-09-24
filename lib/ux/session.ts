@@ -51,3 +51,19 @@ export function puedeVerRegistros(rol: Rol): boolean {
 export function puedeVerFinanzas(rol: Rol): boolean {
   return rol === "owner" || rol === "admin";
 }
+
+/**
+ * Hace conteos físicos: Técnico, Administrador y Owner. El Vendedor consulta
+ * existencias, pero no cuenta. La base lo vuelve a comprobar (puede_contar()).
+ */
+export function puedeContar(rol: Rol): boolean {
+  return rol === "owner" || rol === "admin" || rol === "tecnico";
+}
+
+/**
+ * Movimientos de inventario e historial de conteos: información gerencial,
+ * solo Owner y Administrador (movimientos_lectura y conteos_lectura en la 25).
+ */
+export function esGerencia(rol: Rol): boolean {
+  return rol === "owner" || rol === "admin";
+}
