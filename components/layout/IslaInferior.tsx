@@ -30,13 +30,17 @@ const PASTILLAS: Pastilla[] = [
   { clave: "quotes",         href: "/admin/quotes",         etiqueta: "Cotizar",    icono: "quote" },
 ];
 
-export function IslaInferior({ onMas, permisos }: { onMas: () => void; permisos?: Permisos }) {
+export function IslaInferior({ empresa, onMas, permisos }: { empresa: string | null; onMas: () => void; permisos?: Permisos }) {
   const ruta = usePathname();
   const { rol } = useRol();
 
   // Quien no puede entrar a una sección no la ve: una pastilla que lleva a un
   // "no tenés permiso" gasta uno de los cinco lugares.
-  const visibles = PASTILLAS.filter((p) => !permisos || puedeVer(permisos, rol, p.clave));
+  // Siempre DENTRO de la empresa que se esta mirando: con /admin/inventory a
+  // secas, el tecnico de Sudematin caia en el inventario de Sumigases.
+  const visibles = PASTILLAS
+    .filter((p) => !permisos || puedeVer(permisos, rol, p.clave))
+    .map((p) => ({ ...p, href: empresa ? p.href.replace(/^\/admin\//, `/admin/${empresa}/`) : p.href }));
 
   // Con el teclado abierto la isla estorba: tapa lo que se esta escribiendo.
   // Se marca en <html> y el CSS la esconde (y baja la barra del conteo).
@@ -67,7 +71,7 @@ export function IslaInferior({ onMas, permisos }: { onMas: () => void; permisos?
           pasar el toque al contenido de abajo. */}
       <div className="pointer-events-auto m-3 flex items-stretch gap-1 rounded-full border border-border bg-surface p-1 shadow-xl">
         {visibles.map((p) => {
-          const activa = ruta.startsWith(p.href) || ruta.includes(`/${p.clave}`);
+          const activa = ruta === p.href || ruta.startsWith(`${p.href}/`);
           return (
             <Link
               key={p.clave}

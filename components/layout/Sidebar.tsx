@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { navGroups } from "@/lib/ux/nav";
 import type { Permisos } from "@/lib/auth/permisos";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
+import { useInicio } from "@/lib/ux/inicio";
 
 export function Sidebar({
   empresa,
@@ -22,6 +23,7 @@ export function Sidebar({
   esOwner?: boolean;
 }) {
   const pathname = usePathname();
+  const inicio = useInicio();
   const emp = empresa && isEmpresaId(empresa) ? EMPRESAS[empresa] : null;
   // Prefija los links con la empresa activa: /admin/quotes -> /admin/<empresa>/quotes
   const scoped = (href: string) => (emp ? href.replace(/^\/admin\//, `/admin/${emp.id}/`) : href);
@@ -60,6 +62,8 @@ export function Sidebar({
         aria-label="Navegación principal"
       >
         <div className="flex h-16 items-center gap-2.5 border-b border-border px-4">
+          {/* El nombre de la empresa lleva a Inicio, como en casi cualquier app. */}
+          <Link href={inicio} onClick={onClose} aria-label="Ir al inicio" className="flex min-w-0 items-center gap-2.5 rounded-lg">
           {emp ? (
             <img src={emp.logo} alt="" className="h-8 w-auto max-w-[36px] object-contain" />
           ) : (
@@ -69,27 +73,32 @@ export function Sidebar({
             <p className="truncate text-sm font-semibold text-text">{emp ? emp.nombreCorto : "Macedonia"}</p>
             <p className="text-[11px] text-muted">{emp ? "Macedonia" : "Sumigases · Sudematin"}</p>
           </div>
-
-          {/* Volver al Centro de Control (elegir empresa / salir del panel) */}
-          <Link
-            href="/"
-            onClick={onClose}
-            aria-label="Volver al menú principal de Macedonia"
-            title="Volver al menú principal"
-            className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-brand"
-          >
-            <span className="rotate-180"><Icon name="chevronRight" size={18} /></span>
           </Link>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar menú"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
+            className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-2 lg:hidden"
           >
             <Icon name="close" size={18} />
           </button>
         </div>
+
+        {/* El Centro de Control es donde el Owner elige empresa. Antes era una
+            flecha «‹» sin texto que a los demas los devolvia a la misma
+            pantalla: para ellos no existe, su pantalla principal es Inicio. */}
+        {esOwner && (
+          <Link
+            href="/"
+            onClick={onClose}
+            className="group mx-3 mt-3 flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 text-sm font-medium transition hover:border-brand"
+          >
+            <span className="text-muted group-hover:text-brand"><Icon name="building" size={16} /></span>
+            <span className="text-text group-hover:text-brand">Centro de Control</span>
+            <span className="ml-auto text-[11px] font-normal text-muted">cambiar empresa</span>
+          </Link>
+        )}
 
         <nav className="sumi-scroll flex-1 overflow-y-auto px-3 py-4">
           {gruposVisibles.length === 0 && (

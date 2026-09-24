@@ -24,7 +24,7 @@ export default async function SinAcceso() {
 
   return (
     <SesionProvider
-      identidad={{ nombre: u.nombre, usuario: u.usuario, rol: u.rol, empresaId: u.empresaId }}
+      identidad={{ nombre: u.nombre, usuario: u.usuario, rol: u.rol, empresaId: u.empresaId, permisos: u.permisos }}
     >
       <main className="flex min-h-dvh flex-col bg-bg px-4 py-6">
         <header className="flex items-center justify-between">

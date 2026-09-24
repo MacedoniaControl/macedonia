@@ -59,6 +59,7 @@ export default async function Portada() {
         usuario: usuario.usuario,
         rol: usuario.rol,
         empresaId: usuario.empresaId,
+        permisos: usuario.permisos,
       }}
     >
       <CentroDeControl />

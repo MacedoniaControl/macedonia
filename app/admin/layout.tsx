@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <SesionProvider
       identidad={
-        u ? { nombre: u.nombre, usuario: u.usuario, rol: u.rol, empresaId: u.empresaId } : null
+        u ? { nombre: u.nombre, usuario: u.usuario, rol: u.rol, empresaId: u.empresaId, permisos: u.permisos } : null
       }
     >
       <AppShell>{children}</AppShell>
