@@ -13,8 +13,10 @@ import { Icon } from "@/components/ui/Icon";
 import { useCarga } from "@/lib/ux/use-carga";
 import { buscarProveedores, type Proveedor } from "@/lib/directorio/directorio-db";
 import { FormularioProveedor } from "@/components/directorio/FormularioProveedor";
+import { useExportable } from "@/lib/ux/exportar";
 
-export function PanelProveedores() {
+/** `todos`: el directorio completo, para descargarlo cuando no hay búsqueda. */
+export function PanelProveedores({ todos = [] }: { todos?: Proveedor[] }) {
   const [q, setQ] = useState("");
   const [editando, setEditando] = useState<Partial<Proveedor> | null>(null);
   const [recarga, setRecarga] = useState(0);
@@ -26,6 +28,26 @@ export function PanelProveedores() {
     () => (q.trim().length >= 2 ? buscarProveedores(q, 25) : Promise.resolve([])),
   );
   const lista: Proveedor[] = carga.datos ?? [];
+
+  // Con búsqueda, lo encontrado; sin búsqueda, el directorio entero.
+  useExportable(() => {
+    const busca = q.trim().length >= 2;
+    const filas = busca ? lista : todos;
+    return {
+      modulo: "",
+      seccion: "Proveedores",
+      titulo: "Proveedores",
+      detalle: [busca ? `Búsqueda: «${q.trim()}»` : "Todos los proveedores"],
+      columnas: [
+        { titulo: "RIF", tipo: "codigo" }, { titulo: "Nombre" }, { titulo: "Origen" }, { titulo: "Contacto" }, { titulo: "Teléfonos" },
+        { titulo: "Correo" }, { titulo: "Ciudad" }, { titulo: "Días Créd.", tipo: "num" }, { titulo: "% Ret.", tipo: "pct" },
+      ],
+      filas: filas.map((p) => [
+        p.rif, p.nombre, p.nacional ? "Nacional" : "Extranjero", p.contacto, p.telefonos, p.correo, p.ciudad,
+        p.diasCredito, p.pctRetencion > 0 ? p.pctRetencion : null,
+      ]),
+    };
+  });
 
   return (
     <SectionCard
