@@ -13,6 +13,8 @@ export type Celda = string | number | null;
 export type TablaExport = {
   /** Nombre corto para el archivo: "Master", "Movimientos"… */
   seccion: string;
+  /** Modulo que encabeza el nombre del archivo. Sin indicar, "Inventario"; "" = solo la seccion. */
+  modulo?: string;
   /** Titulo del documento: "Inventario Master". */
   titulo: string;
   /** Que esta mostrando la vista: filtros, busqueda, orden. */
@@ -33,9 +35,10 @@ export const FILAS_PDF_AVISO = 3000;
 export const FILAS_POR_PAGINA = 45;
 
 /** "Inventario Master - Sumigases - 24-09-2026.xlsx", sin caracteres que un sistema rechace. */
-export function nombreArchivo(t: Pick<TablaExport, "seccion">, empresa: string, fecha: string, ext: "xlsx" | "pdf"): string {
+export function nombreArchivo(t: Pick<TablaExport, "seccion" | "modulo">, empresa: string, fecha: string, ext: "xlsx" | "pdf"): string {
   const limpio = (s: string) => s.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
-  return `${limpio(`Inventario ${t.seccion} - ${empresa} - ${fecha}`)}.${ext}`;
+  const modulo = t.modulo ?? "Inventario";
+  return `${limpio(`${modulo ? `${modulo} ` : ""}${t.seccion} - ${empresa} - ${fecha}`)}.${ext}`;
 }
 
 /** Fecha y hora de Venezuela: "24-09-2026 10:05". */

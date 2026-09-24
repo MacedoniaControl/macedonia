@@ -24,7 +24,9 @@ import { AlertCard } from "@/components/ui/AlertCard";
 import { Button } from "@/components/ui/Button";
 import { fmtUsd } from "@/lib/ux/format";
 import { MarcaRevision } from "@/components/finanzas/MarcaRevision";
-import { downloadCsv } from "@/lib/ux/export-csv";
+import { BotonDescargar } from "@/components/ui/BotonDescargar";
+import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
+import { textoCelda } from "@/lib/ux/tabla-export";
 
 type Cta = { id: number; proveedor: string; doc: string; monto: number; abonado: number; venc: string };
 const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
@@ -34,7 +36,12 @@ const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
   : { label: "Al día", tone: "info" };
 const inputClass = "sumi-campo";
 
+// «Descargar» baja las cuentas tal como se ven, con su filtro de clase.
 export default function PayablesPage() {
+  return <ProveedorExportar><CuentasPorPagar /></ProveedorExportar>;
+}
+
+function CuentasPorPagar() {
   const empresaKey = useEmpresaActiva();
   const [recarga, setRecarga] = useState(0);
   const carga = useCarga(`${empresaKey}:${recarga}`, () => listarCuentas(empresaKey, "pagar"));
@@ -140,6 +147,32 @@ export default function PayablesPage() {
   // SENIAT-, asi que la deuda con el es el total menos lo retenido. Greeg pidio
   // que el panel muestre esa cifra, que es la que hay que mover.
   const total = conSaldo.reduce((a, c) => a + c.saldoNeto, 0);
+
+  // «A Pagar» es el neto: la factura menos el IVA retenido, que va al SENIAT.
+  useExportable(() => ({
+    modulo: "",
+    seccion: "Cuentas por Pagar",
+    titulo: "Cuentas por Pagar",
+    detalle: [
+      filtroClase === "todas" ? "Todas las clases" : `Clase: ${CLASES.find((x) => x.id === filtroClase)?.label ?? filtroClase}`,
+      `Total a pagar ${textoCelda(total, "usd")}`,
+    ],
+    columnas: [
+      { titulo: "Proveedor" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Clase" }, { titulo: "Total Factura", tipo: "usd" },
+      { titulo: "IVA Retenido", tipo: "usd" }, { titulo: "A Pagar", tipo: "usd" }, { titulo: "Abonado", tipo: "usd" },
+      { titulo: "Saldo", tipo: "usd" }, { titulo: "Vence", tipo: "fecha" }, { titulo: "Estado" },
+    ],
+    filas: conSaldo.map((c) => [
+      c.contraparte, c.documento, CLASES.find((x) => x.id === c.clase)?.label ?? null, c.monto, c.ivaRetenido ?? null,
+      c.neto, c.abonado, c.saldoNeto, c.vence, c.estado === "liquidada" ? "Liquidada" : estadoDe(c.saldoNeto, c.d).label,
+    ]),
+    totales: [
+      `Total · ${conSaldo.length} cuenta(s)`, "", "", conSaldo.reduce((a, c) => a + c.monto, 0),
+      conSaldo.reduce((a, c) => a + (c.ivaRetenido ?? 0), 0), conSaldo.reduce((a, c) => a + c.neto, 0),
+      conSaldo.reduce((a, c) => a + c.abonado, 0), total, "", "",
+    ],
+    nota: "Montos en USD. A Pagar es el total de la factura menos el IVA retenido.",
+  }));
   // Cuentas cuyo desglose no es el 16% plano: facturas con renglones exentos.
   // Greeg pidio que se le avise, porque si se recalculan con el IVA automatico
   // sube la retencion, y eso es plata que se entera al SENIAT.
@@ -171,7 +204,7 @@ export default function PayablesPage() {
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
-            <Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Total Factura", "IVA Retenido", "A Pagar", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.ivaRetenido ?? 0, c.neto, c.abonado, c.saldoNeto, c.vence])])}>Exportar CSV</Button>
+            <BotonDescargar empresa={empresaKey} />
           </div>
         }
       />

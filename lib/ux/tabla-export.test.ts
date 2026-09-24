@@ -6,6 +6,9 @@ describe("nombreArchivo", () => {
   test("dice que es, de que empresa y de que dia", () => {
     assert.equal(nombreArchivo({ seccion: "Master" }, "Sumigases", "24-09-2026", "xlsx"), "Inventario Master - Sumigases - 24-09-2026.xlsx");
   });
+  test("fuera del inventario, sin el prefijo", () => {
+    assert.equal(nombreArchivo({ seccion: "Cuentas por Cobrar", modulo: "" }, "Sudematin", "24-09-2026", "pdf"), "Cuentas por Cobrar - Sudematin - 24-09-2026.pdf");
+  });
   test("saca lo que Windows o macOS rechazan", () => {
     assert.equal(nombreArchivo({ seccion: "Conteo 05/SOLDADURA: «x»?" }, "Sudematin", "24-09-2026", "pdf"), "Inventario Conteo 05 SOLDADURA «x» - Sudematin - 24-09-2026.pdf");
   });
