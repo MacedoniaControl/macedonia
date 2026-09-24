@@ -20,12 +20,16 @@ import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { MOTIVOS_ENTRADA, MOTIVOS_SALIDA } from "@/lib/ux/catalogos";
+import { useExportable } from "@/lib/ux/exportar";
+import { fechaVista } from "@/lib/ux/tabla-export";
 
 const fieldClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
 type Filtro = "todos" | "entrada" | "salida";
+
+const ORDEN: Record<string, string> = { fecha: "fecha", codigo: "código", nombre: "producto", cantidad: "cantidad", origen: "origen" };
 
 export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }) {
   // Los movimientos vienen de la BASE, no del navegador: el kardex es la fuente
@@ -65,6 +69,34 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
     [],
   );
   const t = useTableView(visibles, acc, 25);
+
+  // El libro tal como se ve: su filtro y su orden, todas las paginas.
+  useExportable(() => {
+    const neto = t.ordenadas.reduce((a, m) => a + (m.direccion === "entrada" ? m.cantidad : -m.cantidad), 0);
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return {
+      seccion: "Movimientos",
+      titulo: "Movimientos de inventario",
+      detalle: [
+        filtro === "todos" ? "Todos los movimientos" : filtro === "entrada" ? "Solo ingresos" : "Solo salidas",
+        // La pantalla carga los ultimos 200 (listarMovimientos): que el archivo
+        // no parezca el kardex entero.
+        ...(movs.length >= 200 ? [`Los últimos ${movs.length} movimientos registrados, los que carga la pantalla`] : []),
+        ...(t.sortKey ? [`Ordenado por ${ORDEN[t.sortKey] ?? t.sortKey} (${t.dir === "asc" ? "ascendente" : "descendente"})`] : []),
+        `Ingresos +${r2(totEntrada)} · Salidas −${r2(totSalida)} · Neto ${r2(totEntrada - totSalida)}`,
+      ],
+      columnas: [
+        { titulo: "Fecha", tipo: "fecha" }, { titulo: "Código", tipo: "codigo" }, { titulo: "Producto" },
+        { titulo: "Cantidad", tipo: "dif" }, { titulo: "Origen" }, { titulo: "Motivo / Documento" }, { titulo: "Usuario" },
+      ],
+      filas: t.ordenadas.map((m) => [
+        fechaVista(m.fecha), m.codigo, m.nombre, m.direccion === "entrada" ? m.cantidad : -m.cantidad,
+        m.origen === "compra" ? "Compra" : m.origen === "venta" ? "Venta" : "Manual", m.motivo || m.documento || null, m.usuario || null,
+      ]),
+      totales: ["", "", `Neto · ${t.ordenadas.length.toLocaleString("es-VE")} movimientos`, r2(neto), "", "", ""],
+      nota: "Cantidad con signo: + entra al inventario, − sale.",
+    };
+  });
 
   return (
     <>

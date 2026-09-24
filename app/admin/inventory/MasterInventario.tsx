@@ -24,6 +24,8 @@ import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { master, type FilaMaster } from "@/lib/inventory/conteos-db";
+import { useExportable } from "@/lib/ux/exportar";
+import { fechaVista } from "@/lib/ux/tabla-export";
 
 const dias = (iso: string) =>
   Math.round((Date.now() - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
@@ -59,6 +61,31 @@ export function MasterInventario({
     [filas],
   );
   const num = (v: number) => v.toLocaleString("es-VE", { maximumFractionDigits: 2 });
+
+  // Lo mismo que la tabla, pero TODAS las filas del filtro (la pantalla corta
+  // en 300). El consolidado es el de todo el catalogo, como abajo.
+  useExportable(() => ({
+    seccion: "Master",
+    titulo: "Inventario Master",
+    detalle: [
+      soloDiferencias && contados > 0 ? "Solo los que no cuadran" : "Todos los productos",
+      ...(filtro.trim() ? [`Búsqueda: «${filtro.trim()}»`] : []),
+      "Ordenado por diferencia, de mayor a menor",
+      `${contados.toLocaleString("es-VE")} de ${filas.length.toLocaleString("es-VE")} productos contados`,
+    ],
+    columnas: [
+      { titulo: "Código", tipo: "codigo" }, { titulo: "Producto" }, { titulo: "Valery", tipo: "num" },
+      { titulo: "Contado", tipo: "num" }, { titulo: "Diferencia", tipo: "dif" }, { titulo: "Estado" }, { titulo: "Contado el", tipo: "fecha" },
+    ],
+    filas: visibles.map((f) => [
+      f.codigo, f.nombre, f.valery, f.contado, f.diferencia, estadoMaster(f), fechaVista(f.fechaConteo),
+    ]),
+    totales: [
+      "", `Consolidado · ${num(filas.length)} productos`, consolidado.valery, consolidado.contado,
+      contados === 0 ? null : consolidado.contado - consolidado.valery, `${num(contados)} contados`, "",
+    ],
+    nota: "El consolidado suma todo el catálogo, no solo las filas de este filtro. Valery en negativo: salió mercancía sin que se registrara su entrada.",
+  }));
 
   return (
     <SectionCard
@@ -197,4 +224,11 @@ export function MasterInventario({
       )}
     </SectionCard>
   );
+}
+
+/** El estado de una fila, con las mismas palabras que la pantalla. */
+function estadoMaster(f: FilaMaster): string {
+  if (f.valery < 0) return "Despacho sin entrada registrada";
+  if (f.contado === null) return "Sin contar";
+  return f.diferencia === 0 ? "Cuadra" : "No cuadra";
 }

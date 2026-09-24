@@ -32,6 +32,7 @@ import {
   abrirConteo, anotar, borrarRenglon, cambiarAlcance, conteoAbierto, departamentosDe, lineasDe, planillaDe,
   type Conteo, type ItemPlanilla,
 } from "@/lib/inventory/conteos-db";
+import { useExportable } from "@/lib/ux/exportar";
 import { AgregarArticulo } from "./AgregarArticulo";
 import { RevisarCierre } from "./RevisarCierre";
 
@@ -220,6 +221,42 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
   const filasRef = useRef(filas);
   const visiblesRef = useRef(visibles);
   useEffect(() => { filasRef.current = filas; visiblesRef.current = visibles; });
+
+  // La planilla como se esta viendo (departamento, filtro, busqueda). Lo que
+  // dice el sistema solo va si esta a la vista: el conteo es ciego, y el
+  // archivo no puede destaparlo.
+  useExportable(() => {
+    const FILTRO: Record<Filtro, string> = { todos: "Todos los renglones", sin: "Solo sin contar", contados: "Solo contados", cero: "Solo en cero" };
+    return {
+      seccion: `Conteo ${titulo}`,
+      titulo: `Conteo en curso · ${titulo}`,
+      detalle: [
+        ...(verDepto ? [etiqueta(verDepto)] : []),
+        FILTRO[filtro],
+        ...(t ? [`Búsqueda: «${q.trim()}»`] : []),
+        `Fecha ${conteo.fecha.split("-").reverse().join("-")}`,
+        ...(conto.trim() ? [`Contó: ${conto.trim()}`] : []),
+        `${contados} de ${total} contados`,
+      ],
+      columnas: [
+        { titulo: "N°", tipo: "num" }, { titulo: "Código", tipo: "codigo" }, { titulo: "Producto" }, { titulo: "Unidad" },
+        { titulo: "Contado", tipo: "num" }, { titulo: "Estado" }, { titulo: "Observación" },
+        ...(verSistema ? [{ titulo: "Sistema", tipo: "num" as const }, { titulo: "Diferencia", tipo: "dif" as const }] : []),
+      ],
+      filas: visibles.map((f) => {
+        const l = leerCantidad(f.texto);
+        const valor = l.estado === "ok" || l.estado === "cero" ? l.valor : null;
+        const estado = l.estado === "vacio" ? "Sin contar" : l.estado === "cero" ? "Cero" : l.estado === "error" ? "Revisar" : "Contado";
+        const nuevo = esSkuMacedonia(f.codigo);
+        return [
+          f.renglon, f.codigo, f.nombre, f.unidad || null, valor, f.extra ? `${estado} · ${nuevo ? "artículo nuevo" : "fuera de planilla"}` : estado,
+          f.obs.trim() || null,
+          ...(verSistema ? [nuevo ? null : f.sistema, valor === null || nuevo ? null : Math.round((valor - f.sistema) * 1000) / 1000] : []),
+        ];
+      }),
+      nota: "Planilla de trabajo de un conteo abierto. El acta oficial, con su número, sale al cerrar el conteo. Vacío = sin contar; 0 = no hay ninguno.",
+    };
+  });
 
   const cambiar = (codigo: string, parche: Partial<Fila>) =>
     setFilas((fs) => fs.map((f) => (f.codigo === codigo ? { ...f, ...parche } : f)));

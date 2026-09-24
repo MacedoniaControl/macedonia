@@ -61,6 +61,8 @@ export function useTableView<T>(rows: T[], accessors: Accessors<T>, initialSize 
 
   return {
     visible,
+    /** Todas las filas en el orden de la pantalla (para descargar), no solo la pagina. */
+    ordenadas: sorted,
     total,
     page: safePage,
     pages,

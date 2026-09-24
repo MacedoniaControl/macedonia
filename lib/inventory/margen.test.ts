@@ -30,7 +30,7 @@ describe("margen de producto, como el % Util. de Valery", () => {
   });
 
   test("la pantalla de Productos usa esta función", () => {
-    const pant = fs.readFileSync("app/admin/products/page.tsx", "utf8");
+    const pant = fs.readFileSync("app/admin/products/CatalogoProductos.tsx", "utf8");
     assert.match(pant, /margenSobreVenta\(p\.costo, p\.precio\)/);
     assert.doesNotMatch(pant, /\(p\.precio - p\.costo\) \/ p\.costo/);
   });
