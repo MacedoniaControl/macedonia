@@ -54,12 +54,12 @@ export default function PurchasesPage() {
 
   async function crear() {
     setMsg("");
-    if (!o.proveedor) return setMsg("ERR:Elegí el proveedor.");
-    if (!o.codigo.trim()) return setMsg("ERR:Elegí o escribí el código del producto.");
+    if (!o.proveedor) return setMsg("ERR:Elige el proveedor.");
+    if (!o.codigo.trim()) return setMsg("ERR:Elige o escribe el código del producto.");
     if (!(o.cantidad > 0)) return setMsg("ERR:La cantidad debe ser al menos 1.");
 
     // Si el producto no está en el inventario, no se puede comprar contra la
-    // nada: se ofrece crearlo acá mismo en vez de mandar a otra pantalla y
+    // nada: se ofrece crearlo aquí mismo en vez de mandar a otra pantalla y
     // hacer que la orden se cargue dos veces.
     const existe = productos.find((x) => x.codigo === o.codigo.trim());
     if (!existe) {
@@ -123,7 +123,7 @@ export default function PurchasesPage() {
         actions={<StatusBadge tone="brand">{ordenes.length} orden(es)</StatusBadge>}
       />
       <div className="sumi-tabs mb-4 flex gap-1 overflow-x-auto">
-        {([["ordenes", "Órdenes de compra"], ["proveedores", "Proveedores"]] as const).map(([id, label]) => (
+        {([["ordenes", "Órdenes de Compra"], ["proveedores", "Proveedores"]] as const).map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -142,12 +142,12 @@ export default function PurchasesPage() {
 
       {tab === "ordenes" && (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.5fr]">
-        <SectionCard title="Nueva orden de compra" description="Los productos salen del inventario de la empresa.">
+        <SectionCard title="Nueva Orden de Compra" description="Los productos salen del inventario de la empresa.">
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted" htmlFor="prov">Proveedor *</label>
               <select id="prov" className={inputClass} value={o.proveedor} onChange={(e) => setO({ ...o, proveedor: e.target.value })}>
-                <option value="">— elegir —</option>
+                <option value="">Elige…</option>
                 {proveedores.map((p) => <option key={p.rif} value={p.nombre}>{p.nombre} · {p.rif}</option>)}
               </select>
               {cargaProv.error && <span className="mt-1 block text-xs text-danger">{cargaProv.error}</span>}
@@ -216,8 +216,8 @@ export default function PurchasesPage() {
             cargando={carga.cargando}
             error={carga.error}
             vacio={ordenes.length === 0}
-            tituloVacio="Sin órdenes de compra"
-            mensajeVacio="Creá una con el formulario de al lado."
+            tituloVacio="Sin Órdenes de Compra"
+            mensajeVacio="Crea una con el formulario de al lado."
           >
             <ul className="space-y-2">
               {ordenes.map((o) => (
@@ -245,7 +245,7 @@ export default function PurchasesPage() {
       )}
 
       {/* El producto no existe todavia. En vez de mandar a Inventario y hacer
-          que la orden se cargue dos veces, se crea aca y la compra sigue. */}
+          que la orden se cargue dos veces, se crea aquí y la compra sigue. */}
       {nuevoProd && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center"
           role="dialog" aria-modal="true" aria-label="Producto nuevo">
@@ -253,7 +253,7 @@ export default function PurchasesPage() {
             <h2 className="font-display text-lg font-semibold text-text">Ese producto no está en el inventario</h2>
             <p className="mt-1 text-sm text-muted">
               El código <span className="font-mono text-text">{nuevoProd.codigo}</span> no existe en esta empresa.
-              Creálo acá y la orden se registra enseguida.
+              Créalo aquí y la orden se registra enseguida.
             </p>
 
             <div className="mt-4 space-y-3">

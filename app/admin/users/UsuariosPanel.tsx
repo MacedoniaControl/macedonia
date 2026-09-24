@@ -16,7 +16,7 @@ const ROLES = [
   { id: "owner", label: "Owner", ayuda: "Todo, ambas empresas. Único que ve los registros." },
   { id: "admin", label: "Administrador", ayuda: "Su empresa. Ve y carga gastos y utilidad." },
   { id: "vendedor", label: "Vendedor", ayuda: "Documentos e inventario. Solo precios de venta." },
-  { id: "tecnico", label: "Técnico de recargas", ayuda: "Cilindros y recargas de su empresa." },
+  { id: "tecnico", label: "Técnico de Recargas", ayuda: "Cilindros y recargas de su empresa." },
 ];
 
 const tono: Record<string, Tone> = { owner: "brand", admin: "info", vendedor: "ok", tecnico: "navy" };
@@ -113,7 +113,7 @@ export function UsuariosPanel({ usuarios }: { usuarios: UsuarioFila[] }) {
         {aviso && <p className="mt-3 text-sm text-muted">{aviso}</p>}
       </SectionCard>
 
-      <SectionCard title="Crear usuario" description="Solo el Owner puede dar de alta.">
+      <SectionCard title="Crear Usuario" description="Solo el Owner puede dar de alta.">
         <form action={accion} className="space-y-3">
           <div>
             <label htmlFor="nombre" className="mb-1 block text-sm font-medium text-text">

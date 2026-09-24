@@ -77,7 +77,7 @@ export function CatalogoProductos({ embebido = false }: { embebido?: boolean }) 
     const conCosto = filtrados.some((p) => p.costo !== null);
     return {
       seccion: "Productos",
-      titulo: "Productos y catálogo",
+      titulo: "Productos y Catálogo",
       detalle: [q.trim() ? `Búsqueda: «${q.trim()}»` : "Todo el catálogo", "Precios en USD"],
       columnas: [
         { titulo: "SKU", tipo: "codigo" }, { titulo: "Producto" }, { titulo: "Unidad" }, { titulo: "Precio con IVA", tipo: "usd" },
@@ -92,13 +92,13 @@ export function CatalogoProductos({ embebido = false }: { embebido?: boolean }) 
     <>
       {!embebido && (
         <PageHeader
-          title="Productos y catálogo"
-          breadcrumbs={[{ label: "Inventario" }, { label: "Productos y catálogo" }]}
+          title="Productos y Catálogo"
+          breadcrumbs={[{ label: "Inventario" }, { label: "Productos y Catálogo" }]}
           actions={<StatusBadge tone="brand">{prods.length} producto(s)</StatusBadge>}
         />
       )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.7fr]">
-        <SectionCard title="Crear producto">
+        <SectionCard title="Crear Producto">
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted" htmlFor="nom">Nombre</label>

@@ -6,7 +6,7 @@
 // mismo código puede existir en una y no en la otra, o ser un producto distinto.
 //
 // Un fallo de red devuelve 503 con motivo, NO un "no encontrado": para el
-// operador son cosas muy distintas — una significa "revisá la etiqueta" y la
+// operador son cosas muy distintas — una significa "revisa la etiqueta" y la
 // otra "el sistema no está respondiendo".
 
 import { NextResponse } from "next/server";

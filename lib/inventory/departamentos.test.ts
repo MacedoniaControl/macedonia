@@ -2,7 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-// La migracion no se puede correr aca: no hay Postgres local, y el SQL Editor
+// La migracion no se puede correr aquí: no hay Postgres local, y el SQL Editor
 // de Supabase esta pendiente de pago. Estas pruebas fijan los dos errores que
 // ya costaron caro con la 21.
 describe("migración 22: departamentos de Valery", () => {

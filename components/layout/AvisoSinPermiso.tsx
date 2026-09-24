@@ -1,6 +1,6 @@
 "use client";
 
-// Aviso de "no tenés acceso a esa sección".
+// Aviso de "no tienes acceso a esa sección".
 //
 // El proxy manda a quien entra a una seccion sin permiso a su inicio con
 // ?sinpermiso=<clave> (lib/auth/acceso.ts). Sin este aviso la persona tocaba

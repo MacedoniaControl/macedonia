@@ -15,15 +15,15 @@ import { alternarPermiso, type UsuarioFila } from "./actions";
 /** Nombre legible de cada capacidad transversal. Lo lee el Owner, no el sistema. */
 const ETIQUETA_ESPECIAL: Record<string, { titulo: string; ayuda: string }> = {
   ver_registros: {
-    titulo: "Ver registros y logs",
+    titulo: "Ver Registros y Logs",
     ayuda: "El historial de documentos y la auditoría. Por defecto es solo tuyo.",
   },
   ver_costos: {
-    titulo: "Ver costos de compra",
+    titulo: "Ver Costos de Compra",
     ayuda: "Cuánto pagas por cada producto, y con eso el margen real.",
   },
   otra_empresa: {
-    titulo: "Acceder a la otra empresa",
+    titulo: "Acceder a la Otra Empresa",
     ayuda: "Entra al panel de la otra empresa con estos mismos permisos.",
   },
 };
@@ -50,8 +50,7 @@ export function FichaPermisos({ usuario }: { usuario: UsuarioFila }) {
     <div className="border-t border-border bg-surface-2/40 px-4 py-3">
       {esOwner && (
         <p className="mb-3 rounded-xl border border-brand/30 bg-brand/10 px-3 py-2 text-sm text-text">
-          El Owner tiene acceso total. Es irrevocable por diseño: aunque se apaguen
-          todos los interruptores, sigue entrando a todo.
+          El Owner tiene acceso total y no se le puede quitar.
         </p>
       )}
 

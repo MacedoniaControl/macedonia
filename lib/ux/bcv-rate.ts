@@ -60,7 +60,7 @@ export function useBcvRate() {
  * La tasa del BCV, traída del servidor al montar.
  *
  * `useBcvRate` solo LEE lo que alguien haya guardado antes; si nadie la
- * refrescó, devuelve null y la pantalla se queda con una constante vieja. Acá
+ * refrescó, devuelve null y la pantalla se queda con una constante vieja. Aquí
  * se pide de verdad. Devuelve `null` mientras no haya respuesta, para que quien
  * la use decida qué mostrar en vez de inventar un número.
  */

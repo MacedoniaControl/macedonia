@@ -74,19 +74,19 @@ export default function RoiPage() {
       </SectionCard>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="ROI por año" description="Ventas, compras, utilidad, margen y ROI anual.">
+        <SectionCard title="ROI por Año" description="Ventas, compras, utilidad, margen y ROI anual.">
           <HistoryYearly empresa={empresa} />
         </SectionCard>
-        <SectionCard title="Productos de mayor utilidad" description="Ganancia acumulada real por producto (histórico).">
+        <SectionCard title="Productos de Mayor Utilidad" description="Ganancia acumulada real por producto (histórico).">
           <HistoryTopProductos empresa={empresa} />
         </SectionCard>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Clientes de mayor facturación" description="Ventas acumuladas por cliente (histórico).">
+        <SectionCard title="Clientes de Mayor Facturación" description="Ventas acumuladas por cliente (histórico).">
           <HistoryTopClientes empresa={empresa} />
         </SectionCard>
-        <SectionCard title="Proveedores de mayor compra" description="Compras acumuladas por proveedor (histórico).">
+        <SectionCard title="Proveedores de Mayor Compra" description="Compras acumuladas por proveedor (histórico).">
           <HistoryTopProveedores empresa={empresa} />
         </SectionCard>
       </div>
@@ -96,7 +96,7 @@ export default function RoiPage() {
         <span className="h-px flex-1 bg-border" />
       </div>
 
-      <SectionCard title="Indicadores del período" action={<StatusBadge tone="brand">2024</StatusBadge>}>
+      <SectionCard title="Indicadores del Período" action={<StatusBadge tone="brand">2024</StatusBadge>}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {roiCards.map((c) => (
             <StatCard key={c.label} label={c.label} value={c.value} sub={c.sub} accent={c.accent} />
@@ -105,7 +105,7 @@ export default function RoiPage() {
       </SectionCard>
 
       <div className="mt-6">
-        <SectionCard title="Ventas vs utilidad" description="Evolución mensual de la rentabilidad (USD).">
+        <SectionCard title="Ventas vs Utilidad" description="Evolución mensual de la rentabilidad (USD).">
           <SeriesChart
             labels={periodos.map((p) => p.etiqueta)}
             formato={(n) => fmtUsd(n)}
@@ -119,7 +119,7 @@ export default function RoiPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="ROI por producto" description="Mayor retorno sobre costo.">
+        <SectionCard title="ROI por Producto" description="Mayor retorno sobre costo.">
           <ul className="divide-y divide-border">
             {productosMayorRetorno.map((p) => (
               <li key={p.nombre} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -129,7 +129,7 @@ export default function RoiPage() {
             ))}
           </ul>
         </SectionCard>
-        <SectionCard title="ROI por categoría" description="Margen bruto promedio.">
+        <SectionCard title="ROI por Categoría" description="Margen bruto promedio.">
           <ul className="divide-y divide-border">
             {categoriasMasRentables.map((c) => (
               <li key={c.nombre} className="flex items-center justify-between gap-3 py-2.5 text-sm">

@@ -20,7 +20,7 @@ export const navGroups: NavGroup[] = [
     title: "Operación",
     items: [
       { label: "Cotizaciones", href: "/admin/quotes", icon: "quote" },
-      { label: "Notas de entrega", href: "/admin/delivery-notes", icon: "delivery" },
+      { label: "Notas de Entrega", href: "/admin/delivery-notes", icon: "delivery" },
     ],
   },
   {
@@ -34,8 +34,8 @@ export const navGroups: NavGroup[] = [
     title: "Finanzas",
     items: [
       { label: "Gastos", href: "/admin/expenses", icon: "cash" },
-      { label: "Cuentas por cobrar", href: "/admin/receivables", icon: "receivable" },
-      { label: "Cuentas por pagar", href: "/admin/payables", icon: "payable" },
+      { label: "Cuentas por Cobrar", href: "/admin/receivables", icon: "receivable" },
+      { label: "Cuentas por Pagar", href: "/admin/payables", icon: "payable" },
       { label: "Compras", href: "/admin/purchases", icon: "purchase" },
     ],
   },
@@ -44,14 +44,14 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Reportes", href: "/admin/reports", icon: "report" },
       { label: "ROI / Rentabilidad", href: "/admin/roi", icon: "roi" },
-      { label: "Matrices administrativas", href: "/admin/matrices", icon: "matrix" },
+      { label: "Matrices Administrativas", href: "/admin/matrices", icon: "matrix" },
     ],
   },
   {
     title: "Sistema",
     items: [
       { label: "Configuración", href: "/admin/settings", icon: "settings" },
-      { label: "Usuarios y roles", href: "/admin/users", icon: "users" },
+      { label: "Usuarios y Roles", href: "/admin/users", icon: "users" },
     ],
   },
 ];

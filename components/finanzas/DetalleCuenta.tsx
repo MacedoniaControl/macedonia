@@ -113,7 +113,7 @@ export function DetalleCuenta({
             {d.iva === null ? (
               <p className="text-muted">
                 Esta cuenta se cargó sin desglose: los archivos de Valery solo traían el
-                total. Usá <strong className="text-text">Editar</strong> para cargar la
+                total. Usa <strong className="text-text">Editar</strong> para cargar la
                 base imponible y el IVA, y la retención sale sola.
               </p>
             ) : (
@@ -247,7 +247,7 @@ export function DetalleCuenta({
                             setMsg(null);
                             // Se valida antes de confirmar: enterarse de que
                             // falta el motivo DESPUES de confirmar es peor.
-                            if (!notaCierre.trim()) return setMsg("Explicá por qué se cierra con saldo pendiente.");
+                            if (!notaCierre.trim()) return setMsg("Explica por qué se cierra con saldo pendiente.");
                             abrir();
                           }}>Cerrar con saldo</Button>
                       </div>

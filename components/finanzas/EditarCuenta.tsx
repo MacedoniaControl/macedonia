@@ -100,7 +100,7 @@ export function EditarCuenta({
       </div>
 
       <fieldset className="rounded-xl border border-border p-3">
-        <legend className="px-1 text-xs font-medium text-muted">Desglose fiscal</legend>
+        <legend className="px-1 text-xs font-medium text-muted">Desglose Fiscal</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           <CampoMonto etiqueta="Base imponible" valor={bi} onChange={setBi} />
           <CampoMonto etiqueta="IVA" valor={iva} onChange={setIva} />
@@ -124,7 +124,7 @@ export function EditarCuenta({
               <p role="alert" className="mt-1 rounded-lg border border-warn/35 bg-warn/10 px-2 py-1.5 text-warn">
                 No suma el monto total ({fmtMonto(monto ?? 0)}):{" "}
                 {descuadre > 0 ? "sobran" : "faltan"} {fmtMonto(Math.abs(descuadre))}. El
-                total no se toca — revisá el desglose.
+                total no se toca — revisa el desglose.
               </p>
             )}
             <p className="flex justify-between text-muted">

@@ -4,10 +4,10 @@
 //
 // No usa <input type="number">: ese control solo entiende el formato del locale
 // del navegador y devuelve cadena vacia cuando no lo entiende. Escribiendo como
-// se escribe aca, "1.500,50" se perdia y "1.500" se guardaba como 1,5 -sin
+// se escribe aquí, "1.500,50" se perdia y "1.500" se guardaba como 1,5 -sin
 // error y con cara de numero correcto-.
 //
-// Aca se escribe libre, se interpreta con parseMonto, y se DEVUELVE el monto
+// Aquí se escribe libre, se interpreta con parseMonto, y se DEVUELVE el monto
 // formateado debajo. Ese eco es lo que permite cazar una ambigüedad: quien
 // escribio "1,500" ve "1,50" y lo corrige antes de guardar.
 

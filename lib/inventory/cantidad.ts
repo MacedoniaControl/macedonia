@@ -2,7 +2,7 @@
 //
 // Usa la misma regla que los montos (lib/ux/monto.ts): coma decimal, punto de
 // miles, y lo que no se entiende da error en vez de un numero plausible. La
-// diferencia con un monto es que aca importa distinguir tres cosas que un
+// diferencia con un monto es que aquí importa distinguir tres cosas que un
 // numero solo no distingue: no contado, contado en cero, y mal escrito.
 
 import { parseMonto } from "../ux/monto.ts";
@@ -19,7 +19,7 @@ export function leerCantidad(texto: string): Lectura {
   if (t === "") return { estado: "vacio" };
   if (/^-/.test(t)) return { estado: "error", msg: "No puede ser negativo." };
   const n = parseMonto(t);
-  if (n === null) return { estado: "error", msg: `No entiendo «${t}». Usá coma para los decimales: 12,5` };
+  if (n === null) return { estado: "error", msg: `No entiendo «${t}». Usa coma para los decimales: 12,5` };
   if (n === 0) return { estado: "cero", valor: 0 };
   // La base guarda tres decimales: un cuarto no existe en lo que se cuenta.
   return { estado: "ok", valor: Math.round(n * 1000) / 1000 };

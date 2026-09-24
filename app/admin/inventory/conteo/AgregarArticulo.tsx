@@ -28,10 +28,10 @@ export function AgregarArticulo({ empresa, conteoId, departamento, enPlanilla, o
 }) {
   const [pestana, setPestana] = useState<"valery" | "nuevo">("valery");
   return (
-    <Modal titulo="Agregar artículo" onCerrar={onCerrar}>
+    <Modal titulo="Agregar Artículo" onCerrar={onCerrar}>
       <p className="mb-3 text-sm text-muted">Todo artículo del conteo lleva una identificación: la de Valery o un SKU de Macedonia.</p>
       <div role="tablist" className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-border bg-surface-2 p-1">
-        {([["valery", "Está en Valery", "Se identifica con su código"], ["nuevo", "Artículo nuevo", "No está en Valery · recibe SKU"]] as const).map(([id, t, s]) => (
+        {([["valery", "Está en Valery", "Se identifica con su código"], ["nuevo", "Artículo Nuevo", "No está en Valery · recibe SKU"]] as const).map(([id, t, s]) => (
           <button key={id} type="button" role="tab" aria-selected={pestana === id} onClick={() => setPestana(id)}
             className={`min-h-12 rounded-lg px-2 py-1.5 text-center ${pestana === id ? "bg-surface shadow-sm" : ""}`}>
             <b className={`block text-sm ${pestana === id ? "text-brand" : "text-text"}`}>{t}</b>
@@ -44,7 +44,7 @@ export function AgregarArticulo({ empresa, conteoId, departamento, enPlanilla, o
           <ProductSearch placeholder="Código de Valery o nombre" onPick={(p: ProductoCatalogo) => onValery(p)} />
           <p className="text-xs text-muted">
             Si ya está en la planilla, te lleva a su renglón. ¿No aparece?{" "}
-            <button type="button" className="font-medium text-brand" onClick={() => setPestana("nuevo")}>Cargalo como artículo nuevo →</button>
+            <button type="button" className="font-medium text-brand" onClick={() => setPestana("nuevo")}>Cárgalo como artículo nuevo →</button>
           </p>
         </div>
       ) : (
@@ -89,7 +89,7 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
   async function guardar() {
     setError(null);
     const faltan = [!f.nombre.trim() && "el nombre", !f.depto && "el departamento", !f.unidad && "la unidad",
-      l.estado === "vacio" && "la cantidad contada (si no hay ninguno, poné 0)"].filter(Boolean);
+      l.estado === "vacio" && "la cantidad contada (si no hay ninguno, pon 0)"].filter(Boolean);
     if (faltan.length) return setError(`Falta ${faltan.join(", ")}.`);
     if (l.estado === "error") return setError(l.msg);
     setYendo(true);
@@ -123,7 +123,7 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
         onChange={(e) => set({ nombre: e.target.value, ...(f.cortoTocado ? {} : { corto: e.target.value.toUpperCase() }) })} />, true)}
       {mostrar.length > 0 && (
         <div className="space-y-2 rounded-xl bg-warn/10 p-3">
-          <p className="text-sm font-medium text-warn">¿Es alguno de estos? Si está en Valery, usá ese código en vez de crear uno nuevo.</p>
+          <p className="text-sm font-medium text-warn">¿Es alguno de estos? Si está en Valery, usa ese código en vez de crear uno nuevo.</p>
           {mostrar.map((p) => (
             <button key={p.codigo} type="button" onClick={() => onValery(p)}
               className="grid w-full grid-cols-[7rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-sm hover:border-brand">
@@ -134,10 +134,10 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
-        {campo("Nombre corto", <input className="sumi-campo" value={f.corto} onChange={(e) => set({ corto: e.target.value, cortoTocado: true })} />, false, "Se copia del nombre; cambialo si hace falta.")}
+        {campo("Nombre corto", <input className="sumi-campo" value={f.corto} onChange={(e) => set({ corto: e.target.value, cortoTocado: true })} />, false, "Se copia del nombre; cámbialo si hace falta.")}
         {campo("Departamento", (
           <select className="sumi-campo" value={f.depto} onChange={(e) => set({ depto: e.target.value })}>
-            <option value="">Elegí uno…</option>
+            <option value="">Elige uno…</option>
             {(deps.datos ?? []).filter((d) => d.seCuenta).map((d) => <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>)}
           </select>
         ), true)}
@@ -146,7 +146,7 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
         {campo("Referencia", <input className="sumi-campo" value={f.referencia} placeholder="Ej: DADO" onChange={(e) => set({ referencia: e.target.value })} />)}
         {campo("Unidad", (
           <select className="sumi-campo" value={f.unidad} onChange={(e) => set({ unidad: e.target.value })}>
-            <option value="">Elegí una…</option>
+            <option value="">Elige una…</option>
             {UNIDADES.map((u) => <option key={u}>{u}</option>)}
           </select>
         ), true)}
@@ -154,7 +154,7 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
         {campo("Observación", <input className="sumi-campo" value={f.obs} placeholder="Opcional" onChange={(e) => set({ obs: e.target.value })} />)}
       </div>
       <p className="rounded-xl bg-info/10 px-3 py-2 text-xs text-info">
-        <b>Costos, precios e IVA no se piden acá.</b> Quien cuenta no siempre puede ver costos. El artículo queda con la ficha incompleta y se termina en Productos.
+        <b>Costos, precios e IVA no se piden aquí.</b> El artículo queda con la ficha incompleta y se completa en Productos.
       </p>
       {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

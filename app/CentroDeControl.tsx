@@ -64,7 +64,7 @@ export function CentroDeControl() {
                       {/* La ventana va escrita: el historico de Valery se corta
                           en 2026-07 y sin esa nota el numero se lee como si
                           llegara hasta hoy. */}
-                      <dt className="text-[11px] uppercase tracking-wide text-muted">Ventas hist.</dt>
+                      <dt className="text-[11px] uppercase tracking-wide text-muted">Ventas Hist.</dt>
                       <dd className="truncate text-base font-semibold tabular-nums text-text">{fmtUsd(t.venta)}</dd>
                       <dd className="text-[11px] text-muted">{h.meta.desde} → {h.meta.hasta}</dd>
                     </div>

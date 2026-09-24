@@ -4,7 +4,7 @@
 //
 // Es el resumen que la hoja "TOTAL GENERAL" del Excel queria dar y nunca dio:
 // tenia los rotulos correctos y ni un numero, porque su unica formula apuntaba
-// a una celda borrada. Aca los numeros salen de los movimientos, asi que el
+// a una celda borrada. Aquí los numeros salen de los movimientos, asi que el
 // resumen se mantiene solo.
 
 import { useCarga } from "@/lib/ux/use-carga";
@@ -36,21 +36,21 @@ export function VistaParque({
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Parque total" value={n(p.total)} sub="cilindros de la empresa" accent />
-        <StatCard label="En planta" value={n(p.enPlanta)} sub="llenos + vacios" />
+        <StatCard label="Parque Total" value={n(p.total)} sub="cilindros de la empresa" accent />
+        <StatCard label="En Planta" value={n(p.enPlanta)} sub="llenos + vacíos" />
         <StatCard label="Prestados" value={n(p.afuera)} sub="hay que recuperarlos" />
         <StatCard label="Gases" value={n(p.porGas.length)} sub="con parque" />
       </div>
 
       <SectionCard
-        title="Donde esta el parque"
+        title="Ubicación del Parque"
         description="Sale de los movimientos registrados, no de un conteo guardado."
       >
         <EstadoDatos
           cargando={cargando}
           error={error}
           vacio={p.sinDatos}
-          mensajeVacio="Todavia no hay movimientos de cilindros. Da de alta el parque para empezar."
+          mensajeVacio="Todavía no hay movimientos de cilindros. Da de alta el parque para empezar."
         >
           {/* En el telefono la tabla obligaba a arrastrar de lado para llegar
               al Total, que es justo el numero que se viene a buscar. Ahi va
@@ -79,9 +79,9 @@ export function VistaParque({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted">
-                  <th scope="col" className="py-2 pr-3 font-medium">Descripcion</th>
+                  <th scope="col" className="py-2 pr-3 font-medium">Descripción</th>
                   <th scope="col" className="py-2 pr-3 text-right font-medium">Llenos</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-medium">Vacios</th>
+                  <th scope="col" className="py-2 pr-3 text-right font-medium">Vacíos</th>
                   <th scope="col" className="py-2 text-right font-medium">Total</th>
                 </tr>
               </thead>
@@ -94,7 +94,7 @@ export function VistaParque({
                         {/* Guion cuando el estado no distingue lleno de vacio.
                             Un cero ahi afirmaria algo que el dato no dice. */}
                         {v === null ? (
-                          <span className="text-muted" title="El dato no distingue llenos de vacios">—</span>
+                          <span className="text-muted" title="El dato no distingue llenos de vacíos">—</span>
                         ) : (
                           n(v)
                         )}
@@ -116,12 +116,12 @@ export function VistaParque({
         </EstadoDatos>
       </SectionCard>
 
-      <SectionCard title="Parque por gas" description="De mayor a menor.">
+      <SectionCard title="Parque por Gas" description="De mayor a menor.">
         <EstadoDatos
           cargando={cargando}
           error={error}
           vacio={p.porGas.length === 0}
-          mensajeVacio="Ningun gas tiene cilindros registrados."
+          mensajeVacio="Ningún gas tiene cilindros registrados."
         >
           <ul className="grid gap-2.5">
             {p.porGas.map((g) => (

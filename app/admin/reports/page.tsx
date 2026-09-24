@@ -20,7 +20,7 @@ const REPORTES: Reporte[] = [
     cols: [{ h: "Ventas", get: (p) => p.venta }] },
   { id: "utilidad", title: "Utilidad",          desc: "Venta, costo y lo que quedó.",
     cols: [{ h: "Ventas", get: (p) => p.venta }, { h: "Costo", get: (p) => p.costo }, { h: "Utilidad", get: (p) => p.util }] },
-  { id: "vc",       title: "Ventas vs compras", desc: "Comparativo del período.",
+  { id: "vc",       title: "Ventas vs Compras", desc: "Comparativo del período.",
     cols: [{ h: "Ventas", get: (p) => p.venta }, { h: "Compras", get: (p) => p.compra }] },
   { id: "roi",      title: "Rentabilidad",      desc: "Margen sobre venta y retorno sobre compra.",
     cols: [{ h: "Utilidad", get: (p) => p.util }, { h: "Margen %", get: (p) => p.margen }, { h: "ROI %", get: (p) => p.roi }] },
@@ -70,7 +70,7 @@ export default function ReportsPage() {
         <SelectorRango valor={rango} onCambio={setRango} agrupaciones={AGRUPACIONES_HISTORICO} />
       </div>
 
-      <SectionCard title="Reportes disponibles">
+      <SectionCard title="Reportes Disponibles">
           <ul className="space-y-2">
             {REPORTES.map((r) => (
               <li key={r.id}>
@@ -119,7 +119,7 @@ export default function ReportsPage() {
           </div>
         </SectionCard>
       </div>
-      <p className="mt-4 text-xs text-muted">Cifras reales 2024 de Sumigases (matrices Excel; ver `docs/data/dashboard-mock-2024.md`).</p>
+      <p className="mt-4 text-xs text-muted">Cifras de 2024 de Sumigases.</p>
     </>
   );
 }

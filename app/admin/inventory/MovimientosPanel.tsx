@@ -76,7 +76,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
     const r2 = (n: number) => Math.round(n * 100) / 100;
     return {
       seccion: "Movimientos",
-      titulo: "Movimientos de inventario",
+      titulo: "Movimientos de Inventario",
       detalle: [
         filtro === "todos" ? "Todos los movimientos" : filtro === "entrada" ? "Solo ingresos" : "Solo salidas",
         // La pantalla carga los ultimos 200 (listarMovimientos): que el archivo
@@ -136,7 +136,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
 
       {/* Alta de movimiento manual */}
       <SectionCard
-        title="Registrar movimiento manual"
+        title="Registrar Movimiento Manual"
         action={
           <div className="flex gap-2">
             <Button variant={alta === "entrada" ? "primary" : "secondary"} icon="plus" onClick={() => setAlta(alta === "entrada" ? null : "entrada")}>
@@ -161,7 +161,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
 
       {/* Libro de movimientos */}
       <SectionCard
-        title="Movimientos de inventario"
+        title="Movimientos de Inventario"
         description={filtro === "todos" ? "Todos los movimientos." : filtro === "entrada" ? "Solo ingresos." : "Solo salidas."}
         action={
           <select className="h-11 rounded-xl border border-border bg-surface px-3 text-sm text-text"
@@ -173,7 +173,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
         }
       >
         {visibles.length === 0 ? (
-          <EmptyState title="Sin movimientos" message="Aún no hay movimientos registrados. Los ingresos y salidas aparecerán aquí." />
+          <EmptyState title="Sin Movimientos" message="Aún no hay movimientos registrados. Los ingresos y salidas aparecerán aquí." />
         ) : (
           <>
             <div className="sumi-scroll max-w-full overflow-x-auto">

@@ -14,7 +14,7 @@ describe("leer la cantidad contada", () => {
     assert.equal(leerCantidad("abc").estado, "error");
   });
 
-  test("coma decimal y punto de miles, como se escribe acá", () => {
+  test("coma decimal y punto de miles, como se escribe aquí", () => {
     assert.deepEqual(leerCantidad("212,5"), { estado: "ok", valor: 212.5 });
     assert.deepEqual(leerCantidad("1.600"), { estado: "ok", valor: 1600 });
     assert.deepEqual(leerCantidad("1.234,75"), { estado: "ok", valor: 1234.75 });

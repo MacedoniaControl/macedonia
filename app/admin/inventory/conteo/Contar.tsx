@@ -77,7 +77,7 @@ function NuevoConteo({ empresa, onAbierto }: { empresa: string; onAbierto: () =>
   return (
     <section className="max-w-xl space-y-4 rounded-2xl border border-border bg-surface p-5">
       <div>
-        <h2 className="text-base font-semibold text-text">Nuevo conteo</h2>
+        <h2 className="text-base font-semibold text-text">Nuevo Conteo</h2>
         <p className="mt-1 text-sm text-muted">
           Se cuenta por departamento, como en Valery, o todo junto para un consolidado. Lo que no se cuente queda
           <b> sin contar</b>, no en cero, y conserva su existencia.
@@ -86,7 +86,7 @@ function NuevoConteo({ empresa, onAbierto }: { empresa: string; onAbierto: () =>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-muted">Qué se va a contar</span>
         <select className="sumi-campo" value={elegido} onChange={(e) => setElegido(e.target.value)}>
-          <option value="">Elegí un departamento…</option>
+          <option value="">Elige un departamento…</option>
           <option value="__general">Todos los departamentos (consolidado)</option>
           <option value="__planilla75">Planilla impresa de 75 productos</option>
           <optgroup label="Departamentos de Valery">
@@ -217,7 +217,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
   });
 
   // Los renglones no se vuelven a dibujar si no cambian (el general tiene miles):
-  // lo que necesitan del resto de la planilla lo leen de aca.
+  // lo que necesitan del resto de la planilla lo leen de aquí.
   const filasRef = useRef(filas);
   const visiblesRef = useRef(visibles);
   useEffect(() => { filasRef.current = filas; visiblesRef.current = visibles; });
@@ -229,7 +229,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
     const FILTRO: Record<Filtro, string> = { todos: "Todos los renglones", sin: "Solo sin contar", contados: "Solo contados", cero: "Solo en cero" };
     return {
       seccion: `Conteo ${titulo}`,
-      titulo: `Conteo en curso · ${titulo}`,
+      titulo: `Conteo en Curso · ${titulo}`,
       detalle: [
         ...(verDepto ? [etiqueta(verDepto)] : []),
         FILTRO[filtro],
@@ -318,7 +318,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
       {/* Los datos del papel */}
       <section className="rounded-2xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Datos de la planilla</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Datos de la Planilla</h2>
           <p className="text-xs text-muted">Abierto el {conteo.abiertoEn} · el número se asigna al cerrar</p>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -361,7 +361,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
               )}
             </select>
             <span id="depto-ayuda" className="mt-1 block text-[11px] text-muted">
-              {conteo.origen === "general" ? "Consolidado: elegí qué departamento estás contando." : grupos.length > 1 ? "Elegí qué parte de la planilla ver." : "Para contar otro departamento o todo junto, elegilo en esta lista."}
+              {conteo.origen === "general" ? "Consolidado: elige qué departamento estás contando." : grupos.length > 1 ? "Elige qué parte de la planilla ver." : "Para contar otro departamento o todo junto, elígelo en esta lista."}
             </span>
           </label>
         </div>
@@ -369,7 +369,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
 
       {conteo.origen === "libre" && (
         <AlertCard tone="warn" titulo="Este conteo no tiene departamento"
-          mensaje="Se abrió antes de que existieran los departamentos, así que no trae planilla. Agregá los artículos uno por uno con «Agregar artículo»." />
+          mensaje="Se abrió antes de que existieran los departamentos, así que no trae planilla. Agrega los artículos uno por uno con «Agregar artículo»." />
       )}
 
       {/* Avance */}
@@ -392,7 +392,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
       {/* Herramientas */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="-mx-1 flex w-full gap-1.5 overflow-x-auto px-1 pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Filtrar renglones">
-          {([["todos", "Todos", cuentaVista.total], ["sin", "Sin contar", cuentaVista.sin], ["contados", "Contados", cuentaVista.ok + cuentaVista.cero], ["cero", "En cero", cuentaVista.cero]] as const).map(([id, label, n]) => (
+          {([["todos", "Todos", cuentaVista.total], ["sin", "Sin Contar", cuentaVista.sin], ["contados", "Contados", cuentaVista.ok + cuentaVista.cero], ["cero", "En Cero", cuentaVista.cero]] as const).map(([id, label, n]) => (
             <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)}
               className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-xs font-medium ${filtro === id ? "border-navy bg-navy text-white" : "border-border bg-surface text-muted hover:text-text"}`}>
               {label} <b className="tabular-nums">{n}</b>
@@ -412,7 +412,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
       </div>
 
       {lector && (
-        <ScanBar hint="Dispará el lector: el producto queda listo para anotar su cantidad."
+        <ScanBar hint="Dispara el lector: el producto queda listo para anotar su cantidad."
           onScan={async (cod) => {
             const f = filas.find((x) => x.codigo.toUpperCase() === cod.toUpperCase());
             if (f) { beep(true); setAviso({ ok: true, text: `${f.codigo} · ${f.nombre}` }); return irA(f.codigo); }
@@ -452,7 +452,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
           </ul>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-2 px-4 py-3 text-xs text-muted">
-          <span>¿Contaste algo que no está? Todo artículo entra con su código de Valery o con un SKU de Macedonia.</span>
+          <span>¿Falta un artículo? Agrégalo con «Agregar artículo».</span>
           <span className="hidden gap-3 xl:flex"><span><kbd className="rounded border border-border px-1">Enter</kbd> o <kbd className="rounded border border-border px-1">↓</kbd> siguiente</span><span>Vacío = sin contar · 0 = no hay ninguno</span></span>
         </div>
       </section>
@@ -464,7 +464,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
             <span className={`h-2 w-2 shrink-0 rounded-full ${filas.some((f) => f.estado === "guardando") ? "bg-warn" : pendientes.length ? "bg-info" : "bg-ok"}`} />
             {filas.some((f) => f.estado === "guardando") ? "Guardando…"
               : pendientes.length ? `${pendientes.length} renglón(es) sin guardar: se guardan al salir de la casilla`
-              : "Todo guardado · podés cerrar y seguir después"}
+              : "Todo guardado · puedes cerrar y seguir después"}
           </p>
           <Button icon="check" className="shrink-0" disabled={contados === 0} onClick={async () => {
             // Lo que quedo escrito sin salir de la casilla se guarda antes de revisar.
@@ -539,14 +539,14 @@ function CambiarAlcance({ conteoId, empresa, propuesta, anotados, antes, onCerra
   const [error, setError] = useState<string | null>(null);
   const ampliar = propuesta.tipo === "ampliar";
   return (
-    <Modal titulo={ampliar ? "Ampliar a todos los departamentos" : `Cambiar a ${propuesta.nombre}`} onCerrar={onCerrar}>
+    <Modal titulo={ampliar ? "Ampliar a Todos los Departamentos" : `Cambiar a ${propuesta.nombre}`} onCerrar={onCerrar}>
       <div className="space-y-3 text-sm text-text">
         {ampliar ? (
           <>
             <p>El conteo pasa a abarcar <b>todos los departamentos que se cuentan</b>, y al cerrar sale una sola acta consolidada.</p>
             <ul className="list-disc space-y-1 pl-5 text-muted">
               <li>{anotados ? `Los ${anotados} renglón(es) ya anotados se conservan.` : "Todavía no hay nada anotado."}</li>
-              <li>Con este mismo selector recorrés un departamento a la vez, con su avance.</li>
+              <li>Con este mismo selector recorres un departamento a la vez, con su avance.</li>
               <li>Lo que no se llegue a contar queda <b>sin contar</b>, no en cero: conserva su existencia.</li>
             </ul>
           </>

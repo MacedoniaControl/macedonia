@@ -206,7 +206,7 @@ export async function crearCuenta(
   }
   if (!(c.monto > 0)) return { ok: false, error: "El monto debe ser mayor que cero." };
   if (!c.vence) return { ok: false, error: "Falta la fecha de vencimiento." };
-  // Se comprueba aca ademas de en la pantalla: la pantalla se puede saltar.
+  // Se comprueba aquí ademas de en la pantalla: la pantalla se puede saltar.
   const total = (c.baseImponible ?? 0) + (c.iva ?? 0);
   if (c.ivaRetenido != null && total > 0 && c.ivaRetenido > total) {
     return { ok: false, error: "La retención no puede ser mayor que el total de la operación." };
@@ -508,11 +508,11 @@ export async function liquidarCuenta(
   const saldo = (await saldoNetoDe(sb, id)) ?? 0;
 
   if (como === "total" && saldo > 0.009) {
-    return { ok: false, error: `Todavía quedan $${saldo.toFixed(2)}. Cerrala como abono parcial o registrá el resto.` };
+    return { ok: false, error: `Todavía quedan $${saldo.toFixed(2)}. Ciérrala como abono parcial o registra el resto.` };
   }
   if (como === "abono" && !nota?.trim()) {
     // Cerrar debiendo pide explicacion: dentro de seis meses nadie se acuerda.
-    return { ok: false, error: "Explicá por qué se cierra con saldo pendiente." };
+    return { ok: false, error: "Explica por qué se cierra con saldo pendiente." };
   }
 
   const { error } = await sb.from("cuentas").update({
@@ -578,7 +578,7 @@ export async function abonarConComprobante(
       // archivo queda en el bucket sin nada que lo relacione con una cuenta.
       return {
         ok: false,
-        error: `Todavía no se pueden guardar comprobantes. ${AVISO_MIGRACION} Podés registrar el abono sin imagen.`,
+        error: `Todavía no se pueden guardar comprobantes. ${AVISO_MIGRACION} Puedes registrar el abono sin imagen.`,
       };
     }
   }

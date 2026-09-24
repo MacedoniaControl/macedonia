@@ -16,9 +16,9 @@ import { useState } from "react";
 const ESTADOS: { id: string; label: string; tone: Tone }[] = [
   { id: "lleno", label: "Llenos", tone: "ok" },
   { id: "vacio", label: "Vacíos", tone: "muted" },
-  { id: "en_cliente", label: "En cliente", tone: "info" },
-  { id: "en_llenado", label: "En llenado", tone: "warn" },
-  { id: "fuera_servicio", label: "Fuera de servicio", tone: "danger" },
+  { id: "en_cliente", label: "En Cliente", tone: "info" },
+  { id: "en_llenado", label: "En Llenado", tone: "warn" },
+  { id: "fuera_servicio", label: "Fuera de Servicio", tone: "danger" },
 ];
 
 const campo = "sumi-campo";
@@ -48,7 +48,7 @@ export function SaldosCilindros({
         title="Rampa"
         description="Calculado de los movimientos, no de un conteo guardado."
         action={
-          <PildoraPanel etiqueta="Agregar Movimiento" icono="plus">
+          <PildoraPanel etiqueta="Agregar movimiento" icono="plus">
             {(cerrar) => (
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-text">Movimiento manual</p>
@@ -56,7 +56,7 @@ export function SaldosCilindros({
                   <label className="block">
                     <span className="mb-1 block text-xs font-medium text-muted">Gas</span>
                     <select value={mov.gas} onChange={(e) => setMov({ ...mov, gas: e.target.value })} className={campo}>
-                      <option value="">Elegí…</option>
+                      <option value="">Elige…</option>
                       {gases.map((g) => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </label>
@@ -93,7 +93,7 @@ export function SaldosCilindros({
                   <Button icon="plus" className="flex-1" disabled={guardando}
                     onClick={async () => {
                       setMsgMov(null);
-                      if (!mov.gas) return setMsgMov("Elegí el gas.");
+                      if (!mov.gas) return setMsgMov("Elige el gas.");
                       setGuardando(true);
                       try {
                         const r = await movimientoManual(mov.gas, mov.cantidad, mov.direccion, mov.estado, empresa, mov.nota);
@@ -148,7 +148,7 @@ export function SaldosCilindros({
       </SectionCard>
 
       <SectionCard
-        title="Cilindros en poder de clientes"
+        title="Cilindros en Poder de Clientes"
         description="Son de la empresa: hay que recuperarlos."
       >
         {listo && c.length === 0 && (
@@ -164,7 +164,7 @@ export function SaldosCilindros({
                   <th className="py-2 pr-3 font-medium">Cliente</th>
                   <th className="py-2 pr-3 font-medium">Gas</th>
                   <th className="py-2 pr-3 text-right font-medium">Tiene</th>
-                  <th className="py-2 pr-3 text-right font-medium">Desde hace</th>
+                  <th className="py-2 pr-3 text-right font-medium">Desde Hace</th>
                 </tr>
               </thead>
               <tbody>

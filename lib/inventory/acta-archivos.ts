@@ -85,7 +85,7 @@ function historial(a: Acta) {
     stack: [
       { text: "HISTORIAL DEL CONTEO", bold: true, fontSize: 8, color: C.navy, margin: [0, 0, 0, 4] },
       { table: { headerRows: 1, widths: [80, 100, "*"], body: [
-        ["Fecha y hora", "Evento", "Detalle"].map((t) => ({ text: t, bold: true, fontSize: 7.5, color: C.gris })),
+        ["Fecha y Hora", "Evento", "Detalle"].map((t) => ({ text: t, bold: true, fontSize: 7.5, color: C.gris })),
         ...a.eventos.map((e) => [
           { text: e.en, fontSize: 7.5 }, { text: e.tipo, bold: true, fontSize: 7.5 }, { text: e.detalle, fontSize: 7.5, color: C.gris },
         ]),
@@ -117,9 +117,9 @@ export async function actaPdf(a: Acta): Promise<Buffer> {
   ];
   const def = {
     pageSize: "A4", pageMargins: [45, 42, 45, 45],
-    info: { title: `Acta de conteo ${a.numero}`, author: "Macedonia" },
+    info: { title: `Acta de Conteo ${a.numero}`, author: "Macedonia" },
     defaultStyle: { font: "Roboto", fontSize: 8.5, color: C.tinta },
-    footer: pie(a, "Acta de conteo"),
+    footer: pie(a, "Acta de Conteo"),
     content: [
       encabezado(a, "ACTA DE CONTEO FÍSICO", `${a.departamento} · ${a.fecha}`),
       { table: { widths: ["*", "*", "*", "*"], body: [
@@ -138,8 +138,8 @@ export async function actaPdf(a: Acta): Promise<Buffer> {
       ]] }, layout: caja, margin: [0, 0, 0, 12] },
       { table: { headerRows: 1, widths: [16, 64, "*", 26, 40, 40, 42, 70], body: cuerpo }, layout: lineaFina },
       { table: { widths: ["*"], body: [[{
-        text: [{ text: "Este acta no modifica el inventario. ", bold: true },
-          `Deja constancia de lo que se contó. Las ${r.faltantes + r.sobrantes} diferencias se ajustan solo cuando un owner o admin las aprueba, y esa aprobación queda en el historial del conteo.` +
+        text: [{ text: "Esta acta no modifica el inventario. ", bold: true },
+          `Deja constancia de lo que se contó. Las ${r.faltantes + r.sobrantes} diferencias se ajustan solo cuando el Owner o un Administrador las aprueba, y esa aprobación queda en el historial del conteo.` +
           (r.sinContar ? ` Los ${r.sinContar} productos sin contar conservan su existencia.` : "")],
         fontSize: 8, color: C.ambar, fillColor: C.fondoAmbar }]] }, layout: "noBorders", margin: [0, 10, 0, 16] },
       historial(a),
@@ -153,7 +153,7 @@ export async function valorizadaPdf(a: ActaValorizada): Promise<Buffer> {
   const pm = await motorPdf();
   const v = a.valor;
   const cuerpo = [
-    ["N°", "Identificación", "Producto", "Und.", "Diferencia", "Costo unit.", "Valor"].map((t, i) => ({
+    ["N°", "Identificación", "Producto", "Und.", "Diferencia", "Costo Unit.", "Valor"].map((t, i) => ({
       text: t, bold: true, fontSize: 7.5, color: "#ffffff", fillColor: C.navy, alignment: i >= 4 ? "right" : "left" })),
     ...a.lineas.map((l) => [
       { text: l.renglon ?? "+", color: C.gris },
@@ -163,19 +163,19 @@ export async function valorizadaPdf(a: ActaValorizada): Promise<Buffer> {
       { text: l.costo == null ? "sin costo" : "$" + l.costo.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), alignment: "right", color: C.gris },
       { text: fmtUsdSigno(l.valor ?? null), alignment: "right", bold: true, color: l.valor == null ? C.marron : l.valor < 0 ? C.rojo : C.azul },
     ]),
-    [{ text: "" }, { text: "" }, { text: "Diferencia neta", bold: true }, { text: "" }, { text: "" }, { text: "" },
+    [{ text: "" }, { text: "" }, { text: "Diferencia Neta", bold: true }, { text: "" }, { text: "" }, { text: "" },
       { text: fmtUsdSigno(v.neto), alignment: "right", bold: true, color: v.neto < 0 ? C.rojo : C.azul }].map((c) => ({ ...c, fillColor: C.fondo })),
   ];
   const def = {
     pageSize: "A4", pageMargins: [45, 48, 45, 45],
-    info: { title: `Acta valorizada ${a.numero}`, author: "Macedonia" },
+    info: { title: `Acta Valorizada ${a.numero}`, author: "Macedonia" },
     defaultStyle: { font: "Roboto", fontSize: 8.5, color: C.tinta },
     // Franja en cada pagina: que nadie la imprima creyendo que es el acta comun.
     background: (_p: number, tam: { width: number }) => ({ stack: [
       { canvas: [{ type: "rect", x: 0, y: 0, w: tam.width, h: 20, color: C.rojo }] },
-      { text: "CONFIDENCIAL · INCLUYE COSTOS · SOLO OWNER Y ADMIN", color: "#ffffff", bold: true, fontSize: 8, alignment: "center", absolutePosition: { x: 0, y: 6 } },
+      { text: "CONFIDENCIAL · INCLUYE COSTOS · SOLO OWNER Y ADMINISTRADOR", color: "#ffffff", bold: true, fontSize: 8, alignment: "center", absolutePosition: { x: 0, y: 6 } },
     ] }),
-    footer: pie(a, "Acta valorizada · Confidencial ·"),
+    footer: pie(a, "Acta Valorizada · Confidencial ·"),
     content: [
       encabezado(a, "ACTA VALORIZADA", `${a.departamento} · ${a.fecha}`),
       { table: { widths: ["*", "*", "*", "*"], body: [[
@@ -187,7 +187,7 @@ export async function valorizadaPdf(a: ActaValorizada): Promise<Buffer> {
       { text: "Costo unitario sin IVA al momento del cierre. Queda fijo en esta acta aunque el costo cambie después. Solo se listan los renglones con diferencia.", fontSize: 7.5, color: C.gris, margin: [0, 0, 0, 10] },
       { table: { headerRows: 1, widths: [16, 64, "*", 26, 46, 50, 54], body: cuerpo }, layout: lineaFina },
       ...(v.sinCosto ? [{ table: { widths: ["*"], body: [[{ text: `${v.sinCosto} renglón(es) sin costo: artículos nuevos con la ficha incompleta o productos que nunca se compraron. Su valor aparece en el próximo conteo, cuando tengan costo: esta acta no se recalcula.`, fontSize: 8, color: C.ambar, fillColor: C.fondoAmbar }]] }, layout: "noBorders", margin: [0, 10, 0, 0] }] : []),
-      firmas("Revisado por (owner o admin)", "Aprobó el ajuste"),
+      firmas("Revisado por (Owner o Administrador)", "Aprobó el ajuste"),
     ],
   };
   return pm.createPdf(def).getBuffer();
@@ -202,7 +202,7 @@ function hojaBase(wb: ExcelJS.Workbook, nombre: string, a: Acta, titulo: string,
   if (confidencial) {
     ws.mergeCells("A1:I1");
     const c = ws.getCell("A1");
-    c.value = "CONFIDENCIAL · INCLUYE COSTOS · SOLO OWNER Y ADMIN";
+    c.value = "CONFIDENCIAL · INCLUYE COSTOS · SOLO OWNER Y ADMINISTRADOR";
     c.font = { bold: true, color: { argb: "FFFFFFFF" } };
     c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.rojo) } };
     c.alignment = { horizontal: "center" };
@@ -236,10 +236,10 @@ const FMT_USD_SIGNO = '+"$"#,##0.00;-"$"#,##0.00;0';
 
 export async function actaExcel(a: Acta): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Macedonia"; wb.title = `Acta de conteo ${a.numero}`;
+  wb.creator = "Macedonia"; wb.title = `Acta de Conteo ${a.numero}`;
   const { ws, fila: f0 } = hojaBase(wb, "Acta", a, "ACTA DE CONTEO FÍSICO");
-  const datos: [string, string][] = [["Empresa", a.empresa], ["Departamento", a.departamento], ["Fecha del conteo", a.fecha],
-    ["Contó", a.conto], ["Abierto", a.abiertoEn], ["Cerrado", a.cerradoEn], ["Existencia del sistema", "Tomada al cerrar"]];
+  const datos: [string, string][] = [["Empresa", a.empresa], ["Departamento", a.departamento], ["Fecha del Conteo", a.fecha],
+    ["Contó", a.conto], ["Abierto", a.abiertoEn], ["Cerrado", a.cerradoEn], ["Existencia del Sistema", "Tomada al cerrar"]];
   datos.forEach(([k, v], i) => {
     ws.getCell(f0 + i, 1).value = k; ws.getCell(f0 + i, 1).font = { size: 9, color: { argb: argb(C.gris) } };
     ws.getCell(f0 + i, 3).value = v; ws.getCell(f0 + i, 3).font = { bold: true };
@@ -268,16 +268,16 @@ export async function actaExcel(a: Acta): Promise<Buffer> {
   const r = a.resumen;
   let fr = ultima + 2;
   ws.getCell(fr, 1).value = "Resumen"; ws.getCell(fr, 1).font = { bold: true, size: 11, color: { argb: argb(C.navy) } };
-  ([["Renglones contados", r.renglones], ["Coinciden con el sistema", r.coinciden], ["Con faltante", r.faltantes],
-    ["Con sobrante", r.sobrantes], ["Artículos nuevos", r.nuevos], ["Sin contar", r.sinContar]] as [string, number][])
+  ([["Renglones Contados", r.renglones], ["Coinciden con el Sistema", r.coinciden], ["Con Faltante", r.faltantes],
+    ["Con Sobrante", r.sobrantes], ["Artículos Nuevos", r.nuevos], ["Sin Contar", r.sinContar]] as [string, number][])
     .forEach(([k, v]) => { fr++; ws.getCell(fr, 1).value = k; ws.getCell(fr, 4).value = v; ws.getCell(fr, 4).font = { bold: true }; });
-  ws.getCell(fr + 2, 1).value = "Este acta no modifica el inventario. Las diferencias se ajustan solo con la aprobación de un owner o admin.";
+  ws.getCell(fr + 2, 1).value = "Esta acta no modifica el inventario. Las diferencias se ajustan solo con la aprobación del Owner o de un Administrador.";
   ws.getCell(fr + 2, 1).font = { italic: true, size: 9, color: { argb: argb(C.ambar) } };
   [5, 15, 14, 44, 8, 11, 11, 11, 38].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
   ws.headerFooter.oddFooter = `&C${a.numero} · Página &P de &N`;
 
   const h = wb.addWorksheet("Historial", { views: [{ showGridLines: false }] });
-  cabecera(h, 1, ["Fecha y hora", "Evento", "Detalle"], []);
+  cabecera(h, 1, ["Fecha y Hora", "Evento", "Detalle"], []);
   a.eventos.forEach((e, i) => {
     const row = h.getRow(2 + i);
     row.values = [e.en, e.tipo, e.detalle];
@@ -287,7 +287,7 @@ export async function actaExcel(a: Acta): Promise<Buffer> {
   [18, 26, 90].forEach((w, i) => { h.getColumn(i + 1).width = w; });
 
   // Lo que falta contar del departamento: la lista de trabajo del proximo conteo.
-  const sc = wb.addWorksheet("Sin contar", { views: [{ state: "frozen", ySplit: 3, showGridLines: false }] });
+  const sc = wb.addWorksheet("Sin Contar", { views: [{ state: "frozen", ySplit: 3, showGridLines: false }] });
   sc.getCell(1, 1).value = `Productos que no entraron en este conteo · conservan su existencia`;
   sc.getCell(1, 1).font = { bold: true, color: { argb: argb(C.navy) } };
   cabecera(sc, 3, ["Código", "Producto", "Und.", "Sistema"], [4]);
@@ -304,17 +304,17 @@ export async function actaExcel(a: Acta): Promise<Buffer> {
 
 export async function valorizadaExcel(a: ActaValorizada): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Macedonia"; wb.title = `Acta valorizada ${a.numero}`;
+  wb.creator = "Macedonia"; wb.title = `Acta Valorizada ${a.numero}`;
   const { ws, fila: f0 } = hojaBase(wb, "Valorizada", a, "ACTA VALORIZADA", true);
   const v = a.valor;
-  ([["Faltantes", v.faltantes], ["Sobrantes", v.sobrantes], ["Diferencia neta", v.neto]] as [string, number][]).forEach(([k, n], i) => {
+  ([["Faltantes", v.faltantes], ["Sobrantes", v.sobrantes], ["Diferencia Neta", v.neto]] as [string, number][]).forEach(([k, n], i) => {
     ws.getCell(f0 + i, 1).value = k; ws.getCell(f0 + i, 1).font = { color: { argb: argb(C.gris) } };
     const c = ws.getCell(f0 + i, 3); c.value = n; c.numFmt = FMT_USD_SIGNO; c.font = { bold: true, size: 11, color: { argb: argb(n < 0 ? C.rojo : C.azul) } };
   });
   ws.getCell(f0 + 3, 1).value = "Costo unitario sin IVA al cierre. Queda fijo aunque el costo cambie después.";
   ws.getCell(f0 + 3, 1).font = { italic: true, size: 9, color: { argb: argb(C.gris) } };
   const fc = f0 + 5;
-  cabecera(ws, fc, ["N°", "Identificación", "Producto", "Und.", "Diferencia", "Costo unit. $", "Valor $"], [5, 6, 7]);
+  cabecera(ws, fc, ["N°", "Identificación", "Producto", "Und.", "Diferencia", "Costo Unit. $", "Valor $"], [5, 6, 7]);
   a.lineas.forEach((l, i) => {
     const r = ws.getRow(fc + 1 + i);
     r.values = [l.renglon ?? "+", l.codigo, l.nombre, l.unidad, l.diferencia ?? "nuevo", l.costo ?? "sin costo", l.valor ?? null];
@@ -325,11 +325,11 @@ export async function valorizadaExcel(a: ActaValorizada): Promise<Buffer> {
     if (l.valor != null) r.getCell(7).font = { bold: true, color: { argb: argb(l.valor < 0 ? C.rojo : C.azul) } };
   });
   const t = ws.getRow(fc + 1 + a.lineas.length);
-  t.getCell(3).value = "Diferencia neta"; t.getCell(3).font = { bold: true };
+  t.getCell(3).value = "Diferencia Neta"; t.getCell(3).font = { bold: true };
   t.getCell(7).value = v.neto; t.getCell(7).numFmt = FMT_USD_SIGNO; t.getCell(7).font = { bold: true, color: { argb: argb(v.neto < 0 ? C.rojo : C.azul) } };
   t.eachCell((c) => { c.border = { top: { style: "medium", color: { argb: argb(C.navy) } } }; });
   [5, 15, 46, 7, 12, 13, 13, 4, 4].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
-  ws.headerFooter.oddHeader = "&CCONFIDENCIAL · SOLO OWNER Y ADMIN";
+  ws.headerFooter.oddHeader = "&CCONFIDENCIAL · SOLO OWNER Y ADMINISTRADOR";
   ws.headerFooter.oddFooter = `&C${a.numero} valorizada · Página &P de &N`;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

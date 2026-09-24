@@ -60,9 +60,9 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
     const ETIQUETAS: Record<string, { etiqueta: string; tone: "ok" | "muted" | "info" | "warn" | "danger" }> = {
       lleno:           { etiqueta: "Llenos",             tone: "ok" },
       vacio:           { etiqueta: "Vacíos",             tone: "muted" },
-      en_cliente:      { etiqueta: "En cliente",         tone: "info" },
-      en_llenado:      { etiqueta: "En llenado",         tone: "warn" },
-      fuera_servicio:  { etiqueta: "Fuera de servicio",  tone: "danger" },
+      en_cliente:      { etiqueta: "En Cliente",         tone: "info" },
+      en_llenado:      { etiqueta: "En Llenado",         tone: "warn" },
+      fuera_servicio:  { etiqueta: "Fuera de Servicio",  tone: "danger" },
     };
     const suma = new Map<string, number>();
     for (const s of (cilindros.datos ?? []) as SaldoCilindro[]) {
@@ -92,14 +92,14 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   // 7 productos en stock crítico...) indistinguibles de un dato verdadero, y alguien
   // podía decidir sobre ellas. Se llenarán cuando existan los datos reales.
   const kpis = [
-    { key: "vh", label: "Ventas hoy", value: money(0), sub: bs ? undefined : "≈ 0 Bs", tone: "brand" as const },
-    { key: "cxc", label: "Cuentas por cobrar", value: money(0), sub: "0 documentos", tone: "warn" as const },
-    { key: "cxp", label: "Cuentas por pagar", value: money(0), sub: "0 proveedores", tone: "danger" as const },
-    { key: "sc", label: "Stock crítico", value: cnt(0), sub: "productos bajo mínimo", tone: "warn" as const },
-    { key: "cp", label: "Cilindros pendientes", value: cnt(0), sub: "por retorno", tone: "info" as const },
-    { key: "rp", label: "Recargas pendientes", value: cnt(0), sub: "en cola", tone: "info" as const },
-    { key: "pp", label: "Pedidos pendientes", value: cnt(0), sub: "por despachar", tone: "navy" as const },
-    { key: "bg", label: "Balance del período", value: money(106826 * frac), sub: "utilidad neta 2024", tone: "ok" as const },
+    { key: "vh", label: "Ventas Hoy", value: money(0), sub: bs ? undefined : "≈ 0 Bs", tone: "brand" as const },
+    { key: "cxc", label: "Cuentas por Cobrar", value: money(0), sub: "0 documentos", tone: "warn" as const },
+    { key: "cxp", label: "Cuentas por Pagar", value: money(0), sub: "0 proveedores", tone: "danger" as const },
+    { key: "sc", label: "Stock Crítico", value: cnt(0), sub: "productos bajo mínimo", tone: "warn" as const },
+    { key: "cp", label: "Cilindros Pendientes", value: cnt(0), sub: "por retorno", tone: "info" as const },
+    { key: "rp", label: "Recargas Pendientes", value: cnt(0), sub: "en cola", tone: "info" as const },
+    { key: "pp", label: "Pedidos Pendientes", value: cnt(0), sub: "por despachar", tone: "navy" as const },
+    { key: "bg", label: "Balance del Período", value: money(106826 * frac), sub: "utilidad neta 2024", tone: "ok" as const },
   ];
 
   // Estos porcentajes y listas derivan de la serie 2024 de Sumigases. Si la empresa
@@ -107,10 +107,10 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   // otra empresa: van en cero y las listas quedan vacías.
   const sinSerie = factor === 0;
   const roiCards = [
-    { label: "ROI del período", value: sinSerie ? "0%" : "53,3%", sub: "utilidad / inversión", accent: true },
-    { label: "Utilidad estimada", value: money(106826 * frac), sub: `acumulado ${count} mes(es)` },
-    { label: "Margen bruto", value: sinSerie ? "0%" : "48,0%", sub: "sobre ventas" },
-    { label: "Ventas vs compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: sinSerie ? "sin datos" : "ratio 3,5x" },
+    { label: "ROI del Período", value: sinSerie ? "0%" : "53,3%", sub: "utilidad / inversión", accent: true },
+    { label: "Utilidad Estimada", value: money(106826 * frac), sub: `acumulado ${count} mes(es)` },
+    { label: "Margen Bruto", value: sinSerie ? "0%" : "48,0%", sub: "sobre ventas" },
+    { label: "Ventas vs Compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: sinSerie ? "sin datos" : "ratio 3,5x" },
   ];
 
   const empresaLabel = empresa === "sudematin" ? "Sudematin" : "Sumigases";
@@ -206,7 +206,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           ) : (
             <>
               <p className="mt-2 text-xl font-semibold text-muted sm:text-2xl">— Bs</p>
-              <p className="mt-1 text-xs text-muted">Sin consulta. Pulsa “Dolar Price” en la barra superior.</p>
+              <p className="mt-1 text-xs text-muted">Sin consultar. Pulsa «Tasa BCV» en la barra superior.</p>
             </>
           )}
         </div>
@@ -221,7 +221,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       {/* Histórico real de ventas y compras (Valery) */}
       <div className="mt-6">
         <SectionCard
-          title="Histórico de ventas y compras"
+          title="Histórico de Ventas y Compras"
           action={<StatusBadge tone="brand">Real {hist.meta.desde.slice(0, 4)}–{hist.meta.hasta.slice(0, 4)}</StatusBadge>}
         >
           <HistoryKpis empresa={empresa} />
@@ -269,22 +269,22 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       </div>
 
       <div className="mt-6">
-        <SectionCard title="Ventas vs utilidad">
+        <SectionCard title="Ventas vs Utilidad">
           <BiVentasUtilidad factor={factor} bs={bs} count={count} />
         </SectionCard>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Ventas vs compras">
+        <SectionCard title="Ventas vs Compras">
           <BiVentasCompras factor={factor} bs={bs} count={count} />
         </SectionCard>
-        <SectionCard title="Categorías más rentables" description="Margen por categoría.">
+        <SectionCard title="Categorías Más Rentables" description="Margen por categoría.">
           <BiCategoriasDonut />
         </SectionCard>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Cilindros por estado" description="Calculado de los movimientos.">
+        <SectionCard title="Cilindros por Estado" description="Calculado de los movimientos.">
           {/* Sale de la base, no de una lista en cero: la vista cilindros_saldo
               existe desde que se construyó el módulo. Antes se dibujaban cinco
               filas en cero y cinco barras con width NaN%, porque el porcentaje
@@ -294,7 +294,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
             error={cilindros.error}
             vacio={porEstado.length === 0}
             tituloVacio="Todavía no hay cilindros"
-            mensajeVacio="Cuando se den de alta en Cilindros, aparecen acá."
+            mensajeVacio="Cuando se den de alta en Cilindros, aparecen aquí."
             filas={4}
           >
             <ul className="space-y-3">
@@ -318,11 +318,10 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Alertas operativas" description="Atención requerida.">
+        <SectionCard title="Alertas Operativas" description="Atención requerida.">
           {alertasOperativas.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted">
-              Nada que atender. Las alertas aparecen cuando haya reglas cargadas
-              — mínimos de stock, cilindros sin retornar, cuentas vencidas.
+              Nada que atender por ahora.
             </p>
           ) : (
             <div className="space-y-3">

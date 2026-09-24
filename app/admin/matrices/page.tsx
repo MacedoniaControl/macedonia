@@ -29,13 +29,13 @@ export default function MatricesPage() {
   return (
     <>
       <PageHeader
-        title="Matrices administrativas"
-        breadcrumbs={[{ label: "Inteligencia" }, { label: "Matrices administrativas" }]}
+        title="Matrices Administrativas"
+        breadcrumbs={[{ label: "Inteligencia" }, { label: "Matrices Administrativas" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {aviso && <span className="text-xs text-muted">{aviso}</span>}
             <SubirArchivo
-              etiqueta="Crear Matriz" acepta=".xls,.xlsx"
+              etiqueta="Crear matriz" acepta=".xls,.xlsx"
               onArchivos={(fs) => {
                 if (!fs?.length) return;
                 // Todavia no se procesa: el parseo de la matriz va en su propia

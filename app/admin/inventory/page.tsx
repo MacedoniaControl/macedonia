@@ -51,7 +51,7 @@ function Inventario() {
 
   const fisicoF = useMemo(() => fisico.filter((f) => match(f.codigo, f.nombre)), [t, fisico]);
 
-  // La tabla de Valery: lo único que queda acá, y sale de la base.
+  // La tabla de Valery: lo único que queda aquí, y sale de la base.
   const accValery = useMemo(
     () => ({
       codigo: (r: ItemInventario) => r.codigo,
@@ -86,7 +86,7 @@ function Inventario() {
           ["conteo", "Conteo"],
           ["valery", `Valery (${fisico.length})`],
           // Productos y catalogo pasa a subdepartamento del inventario.
-          ["productos", "Productos y catálogo"],
+          ["productos", "Productos y Catálogo"],
           ["movimientos", "Movimientos"],
         ] as [Tab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
@@ -119,10 +119,6 @@ function Inventario() {
       {/* -------- MASTER dividido en 3 apartados -------- */}
       {tab === "master" && (
         <>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold tracking-tight text-text">Inventario Master</h2>
-          </div>
-
           {/* Valery contra lo contado a mano. Es la razon de ser del producto:
               lo que se fue sin registrarse no aparece en ningun kardex. */}
           <MasterInventario empresa={empresa} filtro={q} recarga={recargaMaster} />
@@ -141,7 +137,7 @@ function Inventario() {
                   <SortableTh label="Nombre" sortKey="nombre" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
                   <SortableTh label="Und." sortKey="und" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
                   <SortableTh label="Existencia" sortKey="existencia" align="right" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
-                  <SortableTh label="Exist. alt." sortKey="alt" align="right" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
+                  <SortableTh label="Exist. Alt." sortKey="alt" align="right" ariaSort={tVal.ariaSort} onSort={tVal.toggleSort} />
                   <th scope="col" className="py-2.5 font-medium">Estado</th>
                 </tr>
               </thead>
@@ -179,7 +175,7 @@ function ExportaValery({ filas, busqueda }: { filas: ItemInventario[]; busqueda:
     detalle: [busqueda.trim() ? `Búsqueda: «${busqueda.trim()}»` : "Todos los productos", "Existencia calculada de los movimientos"],
     columnas: [
       { titulo: "Código", tipo: "codigo" }, { titulo: "Nombre" }, { titulo: "Und." },
-      { titulo: "Existencia", tipo: "num" }, { titulo: "Exist. alt.", tipo: "num" }, { titulo: "Estado" },
+      { titulo: "Existencia", tipo: "num" }, { titulo: "Exist. Alt.", tipo: "num" }, { titulo: "Estado" },
     ],
     filas: filas.map((f) => [f.codigo, f.nombre, f.undPpal, f.existPpal, f.existAlt || null, fmtEstadoValery(f.existPpal)]),
     totales: ["", `Total · ${filas.length.toLocaleString("es-VE")} productos`, "", filas.reduce((a, f) => a + f.existPpal, 0), null, ""],

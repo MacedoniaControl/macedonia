@@ -22,8 +22,8 @@ export function VentasExternas() {
 
   return (
     <SectionCard
-      title="Ventas externas"
-      description="Cotizaciones de vendedores que no son del personal. Se separan por `vendedor_externo`."
+      title="Ventas Externas"
+      description="Cotizaciones de vendedores que no son del personal."
     >
 
       {carga.error && <p className="text-sm text-danger">{carga.error}</p>}

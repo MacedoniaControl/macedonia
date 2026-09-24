@@ -18,12 +18,12 @@ export function HistoryKpis({ empresa = "sumigases" }: Props) {
   const h = getHistory(empresa);
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-      <StatCard label="Ventas históricas" value={fmtUsd(h.totals.venta)} sub={`${h.meta.desde} → ${h.meta.hasta}`} accent />
-      <StatCard label="Utilidad total" value={fmtUsd(h.totals.util)} sub="ganancia acumulada" />
-      <StatCard label="ROI histórico" value={`${h.totals.roi}%`} sub="utilidad / costo" />
-      <StatCard label="Margen bruto" value={`${h.totals.margen}%`} sub="sobre ventas" />
-      <StatCard label="Compras históricas" value={fmtUsd(h.totals.compra)} sub="inversión total" />
-      <StatCard label="Costo de ventas" value={fmtUsd(h.totals.costo)} sub="costo de lo vendido" />
+      <StatCard label="Ventas Históricas" value={fmtUsd(h.totals.venta)} sub={`${h.meta.desde} → ${h.meta.hasta}`} accent />
+      <StatCard label="Utilidad Total" value={fmtUsd(h.totals.util)} sub="ganancia acumulada" />
+      <StatCard label="ROI Histórico" value={`${h.totals.roi}%`} sub="utilidad / costo" />
+      <StatCard label="Margen Bruto" value={`${h.totals.margen}%`} sub="sobre ventas" />
+      <StatCard label="Compras Históricas" value={fmtUsd(h.totals.compra)} sub="inversión total" />
+      <StatCard label="Costo de Ventas" value={fmtUsd(h.totals.costo)} sub="costo de lo vendido" />
     </div>
   );
 }

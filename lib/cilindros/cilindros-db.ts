@@ -208,7 +208,7 @@ export async function movimientoManual(
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
   if (!(cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
-  if (!nota.trim()) return { ok: false, error: "Explicá el motivo del ajuste." };
+  if (!nota.trim()) return { ok: false, error: "Explica el motivo del ajuste." };
 
   const sb = await createClient();
   const { error } = await sb.from("cilindros_mov").insert({
@@ -233,7 +233,7 @@ export async function movimientoManual(
  * 02-sep-2026 que no se cobra garantia. `garantias_cliente` devuelve vacio
  * porque no hay garantias que mostrar, no porque falte cargar un dato.
  *
- * Si algun dia se cobra, ademas de cargar el monto aca hay que hacer que el
+ * Si algun dia se cobra, ademas de cargar el monto aquí hay que hacer que el
  * movimiento lo registre: hoy `registrarEntrega` y `registrarSalida` insertan
  * con `deposito_usd` en su valor por defecto, o sea cero. Cargar el monto solo
  * en el gas no alcanzaria.
@@ -328,11 +328,11 @@ export async function registrarSalida(s: {
 }): Promise<{ ok: boolean; error?: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
-  if (!s.gas) return { ok: false, error: "Elegí el gas." };
+  if (!s.gas) return { ok: false, error: "Elige el gas." };
   if (!(s.cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
-  if (!s.cliente.trim()) return { ok: false, error: "Decí a qué cliente van." };
-  if (!s.autorizadoPor) return { ok: false, error: "Elegí quién autoriza la salida." };
-  if (!s.retiradoPor.trim()) return { ok: false, error: "Decí quién se los lleva." };
+  if (!s.cliente.trim()) return { ok: false, error: "Indica a qué cliente van." };
+  if (!s.autorizadoPor) return { ok: false, error: "Elige quién autoriza la salida." };
+  if (!s.retiradoPor.trim()) return { ok: false, error: "Indica quién se los lleva." };
 
   const sb = await createClient();
   const { error } = await sb.from("cilindros_mov").insert({

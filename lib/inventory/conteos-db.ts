@@ -7,7 +7,7 @@
 // cerrar se numera (CF-AAAA-NNNNNN), se toma la existencia del sistema en ese
 // momento y se archivan las actas en Excel y PDF. El ajuste lo aprueba un owner
 // o admin por separado. Esas reglas las hace cumplir la BASE (funciones y
-// disparadores de la 23): lo de aca solo las llama.
+// disparadores de la 23): lo de aquí solo las llama.
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
@@ -136,7 +136,7 @@ export async function abrirConteo(
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
-  if (await conteoAbierto(empresa)) return { ok: false, error: "Ya hay un conteo abierto: cerralo o seguilo antes de abrir otro." };
+  if (await conteoAbierto(empresa)) return { ok: false, error: "Ya hay un conteo abierto: ciérralo o síguelo antes de abrir otro." };
   const sb = await createClient();
   const { data, error } = await sb
     .from("conteos")
@@ -246,7 +246,7 @@ export async function cambiarAlcance(
   const { data: lineas, error: el } = await sb.from("conteo_lineas").select("codigo, renglon").eq("conteo_id", conteoId);
   if (el) return { ok: false, error: el.message };
   if ("departamento" in a && (lineas ?? []).length > 0) {
-    return { ok: false, error: "Este conteo ya tiene cantidades anotadas: no se cambia de departamento. Ampliálo a todos los departamentos, o cerralo y abrí otro." };
+    return { ok: false, error: "Este conteo ya tiene cantidades anotadas: no se cambia de departamento. Amplíalo a todos los departamentos, o ciérralo y abre otro." };
   }
   const nuevo = "general" in a ? { departamento: null, zona: ZONA_GENERAL } : { departamento: a.departamento, zona: null };
   const { error } = await sb.from("conteos").update(nuevo).eq("id", conteoId);
@@ -409,7 +409,7 @@ async function actaDe(admin: ReturnType<typeof createAdminClient>, id: number) {
   const eventos: EventoActa[] = (ev.data ?? []).map((e) => ({ en: fechaHora(e.en), tipo: ETIQUETA_EVENTO[e.tipo] ?? e.tipo, detalle: e.detalle ?? "" }));
   if (c.ajuste === "pendiente") {
     const n = (lin.data ?? []).filter((l) => l.existencia_sistema !== null && Number(l.cantidad) !== Number(l.existencia_sistema)).length;
-    eventos.push({ en: "Pendiente", tipo: "Ajuste de inventario", detalle: `${n} diferencia(s) esperan la aprobación de un owner o admin.` });
+    eventos.push({ en: "Pendiente", tipo: "Ajuste de inventario", detalle: `${n} diferencia(s) esperan la aprobación del Owner o de un Administrador.` });
   }
   const acta = armarActa({
     numero: c.numero ?? "(sin número)", empresa: getEmpresa(c.empresa_id)?.nombre ?? c.empresa_id, departamento,
@@ -430,7 +430,7 @@ export async function generarActas(id: number): Promise<{ ok: boolean; error?: s
   // Solo alguien que puede ver ese conteo dispara la generacion.
   const sb = await createClient();
   const { data: visible } = await sb.from("conteos").select("id, cerrado").eq("id", id).maybeSingle();
-  if (!visible) return { ok: false, error: "No existe el conteo o no tenés acceso." };
+  if (!visible) return { ok: false, error: "No existe el conteo o no tienes acceso." };
   if (!visible.cerrado) return { ok: false, error: "El conteo sigue abierto: el acta se genera al cerrarlo." };
 
   const admin = createAdminClient();
@@ -494,7 +494,7 @@ export async function historial(empresa: string): Promise<ResumenConteo[]> {
 export async function detalleConteo(id: number): Promise<DetalleConteo> {
   const sb = await createClient();
   const { data: r, error } = await sb.from("conteos_resumen").select("*").eq("id", id).single();
-  if (error || !r) throw new Error("No existe el conteo o no tenés acceso.");
+  if (error || !r) throw new Error("No existe el conteo o no tienes acceso.");
   const [lin, ev, cos] = await Promise.all([
     sb.from("conteo_lineas").select("renglon, codigo, nombre, unidad, cantidad, existencia_sistema, observacion").eq("conteo_id", id),
     sb.from("conteo_eventos").select("en, tipo, detalle").eq("conteo_id", id).order("en"),
@@ -527,7 +527,7 @@ export async function urlActa(id: number, tipo: TipoArchivo): Promise<{ ok: true
   const ext = tipo.endsWith("pdf") ? "pdf" : "xlsx";
   const nombre = `${c.numero}${tipo.startsWith("valorizada") ? " VALORIZADA" : ""}.${ext}`;
   const { data, error } = await sb.storage.from("actas").createSignedUrl(ruta, 300, { download: nombre });
-  if (error || !data) return { ok: false, error: error?.message.includes("not found") || error?.message.includes("Object") ? "No tenés acceso a esa acta." : `No se pudo abrir: ${error?.message}` };
+  if (error || !data) return { ok: false, error: error?.message.includes("not found") || error?.message.includes("Object") ? "No tienes acceso a esa acta." : `No se pudo abrir: ${error?.message}` };
   return { ok: true, url: data.signedUrl };
 }
 

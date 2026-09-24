@@ -51,7 +51,7 @@ export default async function Portada() {
   if (usuario.rol !== "owner") redirect(rutaPostLogin(usuario));
 
   // La identidad baja igual que en /admin: el Centro de Control tambien
-  // necesita el menu de sesion, o quien entra aca se queda sin salida.
+  // necesita el menu de sesion, o quien entra aquí se queda sin salida.
   return (
     <SesionProvider
       identidad={{

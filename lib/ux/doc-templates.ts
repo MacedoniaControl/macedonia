@@ -23,6 +23,13 @@ function identidad(empresa: EmpresaId) {
 }
 const GASES_CIL = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"]; // orden fijo del formato
 
+/**
+ * Como se escribe cada gas en el papel. Las claves de arriba quedan sin tilde:
+ * son las que ya estan guardadas en las notas emitidas y el codigo las compara.
+ */
+export const NOMBRE_GAS: Record<string, string> = { OXIGENO: "OXÍGENO", ARGON: "ARGÓN", NITROGENO: "NITRÓGENO" };
+const nombreGas = (g: string) => NOMBRE_GAS[g.toUpperCase()] ?? g;
+
 export type NELinea = { cantidad: number; unidad: string; descripcion: string; precio: number; codigo?: string; descuento?: number };
 export type NECil = { gas: string; llenos: number; vacios: number };
 export type NEDoc = {
@@ -81,26 +88,26 @@ function neCopy(d: NEDoc, empresa: EmpresaId) {
     `<tr><td>${m(l.cantidad)}</td><td>${l.unidad}</td><td class="l">${l.codigo ? l.codigo + " - " : ""}${l.descripcion}</td><td class="r">${m(l.precio)}</td><td class="r">${m(lineaTotal(l))}</td></tr>`).join("");
   const c = cilData(d.cilindros);
   const cilRow = (a: NECil, b: NECil) =>
-    `<tr><td class="l">${a.gas}</td><td>${a.llenos || ""}</td><td>${a.vacios || ""}</td><td class="l">${b.gas}</td><td>${b.llenos || ""}</td><td>${b.vacios || ""}</td></tr>`;
+    `<tr><td class="l">${nombreGas(a.gas)}</td><td>${a.llenos || ""}</td><td>${a.vacios || ""}</td><td class="l">${nombreGas(b.gas)}</td><td>${b.llenos || ""}</td><td>${b.vacios || ""}</td></tr>`;
   return `<div class="copy">
     <div class="top">${E.logo}
-      <div class="box num"><div class="tit">CONSTANCIA DE<br>RECEPCION DE MATERIALES</div><div class="n">N° &nbsp;&nbsp; ${d.correlativo}</div></div>
+      <div class="box num"><div class="tit">CONSTANCIA DE<br>RECEPCIÓN DE MATERIALES</div><div class="n">N° &nbsp;&nbsp; ${d.correlativo}</div></div>
     </div>
     ${E.rubros ? `<div class="rubros">${E.rubros}</div>` : ""}
     <table class="cli">
       <tr><td class="k">CLIENTE</td><td>${d.cliente}</td><td class="k">TLF</td><td>${d.tlf}</td></tr>
       <tr><td class="k">RIF</td><td>${d.rif}</td><td></td><td></td></tr>
-      <tr><td class="k">DIRECCION</td><td colspan="3">${d.direccion}</td></tr>
+      <tr><td class="k">DIRECCIÓN</td><td colspan="3">${d.direccion}</td></tr>
       <tr><td class="k">FECHA</td><td>${d.fecha}</td><td class="k" colspan="2">ORDEN DE COMPRA &nbsp; ${d.ordenCompra}</td></tr>
     </table>
-    <table class="items"><thead><tr><th>CANTIDAD</th><th>UNIDAD</th><th class="l">DESCRIPCION</th><th>PRECIO<br>UNITARIO</th><th>TOTAL</th></tr></thead>
+    <table class="items"><thead><tr><th>CANTIDAD</th><th>UNIDAD</th><th class="l">DESCRIPCIÓN</th><th>PRECIO<br>UNITARIO</th><th>TOTAL</th></tr></thead>
       <tbody>${filas}${"<tr class='sp'><td></td><td></td><td></td><td></td><td></td></tr>".repeat(Math.max(0, 6 - d.lineas.length))}</tbody></table>
     <table class="tot">
       <tr><td class="k">BASE IMPONIBLE</td><td class="r">${m(t.base)}</td></tr>
       ${d.llevaIva ? `<tr><td class="k">IVA &nbsp; ${m(d.ivaPct ?? 16)} %</td><td class="r">${m(t.iva)}</td></tr>` : ""}
-      <tr><td class="k">TOTAL OPERACION</td><td class="r">${m(t.total)}</td></tr>
+      <tr><td class="k">TOTAL OPERACIÓN</td><td class="r">${m(t.total)}</td></tr>
     </table>
-    <table class="cilt"><thead><tr><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACIOS</th><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACIOS</th></tr></thead>
+    <table class="cilt"><thead><tr><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACÍOS</th><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACÍOS</th></tr></thead>
       <tbody>${cilRow(c[0], c[1])}${cilRow(c[2], c[3])}</tbody></table>
     <table class="firmas"><tr><td>ENTREGADO</td><td>RECIBIDO CONFORME</td><td>PROCESADO</td></tr>
       <tr class="sign"><td>FECHA &nbsp; ${d.fecha}</td><td></td><td></td></tr></table>

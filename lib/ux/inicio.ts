@@ -5,7 +5,7 @@
 // Es la MISMA regla que usan el login y el proxy (lib/auth/acceso.ts): el
 // tecnico empieza en Cilindros, los demas en el Dashboard, y si no pueden ver
 // esa, la primera seccion que si. "Inicio" en las migas y en el menu lleva
-// siempre aca, asi volver a la pantalla principal es el mismo gesto en todas.
+// siempre aquí, asi volver a la pantalla principal es el mismo gesto en todas.
 
 import { useSesion } from "@/components/auth/SesionProvider";
 import { inicioEn } from "@/lib/auth/acceso";

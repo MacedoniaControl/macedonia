@@ -121,7 +121,7 @@ export function EntregaCilindros({
 
   return (
     <SectionCard
-      title="Registrar entrega"
+      title="Registrar Entrega"
     >
       <div className="space-y-4">
         <div>

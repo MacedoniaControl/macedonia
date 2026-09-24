@@ -129,7 +129,7 @@ export default function SettingsPage() {
                 <option value="sudematin">Sudematin</option>
               </select>
             </Field>
-            <Field label="Vista consolidada (OWNER/ADMIN)" hint="Si se desactiva, cada empresa se ve por separado.">
+            <Field label="Vista consolidada (Owner y Administrador)" hint="Si se desactiva, cada empresa se ve por separado.">
               <select className={inputClass} value={form.consolidada} onChange={set("consolidada")}>
                 <option value="on">Habilitada</option>
                 <option value="off">Solo preparada (no MVP)</option>
@@ -138,11 +138,11 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Moneda y tasa" description="USD/Bs, tasa BCV e IVA." >
+        <SectionCard title="Moneda y Tasa" description="USD/Bs, tasa BCV e IVA." >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Tasa BCV (Bs/USD)"><input className={inputClass} value={form.tasa} onChange={set("tasa")} /></Field>
             <Field label="IVA (%)"><input className={inputClass} value={form.iva} onChange={set("iva")} /></Field>
-            <Field label="Tasa especial sin aprobación (±%)" hint="Fuera de rango: aprueba OWNER/ADMIN."><input className={inputClass} value={form.rangoTasa} onChange={set("rangoTasa")} /></Field>
+            <Field label="Tasa especial sin aprobación (±%)" hint="Fuera de ese rango la aprueba el Owner o un Administrador."><input className={inputClass} value={form.rangoTasa} onChange={set("rangoTasa")} /></Field>
             <Field label="Moneda base"><input className={inputClass} value="USD" readOnly /></Field>
           </div>
           <div className="mt-3">
@@ -168,7 +168,7 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Métodos de pago" description="Requisito y verificación por método.">
+        <SectionCard title="Métodos de Pago" description="Requisito y verificación por método.">
           <ul className="divide-y divide-border text-sm">
             {/* La fila envuelve en pantallas chicas: "Transferencia Bs" más el
                 requisito y la insignia no entran en 320px, y el nombre del
