@@ -54,7 +54,7 @@ export type Fila = {
   error?: string;
 };
 
-export function Contar({ empresa, onCerrado }: { empresa: string; onCerrado: (id: number) => void }) {
+export function Contar({ empresa, gerencia, onCerrado }: { empresa: string; gerencia: boolean; onCerrado: (id: number) => void }) {
   const [recarga, setRecarga] = useState(0);
   const carga = useCarga(`${empresa}:${recarga}`, () => conteoAbierto(empresa));
 
@@ -62,7 +62,7 @@ export function Contar({ empresa, onCerrado }: { empresa: string; onCerrado: (id
   if (carga.error) return <AlertCard tone="danger" titulo="No se pudo leer el conteo" mensaje={carga.error} />;
   if (!carga.datos) return <NuevoConteo empresa={empresa} onAbierto={() => setRecarga((n) => n + 1)} />;
   const c = carga.datos;
-  return <Planilla key={`${c.id}:${c.departamento}:${c.zona}`} empresa={empresa} conteo={c} onCerrado={onCerrado} onCambio={() => setRecarga((n) => n + 1)} />;
+  return <Planilla key={`${c.id}:${c.departamento}:${c.zona}`} empresa={empresa} gerencia={gerencia} conteo={c} onCerrado={onCerrado} onCambio={() => setRecarga((n) => n + 1)} />;
 }
 
 // ---------------------------------------------------------------- abrir
@@ -129,7 +129,7 @@ const porGrupo = (a: string, b: string) => (ordenGrupo(a) < ordenGrupo(b) ? -1 :
 
 type Propuesta = { tipo: "ampliar" } | { tipo: "cambiar"; departamento: string; nombre: string };
 
-function Planilla({ empresa, conteo, onCerrado, onCambio }: { empresa: string; conteo: Conteo; onCerrado: (id: number) => void; onCambio: () => void }) {
+function Planilla({ empresa, gerencia, conteo, onCerrado, onCambio }: { empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void; onCambio: () => void }) {
   const datos = useCarga(`planilla:${conteo.id}:${conteo.departamento}:${conteo.zona}`, async () => {
     const [items, lineas] = await Promise.all([planillaDe(empresa, conteo), lineasDe(conteo.id)]);
     return { items, lineas };
@@ -138,11 +138,11 @@ function Planilla({ empresa, conteo, onCerrado, onCambio }: { empresa: string; c
   if (datos.error || !datos.datos) return <AlertCard tone="danger" titulo="No se pudo leer la planilla" mensaje={datos.error ?? ""} />;
   // Se monta recien con los datos: asi arranca con sus filas, sin un efecto que
   // las copie despues.
-  return <PlanillaLista empresa={empresa} conteo={conteo} onCerrado={onCerrado} onCambio={onCambio} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
+  return <PlanillaLista empresa={empresa} gerencia={gerencia} conteo={conteo} onCerrado={onCerrado} onCambio={onCambio} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
 }
 
-function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
-  empresa: string; conteo: Conteo; onCerrado: (id: number) => void; onCambio: () => void; inicial: Fila[];
+function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, inicial }: {
+  empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void; onCambio: () => void; inicial: Fila[];
 }) {
   const [filas, setFilas] = useState<Fila[]>(inicial);
   // El departamento que se esta mirando ("" = todos). Se recuerda en este
@@ -497,7 +497,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
       )}
       {revisar && (
         <RevisarCierre
-          conteoId={conteo.id} titulo={titulo} fecha={conteo.fecha} conto={conto} onConto={cambiarConto}
+          conteoId={conteo.id} titulo={titulo} gerencia={gerencia} fecha={conteo.fecha} conto={conto} onConto={cambiarConto}
           filas={filas} sinContar={cuenta.sin} errores={filas.filter((f) => leerCantidad(f.texto).estado === "error")}
           onCerrar={() => setRevisar(false)}
           onCerrado={() => { try { localStorage.removeItem(claveConto); } catch { /* idem */ } onCerrado(conteo.id); }}

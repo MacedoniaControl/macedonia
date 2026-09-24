@@ -14,11 +14,13 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AlertCard } from "@/components/ui/AlertCard";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { leerCantidad, fmtCantidad } from "@/lib/inventory/cantidad";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { useCarga } from "@/lib/ux/use-carga";
 import { fmtDif, fmtNum, fmtUsdSigno } from "@/lib/inventory/acta";
 import {
-  aprobarAjuste, detalleConteo, generarActas, historial, puedeAprobar, rechazarAjuste, type ResumenConteo,
+  aprobarAjuste, detalleConteo, editarConteo, eliminarConteo, generarActas, historial, puedeAprobar, rechazarAjuste, type ResumenConteo,
 } from "@/lib/inventory/conteos-db";
 import { Descarga } from "./RevisarCierre";
 import { useExportable } from "@/lib/ux/exportar";
@@ -54,7 +56,7 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
         { titulo: "Contados", tipo: "num" }, { titulo: "Diferencias", tipo: "num" }, { titulo: "Nuevos", tipo: "num" },
         { titulo: "Estado" }, { titulo: "Cerrado el" },
       ],
-      filas: lista.map((c) => [
+      filas: lista.filter((c) => !c.eliminado).map((c) => [
         c.numero ?? "Sin número", c.fecha, c.departamento ? `${c.departamento} - ${c.departamentoNombre ?? ""}` : c.zona ?? "Sin departamento",
         c.conto, c.renglones, c.diferencias, c.articulosNuevos, ESTADO[c.cerrado ? c.ajuste ?? "pendiente" : "abierto"].t, c.cerradoEn,
       ]),
@@ -87,6 +89,7 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
 function Fila({ c, abierta, aprueba, onToggle, onCambio, onIrAContar }: {
   c: ResumenConteo; abierta: boolean; aprueba: boolean; onToggle: () => void; onCambio: () => void; onIrAContar: () => void;
 }) {
+  if (c.eliminado) return <Eliminado e={c.eliminado} />;
   const est = ESTADO[c.cerrado ? c.ajuste ?? "pendiente" : "abierto"];
   const titulo = c.departamento ? `${c.departamento} - ${c.departamentoNombre}` : c.zona ?? "Sin departamento";
   return (
@@ -104,7 +107,12 @@ function Fila({ c, abierta, aprueba, onToggle, onCambio, onIrAContar }: {
       </button>
       {abierta && (c.cerrado
         ? <Detalle c={c} aprueba={aprueba} onCambio={onCambio} />
-        : <p className="px-4 pb-4 text-sm text-muted">Todavía no tiene acta: se genera cuando se cierre. <button type="button" className="font-medium text-brand" onClick={onIrAContar}>Seguir contando →</button></p>)}
+        : (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4">
+            <p className="text-sm text-muted">Todavía no tiene acta: se genera cuando se cierre. <button type="button" className="font-medium text-brand" onClick={onIrAContar}>Seguir contando →</button></p>
+            {aprueba && <BotonEliminar c={c} onEliminado={onCambio} />}
+          </div>
+        ))}
     </li>
   );
 }
@@ -114,6 +122,7 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
   const d = useCarga(`det:${c.id}:${vez}`, () => detalleConteo(c.id));
   const [nota, setNota] = useState("");
   const [yendo, setYendo] = useState<"" | "aprobar" | "rechazar" | "actas">("");
+  const [corrigiendo, setCorrigiendo] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
 
   if (d.cargando) return <div className="px-4 pb-4"><EstadoDatos cargando vacio={false}>{null}</EstadoDatos></div>;
@@ -161,7 +170,12 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
         </div>
       )}
 
-      {conDif.length > 0 && (
+      {corrigiendo && (
+        <Corregir c={c} lineas={acta.lineas} onCancelar={() => setCorrigiendo(false)}
+          onHecho={(t) => { setCorrigiendo(false); setMsg({ ok: true, t }); setVez((n) => n + 1); onCambio(); }} />
+      )}
+
+      {!corrigiendo && conDif.length > 0 && (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full min-w-[520px] text-left text-xs">
             <thead className="bg-surface-2 text-[10px] uppercase tracking-wide text-muted">
@@ -198,6 +212,13 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
       {c.ajusteNota && c.ajuste !== "pendiente" && <p className="text-sm text-muted">Nota del ajuste: {c.ajusteNota}</p>}
       {msg && <p role="status" className={`rounded-xl px-3 py-2 text-sm ${msg.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>{msg.t}</p>}
 
+      {aprueba && !corrigiendo && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon="settings" onClick={() => setCorrigiendo(true)}>Corregir conteo</Button>
+          <BotonEliminar c={c} onEliminado={onCambio} />
+        </div>
+      )}
+
       <ol className="space-y-0">
         {acta.eventos.map((e, i) => (
           <li key={i} className="grid grid-cols-[8.5rem_0.75rem_minmax(0,1fr)] gap-3 pb-3 text-sm max-sm:grid-cols-[0.75rem_minmax(0,1fr)]">
@@ -207,6 +228,150 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- eliminar
+
+/** La línea que queda de un conteo eliminado, como un mensaje borrado en WhatsApp. */
+function Eliminado({ e }: { e: NonNullable<ResumenConteo["eliminado"]> }) {
+  return (
+    <li className="flex items-start gap-2.5 px-4 py-3 text-sm text-muted">
+      <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" />
+      </svg>
+      <span className="min-w-0">
+        <span className="block italic">Se eliminó el conteo {e.resumen}</span>
+        <span className="block text-xs">Por <b className="font-medium text-text">{e.por}</b> · {e.en}</span>
+      </span>
+    </li>
+  );
+}
+
+function BotonEliminar({ c, onEliminado }: { c: ResumenConteo; onEliminado: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [yendo, setYendo] = useState(false);
+  const nombre = c.numero ?? "el conteo sin número";
+  const donde = c.departamento ? `${c.departamento} - ${c.departamentoNombre}` : c.zona ?? "sin departamento";
+  const aviso = c.ajuste === "aprobado"
+    ? " Su ajuste ya se aplicó al inventario: las existencias no cambian al eliminarlo."
+    : "";
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      <ConfirmDialog
+        title="¿Eliminar el conteo?"
+        message={`Se eliminará ${nombre} (${donde}, ${c.fecha.split("-").reverse().join("-")}) con sus renglones y sus actas. En el historial quedará una línea con tu nombre y la hora.${aviso}`}
+        confirmLabel="Sí, eliminar"
+        cancelLabel="No"
+        onConfirm={async () => {
+          setError(null); setYendo(true);
+          const r = await eliminarConteo(c.id);
+          setYendo(false);
+          if (!r.ok) return setError(r.error ?? "No se pudo eliminar.");
+          onEliminado();
+        }}
+        trigger={(abrir) => (
+          <Button variant="ghost" icon="close" cargando={yendo} textoCargando="Eliminando…" onClick={abrir}
+            className="text-danger hover:bg-danger/10">
+            Eliminar conteo
+          </Button>
+        )}
+      />
+      {error && <span role="alert" className="text-xs text-danger">{error}</span>}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------- corregir
+
+type LineaActa = Awaited<ReturnType<typeof detalleConteo>>["acta"]["lineas"][number];
+
+/**
+ * Corregir lo contado cuando alguien se equivocó. Cada cambio queda en el
+ * historial del conteo; si el ajuste ya se aprobó, la diferencia entra al
+ * inventario. Las actas se vuelven a generar.
+ */
+function Corregir({ c, lineas, onCancelar, onHecho }: {
+  c: ResumenConteo; lineas: LineaActa[]; onCancelar: () => void; onHecho: (texto: string) => void;
+}) {
+  const [valores, setValores] = useState(() => new Map(lineas.map((l) => [l.codigo, { texto: fmtCantidad(l.contado), obs: l.observacion ?? "" }])));
+  const [q, setQ] = useState("");
+  const [yendo, setYendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const t = q.trim().toLowerCase();
+  const visibles = lineas.filter((l) => !t || l.codigo.toLowerCase().includes(t) || l.nombre.toLowerCase().includes(t));
+  const poner = (codigo: string, p: Partial<{ texto: string; obs: string }>) =>
+    setValores((m) => new Map(m).set(codigo, { ...m.get(codigo)!, ...p }));
+
+  const cambios = lineas.flatMap((l) => {
+    const v = valores.get(l.codigo)!;
+    const lc = leerCantidad(v.texto);
+    const cantidad = lc.estado === "ok" || lc.estado === "cero" ? lc.valor : NaN;
+    const obs = v.obs.trim() || null;
+    return cantidad !== l.contado || obs !== (l.observacion ?? null) ? [{ codigo: l.codigo, cantidad, observacion: obs }] : [];
+  });
+  const malos = cambios.filter((x) => Number.isNaN(x.cantidad));
+
+  async function guardar() {
+    setError(null);
+    if (malos.length) return setError(`Revisa la cantidad de ${malos.map((m) => m.codigo).join(", ")}.`);
+    setYendo(true);
+    try {
+      const r = await editarConteo(c.id, cambios);
+      if (!r.ok) return setError(r.error ?? "No se pudo guardar.");
+      onHecho(`${r.cambiados} renglón(es) corregido(s).` +
+        (c.ajuste === "aprobado" ? " La diferencia de cada corrección entró al inventario." : " El ajuste queda para revisar con los números nuevos.") +
+        (r.errorActas ? ` Las actas no se pudieron rehacer: ${r.errorActas}` : " Las actas se generaron de nuevo."));
+    } finally { setYendo(false); }
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-brand/30 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-text">Corregir Conteo</p>
+        <input type="search" className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1 sm:max-w-xs" placeholder="Buscar por código o nombre"
+          aria-label="Buscar renglón" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <p className="text-xs text-muted">
+        {c.ajuste === "aprobado"
+          ? "El ajuste ya se aprobó: la diferencia de cada corrección entra al inventario como movimiento."
+          : "Cada cambio queda en el historial del conteo, con tu nombre."}
+      </p>
+      <div className="max-h-[28rem] overflow-auto rounded-xl border border-border">
+        <table className="w-full min-w-[560px] text-left text-xs">
+          <thead className="sticky top-0 bg-surface-2 text-[10px] uppercase tracking-wide text-muted">
+            <tr><th className="px-3 py-2">Producto</th><th className="px-3 py-2 text-right">Sistema</th><th className="px-3 py-2 text-right">Contado</th><th className="px-3 py-2">Observación</th></tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {visibles.map((l) => {
+              const v = valores.get(l.codigo)!;
+              const cambiado = cambios.some((x) => x.codigo === l.codigo);
+              return (
+                <tr key={l.codigo} className={cambiado ? "bg-brand/5" : ""}>
+                  <td className="px-3 py-1.5"><span className="font-mono text-muted">{l.codigo}</span><span className="block">{l.nombre}</span></td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-muted">{l.esNuevo ? "nuevo" : fmtNum(l.sistema)}</td>
+                  <td className="px-3 py-1.5 text-right">
+                    <input className="sumi-campo sumi-campo--auto w-24 text-right tabular-nums" inputMode="decimal" value={v.texto}
+                      aria-label={`Contado de ${l.nombre}`} onChange={(e) => poner(l.codigo, { texto: e.target.value })} />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <input className="sumi-campo" value={v.obs} placeholder="Opcional" aria-label={`Observación de ${l.nombre}`}
+                      onChange={(e) => poner(l.codigo, { obs: e.target.value })} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {error && <p role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button variant="secondary" onClick={onCancelar}>Cancelar</Button>
+        <Button icon="check" cargando={yendo} textoCargando="Guardando…" disabled={!cambios.length || yendo} onClick={guardar}>
+          {cambios.length ? `Guardar ${cambios.length} cambio(s)` : "Sin cambios"}
+        </Button>
+      </div>
     </div>
   );
 }

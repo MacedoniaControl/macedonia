@@ -10,6 +10,7 @@ import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { fmtEstadoValery, type TablaExport } from "@/lib/ux/tabla-export";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
+import { esGerencia, puedeContar, useRol } from "@/lib/ux/session";
 import { MasterInventario } from "./MasterInventario";
 import { ConteoFisico } from "./conteo/ConteoFisico";
 import { CatalogoProductos } from "@/app/admin/products/CatalogoProductos";
@@ -33,7 +34,14 @@ export default function InventoryPage() {
 function Inventario() {
   // Empresa activa según la ruta (consolidado -> sumigases).
   const empresa = useEmpresaActiva();
-  const [tab, setTab] = useState<Tab>("master");
+  const [tabElegida, setTab] = useState<Tab>("master");
+  // Movimientos: Owner y Administrador. Conteo: además el Técnico. La base lo
+  // vuelve a comprobar; aca solo no se ofrece lo que no se puede abrir.
+  const { rol } = useRol();
+  const gerencia = esGerencia(rol);
+  const cuenta = puedeContar(rol);
+  const permitidas: Tab[] = ["master", ...(cuenta ? ["conteo" as const] : []), "valery", "productos", ...(gerencia ? ["movimientos" as const] : [])];
+  const tab: Tab = permitidas.includes(tabElegida) ? tabElegida : "master";
   const [recargaMaster, setRecargaMaster] = useState(0);
   const [q, setQ] = useState("");
 
@@ -73,7 +81,7 @@ function Inventario() {
           <div className="flex flex-wrap items-center gap-2">
             {/* Cargar conteo va primero: es la acción principal de esta
                 pantalla, y la razón por la que el Master significa algo. */}
-            <Button icon="inventory" onClick={() => setTab("conteo")}>Cargar conteo</Button>
+            {cuenta && <Button icon="inventory" onClick={() => setTab("conteo")}>Cargar conteo</Button>}
             <BotonDescargar empresa={empresa} />
           </div>
         }
@@ -88,7 +96,7 @@ function Inventario() {
           // Productos y catalogo pasa a subdepartamento del inventario.
           ["productos", "Productos y Catálogo"],
           ["movimientos", "Movimientos"],
-        ] as [Tab, string][]).map(([id, label]) => (
+        ] as [Tab, string][]).filter(([id]) => permitidas.includes(id)).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>
             {label}
@@ -113,7 +121,7 @@ function Inventario() {
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 
       {/* El conteo fisico: planilla, historial y actas. */}
-      {tab === "conteo" && <ConteoFisico empresa={empresa} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
+      {tab === "conteo" && <ConteoFisico empresa={empresa} gerencia={gerencia} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
 
 
       {/* -------- MASTER dividido en 3 apartados -------- */}
