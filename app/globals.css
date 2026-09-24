@@ -334,3 +334,29 @@ select.sumi-campo { line-height: 1.2; }
   .sumi-realce:focus-visible { transform: none; }
   .sumi-entra { animation: none; }
 }
+
+/* ---------------------------------------------------------------- teléfono
+ * La isla de navegación es fija y mide 5.5rem (más el área segura). Una barra
+ * de trabajo pegada al pie (la del conteo) va ENCIMA de ella: con bottom 0
+ * quedaba debajo, y su botón no se podía tocar.
+ *
+ * Con el teclado abierto la isla se esconde (IslaInferior marca
+ * html[data-teclado]): son 88px menos de planilla, justo cuando más falta. */
+.sumi-barra-fija {
+  position: sticky;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+/* Un renglon enfocado no queda tapado por la cabecera ni por las barras. */
+.sumi-renglon-campo {
+  scroll-margin-top: 5rem;
+  scroll-margin-bottom: 11rem;
+}
+@media (max-width: 767px) {
+  html[data-teclado] .sumi-isla { display: none; }
+  html[data-teclado] .sumi-barra-fija { bottom: 0.5rem; }
+  html[data-teclado] .sumi-renglon-campo { scroll-margin-bottom: 6rem; }
+}
+@media (min-width: 768px) {
+  .sumi-barra-fija { bottom: 0; }
+  .sumi-renglon-campo { scroll-margin-bottom: 7rem; }
+}

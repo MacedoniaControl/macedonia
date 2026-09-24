@@ -99,7 +99,7 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
         <div className="max-h-64 overflow-auto rounded-xl border border-border">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 bg-surface-2 text-[10px] uppercase tracking-wide text-muted">
-              <tr><th className="px-3 py-2">Identificación</th><th className="px-3 py-2">Producto</th><th className="px-3 py-2 text-right">Sistema</th><th className="px-3 py-2 text-right">Contado</th><th className="px-3 py-2 text-right">Dif.</th></tr>
+              <tr><th className="hidden px-3 py-2 sm:table-cell">Identificación</th><th className="px-3 py-2">Producto</th><th className="px-3 py-2 text-right">Sistema</th><th className="px-3 py-2 text-right">Contado</th><th className="px-3 py-2 text-right">Dif.</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {contados.map((f) => {
@@ -108,8 +108,8 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
                 const d = nuevo ? null : Math.round((l.valor - f.sistema) * 1000) / 1000;
                 return (
                   <tr key={f.codigo}>
-                    <td className="px-3 py-1.5 font-mono">{f.codigo}</td>
-                    <td className="px-3 py-1.5">{f.nombre}</td>
+                    <td className="hidden px-3 py-1.5 font-mono sm:table-cell">{f.codigo}</td>
+                    <td className="px-3 py-1.5">{f.nombre}<span className="block font-mono text-[10px] text-muted sm:hidden">{f.codigo}</span></td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-muted">{nuevo ? "nuevo" : fmtNum(f.sistema)}</td>
                     <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{fmtCantidad(l.valor)} {f.unidad}</td>
                     <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${d === null ? "text-brand" : d < 0 ? "text-danger" : d > 0 ? "text-info" : "text-muted"}`}>{fmtDif(d)}</td>
@@ -123,7 +123,7 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
           <b>Cerrar no cambia el inventario.</b> El sistema de esta tabla es el de ahora; al cerrar se toma de nuevo y queda fijo en el acta. Las diferencias se ajustan después, solo si un owner o admin las aprueba.
         </p>
         {fallo && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{fallo}</p>}
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <Button variant="secondary" onClick={onCerrar}>Volver a la planilla</Button>
           <Button icon="check" cargando={yendo} textoCargando="Cerrando y generando actas…" disabled={bloqueos.length > 0 || yendo}
             onClick={async () => {
