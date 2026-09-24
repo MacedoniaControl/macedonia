@@ -117,7 +117,7 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-brand/50 bg-brand/5 px-3 py-2.5">
         <span className="text-xs text-muted">Código que recibe</span>
-        <span className="font-mono text-sm font-semibold text-brand">MC-…… lo asigna el sistema al guardar</span>
+        <span className="text-right text-xs font-semibold text-brand"><span className="font-mono text-sm">MC-……</span> lo asigna el sistema al guardar</span>
       </div>
       {campo("Nombre", <input className="sumi-campo" value={f.nombre} placeholder="Ej: DADO HEXAGONAL 1/2x13MM TOTAL"
         onChange={(e) => set({ nombre: e.target.value, ...(f.cortoTocado ? {} : { corto: e.target.value.toUpperCase() }) })} />, true)}
@@ -157,7 +157,7 @@ function FormNuevo({ empresa, conteoId, departamento, enPlanilla, onValery, onNu
         <b>Costos, precios e IVA no se piden acá.</b> Quien cuenta no siempre puede ver costos. El artículo queda con la ficha incompleta y se termina en Productos.
       </p>
       {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={onCancelar}>Cancelar</Button>
         <Button icon="plus" cargando={yendo} textoCargando="Creando…" onClick={guardar}>Agregar al conteo</Button>
       </div>

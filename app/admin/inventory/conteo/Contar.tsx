@@ -192,7 +192,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
     return [...m.entries()].sort(([a], [b]) => porGrupo(a, b));
   }, [filas]);
   const nombreDep = new Map((deps.datos ?? []).map((d) => [d.codigo, d.nombre]));
-  const etiqueta = (g: string) => (g === SIN_DEPTO ? "Sin departamento" : g === AGREGADOS ? "Agregados al conteo" : `${g} - ${nombreDep.get(g) ?? ""}`);
+  const etiqueta = (g: string) => (g === SIN_DEPTO ? "Sin departamento" : g === AGREGADOS ? "Agregados al conteo" : `${g} - ${nombreDep.get(g) ?? (g === conteo.departamento ? conteo.departamentoNombre ?? "" : "")}`);
   const verDepto = grupos.some(([g]) => g === depto) ? depto : "";
   const enDepto = verDepto ? filas.filter((f) => grupoDe(f) === verDepto) : filas;
   const cuentaVista = useMemo(() => {
@@ -247,7 +247,7 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
     const destino = vs[i + paso];
     if (!destino) return;
     const el = refs.current.get(destino.codigo);
-    el?.focus(); el?.select();
+    el?.focus({ preventScroll: true }); el?.scrollIntoView({ block: "nearest" }); el?.select();
   }
 
   function irA(codigo: string, grupo?: string) {
@@ -354,23 +354,23 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
 
       {/* Herramientas */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar renglones">
+        <div className="-mx-1 flex w-full gap-1.5 overflow-x-auto px-1 pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Filtrar renglones">
           {([["todos", "Todos", cuentaVista.total], ["sin", "Sin contar", cuentaVista.sin], ["contados", "Contados", cuentaVista.ok + cuentaVista.cero], ["cero", "En cero", cuentaVista.cero]] as const).map(([id, label, n]) => (
             <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)}
-              className={`min-h-9 rounded-full border px-3 text-xs font-medium ${filtro === id ? "border-navy bg-navy text-white" : "border-border bg-surface text-muted hover:text-text"}`}>
+              className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-xs font-medium ${filtro === id ? "border-navy bg-navy text-white" : "border-border bg-surface text-muted hover:text-text"}`}>
               {label} <b className="tabular-nums">{n}</b>
             </button>
           ))}
         </div>
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-          <input type="search" className="sumi-campo sumi-campo--auto min-w-[14rem] flex-1 sm:max-w-sm" placeholder="Buscar por N°, código o nombre"
+        <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-1 sm:flex-wrap sm:justify-end">
+          <input type="search" className="sumi-campo sumi-campo--auto col-span-2 min-w-[14rem] flex-1 sm:max-w-sm" placeholder="Buscar por N°, código o nombre"
             aria-label="Buscar en la planilla" value={q} onChange={(e) => setQ(e.target.value)} />
-          <label className="flex items-center gap-2 text-xs text-muted">
+          <label className="order-last col-span-2 flex min-h-9 items-center gap-2 text-xs text-muted sm:order-none">
             <input type="checkbox" checked={verSistema} onChange={(e) => setVerSistema(e.target.checked)} className="h-4 w-4 accent-[var(--brand)]" />
             Ver lo que dice el sistema
           </label>
-          <Button variant="secondary" icon="scan" onClick={() => setLector((v) => !v)}>{lector ? "Ocultar lector" : "Usar lector"}</Button>
-          <Button icon="plus" onClick={() => setAgregar(true)}>Agregar artículo</Button>
+          <Button variant="secondary" icon="scan" className="px-3" onClick={() => setLector((v) => !v)}>{lector ? "Ocultar lector" : "Usar lector"}</Button>
+          <Button icon="plus" className="px-3" onClick={() => setAgregar(true)}>Agregar artículo</Button>
         </div>
       </div>
 
@@ -421,15 +421,15 @@ function PlanillaLista({ empresa, conteo, onCerrado, onCambio, inicial }: {
       </section>
 
       {/* Barra fija */}
-      <div className="sticky bottom-0 z-30 rounded-2xl border border-border bg-surface/95 px-4 py-3 shadow-lg backdrop-blur" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="flex items-center gap-2 text-xs text-muted" aria-live="polite">
-            <span className={`h-2 w-2 rounded-full ${filas.some((f) => f.estado === "guardando") ? "bg-warn" : pendientes.length ? "bg-info" : "bg-ok"}`} />
+      <div className="sumi-barra-fija z-30 rounded-2xl border border-border bg-surface/95 px-3 py-2.5 shadow-lg backdrop-blur sm:px-4 sm:py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="flex min-w-0 flex-1 items-center gap-2 text-[11px] leading-snug text-muted sm:text-xs" aria-live="polite">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${filas.some((f) => f.estado === "guardando") ? "bg-warn" : pendientes.length ? "bg-info" : "bg-ok"}`} />
             {filas.some((f) => f.estado === "guardando") ? "Guardando…"
               : pendientes.length ? `${pendientes.length} renglón(es) sin guardar: se guardan al salir de la casilla`
               : "Todo guardado · podés cerrar y seguir después"}
           </p>
-          <Button icon="check" disabled={contados === 0} onClick={async () => {
+          <Button icon="check" className="shrink-0" disabled={contados === 0} onClick={async () => {
             // Lo que quedo escrito sin salir de la casilla se guarda antes de revisar.
             for (const f of pendientes) await guardar(f);
             setRevisar(true);
@@ -517,7 +517,7 @@ function CambiarAlcance({ conteoId, empresa, propuesta, anotados, antes, onCerra
           <p>Todavía no hay nada anotado en este conteo, así que no se pierde nada: la planilla pasa a ser la de {propuesta.nombre}.</p>
         )}
         {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-danger">{error}</p>}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onCerrar}>Cancelar</Button>
           <Button icon="inventory" cargando={yendo} textoCargando="Cambiando…" onClick={async () => {
             setError(null); setYendo(true);
@@ -547,6 +547,11 @@ function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMov
   refInput: (el: HTMLInputElement | null) => void;
   onTexto: (v: string) => void; onObs: (v: string) => void; onGuardar: () => void; onMover: (p: 1 | -1) => void;
 }) {
+  // En el telefono la observacion se abre a pedido: casi nunca se usa, y
+  // siempre abierta hace cada renglon el doble de alto.
+  const [conObs, setConObs] = useState(false);
+  const obsRef = useRef<HTMLInputElement | null>(null);
+  const verObs = conObs || !!f.obs;
   const l = leerCantidad(f.texto);
   const nuevo = esSkuMacedonia(f.codigo);
   const dif = l.estado === "ok" || l.estado === "cero" ? Math.round((l.valor - f.sistema) * 1000) / 1000 : null;
@@ -567,7 +572,7 @@ function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMov
   };
 
   return (
-    <li className={`grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-3 focus-within:bg-brand/5 ${verSistema ? "xl:grid-cols-[2.5rem_9rem_minmax(0,1fr)_11rem_12rem_5rem_5.5rem]" : "xl:grid-cols-[2.5rem_9rem_minmax(0,1fr)_11rem_12rem]"} xl:items-start`}>
+    <li className={`grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-4 py-3 sm:gap-y-2 focus-within:bg-brand/5 ${verSistema ? "xl:grid-cols-[2.5rem_9rem_minmax(0,1fr)_11rem_12rem_5rem_5.5rem]" : "xl:grid-cols-[2.5rem_9rem_minmax(0,1fr)_11rem_12rem]"} xl:items-start`}>
       <span className="pt-0 text-xs tabular-nums text-muted xl:pt-3">{f.renglon ?? "+"}</span>
       <span className="col-start-2 row-start-2 flex items-center gap-2 xl:col-start-auto xl:row-start-auto xl:block xl:pt-2.5">
         <span className="font-mono text-xs text-text">{f.codigo}</span>
@@ -582,17 +587,25 @@ function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMov
       <div className="col-span-2 grid gap-2 sm:grid-cols-2 xl:contents">
       <div>
         <div className={`flex overflow-hidden rounded-xl border bg-surface-2 focus-within:border-brand ${borde}`}>
-          <input ref={refInput} inputMode="decimal" autoComplete="off" placeholder="—" value={f.texto}
+          <input ref={refInput} inputMode="decimal" enterKeyHint="next" autoComplete="off" placeholder="—" value={f.texto}
             aria-label={`Cantidad contada de ${f.nombre}`}
             onChange={(e) => onTexto(e.target.value)} onBlur={onGuardar} onKeyDown={teclas}
-            className="h-11 min-w-0 flex-1 bg-transparent px-3 text-right text-base font-semibold tabular-nums text-text outline-none xl:h-10" />
+            className="sumi-renglon-campo h-11 min-w-0 flex-1 bg-transparent px-3 text-right text-base font-semibold tabular-nums text-text outline-none xl:h-10" />
           <span className="flex min-w-[3rem] items-center justify-center border-l border-border bg-surface px-2 text-xs font-medium text-muted">{f.unidad || "—"}</span>
         </div>
-        <p className={`mt-1 min-h-4 text-[11px] tabular-nums ${tono}`}>{estadoTexto}</p>
+        <div className="mt-1 flex min-h-4 items-start justify-between gap-2">
+          <p className={`text-[11px] tabular-nums ${tono}`}>{estadoTexto}</p>
+          {!verObs && (
+            <button type="button" className="-my-2 shrink-0 px-1 py-2 text-[11px] font-medium text-brand sm:hidden"
+              onClick={() => { setConObs(true); setTimeout(() => obsRef.current?.focus(), 0); }}>
+              + Observación
+            </button>
+          )}
+        </div>
       </div>
-      <input className="sumi-campo xl:h-10" placeholder="Observación (opcional)" value={f.obs}
-        aria-label={`Observación de ${f.nombre}`} onChange={(e) => onObs(e.target.value)} onBlur={onGuardar}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onGuardar(); onMover(1); } }} />
+      <input ref={obsRef} className={`sumi-campo sumi-renglon-campo xl:h-10 ${verObs ? "" : "hidden sm:block"}`} placeholder="Observación (opcional)" value={f.obs}
+        aria-label={`Observación de ${f.nombre}`} onChange={(e) => onObs(e.target.value)} onBlur={() => { onGuardar(); if (!f.obs.trim()) setConObs(false); }}
+        enterKeyHint="next" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onGuardar(); onMover(1); } }} />
       </div>
       {verSistema && (
         <>

@@ -14,6 +14,7 @@
 // Cilindros son las DOS razones por las que el producto existe, y en el
 // lateral Cilindros era el octavo ítem de dieciséis.
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -37,9 +38,28 @@ export function IslaInferior({ onMas, permisos }: { onMas: () => void; permisos?
   // "no tenés permiso" gasta uno de los cinco lugares.
   const visibles = PASTILLAS.filter((p) => !permisos || puedeVer(permisos, rol, p.clave));
 
+  // Con el teclado abierto la isla estorba: tapa lo que se esta escribiendo.
+  // Se marca en <html> y el CSS la esconde (y baja la barra del conteo).
+  useEffect(() => {
+    const html = document.documentElement;
+    const escribe = (el: Element | null) =>
+      el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable) ||
+      (el instanceof HTMLInputElement && !["checkbox", "radio", "button", "submit", "reset", "range", "file", "color"].includes(el.type));
+    const entra = (e: FocusEvent) => { if (escribe(e.target as Element)) html.dataset.teclado = "1"; };
+    // Pasar de una casilla a la siguiente no debe hacer saltar la isla.
+    const sale = () => setTimeout(() => { if (!escribe(document.activeElement)) delete html.dataset.teclado; }, 0);
+    document.addEventListener("focusin", entra);
+    document.addEventListener("focusout", sale);
+    return () => {
+      document.removeEventListener("focusin", entra);
+      document.removeEventListener("focusout", sale);
+      delete html.dataset.teclado;
+    };
+  }, []);
+
   return (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 md:hidden"
+      className="sumi-isla pointer-events-none fixed inset-x-0 bottom-0 z-30 md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Secciones"
     >
