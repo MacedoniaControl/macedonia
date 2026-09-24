@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarOrdenes, crearOrden, recibir, type Orden as OrdenDb } from "@/lib/compras/compras-db";
-import { buscarProveedores, type Proveedor } from "@/lib/directorio/directorio-db";
+import { listarProveedores, type Proveedor } from "@/lib/directorio/directorio-db";
 import { inventarioDe, type ItemInventario } from "@/lib/inventory/inventario-db";
 import { crearProducto } from "@/lib/inventory/productos-db";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
@@ -15,6 +15,9 @@ import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { InputMonto } from "@/components/ui/InputMonto";
 import { fmtUsd } from "@/lib/ux/format";
+import { BotonDescargar } from "@/components/ui/BotonDescargar";
+import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
+import { fechaVista } from "@/lib/ux/tabla-export";
 
 
 const toneOf: Record<string, Tone> = {
@@ -29,7 +32,12 @@ const etiqueta: Record<string, string> = {
 };
 const inputClass = "sumi-campo";
 
+// «Descargar» baja la pestaña abierta: las órdenes o los proveedores.
 export default function PurchasesPage() {
+  return <ProveedorExportar><Compras /></ProveedorExportar>;
+}
+
+function Compras() {
   const empresaKey = useEmpresaActiva();
   // Las ordenes viven en la base y el estado se DEDUCE de cuanto llego:
   // nadie tiene que acordarse de marcar "recibida parcial".
@@ -39,7 +47,7 @@ export default function PurchasesPage() {
   const ordenes: OrdenDb[] = carga.datos ?? [];
   // Proveedores y productos salen de la BASE. Antes eran dos listas escritas a
   // mano en este archivo: se podia armar una orden a un proveedor inexistente.
-  const cargaProv = useCarga(`prov:${empresaKey}:${recarga}`, () => buscarProveedores("", 500));
+  const cargaProv = useCarga(`prov:${empresaKey}:${recarga}`, () => listarProveedores());
   const proveedores: Proveedor[] = cargaProv.datos ?? [];
   const cargaInv = useCarga(`inv:${empresaKey}:${recarga}`, () => inventarioDe(empresaKey));
   const productos: ItemInventario[] = cargaInv.datos ?? [];
@@ -120,7 +128,12 @@ export default function PurchasesPage() {
       <PageHeader
         title="Compras"
         breadcrumbs={[{ label: "Finanzas" }, { label: "Compras" }]}
-        actions={<StatusBadge tone="brand">{ordenes.length} orden(es)</StatusBadge>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge tone="brand">{ordenes.length} orden(es)</StatusBadge>
+            <BotonDescargar empresa={empresaKey} />
+          </div>
+        }
       />
       <div className="sumi-tabs mb-4 flex gap-1 overflow-x-auto">
         {([["ordenes", "Órdenes de Compra"], ["proveedores", "Proveedores"]] as const).map(([id, label]) => (
@@ -138,7 +151,8 @@ export default function PurchasesPage() {
         ))}
       </div>
 
-      {tab === "proveedores" && <PanelProveedores />}
+      {tab === "proveedores" && <PanelProveedores todos={proveedores} />}
+      {tab === "ordenes" && <ExportaOrdenes ordenes={ordenes} />}
 
       {tab === "ordenes" && (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.5fr]">
@@ -304,4 +318,25 @@ export default function PurchasesPage() {
       )}
     </>
   );
+}
+
+/** Las órdenes como se listan: todas, de la más reciente a la más antigua. */
+function ExportaOrdenes({ ordenes }: { ordenes: OrdenDb[] }) {
+  useExportable(() => ({
+    modulo: "",
+    seccion: "Órdenes de Compra",
+    titulo: "Órdenes de Compra",
+    detalle: [`${ordenes.filter((o) => o.estado !== "recibida").length} orden(es) con mercancía por recibir`],
+    columnas: [
+      { titulo: "N°", tipo: "codigo" }, { titulo: "Fecha", tipo: "fecha" }, { titulo: "Proveedor" }, { titulo: "Código", tipo: "codigo" },
+      { titulo: "Producto" }, { titulo: "Cantidad", tipo: "num" }, { titulo: "Recibido", tipo: "num" }, { titulo: "Pendiente", tipo: "num" },
+      { titulo: "Costo (USD)", tipo: "usd" }, { titulo: "Total (USD)", tipo: "usd" }, { titulo: "Estado" },
+    ],
+    filas: ordenes.map((o) => [
+      o.correlativo, fechaVista(o.fecha), o.proveedor, o.codigo, o.descripcion, o.cantidad, o.recibido, o.pendiente,
+      o.costoUsd, o.cantidad * o.costoUsd, etiqueta[o.estado] ?? o.estado,
+    ]),
+    totales: ["", "", `Total · ${ordenes.length} orden(es)`, "", "", null, null, null, null, ordenes.reduce((a, o) => a + o.cantidad * o.costoUsd, 0), ""],
+  }));
+  return null;
 }

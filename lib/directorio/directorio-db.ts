@@ -159,6 +159,18 @@ export async function buscarProveedores(consulta: string, limite = 10): Promise<
   return (data ?? []).map(aProveedor);
 }
 
+/**
+ * Todos los proveedores activos, por nombre. buscarProveedores exige al menos
+ * dos letras, y Compras la llamaba con "" para llenar su selector: el selector
+ * de la orden de compra salia siempre vacio.
+ */
+export async function listarProveedores(limite = 1000): Promise<Proveedor[]> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("proveedores").select("*").eq("activo", true).order("nombre").limit(limite);
+  if (error) throw new Error(`No se pudieron leer los proveedores: ${error.message}`);
+  return (data ?? []).map(aProveedor);
+}
+
 export async function guardarProveedor(
   p: Partial<Proveedor> & { rif: string; nombre: string },
 ): Promise<{ ok: true; proveedor: Proveedor } | { ok: false; error: string }> {

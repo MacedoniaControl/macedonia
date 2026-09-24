@@ -23,6 +23,9 @@ import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 import { useBcvRate } from "@/lib/ux/bcv-rate";
+import { BotonDescargar } from "@/components/ui/BotonDescargar";
+import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
+import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
 import {
   totalesPorCategoria,
   PARTIDAS, CATEGORIAS, TIPOS_TRANSACCION, categoriaDe, type Gasto,
@@ -32,7 +35,12 @@ const fieldClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
+// «Descargar» baja los gastos del mes elegido, en el orden de la tabla.
 export default function ExpensesPage() {
+  return <ProveedorExportar><Gastos /></ProveedorExportar>;
+}
+
+function Gastos() {
   const pathname = usePathname();
   const empresa = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/)?.[1] ?? "sumigases";
   const { rol } = useRol();
@@ -63,6 +71,31 @@ export default function ExpensesPage() {
   );
   const t = useTableView(delMes as unknown as Gasto[], acc, 25);
 
+  // Mismo permiso que la pantalla: sin acceso a finanzas no hay nada que bajar.
+  useExportable(() => {
+    if (!permitido) return null;
+    const filas = t.ordenadas as unknown as GastoGuardado[];
+    const [a, m] = mes.split("-");
+    return {
+      modulo: "",
+      seccion: `Gastos ${m}-${a}`,
+      titulo: "Gastos del Mes",
+      detalle: [
+        `Período ${m}-${a}`,
+        CATEGORIAS.map((c) => `${c} ${textoCelda(totales[c], "usd")}`).join(" · "),
+      ],
+      columnas: [
+        { titulo: "Fecha", tipo: "fecha" }, { titulo: "Partida" }, { titulo: "Categoría" }, { titulo: "Beneficiario" },
+        { titulo: "Pago" }, { titulo: "Monto Original" }, { titulo: "Monto (USD)", tipo: "usd" }, { titulo: "Nota" },
+      ],
+      filas: filas.map((g) => [
+        fechaVista(g.fecha), g.partida, g.categoria, g.beneficiario || null, g.tipoTransaccion || null,
+        g.moneda === "BS" ? `${g.monto.toLocaleString("es-VE")} Bs · TC ${g.tasa}` : null, g.montoUsd, g.nota || null,
+      ]),
+      totales: ["", `Total · ${filas.length} gasto(s)`, "", "", "", "", totalMes, ""],
+    };
+  });
+
   if (!permitido) {
     return (
       <>
@@ -87,7 +120,12 @@ export default function ExpensesPage() {
               value={mes} onChange={(e) => setMes(e.target.value)} />
           </>
         }
-        actions={<Button icon="plus" onClick={() => setAbierto((v) => !v)}>{abierto ? "Cerrar" : "Registrar gasto"}</Button>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button icon="plus" onClick={() => setAbierto((v) => !v)}>{abierto ? "Cerrar" : "Registrar gasto"}</Button>
+            <BotonDescargar empresa={empresa} />
+          </div>
+        }
       />
 
       {/* Totales por categoría (las 5 del Estado de Resultado) */}
