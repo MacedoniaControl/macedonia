@@ -3,7 +3,7 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { decidirAcceso, sesionPuede, rutaDeInicio, primeraClaveVisible, claveAlerta, type Sesion } from "./acceso.ts";
+import { decidirAcceso, sesionPuede, rutaDeInicio, primeraClaveVisible, claveAlerta, redireccionPanel, EMPRESA_SIN_RUTA, type Sesion } from "./acceso.ts";
 import { plantillaDeRol } from "./permisos.ts";
 
 const sesion = (rol: Sesion["rol"], empresaId: string | null = "sumigases"): Sesion => ({
@@ -95,5 +95,58 @@ describe("sesionPuede", () => {
   test("no se deja engañar por valores que no son true", () => {
     const u = { ...sesion("vendedor"), permisos: { expenses: undefined as unknown as boolean } };
     assert.equal(sesionPuede(u, "expenses"), false);
+  });
+});
+
+describe("redireccionPanel", () => {
+  const tecnicoSude = (): Sesion => ({ ...sesion("tecnico", "sudematin") });
+
+  test("una ruta sin empresa va a la misma seccion de SU empresa", () => {
+    assert.equal(redireccionPanel(tecnicoSude(), "/admin/inventory"), "/admin/sudematin/inventory");
+    assert.equal(redireccionPanel(sesion("owner", null), "/admin/quotes"), "/admin/sumigases/quotes");
+  });
+
+  test("sin empresa y sin permiso: directo a su inicio, sin pasar por la seccion", () => {
+    assert.equal(redireccionPanel(tecnicoSude(), "/admin/payables"), "/admin/sudematin/cylinders?sinpermiso=payables");
+  });
+
+  test("deja quedarse donde puede", () => {
+    assert.equal(redireccionPanel(tecnicoSude(), "/admin/sudematin/cylinders"), null);
+    assert.equal(redireccionPanel(tecnicoSude(), "/admin/sudematin/inventory"), null);
+    assert.equal(redireccionPanel(sesion("owner", null), "/admin/sudematin/payables"), null);
+  });
+
+  test("seccion sin permiso: a su inicio con el aviso", () => {
+    assert.equal(redireccionPanel(sesion("vendedor"), "/admin/sumigases/expenses"), "/admin/sumigases/dashboard?sinpermiso=expenses");
+  });
+
+  test("la otra empresa sin permiso: a la suya", () => {
+    assert.equal(redireccionPanel(tecnicoSude(), "/admin/sumigases/cylinders"), "/admin/sudematin/cylinders");
+    const conPermiso: Sesion = { ...tecnicoSude(), permisos: { ...tecnicoSude().permisos, otra_empresa: true } };
+    assert.equal(redireccionPanel(conPermiso, "/admin/sumigases/cylinders"), null);
+    // El owner entra a las dos aunque tenga una empresa asignada.
+    assert.equal(redireccionPanel(sesion("owner", "sudematin"), "/admin/sumigases/dashboard"), null);
+  });
+
+  test("/admin y /admin/<empresa> a secas: al inicio", () => {
+    assert.equal(redireccionPanel(tecnicoSude(), "/admin"), "/admin/sudematin/cylinders");
+    assert.equal(redireccionPanel(sesion("admin"), "/admin/sumigases"), "/admin/sumigases/dashboard");
+  });
+
+  test("sin ninguna seccion: a /sin-acceso", () => {
+    const nada: Sesion = { ...sesion("vendedor"), permisos: {} };
+    assert.equal(redireccionPanel(nada, "/admin/sumigases/quotes"), "/sin-acceso");
+  });
+
+  test("fuera del panel no se mete", () => {
+    assert.equal(redireccionPanel(tecnicoSude(), "/"), null);
+    assert.equal(redireccionPanel(tecnicoSude(), "/sin-acceso"), null);
+    assert.equal(redireccionPanel(tecnicoSude(), "/administracion"), null);
+  });
+
+  test("EMPRESA_SIN_RUTA es la misma que la del cliente", async () => {
+    const { readFileSync } = await import("node:fs");
+    const hook = readFileSync(new URL("../ux/use-empresa.ts", import.meta.url), "utf8");
+    assert.equal(hook.match(/export const EMPRESA_POR_DEFECTO = "(\w+)"/)?.[1], EMPRESA_SIN_RUTA);
   });
 });

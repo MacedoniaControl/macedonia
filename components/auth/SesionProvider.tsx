@@ -12,12 +12,16 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import type { Rol } from "@/lib/ux/session";
+import type { Permisos } from "@/lib/auth/permisos";
 
 export type Identidad = {
   nombre: string;
   usuario: string;
   rol: Rol;
   empresaId: string | null;
+  /** Sus propios permisos: el menu muestra solo lo que puede usar. Decide la
+   * base (RLS) y el proxy; aca es solo para no ofrecer puertas cerradas. */
+  permisos: Permisos;
 };
 
 const Ctx = createContext<Identidad | null>(null);

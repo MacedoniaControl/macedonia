@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { EMPRESA_IDS, EMPRESAS } from "@/lib/ux/empresas";
 import { EMPRESA_POR_DEFECTO } from "@/lib/ux/use-empresa";
+import { useSesion } from "@/components/auth/SesionProvider";
 
 /**
  * Selector de empresa activa. Navega entre los dashboards separados por empresa
@@ -15,8 +16,10 @@ import { EMPRESA_POR_DEFECTO } from "@/lib/ux/use-empresa";
  * solo la etiqueta, y su trabajo es no mentir sobre cuál está activa.
  */
 
+// /admin/<id> a secas: el proxy lleva a cada quien a SU inicio en esa empresa
+// (Cilindros para el tecnico). Con /dashboard fijo, el tecnico rebotaba.
 const OPCIONES = [
-  ...EMPRESA_IDS.map((id) => ({ id, name: EMPRESAS[id].nombreCorto, href: `/admin/${id}/dashboard` })),
+  ...EMPRESA_IDS.map((id) => ({ id, name: EMPRESAS[id].nombreCorto, href: `/admin/${id}` })),
 ];
 
 export function CompanySelector() {
@@ -38,6 +41,19 @@ export function CompanySelector() {
   const match = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/);
   const activeId = match ? match[1] : EMPRESA_POR_DEFECTO;
   const active = OPCIONES.find((o) => o.id === activeId) ?? OPCIONES[0];
+
+  // Quien no puede entrar a la otra empresa ve la suya como etiqueta: un
+  // menu con una opcion que no abre solo confunde.
+  const sesion = useSesion();
+  const cambia = !sesion || sesion.rol === "owner" || sesion.permisos.otra_empresa === true;
+  if (!cambia) {
+    return (
+      <span className="flex h-11 min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-2.5 text-sm font-medium text-text sm:gap-2 sm:px-3">
+        <Icon name="building" size={18} />
+        <span className="min-w-0 truncate sm:max-w-[8rem]">{active.name}</span>
+      </span>
+    );
+  }
 
   return (
     <div className="relative min-w-0">

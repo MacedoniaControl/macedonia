@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { useSesion } from "@/components/auth/SesionProvider";
+import { AvisoSinPermiso } from "@/components/layout/AvisoSinPermiso";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { IslaInferior } from "@/components/layout/IslaInferior";
 import { Header } from "@/components/layout/Header";
@@ -10,6 +12,9 @@ import { isEmpresaId } from "@/lib/ux/empresas";
 export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
+  const sesion = useSesion();
+  const permisos = sesion?.permisos;
+  const esOwner = sesion?.rol === "owner";
 
   // Empresa activa según la URL: /admin/<empresa>/... ; si no, consolidado (sin tema).
   const m = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/);
@@ -17,11 +22,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={`min-h-screen bg-bg ${empresa ? `theme-${empresa}` : ""}`}>
-      <Sidebar empresa={empresa} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar empresa={empresa} open={sidebarOpen} onClose={() => setSidebarOpen(false)} permisos={permisos} esOwner={esOwner} />
       <div className="lg:pl-64">
         <Header onMenu={() => setSidebarOpen(true)} />
-        <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 md:pb-6">{children}</main>
-        <IslaInferior onMas={() => setSidebarOpen(true)} />
+        <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 md:pb-6">
+          <Suspense fallback={null}><AvisoSinPermiso /></Suspense>
+          {children}
+        </main>
+        <IslaInferior empresa={empresa} onMas={() => setSidebarOpen(true)} permisos={permisos} />
       </div>
     </div>
   );

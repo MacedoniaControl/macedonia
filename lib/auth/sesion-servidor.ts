@@ -82,7 +82,8 @@ export function primeraSeccion(u: UsuarioSesion): string {
 /** A dónde mandar a cada quien después de entrar. */
 export function rutaPostLogin(u: UsuarioSesion): string {
   // El owner elige empresa en el Centro de Control; el resto va directo a la suya.
+  // Para los demas, la MISMA regla que "Inicio" y que el proxy: su seccion
+  // preferida si la puede ver, y si no la primera que pueda.
   if (u.rol === "owner" || !u.empresaId) return "/";
-  if (u.rol === "tecnico") return `/admin/${u.empresaId}/cylinders`;
-  return `/admin/${u.empresaId}/dashboard`;
+  return primeraSeccion(u);
 }
