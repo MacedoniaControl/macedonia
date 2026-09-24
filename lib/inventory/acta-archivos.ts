@@ -8,22 +8,8 @@
 // Solo corre en el servidor: pdfmake y exceljs no van al navegador.
 
 import ExcelJS from "exceljs";
-import { SUMIGASES_LOGO } from "../ux/sumigases-logo.ts";
-import { SUDEMATIN_LOGO } from "../ux/sudematin-logo.ts";
+import { C, argb, logoDe } from "../ux/estilo-documentos.ts";
 import { fmtDif, fmtNum, fmtUsdSigno, type Acta, type ActaValorizada } from "./acta.ts";
-
-const C = {
-  marron: "#b04e15", navy: "#0b2545", tinta: "#0f1b2d", gris: "#5b6b82", linea: "#d9e0ea",
-  fondo: "#f4f6fa", rojo: "#ce2323", azul: "#2461e7", ambar: "#a25903",
-  fondoRojo: "#fdf1f1", fondoAzul: "#eff4fe", fondoAmbar: "#fbf3e9",
-};
-
-function logoDe(empresa: string): { src: string; ancho: number; alto: number } {
-  // Sumigases es horizontal (600x104); Sudematin, cuadrado.
-  return /sudematin/i.test(empresa)
-    ? { src: SUDEMATIN_LOGO, ancho: 52, alto: 52 }
-    : { src: SUMIGASES_LOGO, ancho: 130, alto: 130 * 104 / 600 };
-}
 
 const colorDif = (d: number | null) => (d === null ? C.marron : d < 0 ? C.rojo : d > 0 ? C.azul : C.gris);
 
@@ -208,7 +194,6 @@ export async function valorizadaPdf(a: ActaValorizada): Promise<Buffer> {
 }
 
 // =========================================================================== EXCEL
-const argb = (hex: string) => "FF" + hex.replace("#", "").toUpperCase();
 const fino = { style: "thin" as const, color: { argb: argb(C.linea) } };
 
 function hojaBase(wb: ExcelJS.Workbook, nombre: string, a: Acta, titulo: string, confidencial = false) {

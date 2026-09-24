@@ -6,11 +6,13 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { downloadCsv } from "@/lib/ux/export-csv";
+import { BotonDescargar } from "@/components/ui/BotonDescargar";
+import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
+import { fmtEstadoValery, type TablaExport } from "@/lib/ux/tabla-export";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { MasterInventario } from "./MasterInventario";
 import { ConteoFisico } from "./conteo/ConteoFisico";
-import ProductosPage from "@/app/admin/products/page";
+import { CatalogoProductos } from "@/app/admin/products/CatalogoProductos";
 import { MovimientosPanel } from "./MovimientosPanel";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { useCarga } from "@/lib/ux/use-carga";
@@ -22,7 +24,13 @@ const inputClass = "sumi-campo sumi-campo--con-icono";
 
 type Tab = "master" | "conteo" | "movimientos" | "valery" | "productos";
 
+// El boton "Descargar" de la cabecera baja la pestaña que este abierta: cada
+// una declara su tabla adentro de este proveedor.
 export default function InventoryPage() {
+  return <ProveedorExportar><Inventario /></ProveedorExportar>;
+}
+
+function Inventario() {
   // Empresa activa según la ruta (consolidado -> sumigases).
   const empresa = useEmpresaActiva();
   const [tab, setTab] = useState<Tab>("master");
@@ -66,10 +74,7 @@ export default function InventoryPage() {
             {/* Cargar conteo va primero: es la acción principal de esta
                 pantalla, y la razón por la que el Master significa algo. */}
             <Button icon="inventory" onClick={() => setTab("conteo")}>Cargar conteo</Button>
-            <Button variant="secondary" icon="report" onClick={() => downloadCsv("inventario-valery",
-              [["Código", "Nombre", "Unidad", "Existencia"], ...fisicoF.map((f) => [f.codigo, f.nombre, f.undPpal, f.existPpal])])}>
-              Exportar CSV
-            </Button>
+            <BotonDescargar empresa={empresa} />
           </div>
         }
       />
@@ -91,7 +96,8 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {tab !== "movimientos" && tab !== "conteo" && (
+      {/* Productos trae su propio buscador. */}
+      {tab !== "movimientos" && tab !== "conteo" && tab !== "productos" && (
         <div className="mb-3">
           <label className="relative flex max-w-md items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
@@ -102,7 +108,7 @@ export default function InventoryPage() {
       )}
 
       {/* Productos y catalogo: subdepartamento del inventario, no seccion aparte. */}
-      {tab === "productos" && <ProductosPage />}
+      {tab === "productos" && <CatalogoProductos embebido />}
 
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 
@@ -126,6 +132,7 @@ export default function InventoryPage() {
 
       {tab === "valery" && (
         <SectionCard title="Inventario Valery">
+          <ExportaValery filas={tVal.ordenadas} busqueda={q} />
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
@@ -162,4 +169,20 @@ export default function InventoryPage() {
 
     </>
   );
+}
+
+/** La tabla de Valery tal como se ve: su busqueda y su orden. */
+function ExportaValery({ filas, busqueda }: { filas: ItemInventario[]; busqueda: string }) {
+  useExportable((): TablaExport => ({
+    seccion: "Valery",
+    titulo: "Inventario Valery",
+    detalle: [busqueda.trim() ? `Búsqueda: «${busqueda.trim()}»` : "Todos los productos", "Existencia calculada de los movimientos"],
+    columnas: [
+      { titulo: "Código", tipo: "codigo" }, { titulo: "Nombre" }, { titulo: "Und." },
+      { titulo: "Existencia", tipo: "num" }, { titulo: "Exist. alt.", tipo: "num" }, { titulo: "Estado" },
+    ],
+    filas: filas.map((f) => [f.codigo, f.nombre, f.undPpal, f.existPpal, f.existAlt || null, fmtEstadoValery(f.existPpal)]),
+    totales: ["", `Total · ${filas.length.toLocaleString("es-VE")} productos`, "", filas.reduce((a, f) => a + f.existPpal, 0), null, ""],
+  }));
+  return null;
 }

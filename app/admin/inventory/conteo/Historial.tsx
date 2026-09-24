@@ -21,6 +21,7 @@ import {
   aprobarAjuste, detalleConteo, generarActas, historial, puedeAprobar, rechazarAjuste, type ResumenConteo,
 } from "@/lib/inventory/conteos-db";
 import { Descarga } from "./RevisarCierre";
+import { useExportable } from "@/lib/ux/exportar";
 
 const ESTADO: Record<string, { t: string; tone: "info" | "warn" | "ok" | "danger" | "muted" }> = {
   abierto: { t: "En curso", tone: "info" },
@@ -39,6 +40,27 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
     return { lista, aprueba };
   });
   const [abierta, setAbierta] = useState<number | null>(abrirId);
+
+  // La lista de conteos. Cada acta se baja aparte, desde su conteo.
+  useExportable(() => {
+    const lista = carga.datos?.lista;
+    if (!lista) return null;
+    return {
+      seccion: "Historial de conteos",
+      titulo: "Historial de conteos",
+      detalle: ["Todos los conteos, del más reciente al más antiguo"],
+      columnas: [
+        { titulo: "Número" }, { titulo: "Fecha", tipo: "fecha" }, { titulo: "Departamento" }, { titulo: "Contó" },
+        { titulo: "Contados", tipo: "num" }, { titulo: "Diferencias", tipo: "num" }, { titulo: "Nuevos", tipo: "num" },
+        { titulo: "Estado" }, { titulo: "Cerrado el" },
+      ],
+      filas: lista.map((c) => [
+        c.numero ?? "Sin número", c.fecha, c.departamento ? `${c.departamento} - ${c.departamentoNombre ?? ""}` : c.zona ?? "Sin departamento",
+        c.conto, c.renglones, c.diferencias, c.articulosNuevos, ESTADO[c.cerrado ? c.ajuste ?? "pendiente" : "abierto"].t, c.cerradoEn,
+      ]),
+      nota: "Las actas de cada conteo (Excel y PDF, con su número) se descargan desde el conteo, en el historial.",
+    };
+  });
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-surface">
