@@ -16,6 +16,9 @@ export const AGRUPACIONES_HISTORICO: Agrupacion[] = ["mes", "anio"];
 /** El primer día del mes `ym`, para poder compararlo con el rango. */
 const primerDia = (ym: string) => `${ym}-01`;
 
+// ROI = utilidad / costo de lo vendido, igual que el histórico (history-data)
+// y que la tarjeta «ROI Histórico». Antes aquí era utilidad / compras, y el
+// mismo período daba dos ROI distintos según la pantalla.
 export type Periodo = {
   clave: string;
   etiqueta: string;
@@ -58,7 +61,7 @@ export function historicoEnRango(empresa: string, r: Rango): Periodo[] {
         etiqueta: etiquetaDe(clave, agr),
         venta, costo, util, compra,
         margen: venta > 0 ? Math.round((util / venta) * 1000) / 10 : 0,
-        roi: compra > 0 ? Math.round((util / compra) * 1000) / 10 : 0,
+        roi: costo > 0 ? Math.round((util / costo) * 1000) / 10 : 0,
       };
     });
 }
@@ -71,6 +74,6 @@ export function totalesDe(ps: Periodo[]): Omit<Periodo, "clave" | "etiqueta"> {
   return {
     venta, costo, util, compra,
     margen: venta > 0 ? Math.round((util / venta) * 1000) / 10 : 0,
-    roi: compra > 0 ? Math.round((util / compra) * 1000) / 10 : 0,
+    roi: costo > 0 ? Math.round((util / costo) * 1000) / 10 : 0,
   };
 }

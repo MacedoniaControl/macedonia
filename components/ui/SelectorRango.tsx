@@ -55,11 +55,13 @@ export function SelectorRango({
   const opciones = AGRUPACIONES.filter((a) => !agrupaciones || agrupaciones.includes(a.id));
 
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    // minmax(0,1fr) y min-w-0: sin eso la fila de píldoras empujaba la página a
+    // 603 px en un teléfono de 375 en vez de desplazarse dentro de su caja.
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         {/* Periodo. En el telefono se desplaza en lugar de partirse en dos
             filas: una fila que se rompe se lee como dos grupos distintos. */}
-        <div className="sumi-tabs -mx-1 flex gap-1.5 overflow-x-auto px-1" role="group" aria-label="Período">
+        <div className="sumi-tabs -mx-1 flex min-w-0 max-w-full gap-1.5 overflow-x-auto px-1" role="group" aria-label="Período">
           {PRESETS.map((p) => (
             <button
               key={p.id}

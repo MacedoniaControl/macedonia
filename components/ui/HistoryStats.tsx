@@ -2,7 +2,7 @@
 // Todos los montos en USD. Cada componente recibe `empresa`: sumigases | sudematin | all.
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { fmtUsd } from "@/lib/ux/format";
+import { enBs, fmtUsd } from "@/lib/ux/format";
 import { getHistory, type HistMonth } from "@/lib/ux/history-data";
 
 const MESES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -14,16 +14,17 @@ function labelMes(ym: string) {
 type Props = { empresa?: string };
 
 /** KPIs del histórico completo de la empresa. */
-export function HistoryKpis({ empresa = "sumigases" }: Props) {
+export function HistoryKpis({ empresa = "sumigases", tasa }: Props & { tasa?: number | null }) {
   const h = getHistory(empresa);
+  const mes = (ym: string) => ym.split("-").reverse().join("-");
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-      <StatCard label="Ventas Históricas" value={fmtUsd(h.totals.venta)} sub={`${h.meta.desde} → ${h.meta.hasta}`} accent />
-      <StatCard label="Utilidad Total" value={fmtUsd(h.totals.util)} sub="ganancia acumulada" />
-      <StatCard label="ROI Histórico" value={`${h.totals.roi}%`} sub="utilidad / costo" />
-      <StatCard label="Margen Bruto" value={`${h.totals.margen}%`} sub="sobre ventas" />
-      <StatCard label="Compras Históricas" value={fmtUsd(h.totals.compra)} sub="inversión total" />
-      <StatCard label="Costo de Ventas" value={fmtUsd(h.totals.costo)} sub="costo de lo vendido" />
+      <StatCard label="Ventas Históricas" value={fmtUsd(h.totals.venta)} bs={enBs(h.totals.venta, tasa)} sub={`${mes(h.meta.desde)} → ${mes(h.meta.hasta)}`} accent />
+      <StatCard label="Utilidad Total" value={fmtUsd(h.totals.util)} bs={enBs(h.totals.util, tasa)} sub="ganancia acumulada" />
+      <StatCard label="ROI Histórico" value={`${h.totals.roi.toLocaleString("es-VE")}%`} sub="utilidad / costo" />
+      <StatCard label="Margen Bruto" value={`${h.totals.margen.toLocaleString("es-VE")}%`} sub="sobre ventas" />
+      <StatCard label="Compras Históricas" value={fmtUsd(h.totals.compra)} bs={enBs(h.totals.compra, tasa)} sub="inversión total" />
+      <StatCard label="Costo de Ventas" value={fmtUsd(h.totals.costo)} bs={enBs(h.totals.costo, tasa)} sub="costo de lo vendido" />
     </div>
   );
 }

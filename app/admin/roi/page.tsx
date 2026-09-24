@@ -9,13 +9,8 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SeriesChart } from "@/components/ui/SeriesChart";
-import { fmtUsd } from "@/lib/ux/format";
-import {
-  roiCards,
-  series,
-  productosMayorRetorno,
-  categoriasMasRentables,
-} from "@/lib/ux/dashboard-data";
+import { enBs, fmtUsd } from "@/lib/ux/format";
+import { useTasaViva } from "@/lib/ux/bcv-rate";
 import {
   HistoryKpis,
   HistoryTrend,
@@ -41,6 +36,12 @@ export default function RoiPage() {
   const periodos = historicoEnRango(empresa, rango);
   const t = totalesDe(periodos);
   const label = EMPRESAS.find((e) => e.id === empresa)?.label ?? "Sumigases";
+  const tasa = useTasaViva();
+  // ROI por producto del histórico real: utilidad / costo (venta - utilidad).
+  const roiProductos = h.topProductos
+    .map((p) => ({ ...p, roi: p.venta - p.util > 0 ? Math.round((p.util / (p.venta - p.util)) * 100) : null }))
+    .filter((p) => p.roi !== null)
+    .sort((a, b) => (b.roi ?? 0) - (a.roi ?? 0));
 
   return (
     <>
@@ -67,7 +68,7 @@ export default function RoiPage() {
         title={`ROI histórico real · ${label}`}
         action={<StatusBadge tone="ok">ROI del período {t.roi}%</StatusBadge>}
       >
-        <HistoryKpis empresa={empresa} />
+        <HistoryKpis empresa={empresa} tasa={tasa} />
         <div className="mt-5 border-t border-border pt-4">
           <HistoryTrend empresa={empresa} />
         </div>
@@ -96,11 +97,12 @@ export default function RoiPage() {
         <span className="h-px flex-1 bg-border" />
       </div>
 
-      <SectionCard title="Indicadores del Período" action={<StatusBadge tone="brand">2024</StatusBadge>}>
+      <SectionCard title="Indicadores del Período" action={<StatusBadge tone="brand">{periodos.length} período(s)</StatusBadge>}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {roiCards.map((c) => (
-            <StatCard key={c.label} label={c.label} value={c.value} sub={c.sub} accent={c.accent} />
-          ))}
+          <StatCard label="ROI del Período" value={`${t.roi.toLocaleString("es-VE")}%`} sub="utilidad / costo" accent />
+          <StatCard label="Utilidad" value={fmtUsd(t.util)} bs={enBs(t.util, tasa)} sub="ventas menos costo" />
+          <StatCard label="Margen Bruto" value={`${t.margen.toLocaleString("es-VE")}%`} sub="sobre ventas" />
+          <StatCard label="Ventas" value={fmtUsd(t.venta)} bs={enBs(t.venta, tasa)} sub={`compras ${fmtUsd(t.compra)}`} />
         </div>
       </SectionCard>
 
@@ -118,23 +120,16 @@ export default function RoiPage() {
         </SectionCard>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="ROI por Producto" description="Mayor retorno sobre costo.">
+      <div className="mt-6">
+        <SectionCard title="ROI por Producto" description="Retorno sobre el costo, de los productos con más utilidad del histórico.">
           <ul className="divide-y divide-border">
-            {productosMayorRetorno.map((p) => (
-              <li key={p.nombre} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <span className="truncate text-text">{p.nombre}</span>
-                <StatusBadge tone="ok">ROI {p.roi}%</StatusBadge>
-              </li>
-            ))}
-          </ul>
-        </SectionCard>
-        <SectionCard title="ROI por Categoría" description="Margen bruto promedio.">
-          <ul className="divide-y divide-border">
-            {categoriasMasRentables.map((c) => (
-              <li key={c.nombre} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <span className="truncate text-text">{c.nombre}</span>
-                <StatusBadge tone="brand">Margen {c.margen}%</StatusBadge>
+            {roiProductos.map((p) => (
+              <li key={p.codigo} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <span className="min-w-0 truncate text-text">{p.nombre}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="tabular-nums text-muted">{fmtUsd(p.util)}</span>
+                  <StatusBadge tone="ok">ROI {(p.roi ?? 0).toLocaleString("es-VE")}%</StatusBadge>
+                </span>
               </li>
             ))}
           </ul>
