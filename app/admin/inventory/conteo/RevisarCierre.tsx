@@ -36,7 +36,7 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
 
   if (hecho) {
     return (
-      <Modal titulo="Conteo cerrado" onCerrar={onCerrado}>
+      <Modal titulo="Conteo Cerrado" onCerrar={onCerrado}>
         <div className="space-y-4 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ok/10 text-ok"><Icon name="check" size={24} /></div>
           <div>
@@ -54,7 +54,7 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
             </p>
           ) : null}
           <p className="rounded-xl bg-warn/10 px-3 py-2 text-left text-sm text-warn">
-            Las diferencias esperan la aprobación de un owner o admin, en el historial.
+            Las diferencias esperan la aprobación del Owner o de un Administrador, en el historial.
           </p>
           <Button className="w-full" onClick={onCerrado}>Ver en el historial</Button>
         </div>
@@ -63,7 +63,7 @@ export function RevisarCierre({ conteoId, titulo, fecha, conto, onConto, filas, 
   }
 
   return (
-    <Modal titulo="Revisá antes de cerrar" onCerrar={onCerrar}>
+    <Modal titulo="Revisión del Conteo" onCerrar={onCerrar}>
       <div className="space-y-4">
         <p className="text-sm text-muted">{titulo} · {fecha.split("-").reverse().join("-")}</p>
         <div className="grid gap-2 sm:grid-cols-3">

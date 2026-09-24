@@ -1,6 +1,6 @@
 // Para quien entró pero no tiene ninguna sección asignada.
 //
-// `primeraSeccion()` redirige acá cuando un usuario no puede ver nada, y esta
+// `primeraSeccion()` redirige aquí cuando un usuario no puede ver nada, y esta
 // ruta no existía: la persona caía en un 404 sin salida ni forma de cerrar
 // sesión. No es hipotético — esta mañana los diez usuarios que no son Owner
 // estaban así, con `permisos: {}`, y habrían llegado justo aquí.
@@ -11,7 +11,7 @@ import { getUsuarioSesion, primeraSeccion } from "@/lib/auth/sesion-servidor";
 import { SesionProvider } from "@/components/auth/SesionProvider";
 import { MenuUsuario } from "@/components/layout/MenuUsuario";
 
-export const metadata: Metadata = { title: "Sin acceso · Macedonia" };
+export const metadata: Metadata = { title: "Sin Acceso · Macedonia" };
 export const dynamic = "force-dynamic";
 
 export default async function SinAcceso() {
@@ -43,13 +43,8 @@ export default async function SinAcceso() {
               Todavía no tienes secciones asignadas
             </h1>
             <p className="mt-3 text-sm leading-6 text-muted">
-              Tu cuenta está activa y entraste bien, pero nadie te ha dado acceso
-              a ninguna parte del sistema. No es un error tuyo y no hay nada que
-              puedas hacer desde acá.
-            </p>
-            <p className="mt-3 text-sm leading-6 text-muted">
-              Pídele al Owner que te habilite lo que necesites para tu trabajo.
-              Se hace desde <strong className="text-text">Usuarios</strong>, en tu ficha.
+              Tu cuenta está activa, pero todavía no tiene acceso a ninguna sección.
+              Pídele al Owner que te habilite lo que necesitas desde <strong className="text-text">Usuarios</strong>.
             </p>
           </div>
         </div>

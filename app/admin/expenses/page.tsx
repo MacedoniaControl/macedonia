@@ -68,7 +68,7 @@ export default function ExpensesPage() {
       <>
         <PageHeader title="Gastos" description="Registro de gastos que alimenta el Estado de Resultado."
           breadcrumbs={[{ label: "Finanzas" }, { label: "Gastos" }]} />
-        <EmptyState icon="alert" title="Sin acceso"
+        <EmptyState icon="alert" title="Sin Acceso"
           message="Los gastos y la utilidad solo están disponibles para Owner y Administrador." />
       </>
     );
@@ -92,7 +92,7 @@ export default function ExpensesPage() {
 
       {/* Totales por categoría (las 5 del Estado de Resultado) */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Total del mes" value={ready ? fmtUsd(totalMes) : "—"} sub={`${delMes.length} gasto(s)`} accent />
+        <StatCard label="Total del Mes" value={ready ? fmtUsd(totalMes) : "—"} sub={`${delMes.length} gasto(s)`} accent />
         {CATEGORIAS.map((c) => (
           <StatCard key={c} label={c} value={ready ? fmtUsd(totales[c]) : "—"}
             sub={totalMes > 0 ? `${Math.round((totales[c] / totalMes) * 100)}% del mes` : "—"} />
@@ -106,9 +106,9 @@ export default function ExpensesPage() {
         </>
       )}
 
-      <SectionCard title="Gastos del mes" description={`Partida · categoría · monto. Período ${mes}.`}>
+      <SectionCard title="Gastos del Mes" description={`Partida · categoría · monto. Período ${mes}.`}>
         {delMes.length === 0 ? (
-          <EmptyState title="Sin gastos en este mes" message="Registra un gasto para que aparezca aquí y sume al Estado de Resultado." />
+          <EmptyState title="Sin Gastos en Este Mes" message="Registra un gasto para que aparezca aquí y sume al Estado de Resultado." />
         ) : (
           <>
             <div className="sumi-scroll max-w-full overflow-x-auto">
@@ -200,7 +200,7 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
   }
 
   return (
-    <SectionCard title="Registrar gasto" description="Queda registrado con fecha, partida, beneficiario y usuario.">
+    <SectionCard title="Registrar Gasto" description="Queda registrado con fecha, partida, beneficiario y usuario.">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className={lbl}>Fecha</label>

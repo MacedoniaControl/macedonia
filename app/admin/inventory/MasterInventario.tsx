@@ -102,18 +102,15 @@ export function MasterInventario({
 
       {!carga.cargando && contados === 0 && (
         <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
-          Nadie ha contado todavía, así que la columna <strong>Contado</strong> va
-          en cero y no hay diferencias que calcular. Lo que ves es el lado de
-          Valery. Cargá un conteo con el botón <strong>Cargar conteo</strong>.
+          Todavía no hay conteos: la columna <strong>Contado</strong> está en cero.
+          Carga uno con el botón <strong>Cargar conteo</strong>.
         </p>
       )}
 
       {sinEntrada > 0 && (
         <p className="mb-3 rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-xs text-warn">
-          {num(sinEntrada)} productos salieron sin que se registrara su entrada: el
-          kardex trae las ventas 2023-2026, pero las compras de Valery no traen
-          detalle por producto. Por eso Valery marca negativo. Contá el producto y
-          el número queda corregido.
+          {num(sinEntrada)} productos tienen salidas sin entrada registrada, por eso Valery
+          los marca en negativo. Al contarlos, la existencia se corrige.
         </p>
       )}
 
@@ -215,7 +212,7 @@ export function MasterInventario({
               </table>
               {visibles.length > 300 && (
                 <p className="py-2 text-center text-xs text-muted">
-                  Mostrando 300 de {visibles.length}. Buscá para acotar.
+                  Mostrando 300 de {visibles.length}. Busca para acotar.
                 </p>
               )}
             </div>

@@ -85,7 +85,7 @@ export function FormularioCliente({
     >
       <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-text">Nuevo cliente</h2>
+          <h2 className="font-display text-lg font-semibold text-text">Nuevo Cliente</h2>
           <button
             type="button"
             onClick={onCerrar}

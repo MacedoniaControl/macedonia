@@ -18,7 +18,7 @@ export default async function UsersPage() {
   if (!backendActivo) {
     return (
       <>
-        <PageHeader title="Usuarios y roles" breadcrumbs={[{ label: "Sistema" }, { label: "Usuarios" }]} />
+        <PageHeader title="Usuarios y Roles" breadcrumbs={[{ label: "Sistema" }, { label: "Usuarios" }]} />
         <SectionCard title="Backend no configurado">
           <p className="text-sm text-muted">
             Falta conectar Supabase. Define <code>NEXT_PUBLIC_SUPABASE_URL</code> y{" "}
@@ -34,8 +34,8 @@ export default async function UsersPage() {
   if (!yo || yo.rol !== "owner") {
     return (
       <>
-        <PageHeader title="Usuarios y roles" breadcrumbs={[{ label: "Sistema" }, { label: "Usuarios" }]} />
-        <SectionCard title="Sin acceso">
+        <PageHeader title="Usuarios y Roles" breadcrumbs={[{ label: "Sistema" }, { label: "Usuarios" }]} />
+        <SectionCard title="Sin Acceso">
           <p className="text-sm text-muted">
             Solo el Owner puede gestionar usuarios. Si necesitas un cambio, pídeselo.
           </p>
@@ -49,7 +49,7 @@ export default async function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Usuarios y roles"
+        title="Usuarios y Roles"
         description="Quién entra al sistema, con qué rol y en qué empresa."
         breadcrumbs={[{ label: "Sistema" }, { label: "Usuarios" }]}
       />

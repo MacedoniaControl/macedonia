@@ -47,7 +47,7 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
     if (!lista) return null;
     return {
       seccion: "Historial de conteos",
-      titulo: "Historial de conteos",
+      titulo: "Historial de Conteos",
       detalle: ["Todos los conteos, del más reciente al más antiguo"],
       columnas: [
         { titulo: "Número" }, { titulo: "Fecha", tipo: "fecha" }, { titulo: "Departamento" }, { titulo: "Contó" },
@@ -65,14 +65,13 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-surface">
       <div className="space-y-1 p-4">
-        <h2 className="text-base font-semibold text-text">Historial de conteos</h2>
+        <h2 className="text-base font-semibold text-text">Historial de Conteos</h2>
         <p className="max-w-[70ch] text-sm text-muted">
-          Cada conteo cerrado queda con su número, lo que se contó contra lo que decía el sistema, quién lo hizo, y su acta en Excel y PDF.
-          Las actas no se modifican: si algo salió mal, se hace un conteo nuevo.
+          Cada conteo cerrado queda con su número y su acta en Excel y PDF. Las actas no se modifican.
         </p>
       </div>
       <EstadoDatos cargando={carga.cargando} error={carga.error} vacio={(carga.datos?.lista.length ?? 0) === 0}
-        tituloVacio="Todavía no hay conteos" mensajeVacio="El primero aparece acá apenas se abra.">
+        tituloVacio="Todavía no hay conteos" mensajeVacio="El primero aparece aquí apenas se abra.">
         <ul className="divide-y divide-border border-t border-border">
           {(carga.datos?.lista ?? []).map((c) => (
             <Fila key={c.id} c={c} abierta={abierta === c.id} aprueba={!!carga.datos?.aprueba}
@@ -148,7 +147,7 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
 
       {valor && (
         <div className="space-y-2 rounded-xl border border-dashed border-danger/40 p-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-danger">Solo owner y admin</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-danger">Solo Owner y Administrador</p>
           <p className="text-sm text-muted">
             Acta valorizada: faltantes <b className="text-danger">{fmtUsdSigno(valor.faltantes)}</b> · sobrantes <b className="text-info">{fmtUsdSigno(valor.sobrantes)}</b> · neto <b className="text-text">{fmtUsdSigno(valor.neto)}</b>
             {valor.sinCosto ? ` · ${valor.sinCosto} sin costo` : ""}. Lleva el costo de cada diferencia al momento del cierre.

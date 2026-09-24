@@ -8,9 +8,9 @@ export type ClaseCuenta = "factura" | "nota_entrega" | "nota_debito" | "nota_cre
 
 export const CLASES: { id: ClaseCuenta; label: string }[] = [
   { id: "factura", label: "Factura" },
-  { id: "nota_entrega", label: "Nota de entrega" },
-  { id: "nota_debito", label: "Nota de débito" },
-  { id: "nota_credito", label: "Nota de crédito" },
+  { id: "nota_entrega", label: "Nota de Entrega" },
+  { id: "nota_debito", label: "Nota de Débito" },
+  { id: "nota_credito", label: "Nota de Crédito" },
   // Un saldo anterior que el estado de cuenta declara sin documento detras.
   // Llamarlo "factura" seria mentir sobre un papel que no existe.
   { id: "ajuste", label: "Ajuste" },

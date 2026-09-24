@@ -1,7 +1,7 @@
 // La planilla impresa de 75 productos de Sumigases, en el orden del papel.
 //
 // Es la hoja que se imprimio para el primer conteo: los 75 productos con mas
-// movimiento. El N° de cada renglon es su posicion aca, para que quien pasa el
+// movimiento. El N° de cada renglon es su posicion aquí, para que quien pasa el
 // papel a la pantalla encuentre el mismo numero en los dos lados. El renglon
 // 54 era 010203 (un servicio, no se cuenta): se reemplazo por el siguiente con
 // mas movimiento, 10N24, sin correr la numeracion.

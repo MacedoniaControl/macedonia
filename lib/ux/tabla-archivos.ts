@@ -1,6 +1,6 @@
 // Excel y PDF de una tabla del inventario, armados EN EL NAVEGADOR.
 //
-// Por que aca y no en el servidor, como las actas: Movimientos tiene ~23.000
+// Por que aquí y no en el servidor, como las actas: Movimientos tiene ~23.000
 // filas, y Vercel corta las peticiones y respuestas de una funcion en ~4,5 MB.
 // Los datos ya estan en la pantalla; mandarlos al servidor para que los
 // devuelva dibujados era el camino largo y con techo.

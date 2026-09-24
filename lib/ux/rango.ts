@@ -28,10 +28,10 @@ function atras(dias: number): string {
 
 /** Atajos. El de por defecto es el mes: es lo que se mira todos los días. */
 export const PRESETS: { id: string; label: string; rango: () => Omit<Rango, "agrupacion"> }[] = [
-  { id: "mes",     label: "Este mes",     rango: () => ({ desde: atras(30),  hasta: hoyISO() }) },
-  { id: "tri",     label: "3 meses",      rango: () => ({ desde: atras(90),  hasta: hoyISO() }) },
-  { id: "sem",     label: "6 meses",      rango: () => ({ desde: atras(182), hasta: hoyISO() }) },
-  { id: "anio",    label: "12 meses",     rango: () => ({ desde: atras(365), hasta: hoyISO() }) },
+  { id: "mes",     label: "Este Mes",     rango: () => ({ desde: atras(30),  hasta: hoyISO() }) },
+  { id: "tri",     label: "3 Meses",      rango: () => ({ desde: atras(90),  hasta: hoyISO() }) },
+  { id: "sem",     label: "6 Meses",      rango: () => ({ desde: atras(182), hasta: hoyISO() }) },
+  { id: "anio",    label: "12 Meses",     rango: () => ({ desde: atras(365), hasta: hoyISO() }) },
   { id: "todo",    label: "Todo",         rango: () => ({ desde: INICIO_OPERACIONES, hasta: hoyISO() }) },
 ];
 

@@ -3,7 +3,7 @@
 //   npm test
 //
 // Se prueba esto y no otra cosa porque aquí se decide si alguien entra o no:
-// un fallo silencioso acá deja a un técnico fuera del sistema, o peor, hace que
+// un fallo silencioso aquí deja a un técnico fuera del sistema, o peor, hace que
 // dos personas distintas resuelvan al mismo correo y compartan cuenta.
 
 import { test, describe } from "node:test";

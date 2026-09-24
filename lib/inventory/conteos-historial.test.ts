@@ -2,7 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-// La 23 no se puede correr aca (no hay Postgres local). Estas pruebas fijan lo
+// La 23 no se puede correr aquí (no hay Postgres local). Estas pruebas fijan lo
 // que la hace segura: que nadie se saltee las funciones, y que los costos solo
 // los vea quien corresponde.
 describe("migración 23: historial de conteos y actas", () => {

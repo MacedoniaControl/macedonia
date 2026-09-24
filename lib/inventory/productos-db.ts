@@ -76,7 +76,7 @@ export async function puedeVerCostos(empresa: string): Promise<boolean> {
  *
  * Existe para el momento en que se está cargando una compra y el producto
  * todavía no está: si hay que ir al inventario, crearlo y volver, la orden se
- * carga dos veces o no se carga. Se crea acá y la compra sigue.
+ * carga dos veces o no se carga. Se crea aquí y la compra sigue.
  *
  * El código es único por empresa y distingue mayúsculas: `6x8AT` y `6X8AT` son
  * productos distintos en Valery, y respetarlo es lo que evita fusionar dos

@@ -59,7 +59,7 @@ export function errorDeUsuario(entrada: string): string | null {
  * Con una sola palabra usa sus DOS primeras letras. Una inicial sola no
  * distingue a nadie: Angie y Almacen serian las dos una "A".
  *
- * Vive aca y no en el componente porque es una funcion pura, y Node no puede
+ * Vive aquí y no en el componente porque es una funcion pura, y Node no puede
  * cargar un .tsx para probarla.
  */
 export function inicialesDe(nombre: string): string {

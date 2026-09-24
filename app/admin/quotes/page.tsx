@@ -40,7 +40,7 @@ const CATALOGO = [
   { codigo: "8004005", descripcion: 'DISCO DE CORTE 7" x 1/16"', precio: 2.2 },
   { codigo: "2001105", descripcion: "REGULADOR DE ARGON C/ FLUJOMETRO", precio: 63.87 },
 ];
-const MONEDAS = ["Dolar", "Bolívar"];
+const MONEDAS = ["Dólar", "Bolívar"];
 const toneOf: Record<Estado, Tone> = { Borrador: "muted", Aprobada: "info", Rechazada: "danger", "Nota de entrega": "ok" };
 const inputClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -66,7 +66,7 @@ function deDocumento(d: DocumentoGuardado): Cotizacion {
     fechaEmision: d.fecha,
     fechaVenc: "",
     fechaISO: d.fecha,
-    moneda: "Dolar",
+    moneda: "Dólar",
     nota: "",
     lineas: d.lineas.map((l) => ({
       codigo: l.codigo, descripcion: l.descripcion,
@@ -96,7 +96,7 @@ export default function QuotesPage() {
     id: a.id, correlativo: a.correlativo ?? "—", razonSocial: "(desde archivo)",
     rif: "", direccion: "", telefonos: "",
     fechaEmision: a.fecha, fechaVenc: "", fechaISO: a.fecha,
-    moneda: "Dolar", nota: "", lineas: [], total: 0,
+    moneda: "Dólar", nota: "", lineas: [], total: 0,
     estado: "Aprobada" as Estado, origen: "Valery" as const,
     fileName: a.nombre, ruta: a.ruta,
   }));
@@ -171,10 +171,10 @@ export default function QuotesPage() {
 
       <div className="sumi-tabs mb-4 gap-2">
         {([
-          ["gen", "Generar presupuesto"] as const,
+          ["gen", "Generar Presupuesto"] as const,
           // Ventas externas vive aqui, no en el menu principal: es una forma de
           // cotizar/vender, no un departamento aparte.
-          ["externas", "Ventas externas"] as const,
+          ["externas", "Ventas Externas"] as const,
           ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
         ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
@@ -183,13 +183,13 @@ export default function QuotesPage() {
       </div>
 
       {tab === "registro" && verRegistros && (
-        <SectionCard title="Registro de presupuestos"
+        <SectionCard title="Registro de Presupuestos"
           action={<select className="sumi-campo w-auto" value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option></select>}>
           <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted"><tr className="border-b border-border">
-                <th className="py-2.5 pr-3 font-medium">N°</th><th className="py-2.5 pr-3 font-medium">Razón social</th>
+                <th className="py-2.5 pr-3 font-medium">N°</th><th className="py-2.5 pr-3 font-medium">Razón Social</th>
                 <th className="py-2.5 pr-3 font-medium">Fecha</th><th className="py-2.5 pr-3 text-right font-medium">Total</th>
                 <th className="py-2.5 pr-3 font-medium">Origen</th><th className="py-2.5 pr-3 font-medium">Estado</th>
                 <th className="py-2.5 font-medium">Acciones</th></tr></thead>
@@ -206,7 +206,7 @@ export default function QuotesPage() {
                     <td className="py-2.5">
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => generarPDF(c)} className="text-sm font-medium text-brand hover:underline">Ver / PDF</button>
-                        {/* Aprobar / Rechazar / Convertir vivían acá para el
+                        {/* Aprobar / Rechazar / Convertir vivían aquí para el
                             origen "SumiControl", que ya nadie produce: los
                             documentos vienen de la base o de Storage. Eran
                             botones que no se dibujaban nunca. Cuando haga falta
@@ -260,7 +260,7 @@ type GenDoc = { correlativo: string; fechaEmision: string; fechaVenc: string; ra
 function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) => Promise<{ error: string | null }> }) {
   const [guardando, setGuardando] = useState(false);
   const empresaKey = useEmpresaActiva();
-  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dolar", nota: "", venceDias: 5, vendedorExterno: "" });
+  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", vendedor: "", tipoPrecio: TIPOS_PRECIO[0], moneda: "Dólar", nota: "", venceDias: 5, vendedorExterno: "" });
 
   // El vendedor sale de la tabla de usuarios: antes era un texto fijo igual
   // para todos y no se sabia quien habia hecho cada cotizacion.
@@ -325,7 +325,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1.2fr_1fr]">
-      <SectionCard title="Nueva cotización" description={`N° ${String(seq).padStart(10, "0")}`}>
+      <SectionCard title="Nueva Cotización" description={`N° ${String(seq).padStart(10, "0")}`}>
         <div className="space-y-3">
           <div><label className={lbl}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} placeholder="Empresa externa" /></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -336,7 +336,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={lbl}>Vendedor</label>
               <select className={inputClass} value={f.vendedor} onChange={set("vendedor")}>
-                <option value="">— elegir —</option>
+                <option value="">Elige…</option>
                 {vendedores.map((v) => <option key={v.id} value={v.nombre}>{v.nombre} · {v.rol}</option>)}
                 <option value="__externo">Vendedor externo…</option>
               </select>
@@ -382,7 +382,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
 
         {escaneando && (
           <div className="mt-3">
-            <ScanBar onScan={onScan} hint="Dispará el lector: el producto se agrega solo." />
+            <ScanBar onScan={onScan} hint="Dispara el lector: el producto se agrega solo." />
           </div>
         )}
 
@@ -416,7 +416,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
 
         <p className="mb-2 mt-4 border-t border-border pt-3 text-xs font-medium text-muted">Carga manual</p>
         <div className="grid grid-cols-2 gap-2">
-          <div><label className={lbl}>Del catálogo</label><select className={inputClass} value={ln.codigo} onChange={(e) => pick(e.target.value)}><option value="">— elegir —</option>{CATALOGO.map((p) => <option key={p.codigo} value={p.codigo}>{p.descripcion}</option>)}</select></div>
+          <div><label className={lbl}>Del catálogo</label><select className={inputClass} value={ln.codigo} onChange={(e) => pick(e.target.value)}><option value="">Elige…</option>{CATALOGO.map((p) => <option key={p.codigo} value={p.codigo}>{p.descripcion}</option>)}</select></div>
           <div><label className={lbl}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} /></div>
           <div className="col-span-2"><label className={lbl}>Descripción</label><input className={inputClass} value={ln.descripcion} onChange={(e) => setLn({ ...ln, descripcion: e.target.value })} /></div>
           <div><label className={lbl}>Cantidad</label><input type="number" min={1} className={inputClass} value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>
@@ -492,7 +492,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
 
       {/* Vista previa. Se ve mientras se arma, no después de emitir: corregir un
           documento ya generado cuesta un correlativo quemado. */}
-      <SectionCard title="Vista previa" description="Así va a salir el documento.">
+      <SectionCard title="Vista Previa" description="Así va a salir el documento.">
         <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
           <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
             <div>
@@ -522,7 +522,7 @@ function GenerarPresupuesto({ seq, onSave }: { seq: string; onSave: (d: GenDoc) 
 
           {lineas.length === 0 ? (
             <p className="border-t border-border py-6 text-center text-xs text-muted">
-              Todavía no hay renglones. Escaneá, buscá o agregá un gas.
+              Todavía no hay renglones. Escanea, busca o agrega un gas.
             </p>
           ) : (
             <table className="w-full border-t border-border text-xs">

@@ -97,7 +97,7 @@ export function SelectorCliente({
         {/* Avisa, no bloquea: el vendedor decide con el cliente enfrente. */}
         {aviso && (
           <p role="alert" className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
-            {aviso} Podés emitir igual.
+            {aviso} Puedes emitir igual.
           </p>
         )}
       </div>

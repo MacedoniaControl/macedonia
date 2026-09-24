@@ -35,7 +35,7 @@ export function IslaInferior({ empresa, onMas, permisos }: { empresa: string | n
   const { rol } = useRol();
 
   // Quien no puede entrar a una sección no la ve: una pastilla que lleva a un
-  // "no tenés permiso" gasta uno de los cinco lugares.
+  // "no tienes permiso" gasta uno de los cinco lugares.
   // Siempre DENTRO de la empresa que se esta mirando: con /admin/inventory a
   // secas, el tecnico de Sudematin caia en el inventario de Sumigases.
   const visibles = PASTILLAS
@@ -93,7 +93,7 @@ export function IslaInferior({ empresa, onMas, permisos }: { empresa: string | n
           );
         })}
 
-        {/* Lo que no entra en las cinco vive acá, no se pierde. */}
+        {/* Lo que no entra en las cinco vive aquí, no se pierde. */}
         <button
           type="button"
           onClick={onMas}

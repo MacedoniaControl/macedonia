@@ -51,7 +51,7 @@ export function EstadoDatos({
         title="No se pudieron cargar los datos"
         // El mensaje de la base se muestra: "no se pudo cargar" a secas no deja
         // hacer nada, y quien atiende el mostrador necesita poder decir QUÉ falló.
-        message={`${error} · Reintentá en unos segundos.`}
+        message={`${error} · Reintenta en unos segundos.`}
       />
     );
   }

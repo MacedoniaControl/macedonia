@@ -18,8 +18,8 @@ export function MarcaRevision({ revision }: { revision: Revision }) {
 
   const texto =
     revision.motivo === "exento"
-      ? `${fmtUsd(revision.exento)} de esta factura no llevan IVA. Si la editás, cargá la base y el IVA a mano: el 16% automático los gravaría de más.`
-      : `El IVA es el ${(revision.tasa * 100).toFixed(2)}% de la base, no el 16%. La factura tiene renglones exentos sumados dentro de la base. Si la editás, cargá la base y el IVA a mano.`;
+      ? `${fmtUsd(revision.exento)} de esta factura no llevan IVA. Si la editas, carga la base y el IVA a mano: el 16% automático los gravaría de más.`
+      : `El IVA es el ${(revision.tasa * 100).toFixed(2)}% de la base, no el 16%. La factura tiene renglones exentos sumados dentro de la base. Si la editas, carga la base y el IVA a mano.`;
 
   return (
     <span

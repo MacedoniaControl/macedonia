@@ -55,7 +55,7 @@ export function ImportarCartera({
 
     // .xls binario (Excel 97-2003) no se lee: es otro formato por completo.
     if (/\.xls$/i.test(f.name)) {
-      setError("Ese es un .xls de Excel 97-2003. Abrilo en Excel y guardalo como .xlsx o .csv.");
+      setError("Ese es un .xls de Excel 97-2003. Ábrelo en Excel y guárdalo como .xlsx o .csv.");
       return;
     }
 

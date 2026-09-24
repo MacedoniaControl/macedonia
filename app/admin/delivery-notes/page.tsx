@@ -24,7 +24,7 @@ import { Icon } from "@/components/ui/Icon";
 import { fmtUsd } from "@/lib/ux/format";
 import { TIPOS_PRECIO, DIVISAS, UNIDADES } from "@/lib/ux/catalogos";
 import {
-  notaEntregaHtml, devolucionHtml, printDoc, neTotals,
+  notaEntregaHtml, devolucionHtml, printDoc, neTotals, NOMBRE_GAS,
   type NEDoc, type DevDoc, type NELinea, type DevLinea, type NECil,
 } from "@/lib/ux/doc-templates";
 import { ScanBar } from "@/components/inventory/ScanBar";
@@ -163,16 +163,16 @@ export default function DeliveryNotesPage() {
   return (
     <>
       <PageHeader
-        title="Notas de entrega y devoluciones"
-        breadcrumbs={[{ label: "Operación" }, { label: "Notas de entrega" }]}
+        title="Notas de Entrega y Devoluciones"
+        breadcrumbs={[{ label: "Operación" }, { label: "Notas de Entrega" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {verRegistros && <StatusBadge tone="brand">{docs.length} documento(s)</StatusBadge>}
             {avisoSubida && (
               <span className="text-xs text-muted" role="status">{avisoSubida}</span>
             )}
-            <SubirArchivo onArchivos={onUpload} etiqueta={subiendo ? "Subiendo…" : "Subir Archivo"}
-              ayuda="NET/entrega → Nota de entrega · NC/crédito/devolución → Devolución." />
+            <SubirArchivo onArchivos={onUpload} etiqueta={subiendo ? "Subiendo…" : "Subir archivo"}
+              ayuda="Notas de entrega y notas de crédito (devoluciones) exportadas de Valery." />
           </div>
         }
       />
@@ -180,8 +180,8 @@ export default function DeliveryNotesPage() {
       {/* Tabs */}
       <div className="sumi-tabs mb-4 gap-2">
         {([
-          ["ne", "Generar nota de entrega"] as const,
-          ["dev", "Generar devolución"] as const,
+          ["ne", "Generar Nota de Entrega"] as const,
+          ["dev", "Generar Devolución"] as const,
           ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
         ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
@@ -190,7 +190,7 @@ export default function DeliveryNotesPage() {
       </div>
 
       {tab === "registro" && verRegistros && (
-        <SectionCard title="Registro de documentos"
+        <SectionCard title="Registro de Documentos"
           action={
             <select className="sumi-campo w-auto" value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option>
@@ -244,7 +244,7 @@ export default function DeliveryNotesPage() {
         const t = neTotals(conNumero);
         void t;
         // No se agrega a mano a la lista: se relee de la base. Empujar la fila
-        // aca dejaria la pantalla mostrando algo que quiza no se guardo igual.
+        // aquí dejaria la pantalla mostrando algo que quiza no se guardo igual.
         setRecarga((n) => n + 1);
         setPrevistoNE(String(Number(r.documento.correlativo) + 1).padStart(10, "0"));
         printDoc(notaEntregaHtml(conNumero, empresaKey));
@@ -373,7 +373,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1.2fr_1fr]">
-      <SectionCard title="Datos de la nota de entrega" description={`N° ${seq}`}>
+      <SectionCard title="Datos de la Nota de Entrega" description={`N° ${seq}`}>
         <div className="space-y-3">
           {/* Se ELIGE de la cartera, no se escribe.
               Escribir a mano convertia "Ferreteria Los Andes" y "FERRETERIA LOS
@@ -401,7 +401,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
 
           {/* Quedan editables: la ficha puede estar incompleta —se cargaron
               5.028 clientes solo con el nombre— y el vendedor tiene el dato
-              delante. Lo que escriba acá va al documento; completar la ficha
+              delante. Lo que escriba aquí va al documento; completar la ficha
               es otra tarea, en su propia pantalla. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className={label}>Cédula / R.I.F.</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
@@ -414,7 +414,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
                   texto fijo, "01 - GERENTE" para todos: no se sabia quien
                   habia emitido cada nota. */}
               <select className={inputClass} value={f.vendedor} onChange={set("vendedor")}>
-                <option value="">— elegir —</option>
+                <option value="">Elige…</option>
                 {vendedores.map((v) => <option key={v.id} value={v.nombre}>{v.nombre} · {v.rol}</option>)}
               </select></div>
             <div><label className={label}>Depósito</label>
@@ -430,7 +430,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           <p className="text-xs font-medium text-muted">Cilindros (llenos / vacíos)</p>
           {cil.map((c, i) => (
             <div key={c.gas} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-              <span className="text-sm text-text">{c.gas}</span>
+              <span className="text-sm text-text">{NOMBRE_GAS[c.gas] ?? c.gas}</span>
               <input type="number" min={0} className="sumi-campo w-16 px-2 text-center" value={c.llenos} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, llenos: Number(e.target.value) } : x))} placeholder="Ll" />
               <input type="number" min={0} className="sumi-campo w-16 px-2 text-center" value={c.vacios} onChange={(e) => setCil(cil.map((x, j) => j === i ? { ...x, vacios: Number(e.target.value) } : x))} placeholder="Va" />
             </div>
@@ -458,7 +458,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
 
         {escaneando && (
           <div className="mt-3">
-            <ScanBar onScan={onScan} hint="Dispará el lector: el producto se agrega como renglón." />
+            <ScanBar onScan={onScan} hint="Dispara el lector: el producto se agrega como renglón." />
           </div>
         )}
         {scanMsg && (
@@ -518,15 +518,14 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           </div>
         )}
         <dl className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
-          <div className="flex justify-between"><dt className="text-muted">Base imponible</dt><dd className="text-text">{enBs ? (tasa ? `${(t.base * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa") : fmtUsd(t.base)}</dd></div>
+          <div className="flex justify-between"><dt className="text-muted">Base Imponible</dt><dd className="text-text">{enBs ? (tasa ? `${(t.base * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa") : fmtUsd(t.base)}</dd></div>
           <div className="flex justify-between"><dt className="text-muted">I.V.A. {ivaPct}%</dt><dd className="text-text">{enBs ? (tasa ? `${(t.iva * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa") : fmtUsd(t.iva)}</dd></div>
           <div className="flex justify-between font-semibold"><dt>{enBs ? "Total Bs." : "Total $"}</dt><dd>{enBs ? (tasa ? `${(t.total * tasa).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : "sin tasa") : fmtUsd(t.total)}</dd></div>
           {enBs && <div className="flex justify-between"><dt className="text-muted">Dólar $</dt><dd className="text-muted">{fmtUsd(t.total)}</dd></div>}
         </dl>
         {enBs && !tasa && (
           <p role="alert" className="mt-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-            No se pudo consultar la tasa del BCV. No emitas en bolívares hasta que cargue:
-            un total inventado es peor que no tener total.
+            No se pudo consultar la tasa del BCV. No emitas en bolívares hasta que cargue.
           </p>
         )}
         {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
@@ -595,7 +594,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
           revés de lo que conviene: son 290 notas contra 59 facturas, y
           corregir una ya emitida cuesta un correlativo quemado.
           Se ve ANTES de emitir, que es el único momento en que sirve. */}
-      <SectionCard title="Vista previa" description="Así va a salir el documento.">
+      <SectionCard title="Vista Previa" description="Así va a salir el documento.">
         <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
           <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
             <div>
@@ -619,7 +618,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
 
           {lineas.length === 0 ? (
             <p className="border-t border-border py-6 text-center text-xs text-muted">
-              Todavía no hay renglones. Escaneá o buscá un producto.
+              Todavía no hay renglones. Escanea o busca un producto.
             </p>
           ) : (
             <table className="w-full border-t border-border text-xs">
@@ -655,7 +654,7 @@ function GenerarNE({ onSave, seq }: { onSave: (d: NEDoc) => Promise<{ error: str
               <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted">Cilindros</p>
               {cil.filter((c) => c.llenos > 0 || c.vacios > 0).map((c) => (
                 <p key={c.gas} className="flex justify-between text-xs">
-                  <span className="text-text">{c.gas}</span>
+                  <span className="text-text">{NOMBRE_GAS[c.gas] ?? c.gas}</span>
                   <span className="tabular-nums text-muted">
                     {c.llenos} lleno(s) · {c.vacios} vacío(s)
                     {c.llenos !== c.vacios && (
@@ -706,7 +705,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: s
   const [msg, setMsg] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const sub = lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
-  // El IVA sale de la configuracion de la empresa, no de un 16 escrito aca:
+  // El IVA sale de la configuracion de la empresa, no de un 16 escrito aquí:
   // si cambia la alicuota, cambiarla en un solo lugar y no buscarla por el codigo.
   const cfgDev = useCarga(empresaDev, () => leerConfig(empresaDev));
   const ivaPctDev = Number(cfgDev.datos?.iva_pct) || 16;
@@ -714,7 +713,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: s
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <SectionCard title="Datos de la devolución (Nota de Crédito)" description={`N° ${seq}`}>
+      <SectionCard title="Datos de la Devolución (Nota de Crédito)" description={`N° ${seq}`}>
         <div className="space-y-3">
           <div><label className={label}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} /></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -728,7 +727,7 @@ function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: s
         </div>
       </SectionCard>
 
-      <SectionCard title="Productos devueltos">
+      <SectionCard title="Productos Devueltos">
         <div className="grid grid-cols-2 gap-2">
           <div><label className={label}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} /></div>
           <div><label className={label}>Cantidad</label><input type="number" min={1} className={inputClass} value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>

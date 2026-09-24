@@ -95,7 +95,7 @@ export function AltaCilindros({
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <SectionCard title="Dar de alta" description="Cilindros nuevos que entran al parque.">
+      <SectionCard title="Dar de Alta" description="Cilindros nuevos que entran al parque.">
         <div className="space-y-3">
           <div>
             <label htmlFor="alta-gas" className="mb-1.5 block text-sm font-medium text-text">Gas</label>
@@ -123,7 +123,7 @@ export function AltaCilindros({
         </div>
       </SectionCard>
 
-      <SectionCard title="Cambiar de estado" description="Llenado en planta, baja por daño, corrección.">
+      <SectionCard title="Cambiar de Estado" description="Llenado en planta, baja por daño, corrección.">
         <div className="space-y-3">
           <div>
             <label htmlFor="mov-gas" className="mb-1.5 block text-sm font-medium text-text">Gas</label>

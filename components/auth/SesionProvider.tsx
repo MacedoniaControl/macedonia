@@ -20,7 +20,7 @@ export type Identidad = {
   rol: Rol;
   empresaId: string | null;
   /** Sus propios permisos: el menu muestra solo lo que puede usar. Decide la
-   * base (RLS) y el proxy; aca es solo para no ofrecer puertas cerradas. */
+   * base (RLS) y el proxy; aquí es solo para no ofrecer puertas cerradas. */
   permisos: Permisos;
 };
 

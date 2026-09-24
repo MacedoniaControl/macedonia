@@ -62,8 +62,8 @@ export function PanelGases({ empresa, onCambio }: { empresa: string; onCambio?: 
 
           {lista.length > 0 && conDeposito === 0 && (
             <p className="rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
-              Hoy no se cobra depósito en garantía. Si empiezan a cobrarlo, cargá
-              el monto acá y las garantías por cliente se calculan solas.
+              Hoy no se cobra depósito en garantía. Si empiezan a cobrarlo, carga
+              el monto aquí y las garantías por cliente se calculan solas.
             </p>
           )}
           {mezclado && (
@@ -145,7 +145,7 @@ export function PanelGases({ empresa, onCambio }: { empresa: string; onCambio?: 
                   como una afirmacion sino como algo sin responder. */}
               <p className="-mt-1 text-xs text-muted">
                 {edit.seRellena
-                  ? "Entra vacio y se llena aca: vacio → en llenado → lleno."
+                  ? "Entra vacío y se llena aquí: vacío → en llenado → lleno."
                   : "Sin marcar: viene lleno del proveedor."}
               </p>
 

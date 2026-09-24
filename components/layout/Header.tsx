@@ -79,7 +79,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         ) : (
           <>
             <p className="text-sm font-semibold text-muted">— Bs</p>
-            <p className="text-[10px] text-muted">Pulsá “Tasa BCV”</p>
+            <p className="text-[10px] text-muted">Pulsa “Tasa BCV”</p>
           </>
         )}
       </div>

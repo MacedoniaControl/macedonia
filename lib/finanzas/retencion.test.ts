@@ -313,10 +313,10 @@ describe("el panel muestra lo que hay que pagar, no el valor de cara", () => {
     assert.doesNotMatch(pant, /reduce\(\(a, c\) => a \+ c\.saldo,/);
   });
 
-  test("la columna se llama «A pagar», no «Monto»", () => {
+  test("la columna se llama «A Pagar», no «Monto»", () => {
     // Si el numero es el neto, llamarlo Monto hace creer que es el de la
     // factura, y no cuadraria con el papel.
-    assert.match(pant, />A pagar</);
+    assert.match(pant, />A Pagar</);
   });
 
   test("cuando hay retención, el total de la factura sigue a la vista", () => {
@@ -448,7 +448,7 @@ describe("la marca llega hasta la pantalla", () => {
   });
 
   test("la marca dice qué hacer, no solo que algo pasa", () => {
-    // Sin el «cargá la base y el IVA a mano», la marca no evita el error.
+    // Sin el «carga la base y el IVA a mano», la marca no evita el error.
     assert.match(marca, /a mano/);
   });
 

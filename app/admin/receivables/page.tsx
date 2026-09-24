@@ -86,7 +86,7 @@ export default function ReceivablesPage() {
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-muted">Documento</span>
         <select className={inputClass} value={docSel} onChange={(e) => setDocSel(e.target.value)}>
-          <option value="">Elegí un documento…</option>
+          <option value="">Elige un documento…</option>
           {conSaldo.filter((c) => c.saldo > 0).map((c) => (
             <option key={c.documento} value={c.documento}>
               {c.documento} · {c.contraparte} · saldo {fmtUsd(c.saldo)}
@@ -152,8 +152,8 @@ export default function ReceivablesPage() {
   return (
     <>
       <PageHeader
-        title="Cuentas por cobrar"
-        breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por cobrar" }]}
+        title="Cuentas por Cobrar"
+        breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por Cobrar" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <PildoraPanel etiqueta="Nueva cuenta" icono="plus">
@@ -174,19 +174,19 @@ export default function ReceivablesPage() {
       <FiltroClase conteo={porClase} total={cuentas.length}
         valor={filtroClase} onCambio={setFiltroClase} />
 
-      <SectionCard title="Resumen de cartera">
+      <SectionCard title="Resumen de Cartera">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Total por cobrar" value={fmtUsd(totalSaldo)} accent />
+          <StatCard label="Total por Cobrar" value={fmtUsd(totalSaldo)} accent />
           <StatCard label="Vencido" value={fmtUsd(vencido)} />
-          <StatCard label="Por vencer (≤8d)" value={fmtUsd(porVencer)} />
-          <StatCard label="Cuentas vencidas" value={String(nVencidas)} />
+          <StatCard label="Por Vencer (≤8d)" value={fmtUsd(porVencer)} />
+          <StatCard label="Cuentas Vencidas" value={String(nVencidas)} />
         </div>
       </SectionCard>
 
       {nVencidas > 0 && (
         <div className="mt-4">
-          <AlertCard tone="danger" titulo="Cartera vencida"
-            mensaje={`${nVencidas} cuenta(s) vencida(s) por ${fmtUsd(vencido)}. Venta a cliente moroso requiere aprobación (§23).`} />
+          <AlertCard tone="danger" titulo="Cartera Vencida"
+            mensaje={`${nVencidas} cuenta(s) vencida(s) por ${fmtUsd(vencido)}. La venta a un cliente moroso requiere aprobación.`} />
         </div>
       )}
 
@@ -196,11 +196,11 @@ export default function ReceivablesPage() {
             cargando={carga.cargando}
             error={carga.error}
             vacio={conSaldo.length === 0}
-            tituloVacio="Sin cuentas por cobrar"
+            tituloVacio="Sin Cuentas por Cobrar"
             mensajeVacio={
               filtroClase === "todas"
-                ? "Nadie debe nada todavía. Cargá una con «Nueva cuenta» o importá la cartera."
-                : `No hay ninguna cuenta de esa clase. Hay ${cuentas.length} en total: tocá «Todas».`
+                ? "Nadie debe nada todavía. Carga una con «Nueva cuenta» o importa la cartera."
+                : `No hay ninguna cuenta de esa clase. Hay ${cuentas.length} en total: toca «Todas».`
             }
           >
             <div className="sumi-scroll max-w-full overflow-x-auto">
@@ -250,7 +250,7 @@ export default function ReceivablesPage() {
       </div>
 
       {abierta !== null && (
-        <Modal titulo="Cuenta por cobrar" onCerrar={() => { setAbierta(null); setEditando(null); }}>
+        <Modal titulo="Cuenta por Cobrar" onCerrar={() => { setAbierta(null); setEditando(null); }}>
           {editando ? (
             <EditarCuenta
               cuenta={editando}

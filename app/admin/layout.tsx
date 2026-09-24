@@ -3,7 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { SesionProvider } from "@/components/auth/SesionProvider";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
 
-// La identidad se resuelve aca, en el servidor, contra la tabla `usuarios`.
+// La identidad se resuelve aquí, en el servidor, contra la tabla `usuarios`.
 // Antes el rol lo ponia el navegador y por defecto era "owner".
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const u = await getUsuarioSesion();

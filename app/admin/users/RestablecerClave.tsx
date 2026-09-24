@@ -7,7 +7,7 @@
 // tenia como darle su clave a las doce personas.
 //
 // La clave se ENTREGA EN MANO, no se manda por chat ni por correo: quien la
-// escribe aca es el Owner, y el sistema no la guarda en ningun lado desde donde
+// escribe aquí es el Owner, y el sistema no la guarda en ningun lado desde donde
 // se pueda volver a leer.
 
 import { useState } from "react";
@@ -18,7 +18,7 @@ import { restablecerPassword, type UsuarioFila } from "./actions";
 const campo =
   "h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
 
-/** Minimo que exige la accion de servidor. Se repite aca para avisar antes. */
+/** Minimo que exige la accion de servidor. Se repite aquí para avisar antes. */
 const MINIMO = 8;
 
 export function RestablecerClave({ usuario }: { usuario: UsuarioFila }) {

@@ -68,7 +68,7 @@ describe("parseMonto", () => {
 });
 
 describe("fmtMonto", () => {
-  test("devuelve el monto como se escribe aca, para poder comprobarlo", () => {
+  test("devuelve el monto como se escribe aquí, para poder comprobarlo", () => {
     assert.equal(fmtMonto(1500.5), "1.500,50");
     assert.equal(fmtMonto(0), "0,00");
   });

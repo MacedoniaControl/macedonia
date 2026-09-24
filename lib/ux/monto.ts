@@ -2,7 +2,7 @@
 //
 // El campo era <input type="number">. Ese control solo acepta el formato del
 // LOCALE DEL NAVEGADOR, y cuando no lo entiende devuelve cadena vacia sin
-// avisar. Escribiendo como se escribe aca:
+// avisar. Escribiendo como se escribe aquí:
 //
 //   "1500,50"    -> value "" -> 0        (se pierde)
 //   "1.500,50"   -> value "" -> 0        (se pierde)

@@ -94,7 +94,7 @@ export default function PayablesPage() {
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-muted">Documento</span>
         <select className={inputClass} value={docSel} onChange={(e) => setDocSel(e.target.value)}>
-          <option value="">Elegí un documento…</option>
+          <option value="">Elige un documento…</option>
           {conSaldo.filter((c) => c.saldoNeto > 0).map((c) => (
             <option key={c.documento} value={c.documento}>
               {c.documento} · {c.contraparte} · saldo {fmtUsd(c.saldoNeto)}
@@ -157,8 +157,8 @@ export default function PayablesPage() {
   return (
     <>
       <PageHeader
-        title="Cuentas por pagar"
-        breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por pagar" }]}
+        title="Cuentas por Pagar"
+        breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por Pagar" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <PildoraPanel etiqueta="Nueva cuenta" icono="plus">
@@ -171,13 +171,13 @@ export default function PayablesPage() {
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
-            <Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Total factura", "IVA retenido", "A pagar", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.ivaRetenido ?? 0, c.neto, c.abonado, c.saldoNeto, c.vence])])}>Exportar CSV</Button>
+            <Button variant="secondary" icon="report" onClick={() => downloadCsv("cuentas-por-pagar", [["Proveedor", "Documento", "Total Factura", "IVA Retenido", "A Pagar", "Abonado", "Saldo", "Vence"], ...conSaldo.map((c) => [c.contraparte, c.documento, c.monto, c.ivaRetenido ?? 0, c.neto, c.abonado, c.saldoNeto, c.vence])])}>Exportar CSV</Button>
           </div>
         }
       />
       {exito && (
         <div className="mb-4">
-          <AlertCard tone="ok" titulo="Abono registrado" mensaje={exito} />
+          <AlertCard tone="ok" titulo="Abono Registrado" mensaje={exito} />
         </div>
       )}
       <FiltroClase conteo={porClase} total={ctas.length}
@@ -185,15 +185,15 @@ export default function PayablesPage() {
 
       <SectionCard title="Resumen">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Total a pagar" value={fmtUsd(total)} accent />
+          <StatCard label="Total a Pagar" value={fmtUsd(total)} accent />
           <StatCard label="Vencido" value={fmtUsd(vencido)} />
           <StatCard label="Alerta (≤7d)" value={fmtUsd(alerta)} />
-          <StatCard label="Cuentas vencidas" value={String(nVenc)} />
+          <StatCard label="Cuentas Vencidas" value={String(nVenc)} />
         </div>
       </SectionCard>
       {nVenc > 0 && (
         <div className="mt-4">
-          <AlertCard tone="danger" titulo="Pagos vencidos" mensaje={`${nVenc} cuenta(s) vencida(s) por ${fmtUsd(vencido)}.`} />
+          <AlertCard tone="danger" titulo="Pagos Vencidos" mensaje={`${nVenc} cuenta(s) vencida(s) por ${fmtUsd(vencido)}.`} />
         </div>
       )}
       {aRevisar.length > 0 && (
@@ -207,7 +207,7 @@ export default function PayablesPage() {
                 ? `En ${conExento.length} son ${fmtUsd(exento)} sin IVA; ` +
                   `en las otras ${aRevisar.length - conExento.length} lo exento viene sumado dentro de la base. `
                 : "") +
-              "Están marcadas en la tabla. Si las editás, cargá la base y el IVA a mano: " +
+              "Están marcadas en la tabla. Si las editas, carga la base y el IVA a mano: " +
               "el 16% automático los gravaría de más y subiría la retención."
             }
           />
@@ -219,14 +219,14 @@ export default function PayablesPage() {
             cargando={carga.cargando}
             error={carga.error}
             vacio={conSaldo.length === 0}
-            tituloVacio="Sin cuentas por pagar"
+            tituloVacio="Sin Cuentas por Pagar"
             mensajeVacio={
               // Con un filtro puesto la tabla puede estar vacia AUNQUE haya
               // cuentas. Decir "no hay deudas" seria mentir: hay, pero no de
               // esa clase.
               filtroClase === "todas"
-                ? "No hay deudas cargadas. Usá «Nueva cuenta» o importá la cartera."
-                : `No hay ninguna cuenta de esa clase. Hay ${ctas.length} en total: tocá «Todas».`
+                ? "No hay deudas cargadas. Usa «Nueva cuenta» o importa la cartera."
+                : `No hay ninguna cuenta de esa clase. Hay ${ctas.length} en total: toca «Todas».`
             }
           >
             <div className="sumi-scroll max-w-full overflow-x-auto">
@@ -236,7 +236,7 @@ export default function PayablesPage() {
                   <th className="py-2.5 pr-3 font-medium">Proveedor</th>
                   <th className="py-2.5 pr-3 font-medium">Documento</th>
                   <th className="py-2.5 pr-3 font-medium">Clase</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">A pagar</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">A Pagar</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Saldo</th>
                   <th className="py-2.5 font-medium">Estado</th>
                 </tr>
@@ -286,7 +286,7 @@ export default function PayablesPage() {
       </div>
 
       {abierta !== null && (
-        <Modal titulo="Cuenta por pagar" onCerrar={() => { setAbierta(null); setEditando(null); }}>
+        <Modal titulo="Cuenta por Pagar" onCerrar={() => { setAbierta(null); setEditando(null); }}>
           {editando ? (
             <EditarCuenta
               cuenta={editando}

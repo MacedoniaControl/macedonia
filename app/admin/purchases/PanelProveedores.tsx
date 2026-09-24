@@ -2,7 +2,7 @@
 
 // Proveedores, dentro de Compras.
 //
-// Vive acá y no en el menú principal por la misma razón que los clientes viven
+// Vive aquí y no en el menú principal por la misma razón que los clientes viven
 // dentro de las notas de entrega: se cargan cuando hacen falta, en el momento en
 // que hacen falta, no como un trámite aparte que alguien tiene que acordarse de
 // hacer antes.
@@ -30,7 +30,7 @@ export function PanelProveedores() {
   return (
     <SectionCard
       title="Proveedores"
-      description="Busca por nombre o RIF. El RIF es el código: no hay otro número que recordar."
+      description="Busca por nombre o RIF."
     >
       <div className="mb-3 flex gap-2">
         <label className="relative flex flex-1 items-center">
@@ -77,7 +77,7 @@ export function PanelProveedores() {
                 <th className="py-2 pr-3 font-medium">RIF</th>
                 <th className="py-2 pr-3 font-medium">Nombre</th>
                 <th className="py-2 pr-3 font-medium">Contacto</th>
-                <th className="py-2 pr-3 text-right font-medium">Días créd.</th>
+                <th className="py-2 pr-3 text-right font-medium">Días Créd.</th>
                 <th className="py-2 pr-3 text-right font-medium">% Ret.</th>
                 <th className="py-2 font-medium"></th>
               </tr>

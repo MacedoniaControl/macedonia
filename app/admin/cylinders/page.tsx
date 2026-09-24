@@ -29,12 +29,12 @@ export default function CylindersPage() {
 
   const tabs: { id: Tab; label: string }[] = [
     // Entrega va primero: es lo que hacen seis técnicos todos los días.
-    { id: "entrega", label: "Registrar entrega" },
+    { id: "entrega", label: "Registrar Entrega" },
     // Parque va antes que Rampa: responde "cuantos tengo y donde estan", que es
     // la pregunta de quien mira; Rampa es el detalle por gas y estado.
     { id: "parque", label: "Parque" },
     { id: "saldos", label: "Rampa" },
-    { id: "alta", label: "Dar de alta" },
+    { id: "alta", label: "Dar de Alta" },
   ];
 
   return (

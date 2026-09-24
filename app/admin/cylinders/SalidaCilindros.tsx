@@ -50,7 +50,7 @@ export function SalidaCilindros({ empresa, onRegistrada }: { empresa: string; on
             <label className="block">
               <span className={lbl}>Gas *</span>
               <select value={f.gas} onChange={(e) => setF({ ...f, gas: e.target.value })} className={campo}>
-                <option value="">Elegí…</option>
+                <option value="">Elige…</option>
                 {listaGases.map((g) => <option key={g.nombre} value={g.nombre}>{g.nombre}</option>)}
               </select>
             </label>
@@ -71,14 +71,14 @@ export function SalidaCilindros({ empresa, onRegistrada }: { empresa: string; on
           <label className="block">
             <span className={lbl}>Autoriza *</span>
             <select value={f.autorizadoPor} onChange={(e) => setF({ ...f, autorizadoPor: e.target.value })} className={campo}>
-              <option value="">Elegí…</option>
+              <option value="">Elige…</option>
               {listaAutoriza.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
             </select>
             {/* Si no hay a quien elegir, decirlo: un desplegable vacio parece un
                 fallo de carga y deja al operador sin saber que hacer. */}
             {!datos.cargando && listaAutoriza.length === 0 && (
               <span className="mt-1 block text-xs text-warn">
-                No hay usuarios con permiso para autorizar. Pedile a un administrador que lo habilite.
+                No hay usuarios con permiso para autorizar. Pídele a un administrador que lo habilite.
               </span>
             )}
           </label>

@@ -8,7 +8,7 @@
 // navegador- pero la interfaz mostraba secciones que no correspondian.
 //
 // Ahora el rol lo resuelve el servidor contra la tabla `usuarios` y baja por
-// contexto (components/auth/SesionProvider). Aca solo se lee.
+// contexto (components/auth/SesionProvider). Aquí solo se lee.
 //
 // Regla de negocio: los registros/logs (historial de documentos, auditoria) son
 // solo del OWNER.
@@ -21,7 +21,7 @@ export const ROLES: { id: Rol; label: string }[] = [
   { id: "owner", label: "Owner" },
   { id: "admin", label: "Administrador" },
   { id: "vendedor", label: "Vendedor" },
-  { id: "tecnico", label: "Tecnico de recargas" },
+  { id: "tecnico", label: "Técnico de Recargas" },
 ];
 
 /**

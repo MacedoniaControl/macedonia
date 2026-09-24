@@ -63,7 +63,7 @@ export function InputMonto({
       }}
       onBlur={() => {
         enfocado.current = false;
-        // Al salir se normaliza a como se escribe aca: quien lo escribio ve
+        // Al salir se normaliza a como se escribe aquí: quien lo escribio ve
         // como quedo, y una ambigüedad ("1,500") se nota en el acto.
         setTexto(n !== null ? fmtMonto(n) : "");
         if (n === null) onChange(0);

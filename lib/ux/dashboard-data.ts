@@ -32,14 +32,14 @@ export type KpiDatum = {
 // Antes mostraban cifras inventadas indistinguibles de un dato verdadero, y alguien
 // podía decidir sobre ellas. Se llenarán cuando el backend los alimente.
 export const kpis: KpiDatum[] = [
-  { key: "ventasHoy", label: "Ventas hoy", value: "$0", sub: "sin datos", tone: "brand" },
-  { key: "cxc", label: "Cuentas por cobrar", value: "$0", sub: "0 documentos", tone: "warn" },
-  { key: "cxp", label: "Cuentas por pagar", value: "$0", sub: "0 proveedores", tone: "danger" },
-  { key: "stock", label: "Stock crítico", value: "0", sub: "productos bajo mínimo", tone: "warn" },
-  { key: "cilPend", label: "Cilindros pendientes", value: "0", sub: "por retorno", tone: "info" },
-  { key: "recargas", label: "Recargas pendientes", value: "0", sub: "en cola", tone: "info" },
-  { key: "pedidos", label: "Pedidos pendientes", value: "0", sub: "por despachar", tone: "navy" },
-  { key: "balance", label: "Balance general", value: "$106.826", sub: "utilidad neta 2024", tone: "ok" },
+  { key: "ventasHoy", label: "Ventas Hoy", value: "$0", sub: "sin datos", tone: "brand" },
+  { key: "cxc", label: "Cuentas por Cobrar", value: "$0", sub: "0 documentos", tone: "warn" },
+  { key: "cxp", label: "Cuentas por Pagar", value: "$0", sub: "0 proveedores", tone: "danger" },
+  { key: "stock", label: "Stock Crítico", value: "0", sub: "productos bajo mínimo", tone: "warn" },
+  { key: "cilPend", label: "Cilindros Pendientes", value: "0", sub: "por retorno", tone: "info" },
+  { key: "recargas", label: "Recargas Pendientes", value: "0", sub: "en cola", tone: "info" },
+  { key: "pedidos", label: "Pedidos Pendientes", value: "0", sub: "por despachar", tone: "navy" },
+  { key: "balance", label: "Balance General", value: "$106.826", sub: "utilidad neta 2024", tone: "ok" },
 ];
 
 export type RoiCard = {
@@ -50,10 +50,10 @@ export type RoiCard = {
 };
 
 export const roiCards: RoiCard[] = [
-  { label: "ROI del mes", value: "53,3%", sub: "utilidad / inversión", accent: true },
-  { label: "Utilidad estimada", value: "$106.826", sub: "acumulado 2024" },
-  { label: "Margen bruto", value: "48,0%", sub: "sobre ventas" },
-  { label: "Ventas vs compras", value: "$310.865 / $89.203", sub: "ratio 3,5x" },
+  { label: "ROI del Mes", value: "53,3%", sub: "utilidad / inversión", accent: true },
+  { label: "Utilidad Estimada", value: "$106.826", sub: "acumulado 2024" },
+  { label: "Margen Bruto", value: "48,0%", sub: "sobre ventas" },
+  { label: "Ventas vs Compras", value: "$310.865 / $89.203", sub: "ratio 3,5x" },
 ];
 
 export const productosMayorRetorno = [

@@ -4,7 +4,7 @@ type AlertTone = "warn" | "danger" | "info" | "ok";
 
 // El aviso se distingue por su superficie teñida y el color del ícono, no por
 // una barra gruesa a la izquierda: esa barra es el tic más reconocible de una
-// interfaz generada, y acá no aportaba nada que el color del ícono no diga ya.
+// interfaz generada, y aquí no aportaba nada que el color del ícono no diga ya.
 const tones: Record<AlertTone, { borde: string; fondo: string; text: string }> = {
   warn:   { borde: "border-warn/35",   fondo: "bg-warn/10",   text: "text-warn" },
   danger: { borde: "border-danger/35", fondo: "bg-danger/10", text: "text-danger" },
