@@ -1,5 +1,17 @@
 "use client";
 
+// Dashboard: todo de datos reales, en dólares y en bolívares.
+//
+//   · Arriba, el día: ventas de hoy, cuentas por cobrar y por pagar, cilindros,
+//     compras por recibir. Antes eran ocho tarjetas escritas en cero.
+//   · Abajo, el período elegido, del histórico real de Valery (las dos empresas).
+//     Antes «Rentabilidad» y los gráficos eran cifras fijas de 2024 de
+//     Sumigases, y Sudematin salía en cero por un factor 0.
+//   · Los bolívares van a la tasa BCV de hoy, debajo de cada monto. Con años
+//     enteros llegan a diez y más dígitos: se abrevian en millones o billones
+//     para que quepan (fmtBsCorto).
+//   · Utilidad, ROI y márgenes son de Owner y Administrador, como Gastos.
+
 import { useMemo } from "react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -8,54 +20,48 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { BiVentasUtilidad, BiVentasCompras, BiCategoriasDonut } from "@/components/ui/BiCharts";
+import { SeriesChart } from "@/components/ui/SeriesChart";
 import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
 import { getHistory } from "@/lib/ux/history-data";
-import { fmtUsd } from "@/lib/ux/format";
+import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
+import { enBs, fmtUsd } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useBcvRate, useTasaViva } from "@/lib/ux/bcv-rate";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { saldos, type SaldoCilindro } from "@/lib/cilindros/cilindros-db";
+import { resumenOperativo } from "@/lib/ux/dashboard-db";
 import { useCarga } from "@/lib/ux/use-carga";
 import { SelectorRango } from "@/components/ui/SelectorRango";
-import { RANGO_POR_DEFECTO, type Rango } from "@/lib/ux/rango";
+import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { Icon } from "@/components/ui/Icon";
-import {
-  productosMayorRetorno,
-  categoriasMasRentables,
-  alertasOperativas,
-} from "@/lib/ux/dashboard-data";
+import { alertasOperativas } from "@/lib/ux/dashboard-data";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
+import { useSesion } from "@/components/auth/SesionProvider";
+import { puedeVer } from "@/lib/auth/permisos";
+import { puedeVerFinanzas, useRol } from "@/lib/ux/session";
 
 const selectClass = "sumi-campo sumi-campo--auto min-w-[9rem]";
 
-// Las series mensuales provienen del histórico REAL de Sumigases. Sudematin no tiene
-// desglose mensual cargado: antes se estimaba multiplicando por 0,35 — un número
-// inventado que se veía igual que un dato real. Ahora va en 0 hasta cargar su serie.
-const FACTORES: Record<string, number> = { sumigases: 1, sudematin: 0, all: 1 };
-
-type Filtros = { empresa: string; rango: Rango; moneda: string };
+type Filtros = { empresa: string; rango: Rango };
 
 // Vista de dashboard reutilizable. Con `empresaFija` queda bloqueada a una empresa
-// (rutas /admin/[empresa]/dashboard, con su tema). Sin ella, es filtrable (consolidado).
+// (rutas /admin/[empresa]/dashboard, con su tema).
 export function DashboardView({ empresaFija }: { empresaFija?: string }) {
-  // v2: el rango pasa a ser {desde,hasta,agrupacion}. Clave nueva para no
-  // leer el formato viejo guardado en el navegador.
-  const [f, setF] = usePersistedState<Filtros>("dash:filtros:v2", { empresa: "sumigases", rango: RANGO_POR_DEFECTO, moneda: "usd" });
+  // v3: sin el selector de moneda (dólares y bolívares van juntos) y con el
+  // rango del histórico, que cierra el mes anterior.
+  const [f, setF] = usePersistedState<Filtros>("dash:filtros:v3", { empresa: "sumigases", rango: RANGO_HISTORICO });
   const empresa = empresaFija ?? f.empresa;
   const emp = isEmpresaId(empresa) ? EMPRESAS[empresa] : null;
-  const factor = FACTORES[empresa] ?? 1;
-  const dias = Math.max(1, Math.round((new Date(f.rango.hasta).getTime() - new Date(f.rango.desde).getTime()) / 86400000));
-  const count = Math.max(1, Math.round(dias / 30));
-  const bs = f.moneda === "bs";
-  // La tasa sale del BCV, no de una constante. Antes convertia con 49,5
-  // mientras el BCV estaba en 787: los montos en Bs salian 16 veces abajo.
   const tasa = useTasaViva();
+  const bcv = useBcvRate();
+  const { rol } = useRol();
+  const sesion = useSesion();
+  const finanzas = puedeVerFinanzas(rol);
+  const ve = (clave: string) => !sesion?.permisos || puedeVer(sesion.permisos, rol, clave);
 
-  // Los cilindros salen de la base, y de LA EMPRESA ACTIVA. La tarjeta anterior
-  // usaba una lista en cero y multiplicaba por `factor`, que es un coeficiente
-  // de estimación: un número inventado sobre otro.
-  const cilindros = useCarga(empresa, () => saldos(empresa));
+  const op = useCarga(`op:${empresa}`, () => resumenOperativo(empresa));
+  const cilindros = useCarga(`cil:${empresa}`, () => (ve("cylinders") ? saldos(empresa) : Promise.resolve([] as SaldoCilindro[])));
+
   const porEstado = useMemo(() => {
     const ETIQUETAS: Record<string, { etiqueta: string; tone: "ok" | "muted" | "info" | "warn" | "danger" }> = {
       lleno:           { etiqueta: "Llenos",             tone: "ok" },
@@ -71,70 +77,59 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
     return [...suma.entries()]
       .filter(([, n]) => n !== 0)
       .map(([estado, cantidad]) => ({
-        estado,
-        cantidad,
+        estado, cantidad,
         etiqueta: ETIQUETAS[estado]?.etiqueta ?? estado,
         tone: ETIQUETAS[estado]?.tone ?? ("muted" as const),
       }));
   }, [cilindros.datos]);
   const totalCil = porEstado.reduce((a, c) => a + c.cantidad, 0);
-  const frac = count / 12; // proporción del año para KPIs monetarios acumulados
+  const cil = (estado: string) => porEstado.find((c) => c.estado === estado)?.cantidad ?? 0;
 
-  const money = (usd: number) => {
-    const v = usd * factor;
-    const n = bs && tasa ? v * tasa : v;
-    return (bs ? "" : "$") + Math.round(n).toLocaleString("es-VE") + (bs ? " Bs" : "");
-  };
-  const cnt = (n: number) => String(Math.max(0, Math.round(n * factor)));
+  // El período, del histórico real de la empresa activa.
+  const hist = getHistory(empresa);
+  const periodos = historicoEnRango(empresa, f.rango);
+  const t = totalesDe(periodos);
+  const hastaHist = hist.meta.hasta.split("-").reverse().join("-");
+  const cargando = op.cargando ? "…" : "—";
+  const o = op.datos;
+  const n = (x: number) => x.toLocaleString("es-VE");
 
-  // KPIs operativos: pendientes de conectar a la base.
-  // Van en CERO a propósito. Antes traían cifras inventadas ($1.036 de "ventas hoy",
-  // 7 productos en stock crítico...) indistinguibles de un dato verdadero, y alguien
-  // podía decidir sobre ellas. Se llenarán cuando existan los datos reales.
-  const kpis = [
-    { key: "vh", label: "Ventas Hoy", value: money(0), sub: bs ? undefined : "≈ 0 Bs", tone: "brand" as const },
-    { key: "cxc", label: "Cuentas por Cobrar", value: money(0), sub: "0 documentos", tone: "warn" as const },
-    { key: "cxp", label: "Cuentas por Pagar", value: money(0), sub: "0 proveedores", tone: "danger" as const },
-    { key: "sc", label: "Stock Crítico", value: cnt(0), sub: "productos bajo mínimo", tone: "warn" as const },
-    { key: "cp", label: "Cilindros Pendientes", value: cnt(0), sub: "por retorno", tone: "info" as const },
-    { key: "rp", label: "Recargas Pendientes", value: cnt(0), sub: "en cola", tone: "info" as const },
-    { key: "pp", label: "Pedidos Pendientes", value: cnt(0), sub: "por despachar", tone: "navy" as const },
-    { key: "bg", label: "Balance del Período", value: money(106826 * frac), sub: "utilidad neta 2024", tone: "ok" as const },
-  ];
-
-  // Estos porcentajes y listas derivan de la serie 2024 de Sumigases. Si la empresa
-  // activa no tiene serie mensual cargada (factor 0), NO se muestran los números de
-  // otra empresa: van en cero y las listas quedan vacías.
-  const sinSerie = factor === 0;
-  const roiCards = [
-    { label: "ROI del Período", value: sinSerie ? "0%" : "53,3%", sub: "utilidad / inversión", accent: true },
-    { label: "Utilidad Estimada", value: money(106826 * frac), sub: `acumulado ${count} mes(es)` },
-    { label: "Margen Bruto", value: sinSerie ? "0%" : "48,0%", sub: "sobre ventas" },
-    { label: "Ventas vs Compras", value: `${money(310865 * frac)} / ${money(89203 * frac)}`, sub: sinSerie ? "sin datos" : "ratio 3,5x" },
+  type Kpi = { key: string; label: string; value: string; bs?: string | null; sub?: string; tone: "brand" | "navy" | "ok" | "warn" | "danger" | "info" };
+  const kpis: Kpi[] = [
+    ...(ve("delivery-notes") ? [{ key: "vh", label: "Ventas Hoy", value: o?.ventasHoy ? fmtUsd(o.ventasHoy.usd) : cargando,
+      bs: o?.ventasHoy ? enBs(o.ventasHoy.usd, tasa) : null, sub: o?.ventasHoy ? `${n(o.ventasHoy.notas)} nota(s) de entrega` : undefined, tone: "brand" as const }] : []),
+    ...(o?.cobrar !== null && ve("receivables") ? [{ key: "cxc", label: "Cuentas por Cobrar", value: o?.cobrar ? fmtUsd(o.cobrar.usd) : cargando,
+      bs: o?.cobrar ? enBs(o.cobrar.usd, tasa) : null,
+      sub: o?.cobrar ? `${n(o.cobrar.documentos)} documento(s) · vencido ${fmtUsd(o.cobrar.vencido)}` : undefined, tone: "warn" as const }] : []),
+    ...(o?.pagar !== null && ve("payables") ? [{ key: "cxp", label: "Cuentas por Pagar", value: o?.pagar ? fmtUsd(o.pagar.usd) : cargando,
+      bs: o?.pagar ? enBs(o.pagar.usd, tasa) : null,
+      sub: o?.pagar ? `${n(o.pagar.proveedores)} proveedor(es) · vencido ${fmtUsd(o.pagar.vencido)}` : undefined, tone: "danger" as const }] : []),
+    ...(ve("inventory") ? [{ key: "neg", label: "Existencia Negativa", value: o?.negativos ? n(o.negativos.productos) : cargando,
+      sub: "productos que salieron sin entrada registrada", tone: "warn" as const }] : []),
+    ...(ve("cylinders") ? [
+      { key: "cp", label: "Cilindros por Retornar", value: cilindros.cargando ? "…" : n(cil("en_cliente")), sub: "en poder de clientes", tone: "info" as const },
+      { key: "rp", label: "Recargas Pendientes", value: cilindros.cargando ? "…" : n(cil("vacio") + cil("en_llenado")), sub: "vacíos y en llenado", tone: "info" as const },
+    ] : []),
+    ...(o?.compras !== null && ve("purchases") ? [{ key: "oc", label: "Compras por Recibir", value: o?.compras ? n(o.compras.ordenes) : cargando,
+      bs: null, sub: o?.compras ? `orden(es) · ${fmtUsd(o.compras.usd)} pendientes` : undefined, tone: "navy" as const }] : []),
+    ...(finanzas ? [{ key: "bg", label: "Utilidad del Período", value: fmtUsd(t.util), bs: enBs(t.util, tasa),
+      sub: `histórico de Valery, hasta ${hastaHist}`, tone: "ok" as const }] : []),
   ];
 
   const empresaLabel = empresa === "sudematin" ? "Sudematin" : "Sumigases";
-
-  const bcv = useBcvRate();
-  // Histórico real de la empresa seleccionada.
-  const hist = getHistory(empresa);
-  const histLabel = empresaLabel;
+  const topProductos = hist.topProductos.slice(0, 5);
+  const topClientes = hist.topClientes.slice(0, 5);
 
   return (
     <div className={emp ? `theme-${emp.id}` : ""}>
       {emp && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-sm">
-          {/* El logo cede ancho en el teléfono: a 320px, 160 fijos dejaban al
-              nombre y al RIF sin lugar y todo se montaba encima. */}
           <img src={emp.logo} alt={emp.nombre}
             className="h-8 w-auto max-w-[110px] shrink-0 object-contain sm:h-9 sm:max-w-[160px]" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-text">{emp.nombre}</p>
             <p className="truncate text-xs text-muted">RIF {emp.rif}</p>
           </div>
-          {/* La insignia se va en móvil: decía "Panel Sumigases" al lado del
-              logo de Sumigases, con "Sumigases" también en la cabecera. Tres
-              veces el mismo dato, y el que se comía el espacio de los otros. */}
           <div className="hidden sm:block">
             <StatusBadge tone="brand">Panel {emp.nombreCorto}</StatusBadge>
           </div>
@@ -142,59 +137,50 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       )}
       <PageHeader
         title="Dashboard"
-        filters={
+        filters={!empresaFija ? (
           <>
-            {!empresaFija && (
-              <>
-                <label className="sr-only" htmlFor="f-empresa">Empresa</label>
-                <select id="f-empresa" className={selectClass} value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}>
-                  <option value="sumigases">Sumigases</option>
-                  <option value="sudematin">Sudematin</option>
-                </select>
-              </>
-            )}
-            <label className="sr-only" htmlFor="f-moneda">Moneda</label>
-            <select id="f-moneda" className={selectClass} value={f.moneda} onChange={(e) => setF({ ...f, moneda: e.target.value })}>
-              <option value="usd">USD</option>
-              <option value="bs">{tasa ? `Bs (tasa ${tasa.toFixed(2)})` : "Bs (sin tasa)"}</option>
+            <label className="sr-only" htmlFor="f-empresa">Empresa</label>
+            <select id="f-empresa" className={selectClass} value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}>
+              <option value="sumigases">Sumigases</option>
+              <option value="sudematin">Sudematin</option>
             </select>
           </>
-        }
+        ) : undefined}
       />
 
-      <div className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3">
-        <SelectorRango valor={f.rango} onCambio={(r) => setF({ ...f, rango: r })} />
-      </div>
-
-      {/* Banda superior: resumen real (histórico) + tipo de cambio BCV */}
+      {/* Banda superior: el histórico en una línea + la tasa del día */}
       <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {/* Resumen del histórico */}
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ok/10 text-ok"><Icon name="roi" size={18} /></span>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Resumen real · histórico {histLabel}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Histórico {empresaLabel} · Valery</p>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className={`mt-3 grid gap-3 ${finanzas ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.venta)}</p>
+              <p className="text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.venta)}</p>
+              {tasa && <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">≈ {enBs(hist.totals.venta, tasa)}</p>}
               <p className="text-xs text-muted">Ventas</p>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.util)}</p>
-              <p className="text-xs text-muted">Utilidad</p>
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold tabular-nums text-ok sm:text-xl">{hist.totals.roi}%</p>
-              <p className="text-xs text-muted">ROI</p>
-            </div>
+            {finanzas && (
+              <>
+                <div className="min-w-0">
+                  <p className="text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.util)}</p>
+                  {tasa && <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">≈ {enBs(hist.totals.util, tasa)}</p>}
+                  <p className="text-xs text-muted">Utilidad</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-base font-semibold tabular-nums text-ok sm:text-xl">{hist.totals.roi.toLocaleString("es-VE")}%</p>
+                  <p className="text-xs text-muted">ROI (utilidad / costo)</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Precio del dólar BCV (se actualiza con el botón "Dolar Price" del header) */}
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand"><Icon name="dollar" size={18} /></span>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Precio del dólar · BCV</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Precio del Dólar · BCV</p>
           </div>
           {bcv ? (
             <>
@@ -202,6 +188,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
               <p className="mt-1 text-xs text-muted">
                 {bcv.fecha ? `Fecha valor BCV: ${bcv.fecha} · ` : ""}Consultado: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
               </p>
+              <p className="mt-1 text-xs text-muted">Los bolívares de esta pantalla se calculan a esta tasa.</p>
             </>
           ) : (
             <>
@@ -212,79 +199,95 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
         </div>
       </div>
 
+      {op.error && <AlertCard tone="danger" titulo="No se pudieron leer los indicadores del día" mensaje={op.error} />}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {kpis.map((k) => (
-          <KpiCard key={k.key} label={k.label} value={k.value} sub={k.sub} tone={k.tone} />
+          <KpiCard key={k.key} label={k.label} value={k.value} bs={k.bs} sub={k.sub} tone={k.tone} />
         ))}
       </div>
 
-      {/* Histórico real de ventas y compras (Valery) */}
-      <div className="mt-6">
-        <SectionCard
-          title="Histórico de Ventas y Compras"
-          action={<StatusBadge tone="brand">Real {hist.meta.desde.slice(0, 4)}–{hist.meta.hasta.slice(0, 4)}</StatusBadge>}
-        >
-          <HistoryKpis empresa={empresa} />
-          <div className="mt-5 border-t border-border pt-4">
-            <HistoryTrend empresa={empresa} />
+      {finanzas && (
+        <>
+          <div className="mt-6">
+            <SectionCard
+              title="Histórico de Ventas y Compras"
+              action={<StatusBadge tone="brand">Real {hist.meta.desde.slice(0, 4)}–{hist.meta.hasta.slice(0, 4)}</StatusBadge>}
+            >
+              <HistoryKpis empresa={empresa} tasa={tasa} />
+              <div className="mt-5 border-t border-border pt-4">
+                <HistoryTrend empresa={empresa} />
+              </div>
+            </SectionCard>
           </div>
-        </SectionCard>
-      </div>
 
-      <div className="mt-6">
-        <SectionCard title="Rentabilidad"
-          action={<StatusBadge tone="brand">Métrica clave</StatusBadge>}>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {roiCards.map((c) => (
-              <StatCard key={c.label} label={c.label} value={c.value} sub={c.sub} accent={c.accent} />
-            ))}
+          <div className="mb-4 mt-6 rounded-2xl border border-border bg-surface px-4 py-3">
+            <SelectorRango valor={f.rango} onCambio={(r) => setF({ ...f, rango: r })} agrupaciones={AGRUPACIONES_HISTORICO} />
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <p className="mb-2 text-sm font-medium text-text">Productos con mayor retorno</p>
-              {sinSerie && <p className="text-sm text-muted">Sin serie mensual cargada para esta empresa.</p>}
-              <ul className="space-y-1.5">
-                {(sinSerie ? [] : productosMayorRetorno).map((p) => (
-                  <li key={p.nombre} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="truncate text-muted">{p.nombre}</span>
-                    <StatusBadge tone="ok">ROI {p.roi}%</StatusBadge>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-medium text-text">Categorías más rentables</p>
-              {sinSerie && <p className="text-sm text-muted">Sin serie mensual cargada para esta empresa.</p>}
-              <ul className="space-y-1.5">
-                {(sinSerie ? [] : categoriasMasRentables).map((c) => (
-                  <li key={c.nombre} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="truncate text-muted">{c.nombre}</span>
-                    <StatusBadge tone="brand">Margen {c.margen}%</StatusBadge>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </SectionCard>
-      </div>
 
-      <div className="mt-6">
-        <SectionCard title="Ventas vs Utilidad">
-          <BiVentasUtilidad factor={factor} bs={bs} count={count} />
-        </SectionCard>
-      </div>
+          <SectionCard title="Rentabilidad del Período"
+            description={`Del histórico de Valery, que llega hasta ${hastaHist}.`}
+            action={<StatusBadge tone="brand">{periodos.length} período(s)</StatusBadge>}>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatCard label="ROI del Período" value={`${t.roi.toLocaleString("es-VE")}%`} sub="utilidad / costo" accent />
+              <StatCard label="Utilidad" value={fmtUsd(t.util)} bs={enBs(t.util, tasa)} sub="ventas menos costo" />
+              <StatCard label="Margen Bruto" value={`${t.margen.toLocaleString("es-VE")}%`} sub="sobre ventas" />
+              <StatCard label="Ventas" value={fmtUsd(t.venta)} bs={enBs(t.venta, tasa)}
+                sub={`compras ${fmtUsd(t.compra)}${t.compra > 0 ? ` · ${(t.venta / t.compra).toLocaleString("es-VE", { maximumFractionDigits: 1 })}x` : ""}`} />
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <p className="mb-2 text-sm font-medium text-text">Productos de Mayor Utilidad</p>
+                <ul className="space-y-1.5">
+                  {topProductos.map((p) => {
+                    const costo = p.venta - p.util;
+                    return (
+                      <li key={p.codigo} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="min-w-0 truncate text-muted">{p.nombre}</span>
+                        <span className="shrink-0 text-right">
+                          <b className="block tabular-nums text-text">{fmtUsd(p.util)}</b>
+                          {costo > 0 && <span className="text-[11px] text-muted">ROI {Math.round((p.util / costo) * 100).toLocaleString("es-VE")}%</span>}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium text-text">Clientes de Mayor Facturación</p>
+                <ul className="space-y-1.5">
+                  {topClientes.map((c) => (
+                    <li key={c.nombre} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate text-muted">{c.nombre}</span>
+                      <b className="shrink-0 tabular-nums text-text">{fmtUsd(c.venta)}</b>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-muted">Productos y clientes: acumulado de todo el histórico.</p>
+          </SectionCard>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <SectionCard title="Ventas vs Utilidad">
+              <SeriesChart labels={periodos.map((p) => p.etiqueta)} formato={(v) => fmtUsd(v)} height={240}
+                series={[
+                  { name: "Ventas", color: "var(--color-brand)", values: periodos.map((p) => p.venta) },
+                  { name: "Utilidad", color: "var(--color-ok)", values: periodos.map((p) => p.util) },
+                ]} />
+            </SectionCard>
+            <SectionCard title="Ventas vs Compras">
+              <SeriesChart labels={periodos.map((p) => p.etiqueta)} formato={(v) => fmtUsd(v)} height={240}
+                series={[
+                  { name: "Ventas", color: "var(--color-brand)", values: periodos.map((p) => p.venta) },
+                  { name: "Compras", color: "var(--color-warn)", values: periodos.map((p) => p.compra) },
+                ]} />
+            </SectionCard>
+          </div>
+        </>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Ventas vs Compras">
-          <BiVentasCompras factor={factor} bs={bs} count={count} />
-        </SectionCard>
-        <SectionCard title="Categorías Más Rentables" description="Margen por categoría.">
-          <BiCategoriasDonut />
-        </SectionCard>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Cilindros por Estado" description="Calculado de los movimientos.">
+        {ve("cylinders") && <SectionCard title="Cilindros por Estado" description="Calculado de los movimientos.">
           {/* Sale de la base, no de una lista en cero: la vista cilindros_saldo
               existe desde que se construyó el módulo. Antes se dibujaban cinco
               filas en cero y cinco barras con width NaN%, porque el porcentaje
@@ -314,7 +317,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
               })}
             </ul>
           </EstadoDatos>
-        </SectionCard>
+        </SectionCard>}
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
