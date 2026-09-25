@@ -61,3 +61,22 @@ test("27: un solo pendiente por empresa y el técnico sin altas ni bajas sueltas
   assert.match(politica, /estado_hacia = 'vacio' and cliente is not null/);
   assert.match(sql, /rechazar_conteo_cilindros[\s\S]*Indica por qué se rechaza/);
 });
+
+const sql28 = readFileSync(new URL("../../supabase/28-cilindros-sin-negativos.sql", import.meta.url), "utf8");
+
+test("28: la base no deja saldos negativos ni clientes debiendo menos de cero", () => {
+  assert.match(sql28, /create trigger cil_mov_sin_negativos after insert or update on public\.cilindros_mov/);
+  assert.match(sql28, /having sum\(t\.d\) < 0/);
+  assert.match(sql28, /No puede devolver más de los que tiene/);
+  assert.match(sql28, /pg_advisory_xact_lock\(hashtext\('cil_saldo:'/);
+});
+
+test("28: la fecha de los movimientos es la de Venezuela", () => {
+  assert.match(sql28, /alter column fecha set default \(\(now\(\) at time zone 'America\/Caracas'\)::date\)/);
+});
+
+test("la prueba completa de cilindros deshace todo al final", () => {
+  const p = readFileSync(new URL("../../supabase/pruebas/prueba-cilindros.sql", import.meta.url), "utf8");
+  assert.match(p, /raise exception 'FIN_DE_LA_PRUEBA'/);
+  assert.match(p, /revoke execute on function prueba_tmp\.probar_cilindros\(\) from public, anon, authenticated/);
+});
