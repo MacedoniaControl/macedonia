@@ -3,16 +3,18 @@
 // Rampa: dónde está cada cilindro y quién tiene los que faltan.
 //
 // Los números NO se guardan: los calcula la base sumando movimientos. Por eso
-// siempre cuadran con su propio historial.
+// siempre cuadran con su propio historial. Para corregirlos se CUENTA: se
+// escribe lo que hay en el galpón y el sistema registra la diferencia.
 
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
-import { saldos, comodatos, movimientoManual, gases as gasesActivos, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
+import { saldos, comodatos, contarRampa, gases as gasesActivos, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
+import { ESTADOS_RAMPA, type AjusteRampa, type EstadoRampa } from "@/lib/cilindros/rampa";
 import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
-import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { Button } from "@/components/ui/Button";
+import { CampoNumero } from "@/components/ui/CampoNumero";
 import { useState } from "react";
 
 const ESTADOS: { id: string; label: string; tone: Tone }[] = [
@@ -24,13 +26,12 @@ const ESTADOS: { id: string; label: string; tone: Tone }[] = [
 ];
 
 const campo = "sumi-campo";
+const ETIQUETA_RAMPA: Record<EstadoRampa, string> = { lleno: "Llenos", vacio: "Vacíos" };
+const conSigno = (n: number) => (n > 0 ? `+${n}` : String(n));
 
 export function SaldosCilindros({
-  empresa, gerencia, recarga, onCambio,
-}: { empresa: string; gerencia: boolean; recarga: number; onCambio?: () => void }) {
-  const [mov, setMov] = useState({ gas: "", cantidad: 1, direccion: "entrada" as "entrada" | "salida", estado: "lleno" as "lleno" | "vacio", nota: "" });
-  const [msgMov, setMsgMov] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
+  empresa, puedeContar, recarga, onCambio,
+}: { empresa: string; puedeContar: boolean; recarga: number; onCambio?: () => void }) {
   const carga = useCarga(`${empresa}:${recarga}`, async () => {
     const [sa, co, ga] = await Promise.all([saldos(empresa), comodatos(empresa), gasesActivos(empresa)]);
     return { sa, co, ga };
@@ -43,21 +44,62 @@ export function SaldosCilindros({
   const gases = [...new Set(s.map((x) => x.gas))].sort();
   const cant = (gas: string, estado: string) =>
     s.find((x) => x.gas === gas && x.estado === estado)?.cantidad ?? 0;
+  const totalGas = (gas: string) => ESTADOS.reduce((a, e) => a + cant(gas, e.id), 0);
+  const totalEstado = (estado: string) => gases.reduce((a, g) => a + cant(g, estado), 0);
+  const totalParque = gases.reduce((a, g) => a + totalGas(g), 0);
+
+  // ---- Conteo: lo que se ve en el galpón, por gas.
+  const [contando, setContando] = useState(false);
+  const [contado, setContado] = useState<Record<string, Record<EstadoRampa, number>>>({});
+  const [visto, setVisto] = useState<Record<string, Record<EstadoRampa, number>>>({});
+  const [motivo, setMotivo] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
+  // Todos los gases activos: uno nuevo, sin movimientos, también se cuenta.
+  const aContar = [...new Set([...(carga.datos?.ga ?? []).map((g) => g.nombre)])].sort();
+
+  function empezar() {
+    // Se arranca con lo registrado: el técnico solo cambia lo que no cuadra.
+    const base = Object.fromEntries(aContar.map((g) => [g, { lleno: cant(g, "lleno"), vacio: cant(g, "vacio") }]));
+    setVisto(base); setContado(structuredClone(base)); setMotivo(""); setMsg(null); setContando(true);
+  }
+  const diferencias: AjusteRampa[] = aContar.flatMap((g) => ESTADOS_RAMPA
+    .map((e) => ({ gas: g, estado: e, antes: visto[g]?.[e] ?? 0, ahora: contado[g]?.[e] ?? 0 }))
+    .filter((x) => x.ahora !== x.antes)
+    .map((x) => ({ ...x, diferencia: x.ahora - x.antes })));
+
+  async function guardar() {
+    setMsg(null);
+    if (diferencias.length === 0) { setContando(false); return setMsg({ ok: true, texto: "El conteo coincide con la Rampa: no hubo nada que ajustar." }); }
+    if (!motivo.trim()) return setMsg({ ok: false, texto: "Explica por qué no cuadra: queda en el historial." });
+    if (guardando) return;
+    setGuardando(true);
+    try {
+      const r = await contarRampa(empresa, aContar.map((g) => ({ gas: g, contado: contado[g], visto: visto[g] })), motivo);
+      if (!r.ok) return setMsg({ ok: false, texto: r.error });
+      setContando(false);
+      setMsg({ ok: true, texto: `Conteo guardado: ${r.ajustes.length} ajuste(s). ${r.ajustes.map((a) => `${a.gas} ${ETIQUETA_RAMPA[a.estado].toLowerCase()} ${a.antes} → ${a.ahora}`).join(" · ")}.` });
+      onCambio?.();
+    } catch (e) {
+      setMsg({ ok: false, texto: e instanceof Error ? e.message : "No se pudo guardar el conteo." });
+    } finally { setGuardando(false); }
+  }
 
   // La Rampa por gas y estado, y abajo los cilindros en poder de cada cliente.
   useExportable(() => ({
     modulo: "",
     seccion: "Rampa de Cilindros",
     titulo: "Rampa de Cilindros",
-    detalle: [`${gases.length} gas(es) · ${c.length} cliente(s) con cilindros`],
+    detalle: [`${gases.length} gas(es) · ${totalParque} cilindro(s) · ${c.length} cliente(s) con cilindros`],
     columnas: [
       { titulo: "Gas / Cliente" }, ...ESTADOS.map((e) => ({ titulo: e.label, tipo: "num" as const })),
       { titulo: "Total", tipo: "num" }, { titulo: "Desde", tipo: "fecha" },
     ],
     filas: [
-      ...gases.map((g) => [g, ...ESTADOS.map((e) => cant(g, e.id)), ESTADOS.reduce((a, e) => a + cant(g, e.id), 0), null]),
+      ...gases.map((g) => [g, ...ESTADOS.map((e) => cant(g, e.id)), totalGas(g), null]),
       ...c.map((x) => [`${x.cliente} · ${x.gas}`, ...ESTADOS.map((e) => (e.id === "en_cliente" ? x.enPoder : null)), x.enPoder, fechaVista(x.desde)]),
     ],
+    totales: ["Total del parque", ...ESTADOS.map((e) => totalEstado(e.id)), totalParque, null],
     nota: "Primero los gases con sus cantidades por estado; después cada cliente con los cilindros que tiene y desde cuándo.",
   }));
 
@@ -65,80 +107,75 @@ export function SaldosCilindros({
     <div className="grid gap-4">
       <SectionCard
         title="Rampa"
-        description="Calculado de los movimientos, no de un conteo guardado."
-        action={
-          // El ajuste manual es de la gerencia, como los movimientos del inventario.
-          gerencia && <PildoraPanel etiqueta="Ajustar parque" icono="plus">
-            {(cerrar) => (
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-text">Ajuste del parque</p>
-                <p className="text-xs text-muted">Para cuando lo que hay en el galpón no coincide con lo registrado. Queda en el historial con el motivo.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-muted">Gas</span>
-                    <select value={mov.gas} onChange={(e) => setMov({ ...mov, gas: e.target.value })} className={campo}>
-                      <option value="">Elige…</option>
-                      {/* Todos los gases activos: uno nuevo, sin movimientos, también se ajusta. */}
-                      {(carga.datos?.ga ?? []).map((g) => <option key={g.nombre} value={g.nombre}>{g.nombre}</option>)}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-muted">Cantidad</span>
-                    <input type="number" min={1} value={mov.cantidad}
-                      onChange={(e) => setMov({ ...mov, cantidad: Math.max(1, Number(e.target.value) || 1) })}
-                      className={`${campo} tabular-nums`} />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-muted">Movimiento</span>
-                    <select value={mov.direccion} onChange={(e) => setMov({ ...mov, direccion: e.target.value as "entrada" | "salida" })} className={campo}>
-                      <option value="entrada">Agregar</option>
-                      <option value="salida">Quitar</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-muted">Estado</span>
-                    <select value={mov.estado} onChange={(e) => setMov({ ...mov, estado: e.target.value as "lleno" | "vacio" })} className={campo}>
-                      <option value="lleno">Lleno</option>
-                      <option value="vacio">Vacío</option>
-                    </select>
-                  </label>
-                </div>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-muted">Motivo *</span>
-                  <input value={mov.nota} onChange={(e) => setMov({ ...mov, nota: e.target.value })}
-                    placeholder="Por qué se ajusta" className={campo} />
-                </label>
-                {msgMov && (
-                  <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{msgMov}</p>
-                )}
-                <div className="flex gap-2">
-                  <Button icon="plus" className="flex-1" disabled={guardando}
-                    onClick={async () => {
-                      setMsgMov(null);
-                      if (!mov.gas) return setMsgMov("Elige el gas.");
-                      setGuardando(true);
-                      try {
-                        const r = await movimientoManual(mov.gas, mov.cantidad, mov.direccion, mov.estado, empresa, mov.nota);
-                        if (!r.ok) return setMsgMov(r.error ?? "No se pudo registrar.");
-                        setMov({ ...mov, cantidad: 1, nota: "" });
-                        onCambio?.();
-                        cerrar();
-                      } finally { setGuardando(false); }
-                    }}>{guardando ? "Registrando…" : "Registrar"}</Button>
-                  <Button variant="secondary" onClick={cerrar}>Cancelar</Button>
-                </div>
-              </div>
-            )}
-          </PildoraPanel>
-        }
+        description="Calculado de los movimientos. Si no cuadra con el galpón, cuéntala."
+        action={puedeContar && !contando && listo && !error && (
+          <Button icon="inventory" variant="secondary" onClick={empezar}>Contar rampa</Button>
+        )}
       >
+        {msg && !contando && (
+          <p role={msg.ok ? "status" : "alert"}
+            className={`mb-3 rounded-xl px-3 py-2.5 text-sm ${msg.ok ? "border border-ok/30 bg-ok/10 text-ok" : "border border-danger/30 bg-danger/10 text-danger"}`}>
+            {msg.texto}
+          </p>
+        )}
+        {contando && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted">
+              Escribe cuántos hay <b className="text-text">en el galpón</b> de cada gas. Arranca con lo registrado: cambia solo lo que no cuadre.
+              Los que están en clientes o en llenado no se cuentan aquí.
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {aContar.map((g) => (
+                <div key={g} className="rounded-2xl border border-border bg-surface-2 p-3">
+                  <p className="mb-2 text-sm font-semibold text-text">{g}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ESTADOS_RAMPA.map((e) => {
+                      const antes = visto[g]?.[e] ?? 0;
+                      const ahora = contado[g]?.[e] ?? 0;
+                      return (
+                        <label key={e} className="block">
+                          <span className="mb-1 block text-xs font-medium text-muted">{ETIQUETA_RAMPA[e]}</span>
+                          <CampoNumero valor={ahora} aria-label={`${ETIQUETA_RAMPA[e]} de ${g} en el galpón`}
+                            onChange={(n) => setContado((p) => ({ ...p, [g]: { ...p[g], [e]: n } }))}
+                            className={`${campo} text-center ${ahora !== antes ? "border-warn" : ""}`} />
+                          <span className={`mt-1 block text-xs ${ahora !== antes ? "font-medium text-warn" : "text-muted"}`}>
+                            {ahora !== antes ? `Registrado ${antes} · ${conSigno(ahora - antes)}` : `Registrado ${antes}`}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {diferencias.length > 0 && (
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-text">Motivo *</span>
+                <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
+                  placeholder="Ej.: conteo semanal, había 2 vacíos sin registrar" className={campo} />
+              </label>
+            )}
+            {msg && (
+              <p role={msg.ok ? "status" : "alert"}
+                className={`rounded-xl px-3 py-2.5 text-sm ${msg.ok ? "border border-ok/30 bg-ok/10 text-ok" : "border border-danger/30 bg-danger/10 text-danger"}`}>
+                {msg.texto}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button icon="check" className="flex-1" disabled={guardando} onClick={guardar}>
+                {guardando ? "Guardando…" : diferencias.length ? `Guardar conteo · ${diferencias.length} ajuste(s)` : "Guardar conteo"}
+              </Button>
+              <Button variant="secondary" disabled={guardando} onClick={() => { setContando(false); setMsg(null); }}>Cancelar</Button>
+            </div>
+          </div>
+        )}
         {error && <p className="text-sm text-danger">{error}</p>}
-        {!error && listo && gases.length === 0 && (
+        {!contando && !error && listo && gases.length === 0 && (
           <p className="py-6 text-center text-sm text-muted">
             Todavía no hay cilindros registrados. Da de alta el parque para empezar.
           </p>
         )}
-        {gases.length > 0 && (
+        {!contando && gases.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -147,6 +184,7 @@ export function SaldosCilindros({
                   {ESTADOS.map((e) => (
                     <th key={e.id} className="py-2 pr-3 text-right font-medium">{e.label}</th>
                   ))}
+                  <th className="py-2 pr-3 text-right font-semibold text-text">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,9 +199,19 @@ export function SaldosCilindros({
                         </td>
                       );
                     })}
+                    <td className="py-2.5 pr-3 text-right font-semibold tabular-nums text-text">{totalGas(g)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-semibold text-text">
+                  <td className="py-2.5 pr-3">Total</td>
+                  {ESTADOS.map((e) => (
+                    <td key={e.id} className="py-2.5 pr-3 text-right tabular-nums">{totalEstado(e.id)}</td>
+                  ))}
+                  <td className="py-2.5 pr-3 text-right tabular-nums">{totalParque}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}

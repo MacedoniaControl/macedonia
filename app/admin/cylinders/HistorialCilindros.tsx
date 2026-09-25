@@ -18,6 +18,7 @@ import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { useCarga } from "@/lib/ux/use-carga";
 import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
+import { NOTA_CONTEO_RAMPA } from "@/lib/cilindros/rampa";
 import {
   editarMovCilindro, eliminarMovCilindro, historialCilindros, type EstadoCilindro, type MovCilindro,
 } from "@/lib/cilindros/cilindros-db";
@@ -27,7 +28,8 @@ const ESTADO: Record<EstadoCilindro, string> = {
 };
 
 /** Qué fue el movimiento, en palabras. */
-export function tipoDe(m: Pick<MovCilindro, "desde" | "hacia">): { t: string; tone: Tone } {
+export function tipoDe(m: Pick<MovCilindro, "desde" | "hacia"> & { nota?: string | null }): { t: string; tone: Tone } {
+  if (m.nota?.startsWith(NOTA_CONTEO_RAMPA)) return { t: "Conteo de rampa", tone: "warn" };
   if (!m.desde) return { t: "Alta", tone: "ok" };
   if (!m.hacia) return { t: "Baja", tone: "danger" };
   if (m.hacia === "en_cliente") return { t: "Entrega a cliente", tone: "info" };
