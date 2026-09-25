@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Icon } from "@/components/ui/Icon";
+import { CampoNumero } from "@/components/ui/CampoNumero";
 import { useCarga } from "@/lib/ux/use-carga";
 import { useSesion } from "@/components/auth/SesionProvider";
 import {
@@ -34,9 +35,8 @@ function Contador({ valor, onChange, etiqueta, max }: { valor: number; onChange:
     <div className="flex items-center gap-2">
       <button type="button" aria-label={`Quitar uno a ${etiqueta}`} disabled={valor <= 0}
         onClick={() => onChange(Math.max(0, valor - 1))} className={boton}>−</button>
-      <input type="number" inputMode="numeric" min={0} value={valor} aria-label={etiqueta}
-        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-        className={`${campo} w-16 text-center tabular-nums`} />
+      <CampoNumero valor={valor} aria-label={etiqueta} onChange={onChange}
+        className={`${campo} w-16 text-center`} />
       <button type="button" aria-label={`Sumar uno a ${etiqueta}`} disabled={max !== undefined && valor >= max}
         onClick={() => onChange(valor + 1)} className={boton}>+</button>
     </div>

@@ -19,7 +19,7 @@ import { ResumenParque } from "./ResumenParque";
 import { HistorialCilindros } from "./HistorialCilindros";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar } from "@/lib/ux/exportar";
-import { esGerencia, useRol } from "@/lib/ux/session";
+import { esGerencia, puedeContar, useRol } from "@/lib/ux/session";
 
 type Tab = "entrega" | "parque" | "saldos" | "alta" | "historial";
 
@@ -85,7 +85,7 @@ function Cilindros() {
 
       {tab === "entrega" && <EntregaCilindros empresa={empresa} recarga={recarga} onRegistrada={refrescar} />}
       {tab === "parque" && <ResumenParque empresa={empresa} recarga={recarga} />}
-      {tab === "saldos" && <SaldosCilindros empresa={empresa} gerencia={gerencia} recarga={recarga} onCambio={refrescar} />}
+      {tab === "saldos" && <SaldosCilindros empresa={empresa} puedeContar={puedeContar(rol)} recarga={recarga} onCambio={refrescar} />}
       {tab === "alta" && <AltaCilindros empresa={empresa} gerencia={gerencia} recarga={recarga} onRegistrada={refrescar} />}
       {tab === "historial" && <HistorialCilindros empresa={empresa} recarga={recarga} onCambio={refrescar} />}
     </>

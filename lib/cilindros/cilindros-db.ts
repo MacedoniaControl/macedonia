@@ -9,6 +9,7 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion, puedeEntrarAEmpresa, sesionPuede, type UsuarioSesion } from "@/lib/auth/sesion-servidor";
 import { normalizarCliente, planEntrega } from "./entrega.ts";
+import { movimientoDeAjuste, planConteoRampa, NOTA_CONTEO_RAMPA, type AjusteRampa, type LineaConteoRampa } from "./rampa.ts";
 
 export type EstadoCilindro = "lleno" | "vacio" | "en_cliente" | "en_llenado" | "fuera_servicio";
 
@@ -241,48 +242,46 @@ export async function cambiarEstado(
 }
 
 /**
- * Movimiento manual de cilindros: sumar o restar a mano.
+ * Conteo de la Rampa: lo que se ve en el galpón pasa a ser el saldo. Por cada
+ * número que cambia se registra un movimiento (sobrante entra, faltante sale)
+ * con el motivo, y la gerencia lo ve en el historial y puede corregirlo.
  *
- * Para cuando la realidad del galpón no coincide con lo registrado y hay que
- * corregirla. No pisa el saldo: agrega un movimiento más, igual que todo lo
- * demás. Un ajuste que borra el historial esconde justo lo que hay que ver.
- *
- * La nota es obligatoria: un ajuste sin explicación es un agujero con permiso.
+ * Lo hacen Owner, Administrador y Técnico, igual que el conteo del
+ * inventario; la base lo vuelve a comprobar (cil_mov_inserta).
  */
-export async function movimientoManual(
-  gas: string,
-  cantidad: number,
-  direccion: "entrada" | "salida",
-  estado: "lleno" | "vacio",
+export async function contarRampa(
   empresa: string,
-  nota: string,
-): Promise<{ ok: boolean; error?: string }> {
+  lineas: LineaConteoRampa[],
+  motivo: string,
+): Promise<{ ok: true; ajustes: AjusteRampa[] } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
-  // Un ajuste corrige el parque sin que nada físico pase: es de la gerencia,
-  // como los movimientos manuales del inventario.
-  if (!esGerenciaU(usuario)) return { ok: false, error: "Los ajustes del parque los hace el Owner o un Administrador." };
-  if (!(cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
-  if (!nota.trim()) return { ok: false, error: "Explica el motivo del ajuste." };
+  if (!["owner", "admin", "tecnico"].includes(usuario.rol) || !sesionPuede(usuario, "cylinders") || !puedeEntrarAEmpresa(usuario, empresa)) {
+    return { ok: false, error: "Contar la Rampa lo hacen el Owner, un Administrador o un Técnico." };
+  }
 
   const sb = await createClient();
-  if (direccion === "salida") {
-    const hay = (await enEstado(sb, empresa, estado))[gas] ?? 0;
-    if (cantidad > hay) return { ok: false, error: `Solo hay ${hay} cilindro(s) de ${gas} ${estado === "lleno" ? "llenos" : "vacíos"}.` };
-  }
-  const { error } = await sb.from("cilindros_mov").insert({
-    empresa_id: empresa,
-    gas,
-    cantidad,
-    // entrada: aparece de la nada. salida: desaparece hacia la nada.
-    estado_desde: direccion === "entrada" ? null : estado,
-    estado_hacia: direccion === "entrada" ? estado : null,
-    nota: `Ajuste manual · ${nota.trim()}`,
-    usuario_id: usuario.id,
-  });
+  const [activos, lleno, vacio] = await Promise.all([gases(empresa), enEstado(sb, empresa, "lleno"), enEstado(sb, empresa, "vacio")]);
+  const plan = planConteoRampa(lineas, { lleno, vacio }, activos.map((g) => g.nombre));
+  if (!plan.ok) return plan;
+  if (plan.ajustes.length === 0) return plan;
+  if (!motivo.trim()) return { ok: false, error: "Explica por qué no cuadra: queda en el historial." };
 
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  // Un solo insert: o entran todos los ajustes o ninguno.
+  const { error } = await sb.from("cilindros_mov").insert(plan.ajustes.map((a) => {
+    const m = movimientoDeAjuste(a);
+    return {
+      empresa_id: empresa,
+      gas: m.gas,
+      cantidad: m.cantidad,
+      estado_desde: m.desde,
+      estado_hacia: m.hacia,
+      nota: `${NOTA_CONTEO_RAMPA} · ${motivo.trim()} (${a.antes} → ${a.ahora})`,
+      usuario_id: usuario.id,
+    };
+  }));
+  if (error) return { ok: false, error: `No se pudo guardar el conteo: ${error.message}` };
+  return plan;
 }
 
 /**

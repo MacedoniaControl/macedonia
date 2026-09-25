@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
+import { CampoNumero } from "@/components/ui/CampoNumero";
 import {
   gases, ingresarCilindros, cambiarEstado, saldos,
   type Gas, type EstadoCilindro,
@@ -114,9 +115,7 @@ export function AltaCilindros({
           </div>
           <div>
             <label htmlFor="alta-cant" className="mb-1.5 block text-sm font-medium text-text">Cantidad</label>
-            <input id="alta-cant" type="number" inputMode="numeric" min={0} value={cantAlta}
-              onChange={(e) => setCantAlta(Math.max(0, Number(e.target.value) || 0))}
-              className={`${campo} tabular-nums`} />
+            <CampoNumero id="alta-cant" valor={cantAlta} onChange={setCantAlta} className={campo} />
           </div>
           <div>
             <label htmlFor="alta-estado" className="mb-1.5 block text-sm font-medium text-text">Entran</label>
@@ -143,9 +142,7 @@ export function AltaCilindros({
           </div>
           <div>
             <label htmlFor="mov-cant" className="mb-1.5 block text-sm font-medium text-text">Cantidad</label>
-            <input id="mov-cant" type="number" inputMode="numeric" min={0} value={cantMov}
-              onChange={(e) => setCantMov(Math.max(0, Number(e.target.value) || 0))}
-              className={`${campo} tabular-nums`} />
+            <CampoNumero id="mov-cant" valor={cantMov} onChange={setCantMov} className={campo} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
