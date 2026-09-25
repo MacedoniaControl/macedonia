@@ -9,6 +9,8 @@ import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { saldos, comodatos, movimientoManual, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
+import { useExportable } from "@/lib/ux/exportar";
+import { fechaVista } from "@/lib/ux/tabla-export";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { Button } from "@/components/ui/Button";
 import { useState } from "react";
@@ -41,6 +43,23 @@ export function SaldosCilindros({
   const gases = [...new Set(s.map((x) => x.gas))].sort();
   const cant = (gas: string, estado: string) =>
     s.find((x) => x.gas === gas && x.estado === estado)?.cantidad ?? 0;
+
+  // La Rampa por gas y estado, y abajo los cilindros en poder de cada cliente.
+  useExportable(() => ({
+    modulo: "",
+    seccion: "Rampa de Cilindros",
+    titulo: "Rampa de Cilindros",
+    detalle: [`${gases.length} gas(es) · ${c.length} cliente(s) con cilindros`],
+    columnas: [
+      { titulo: "Gas / Cliente" }, ...ESTADOS.map((e) => ({ titulo: e.label, tipo: "num" as const })),
+      { titulo: "Total", tipo: "num" }, { titulo: "Desde", tipo: "fecha" },
+    ],
+    filas: [
+      ...gases.map((g) => [g, ...ESTADOS.map((e) => cant(g, e.id)), ESTADOS.reduce((a, e) => a + cant(g, e.id), 0), null]),
+      ...c.map((x) => [`${x.cliente} · ${x.gas}`, ...ESTADOS.map((e) => (e.id === "en_cliente" ? x.enPoder : null)), x.enPoder, fechaVista(x.desde)]),
+    ],
+    nota: "Primero los gases con sus cantidades por estado; después cada cliente con los cilindros que tiene y desde cuándo.",
+  }));
 
   return (
     <div className="grid gap-4">
