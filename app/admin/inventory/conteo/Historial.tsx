@@ -42,6 +42,7 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
     return { lista, aprueba };
   });
   const [abierta, setAbierta] = useState<number | null>(abrirId);
+  const pendientes = (carga.datos?.lista ?? []).filter((c) => !c.eliminado && c.cerrado && c.ajuste === "pendiente");
 
   // La lista de conteos. Cada acta se baja aparte, desde su conteo.
   useExportable(() => {
@@ -69,9 +70,19 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
       <div className="space-y-1 p-4">
         <h2 className="text-base font-semibold text-text">Historial de Conteos</h2>
         <p className="max-w-[70ch] text-sm text-muted">
-          Cada conteo cerrado queda con su número y su acta en Excel y PDF. Las actas no se modifican.
+          Cada conteo cerrado queda con su número y su acta en Excel y PDF. Las diferencias entran a la existencia cuando el Owner o un Administrador aprueban el ajuste.
         </p>
       </div>
+      {/* Lo que espera una decisión va arriba: contar no ajusta, aprobar sí. */}
+      {carga.datos?.aprueba && pendientes.length > 0 && (
+        <div className="mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
+          <p className="text-text">
+            <b>{pendientes.length === 1 ? "1 conteo espera" : `${pendientes.length} conteos esperan`} tu aprobación</b> ({pendientes.map((c) => c.numero).join(", ")}).
+            La existencia cambia cuando lo apruebas.
+          </p>
+          <Button variant="secondary" onClick={() => setAbierta(pendientes[0].id)}>Revisar</Button>
+        </div>
+      )}
       <EstadoDatos cargando={carga.cargando} error={carga.error} vacio={(carga.datos?.lista.length ?? 0) === 0}
         tituloVacio="Todavía no hay conteos" mensajeVacio="El primero aparece aquí apenas se abra.">
         <ul className="divide-y divide-border border-t border-border">
