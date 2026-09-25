@@ -17,12 +17,25 @@ import { SaldosCilindros } from "./SaldosCilindros";
 import { AltaCilindros } from "./AltaCilindros";
 import { ResumenParque } from "./ResumenParque";
 import { SalidaCilindros } from "./SalidaCilindros";
+import { HistorialCilindros } from "./HistorialCilindros";
+import { BotonDescargar } from "@/components/ui/BotonDescargar";
+import { ProveedorExportar } from "@/lib/ux/exportar";
+import { esGerencia, useRol } from "@/lib/ux/session";
 
-type Tab = "entrega" | "parque" | "saldos" | "alta";
+type Tab = "entrega" | "parque" | "saldos" | "alta" | "historial";
 
+// «Descargar» baja la pestaña abierta (Parque, Rampa o Historial).
 export default function CylindersPage() {
+  return <ProveedorExportar><Cilindros /></ProveedorExportar>;
+}
+
+function Cilindros() {
   const empresa = useEmpresaActiva();
-  const [tab, setTab] = useState<Tab>("entrega");
+  const [tabElegida, setTab] = useState<Tab>("entrega");
+  // El historial es del Owner y el Administrador, como en el inventario.
+  const { rol } = useRol();
+  const gerencia = esGerencia(rol);
+  const tab: Tab = tabElegida === "historial" && !gerencia ? "entrega" : tabElegida;
   const [recarga, setRecarga] = useState(0);
 
   const refrescar = () => setRecarga((n) => n + 1);
@@ -35,6 +48,7 @@ export default function CylindersPage() {
     { id: "parque", label: "Parque" },
     { id: "saldos", label: "Rampa" },
     { id: "alta", label: "Dar de Alta" },
+    ...(gerencia ? [{ id: "historial" as const, label: "Historial" }] : []),
   ];
 
   return (
@@ -46,6 +60,7 @@ export default function CylindersPage() {
           <div className="flex flex-wrap gap-2">
             <SalidaCilindros empresa={empresa} onRegistrada={refrescar} />
             <PanelGases empresa={empresa} onCambio={refrescar} />
+            <BotonDescargar empresa={empresa} />
           </div>
         }
       />
@@ -72,6 +87,7 @@ export default function CylindersPage() {
       {tab === "parque" && <ResumenParque empresa={empresa} recarga={recarga} />}
       {tab === "saldos" && <SaldosCilindros empresa={empresa} recarga={recarga} onCambio={refrescar} />}
       {tab === "alta" && <AltaCilindros empresa={empresa} onRegistrada={refrescar} />}
+      {tab === "historial" && <HistorialCilindros empresa={empresa} recarga={recarga} onCambio={refrescar} />}
     </>
   );
 }

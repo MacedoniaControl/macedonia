@@ -353,3 +353,69 @@ export async function registrarSalida(s: {
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+// ---------------------------------------------------------------- historial (Owner y Administrador)
+
+export type MovCilindro = {
+  id: number;
+  fecha: string;
+  registradoEn: string;
+  gas: string;
+  cantidad: number;
+  desde: EstadoCilindro | null;
+  hacia: EstadoCilindro | null;
+  cliente: string | null;
+  documento: string | null;
+  nota: string | null;
+  retiradoPor: string | null;
+  registro: string | null;
+  autorizo: string | null;
+  /** Lo que se corrigió, con quién y cuándo. */
+  edicion: string | null;
+  /** Eliminado: queda como la línea «Se eliminó … · Por … · fecha». */
+  eliminado: { en: string; por: string } | null;
+};
+
+const fechaHoraVE = (iso: string) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("es-VE", {
+    timeZone: "America/Caracas", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute}`;
+};
+
+/** Todos los movimientos de cilindros, del más reciente al más viejo. La base solo se los da al Owner y al Administrador. */
+export async function historialCilindros(empresa: string): Promise<MovCilindro[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("cilindros_historial")
+    .select("*")
+    .eq("empresa_id", empresa)
+    .order("fecha", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(2000);
+  if (error) throw new Error(`No se pudo leer el historial: ${error.message}`);
+  return (data ?? []).map((m) => ({
+    id: m.id, fecha: m.fecha, registradoEn: fechaHoraVE(m.created_at), gas: m.gas, cantidad: Number(m.cantidad),
+    desde: m.estado_desde, hacia: m.estado_hacia, cliente: m.cliente, documento: m.documento, nota: m.nota,
+    retiradoPor: m.retirado_por, registro: m.registro, autorizo: m.autorizo, edicion: m.edicion,
+    eliminado: m.eliminado_en ? { en: fechaHoraVE(m.eliminado_en), por: m.eliminado_nombre ?? "Un usuario" } : null,
+  }));
+}
+
+export async function editarMovCilindro(
+  id: number,
+  cambios: { cantidad?: number; cliente?: string | null; documento?: string | null; retirado_por?: string | null; nota?: string | null },
+): Promise<{ ok: boolean; error?: string }> {
+  if (cambios.cantidad !== undefined && !(Number.isInteger(cambios.cantidad) && cambios.cantidad > 0)) {
+    return { ok: false, error: "La cantidad tiene que ser un número entero mayor que cero." };
+  }
+  const sb = await createClient();
+  const { error } = await sb.rpc("editar_mov_cilindro", { p_id: id, p_cambios: cambios });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function eliminarMovCilindro(id: number): Promise<{ ok: boolean; error?: string }> {
+  const sb = await createClient();
+  const { error } = await sb.rpc("eliminar_mov_cilindro", { p_id: id });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}

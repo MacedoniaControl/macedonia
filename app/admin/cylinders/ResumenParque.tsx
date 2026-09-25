@@ -13,6 +13,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { saldos } from "@/lib/cilindros/cilindros-db";
 import { resumirParque, type Parque } from "@/lib/cilindros/parque";
+import { useExportable } from "@/lib/ux/exportar";
 
 const n = (v: number) => v.toLocaleString("es-VE");
 
@@ -32,6 +33,20 @@ export function VistaParque({
   parque: p, cargando, error,
 }: { parque: Parque; cargando: boolean; error?: string | null }) {
   const mayor = Math.max(1, ...p.porGas.map((g) => g.total));
+
+  useExportable(() => ({
+    modulo: "",
+    seccion: "Parque de Cilindros",
+    titulo: "Parque de Cilindros",
+    detalle: [`${n(p.total)} cilindros · ${n(p.enPlanta)} en planta · ${n(p.afuera)} afuera`],
+    columnas: [{ titulo: "Ubicación" }, { titulo: "Llenos", tipo: "num" }, { titulo: "Vacíos", tipo: "num" }, { titulo: "Total", tipo: "num" }],
+    filas: [
+      ...p.ubicaciones.map((u) => [u.descripcion, u.llenos, u.vacios, u.total]),
+      ...p.porGas.map((g) => [`Gas: ${g.gas}`, null, null, g.total]),
+    ],
+    totales: ["Total del parque", null, null, p.total],
+    nota: "Calculado de los movimientos de cilindros. Arriba, por ubicación; abajo, por gas.",
+  }));
 
   return (
     <div className="grid gap-4">
