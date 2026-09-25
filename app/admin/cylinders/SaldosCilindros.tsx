@@ -8,7 +8,7 @@
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
-import { saldos, comodatos, movimientoManual, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
+import { saldos, comodatos, movimientoManual, gases as gasesActivos, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
 import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
@@ -26,14 +26,14 @@ const ESTADOS: { id: string; label: string; tone: Tone }[] = [
 const campo = "sumi-campo";
 
 export function SaldosCilindros({
-  empresa, recarga, onCambio,
-}: { empresa: string; recarga: number; onCambio?: () => void }) {
+  empresa, gerencia, recarga, onCambio,
+}: { empresa: string; gerencia: boolean; recarga: number; onCambio?: () => void }) {
   const [mov, setMov] = useState({ gas: "", cantidad: 1, direccion: "entrada" as "entrada" | "salida", estado: "lleno" as "lleno" | "vacio", nota: "" });
   const [msgMov, setMsgMov] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const carga = useCarga(`${empresa}:${recarga}`, async () => {
-    const [sa, co] = await Promise.all([saldos(empresa), comodatos(empresa)]);
-    return { sa, co };
+    const [sa, co, ga] = await Promise.all([saldos(empresa), comodatos(empresa), gasesActivos(empresa)]);
+    return { sa, co, ga };
   });
   const s: SaldoCilindro[] = carga.datos?.sa ?? [];
   const c: Comodato[] = carga.datos?.co ?? [];
@@ -67,16 +67,19 @@ export function SaldosCilindros({
         title="Rampa"
         description="Calculado de los movimientos, no de un conteo guardado."
         action={
-          <PildoraPanel etiqueta="Agregar movimiento" icono="plus">
+          // El ajuste manual es de la gerencia, como los movimientos del inventario.
+          gerencia && <PildoraPanel etiqueta="Ajustar parque" icono="plus">
             {(cerrar) => (
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-text">Movimiento manual</p>
+                <p className="text-sm font-semibold text-text">Ajuste del parque</p>
+                <p className="text-xs text-muted">Para cuando lo que hay en el galpón no coincide con lo registrado. Queda en el historial con el motivo.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
                     <span className="mb-1 block text-xs font-medium text-muted">Gas</span>
                     <select value={mov.gas} onChange={(e) => setMov({ ...mov, gas: e.target.value })} className={campo}>
                       <option value="">Elige…</option>
-                      {gases.map((g) => <option key={g} value={g}>{g}</option>)}
+                      {/* Todos los gases activos: uno nuevo, sin movimientos, también se ajusta. */}
+                      {(carga.datos?.ga ?? []).map((g) => <option key={g.nombre} value={g.nombre}>{g.nombre}</option>)}
                     </select>
                   </label>
                   <label className="block">

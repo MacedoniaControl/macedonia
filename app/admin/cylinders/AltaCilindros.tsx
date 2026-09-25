@@ -1,13 +1,15 @@
 "use client";
 
-// Dar de alta cilindros al parque, y moverlos de estado dentro del almacén
-// (llenado, baja por daño). No es lo que hace el técnico a diario: esto lo usa
-// quien administra el parque, cuando llegan cilindros nuevos o se da de baja uno.
+// Cambiar de estado dentro del almacén (llenado, baja por daño), y dar de alta
+// cilindros nuevos. Cambiar de estado lo hace cualquiera que opere cilindros;
+// dar de alta es de la gerencia (Owner y Administrador): son activos que entran,
+// como una compra, y la base del servidor lo vuelve a comprobar.
 
 import { useEffect, useState } from "react";
+import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import {
-  gases, ingresarCilindros, cambiarEstado,
+  gases, ingresarCilindros, cambiarEstado, saldos,
   type Gas, type EstadoCilindro,
 } from "@/lib/cilindros/cilindros-db";
 
@@ -24,9 +26,13 @@ const ESTADOS: { id: EstadoCilindro; label: string }[] = [
 
 export function AltaCilindros({
   empresa,
+  gerencia,
+  recarga,
   onRegistrada,
 }: {
   empresa: string;
+  gerencia: boolean;
+  recarga: number;
   onRegistrada: () => void;
 }) {
   const [lista, setLista] = useState<Gas[]>([]);
@@ -43,6 +49,10 @@ export function AltaCilindros({
   const [cantMov, setCantMov] = useState(0);
   const [desde, setDesde] = useState<EstadoCilindro>("vacio");
   const [hacia, setHacia] = useState<EstadoCilindro>("lleno");
+  const [notaMov, setNotaMov] = useState("");
+  // Cuántos hay en cada estado, para no mover más de los que existen.
+  const s = useCarga(`estados:${empresa}:${recarga}`, () => saldos(empresa));
+  const hay = (gas: string, estado: EstadoCilindro) => (s.datos ?? []).find((x) => x.gas === gas && x.estado === estado)?.cantidad ?? 0;
 
   useEffect(() => {
     let vigente = true;
@@ -77,10 +87,10 @@ export function AltaCilindros({
     if (desde === hacia) return setMsg({ ok: false, texto: "El estado de origen y destino son el mismo." });
     setGuardando(true);
     try {
-      const r = await cambiarEstado(gasMov, cantMov, desde, hacia, empresa);
+      const r = await cambiarEstado(gasMov, cantMov, desde, hacia, empresa, notaMov);
       if (!r.ok) return setMsg({ ok: false, texto: r.error ?? "No se pudo mover." });
-      setMsg({ ok: true, texto: `${cantMov} cilindro(s) de ${gasMov} pasaron a ${hacia.replace("_", " ")}.` });
-      setCantMov(0);
+      setMsg({ ok: true, texto: `${cantMov} cilindro(s) de ${gasMov} pasaron a «${ESTADOS.find((e) => e.id === hacia)?.label.toLowerCase()}».` });
+      setCantMov(0); setNotaMov("");
       onRegistrada();
     } finally {
       setGuardando(false);
@@ -95,6 +105,7 @@ export function AltaCilindros({
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {gerencia && (
       <SectionCard title="Dar de Alta" description="Cilindros nuevos que entran al parque.">
         <div className="space-y-3">
           <div>
@@ -122,6 +133,7 @@ export function AltaCilindros({
           </button>
         </div>
       </SectionCard>
+      )}
 
       <SectionCard title="Cambiar de Estado" description="Llenado en planta, baja por daño, corrección.">
         <div className="space-y-3">
@@ -150,6 +162,15 @@ export function AltaCilindros({
                 {ESTADOS.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
               </select>
             </div>
+          </div>
+          <p className="text-xs text-muted">
+            Hay <b className="tabular-nums text-text">{hay(gasMov, desde)}</b> de {gasMov || "este gas"} en «{ESTADOS.find((e) => e.id === desde)?.label.toLowerCase()}».
+            {cantMov > hay(gasMov, desde) && <span className="text-danger"> No alcanza para mover {cantMov}.</span>}
+          </p>
+          <div>
+            <label htmlFor="mov-nota" className="mb-1.5 block text-sm font-medium text-text">Motivo</label>
+            <input id="mov-nota" value={notaMov} onChange={(e) => setNotaMov(e.target.value)}
+              placeholder={hacia === "fuera_servicio" ? "Qué daño tiene" : "Opcional"} className={campo} />
           </div>
           <button type="button" onClick={mover} disabled={guardando}
             className="h-12 w-full rounded-xl border border-border-strong text-sm font-semibold text-text
