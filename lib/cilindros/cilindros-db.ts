@@ -6,10 +6,13 @@
 // la entrega: cuántos llenos deja y cuántos vacíos trae. NO tienen por qué
 // coincidir — puede dejar 5 y traer 3, y el saldo del cliente sube 2.
 
-import { createClient } from "@/lib/supabase/server";
-import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getUsuarioSesion, puedeEntrarAEmpresa, sesionPuede, type UsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { normalizarCliente, planEntrega } from "./entrega.ts";
 
 export type EstadoCilindro = "lleno" | "vacio" | "en_cliente" | "en_llenado" | "fuera_servicio";
+
+const ETIQUETA: Record<EstadoCilindro, string> = { lleno: "lleno", vacio: "vacío", en_cliente: "en cliente", en_llenado: "en llenado", fuera_servicio: "fuera de servicio" };
 
 export type Gas = {
   nombre: string;
@@ -91,53 +94,94 @@ export async function comodatos(empresa: string): Promise<Comodato[]> {
   }));
 }
 
+type Sb = Awaited<ReturnType<typeof createClient>>;
+
+/** Cuántos hay de cada gas en un estado. Lo lee también el Técnico (la 26 lo calcula en una función). */
+async function enEstado(sb: Sb, empresa: string, estado: EstadoCilindro): Promise<Record<string, number>> {
+  const { data, error } = await sb.from("cilindros_saldo").select("gas, cantidad").eq("empresa_id", empresa).eq("estado", estado);
+  if (error) throw new Error(`No se pudieron leer los saldos: ${error.message}`);
+  return Object.fromEntries((data ?? []).map((x) => [x.gas as string, Number(x.cantidad) || 0]));
+}
+
+/** Cuántos cilindros de cada gas tiene un cliente, según los movimientos. */
+async function enPoder(sb: Sb, empresa: string, cliente: string): Promise<Record<string, number>> {
+  const { data, error } = await sb.from("comodato_cliente").select("cliente, gas, en_poder").eq("empresa_id", empresa);
+  if (error) throw new Error(`No se pudo leer el comodato: ${error.message}`);
+  const k = normalizarCliente(cliente);
+  const r: Record<string, number> = {};
+  for (const x of data ?? []) if (normalizarCliente(x.cliente) === k) r[x.gas] = (r[x.gas] ?? 0) + (Number(x.en_poder) || 0);
+  return r;
+}
+
+/** Para la pantalla: lo que tiene el cliente, mientras se escribe su nombre. */
+export async function cilindrosDelCliente(empresa: string, cliente: string): Promise<Record<string, number>> {
+  if (normalizarCliente(cliente).length < 2) return {};
+  return enPoder(await createClient(), empresa, cliente);
+}
+
+/** Sugerencias de cliente: primero los que ya tienen cilindros, después el directorio. */
+export async function sugerirClientes(empresa: string, q: string): Promise<string[]> {
+  const t = normalizarCliente(q);
+  if (t.length < 2) return [];
+  const sb = await createClient();
+  const [co, dir] = await Promise.all([
+    sb.from("comodato_cliente").select("cliente").eq("empresa_id", empresa).ilike("cliente", `%${t.replace(/[%_]/g, "")}%`).limit(8),
+    sb.from("clientes").select("nombre").eq("activo", true).ilike("nombre", `%${t.replace(/[%_]/g, "")}%`).limit(8),
+  ]);
+  const nombres = [...(co.data ?? []).map((x) => x.cliente as string), ...(dir.data ?? []).map((x) => x.nombre as string)].map(normalizarCliente);
+  return [...new Set(nombres)].slice(0, 10);
+}
+
+const esGerenciaU = (u: UsuarioSesion) => u.rol === "owner" || u.rol === "admin";
+
 /**
- * Registra una entrega completa: por cada gas, los llenos que se dejan y los
- * vacíos que se traen.
+ * Registra una visita o un retiro en planta: por cada gas, los llenos que
+ * se dejan y los vacíos que se traen. Reemplaza a «Declarar salida», que
+ * hacía lo mismo con los llenos por otra puerta.
  *
- * Genera hasta dos movimientos por gas, y son independientes a propósito:
- * dejar 5 y traer 3 es una visita normal, no un error. El saldo del cliente
- * sube o baja según la diferencia y el sistema lo calcula solo.
+ * Si se dejan llenos, hacen falta quién autoriza (Owner o Administrador) y
+ * quién se los lleva: sin esos dos nombres, un cilindro que no vuelve no
+ * tiene a quién reclamarse (la base lo exige desde la migración 19; antes
+ * esta función no los mandaba y toda entrega con llenos fallaba).
  */
 export async function registrarEntrega(
   cliente: string,
   lineas: LineaEntrega[],
   empresa: string,
-  documento?: string,
-): Promise<{ ok: true; movimientos: number } | { ok: false; error: string }> {
+  extra: { autorizadoPor?: string | null; retiradoPor?: string | null; documento?: string | null } = {},
+): Promise<{ ok: true; movimientos: number; avisos: string[] } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
-  if (!cliente.trim()) return { ok: false, error: "Falta el cliente." };
-
+  const nombre = normalizarCliente(cliente);
+  if (!nombre) return { ok: false, error: "Falta el cliente." };
   const utiles = lineas.filter((l) => l.llenosEntregados > 0 || l.vaciosRecibidos > 0);
-  if (utiles.length === 0) return { ok: false, error: "No hay cilindros que registrar." };
+  if (utiles.length === 0) return { ok: false, error: "No has cargado ningún cilindro." };
 
-  const sb = await createClient();
-  const filas: Record<string, unknown>[] = [];
-
-  for (const l of utiles) {
-    if (l.llenosEntregados > 0) {
-      // Sale un lleno del almacén y queda en poder del cliente.
-      filas.push({
-        empresa_id: empresa, gas: l.gas, cantidad: l.llenosEntregados,
-        estado_desde: "lleno", estado_hacia: "en_cliente",
-        cliente: cliente.trim(), documento: documento ?? null, usuario_id: usuario.id,
-      });
-    }
-    if (l.vaciosRecibidos > 0) {
-      // Vuelve un cilindro del cliente y entra vacío al almacén.
-      filas.push({
-        empresa_id: empresa, gas: l.gas, cantidad: l.vaciosRecibidos,
-        estado_desde: "en_cliente", estado_hacia: "vacio",
-        cliente: cliente.trim(), documento: documento ?? null, usuario_id: usuario.id,
-      });
-    }
+  const dejaLlenos = utiles.some((l) => l.llenosEntregados > 0);
+  if (dejaLlenos) {
+    if (!extra.autorizadoPor) return { ok: false, error: "Elige quién autoriza que salgan los llenos." };
+    if (!extra.retiradoPor?.trim()) return { ok: false, error: "Indica quién se lleva los cilindros." };
+    const permitidos = await autorizantes(empresa);
+    if (!permitidos.some((a) => a.id === extra.autorizadoPor)) return { ok: false, error: "Quien autoriza tiene que ser el Owner o un Administrador." };
   }
 
+  const sb = await createClient();
+  const [llenos, tiene] = await Promise.all([enEstado(sb, empresa, "lleno"), enPoder(sb, empresa, nombre)]);
+  const plan = planEntrega(utiles, llenos, tiene);
+  if (plan.errores.length) return { ok: false, error: `${plan.errores.join(" ")} Si en planta hay más, pídele al Administrador que ajuste el parque.` };
+
+  const filas = plan.movimientos.map((m) => ({
+    empresa_id: empresa, gas: m.gas, cantidad: m.cantidad, estado_desde: m.desde, estado_hacia: m.hacia,
+    cliente: m.desde === null ? null : nombre,
+    documento: extra.documento?.trim() || null,
+    // El alta de un vacío que el cliente devolvió sin figurar: se anota de quién vino.
+    nota: m.desde === null ? `${m.nota} Cliente: ${nombre}.` : null,
+    usuario_id: usuario.id,
+    ...(m.hacia === "en_cliente" ? { autorizado_por: extra.autorizadoPor, retirado_por: extra.retiradoPor!.trim() } : {}),
+  }));
   const { error } = await sb.from("cilindros_mov").insert(filas);
   if (error) return { ok: false, error: `No se pudo registrar la entrega: ${error.message}` };
-
-  return { ok: true, movimientos: filas.length };
+  return { ok: true, movimientos: filas.length, avisos: plan.avisos };
 }
 
 /** Alta de cilindros al parque (compra). Sin estado previo: entran de la nada. */
@@ -150,6 +194,9 @@ export async function ingresarCilindros(
 ): Promise<{ ok: boolean; error?: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
+  // Cilindros nuevos en el parque son un activo que entra: como las compras
+  // y los movimientos del inventario, lo registran el Owner o un Administrador.
+  if (!esGerenciaU(usuario)) return { ok: false, error: "Dar de alta cilindros lo hace el Owner o un Administrador." };
   if (!(cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
 
   const sb = await createClient();
@@ -176,8 +223,13 @@ export async function cambiarEstado(
   if (!usuario) return { ok: false, error: "Sin sesión." };
   if (desde === hacia) return { ok: false, error: "El estado de origen y destino son el mismo." };
   if (!(cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
+  // Los que están en clientes se mueven con la entrega, que sabe de quién son.
+  if (desde === "en_cliente" || hacia === "en_cliente") return { ok: false, error: "Los cilindros de clientes se mueven con «Registrar entrega»." };
+  if (hacia === "fuera_servicio" && !nota?.trim()) return { ok: false, error: "Indica qué daño tiene: un cilindro fuera de servicio sin motivo no se puede reclamar ni reparar." };
 
   const sb = await createClient();
+  const hay = (await enEstado(sb, empresa, desde))[gas] ?? 0;
+  if (cantidad > hay) return { ok: false, error: `Solo hay ${hay} cilindro(s) de ${gas} en «${ETIQUETA[desde]}».` };
   const { error } = await sb.from("cilindros_mov").insert({
     empresa_id: empresa, gas, cantidad,
     estado_desde: desde, estado_hacia: hacia,
@@ -207,10 +259,17 @@ export async function movimientoManual(
 ): Promise<{ ok: boolean; error?: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
+  // Un ajuste corrige el parque sin que nada físico pase: es de la gerencia,
+  // como los movimientos manuales del inventario.
+  if (!esGerenciaU(usuario)) return { ok: false, error: "Los ajustes del parque los hace el Owner o un Administrador." };
   if (!(cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
   if (!nota.trim()) return { ok: false, error: "Explica el motivo del ajuste." };
 
   const sb = await createClient();
+  if (direccion === "salida") {
+    const hay = (await enEstado(sb, empresa, estado))[gas] ?? 0;
+    if (cantidad > hay) return { ok: false, error: `Solo hay ${hay} cilindro(s) de ${gas} ${estado === "lleno" ? "llenos" : "vacíos"}.` };
+  }
   const { error } = await sb.from("cilindros_mov").insert({
     empresa_id: empresa,
     gas,
@@ -290,10 +349,12 @@ export async function desactivarGas(nombre: string, empresa: string): Promise<{ 
 export type Autorizante = { id: string; nombre: string; rol: string };
 
 export async function autorizantes(empresa: string): Promise<Autorizante[]> {
-  const sb = await createClient();
-  // Solo owner y admin autorizan que un cilindro salga de la planta. Un tecnico
-  // registra el movimiento, pero no se autoriza a si mismo la salida.
-  const { data, error } = await sb
+  // Quien registra (el Técnico) solo puede leer su propia fila en usuarios:
+  // la lista salía vacía y nadie podía declarar una salida. Se lee con el
+  // servidor, y solo para quien opera cilindros en esa empresa.
+  const u = await getUsuarioSesion();
+  if (!u || !sesionPuede(u, "cylinders") || !puedeEntrarAEmpresa(u, empresa)) return [];
+  const { data, error } = await createAdminClient()
     .from("usuarios")
     .select("id, nombre, rol, empresa_id, activo")
     .in("rol", ["owner", "admin"])
@@ -306,52 +367,6 @@ export async function autorizantes(empresa: string): Promise<Autorizante[]> {
     // empresa_id null = owner, entra a todas las empresas.
     .filter((u) => u.empresa_id === null || u.empresa_id === empresa)
     .map((u) => ({ id: u.id, nombre: u.nombre, rol: u.rol }));
-}
-
-/**
- * Salida declarada de cilindros hacia un cliente.
- *
- * Se separa de `registrarEntrega` porque responde otra pregunta. La entrega
- * cuenta cuantos cilindros cambiaron de manos; esto deja por escrito QUIEN
- * autorizo que salieran y QUIEN se los llevo. Sin esos dos nombres, un cilindro
- * que no vuelve no tiene a quien reclamarsele.
- */
-export async function registrarSalida(s: {
-  gas: string;
-  cantidad: number;
-  cliente: string;
-  autorizadoPor: string;
-  retiradoPor: string;
-  documento?: string;
-  nota?: string;
-  empresa: string;
-}): Promise<{ ok: boolean; error?: string }> {
-  const usuario = await getUsuarioSesion();
-  if (!usuario) return { ok: false, error: "Sin sesión." };
-  if (!s.gas) return { ok: false, error: "Elige el gas." };
-  if (!(s.cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
-  if (!s.cliente.trim()) return { ok: false, error: "Indica a qué cliente van." };
-  if (!s.autorizadoPor) return { ok: false, error: "Elige quién autoriza la salida." };
-  if (!s.retiradoPor.trim()) return { ok: false, error: "Indica quién se los lleva." };
-
-  const sb = await createClient();
-  const { error } = await sb.from("cilindros_mov").insert({
-    empresa_id: s.empresa,
-    gas: s.gas,
-    cantidad: s.cantidad,
-    estado_desde: "lleno",
-    estado_hacia: "en_cliente",
-    cliente: s.cliente.trim(),
-    autorizado_por: s.autorizadoPor,
-    retirado_por: s.retiradoPor.trim(),
-    documento: s.documento?.trim() || null,
-    nota: s.nota?.trim() || null,
-    // Quien REGISTRA. Distinto de quien autoriza y de quien retira.
-    usuario_id: usuario.id,
-  });
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
 }
 
 // ---------------------------------------------------------------- historial (Owner y Administrador)
