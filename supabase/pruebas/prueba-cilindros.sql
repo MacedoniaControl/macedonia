@@ -1,6 +1,9 @@
--- Prueba de cilindros. Corre como cada usuario real y al final DESHACE TODO:
--- no deja movimientos, conteos ni números gastados. Solo muestra resultados.
-create or replace function pg_temp.probar_cilindros()
+-- Prueba de cilindros · PASO 1 de 3: crea la función de prueba.
+-- La prueba corre como cada usuario real y al final DESHACE TODO: no deja
+-- movimientos, conteos ni números gastados. Solo muestra resultados.
+--   Paso 2 (consulta aparte):  select * from public.probar_cilindros_tmp();
+--   Paso 3 (consulta aparte):  drop function public.probar_cilindros_tmp();
+create or replace function public.probar_cilindros_tmp()
 returns table (n integer, caso text, resultado text, detalle text)
 language plpgsql as $prueba$
 declare
@@ -662,4 +665,5 @@ perform set_config('role', 'postgres', true); perform set_config('request.jwt.cl
   return query select i, casos[i], oks[i], dets[i] from generate_subscripts(casos, 1) i order by i;
 end $prueba$;
 
-select * from pg_temp.probar_cilindros();
+-- Nadie la puede llamar desde la app: solo el editor SQL.
+revoke execute on function public.probar_cilindros_tmp() from public, anon, authenticated;
