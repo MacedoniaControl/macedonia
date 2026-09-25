@@ -78,5 +78,5 @@ test("28: la fecha de los movimientos es la de Venezuela", () => {
 test("la prueba completa de cilindros deshace todo al final", () => {
   const p = readFileSync(new URL("../../supabase/pruebas/prueba-cilindros.sql", import.meta.url), "utf8");
   assert.match(p, /raise exception 'FIN_DE_LA_PRUEBA'/);
-  assert.match(p, /revoke execute on function public\.probar_cilindros_tmp\(\) from public, anon, authenticated/);
+  assert.match(p, /revoke execute on function prueba_tmp\.probar_cilindros\(\) from public, anon, authenticated/);
 });
