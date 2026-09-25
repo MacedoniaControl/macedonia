@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PanelGases } from "./PanelGases";
 import { EntregaCilindros } from "./EntregaCilindros";
 import { SaldosCilindros } from "./SaldosCilindros";
+import { ConteosRampa } from "./ConteosRampa";
 import { AltaCilindros } from "./AltaCilindros";
 import { ResumenParque } from "./ResumenParque";
 import { HistorialCilindros } from "./HistorialCilindros";
@@ -85,9 +86,15 @@ function Cilindros() {
 
       {tab === "entrega" && <EntregaCilindros empresa={empresa} recarga={recarga} onRegistrada={refrescar} />}
       {tab === "parque" && <ResumenParque empresa={empresa} recarga={recarga} />}
-      {tab === "saldos" && <SaldosCilindros empresa={empresa} puedeContar={puedeContar(rol)} recarga={recarga} onCambio={refrescar} />}
+      {tab === "saldos" && <SaldosCilindros empresa={empresa} puedeContar={puedeContar(rol)} gerencia={gerencia} recarga={recarga} onCambio={refrescar} onIrAHistorial={() => setTab("historial")} />}
       {tab === "alta" && <AltaCilindros empresa={empresa} gerencia={gerencia} recarga={recarga} onRegistrada={refrescar} />}
-      {tab === "historial" && <HistorialCilindros empresa={empresa} recarga={recarga} onCambio={refrescar} />}
+      {tab === "historial" && (
+        <div className="grid gap-4">
+          {/* Primero lo que espera una decisión: los conteos por aprobar. */}
+          <ConteosRampa empresa={empresa} recarga={recarga} onCambio={refrescar} />
+          <HistorialCilindros empresa={empresa} recarga={recarga} onCambio={refrescar} />
+        </div>
+      )}
     </>
   );
 }

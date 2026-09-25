@@ -4,13 +4,14 @@
 //
 // Los números NO se guardan: los calcula la base sumando movimientos. Por eso
 // siempre cuadran con su propio historial. Para corregirlos se CUENTA: se
-// escribe lo que hay en el galpón y el sistema registra la diferencia.
+// escribe lo que hay en el galpón y el conteo queda pendiente hasta que el
+// Owner o un Administrador lo aprueba en el Historial.
 
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
-import { saldos, comodatos, contarRampa, gases as gasesActivos, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
-import { ESTADOS_RAMPA, type AjusteRampa, type EstadoRampa } from "@/lib/cilindros/rampa";
+import { saldos, comodatos, contarRampa, conteosRampa, gases as gasesActivos, type SaldoCilindro, type Comodato } from "@/lib/cilindros/cilindros-db";
+import { conSigno, diferencias, ESTADOS_RAMPA, ETIQUETA_RAMPA, renglonesDe, type EstadoRampa } from "@/lib/cilindros/rampa";
 import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
 import { Button } from "@/components/ui/Button";
@@ -26,15 +27,14 @@ const ESTADOS: { id: string; label: string; tone: Tone }[] = [
 ];
 
 const campo = "sumi-campo";
-const ETIQUETA_RAMPA: Record<EstadoRampa, string> = { lleno: "Llenos", vacio: "Vacíos" };
-const conSigno = (n: number) => (n > 0 ? `+${n}` : String(n));
 
 export function SaldosCilindros({
-  empresa, puedeContar, recarga, onCambio,
-}: { empresa: string; puedeContar: boolean; recarga: number; onCambio?: () => void }) {
-  const carga = useCarga(`${empresa}:${recarga}`, async () => {
-    const [sa, co, ga] = await Promise.all([saldos(empresa), comodatos(empresa), gasesActivos(empresa)]);
-    return { sa, co, ga };
+  empresa, puedeContar, gerencia, recarga, onCambio, onIrAHistorial,
+}: { empresa: string; puedeContar: boolean; gerencia: boolean; recarga: number; onCambio?: () => void; onIrAHistorial: () => void }) {
+  const carga = useCarga(`${empresa}:${recarga}:${puedeContar}`, async () => {
+    const [sa, co, ga, cr] = await Promise.all([saldos(empresa), comodatos(empresa), gasesActivos(empresa), puedeContar ? conteosRampa(empresa, 1) : []]);
+    // Hay uno solo pendiente a la vez (cil_conteo_un_pendiente): es el más reciente.
+    return { sa, co, ga, pendiente: cr[0]?.estado === "pendiente" ? cr[0] : null };
   });
   const s: SaldoCilindro[] = carga.datos?.sa ?? [];
   const c: Comodato[] = carga.datos?.co ?? [];
@@ -63,22 +63,21 @@ export function SaldosCilindros({
     const base = Object.fromEntries(aContar.map((g) => [g, { lleno: cant(g, "lleno"), vacio: cant(g, "vacio") }]));
     setVisto(base); setContado(structuredClone(base)); setMotivo(""); setMsg(null); setContando(true);
   }
-  const diferencias: AjusteRampa[] = aContar.flatMap((g) => ESTADOS_RAMPA
-    .map((e) => ({ gas: g, estado: e, antes: visto[g]?.[e] ?? 0, ahora: contado[g]?.[e] ?? 0 }))
-    .filter((x) => x.ahora !== x.antes)
-    .map((x) => ({ ...x, diferencia: x.ahora - x.antes })));
+  const lineas = aContar.filter((g) => visto[g]).map((g) => ({ gas: g, contado: contado[g], visto: visto[g] }));
+  const dif = diferencias(renglonesDe(lineas));
+  const pendiente = carga.datos?.pendiente ?? null;
 
   async function guardar() {
     setMsg(null);
-    if (diferencias.length === 0) { setContando(false); return setMsg({ ok: true, texto: "El conteo coincide con la Rampa: no hubo nada que ajustar." }); }
+    if (dif.length === 0) { setContando(false); return setMsg({ ok: true, texto: "El conteo coincide con la Rampa: no hay nada que ajustar." }); }
     if (!motivo.trim()) return setMsg({ ok: false, texto: "Explica por qué no cuadra: queda en el historial." });
     if (guardando) return;
     setGuardando(true);
     try {
-      const r = await contarRampa(empresa, aContar.map((g) => ({ gas: g, contado: contado[g], visto: visto[g] })), motivo);
+      const r = await contarRampa(empresa, lineas, motivo);
       if (!r.ok) return setMsg({ ok: false, texto: r.error });
       setContando(false);
-      setMsg({ ok: true, texto: `Conteo guardado: ${r.ajustes.length} ajuste(s). ${r.ajustes.map((a) => `${a.gas} ${ETIQUETA_RAMPA[a.estado].toLowerCase()} ${a.antes} → ${a.ahora}`).join(" · ")}.` });
+      setMsg({ ok: true, texto: `Conteo ${r.numero} enviado con ${r.diferencias} diferencia(s). La Rampa cambia cuando el Owner o un Administrador lo apruebe.` });
       onCambio?.();
     } catch (e) {
       setMsg({ ok: false, texto: e instanceof Error ? e.message : "No se pudo guardar el conteo." });
@@ -107,11 +106,20 @@ export function SaldosCilindros({
     <div className="grid gap-4">
       <SectionCard
         title="Rampa"
-        description="Calculado de los movimientos. Si no cuadra con el galpón, cuéntala."
-        action={puedeContar && !contando && listo && !error && (
+        description="Calculado de los movimientos. Si no cuadra con el galpón, cuéntala: el cambio se aplica cuando se aprueba."
+        action={puedeContar && !contando && !pendiente && listo && !error && (
           <Button icon="inventory" variant="secondary" onClick={empezar}>Contar rampa</Button>
         )}
       >
+        {pendiente && !contando && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
+            <p className="text-text">
+              <b>Conteo {pendiente.numero}</b> de {pendiente.creadoNombre} espera aprobación: {diferencias(pendiente.renglones).map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}.
+              {!gerencia && " Los números de abajo cambian cuando el Owner o un Administrador lo apruebe."}
+            </p>
+            {gerencia && <Button variant="secondary" onClick={onIrAHistorial}>Revisar y aprobar</Button>}
+          </div>
+        )}
         {msg && !contando && (
           <p role={msg.ok ? "status" : "alert"}
             className={`mb-3 rounded-xl px-3 py-2.5 text-sm ${msg.ok ? "border border-ok/30 bg-ok/10 text-ok" : "border border-danger/30 bg-danger/10 text-danger"}`}>
@@ -122,7 +130,7 @@ export function SaldosCilindros({
           <div className="space-y-3">
             <p className="text-sm text-muted">
               Escribe cuántos hay <b className="text-text">en el galpón</b> de cada gas. Arranca con lo registrado: cambia solo lo que no cuadre.
-              Los que están en clientes o en llenado no se cuentan aquí.
+              Los que están en clientes o en llenado no se cuentan aquí. El conteo va a aprobación del Owner o un Administrador.
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {aContar.map((g) => (
@@ -148,7 +156,7 @@ export function SaldosCilindros({
                 </div>
               ))}
             </div>
-            {diferencias.length > 0 && (
+            {dif.length > 0 && (
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-text">Motivo *</span>
                 <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
@@ -163,7 +171,7 @@ export function SaldosCilindros({
             )}
             <div className="flex flex-wrap gap-2">
               <Button icon="check" className="flex-1" disabled={guardando} onClick={guardar}>
-                {guardando ? "Guardando…" : diferencias.length ? `Guardar conteo · ${diferencias.length} ajuste(s)` : "Guardar conteo"}
+                {guardando ? "Enviando…" : dif.length ? `Enviar a aprobación · ${dif.length} diferencia(s)` : "Enviar conteo"}
               </Button>
               <Button variant="secondary" disabled={guardando} onClick={() => { setContando(false); setMsg(null); }}>Cancelar</Button>
             </div>

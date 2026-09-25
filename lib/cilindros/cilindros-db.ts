@@ -9,7 +9,7 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion, puedeEntrarAEmpresa, sesionPuede, type UsuarioSesion } from "@/lib/auth/sesion-servidor";
 import { normalizarCliente, planEntrega } from "./entrega.ts";
-import { movimientoDeAjuste, planConteoRampa, NOTA_CONTEO_RAMPA, type AjusteRampa, type LineaConteoRampa } from "./rampa.ts";
+import { cargaConteo, ESTADOS_RAMPA, type EstadoRampa, type LineaConteoRampa, type RenglonConteo } from "./rampa.ts";
 
 export type EstadoCilindro = "lleno" | "vacio" | "en_cliente" | "en_llenado" | "fuera_servicio";
 
@@ -173,7 +173,9 @@ export async function registrarEntrega(
 
   const filas = plan.movimientos.map((m) => ({
     empresa_id: empresa, gas: m.gas, cantidad: m.cantidad, estado_desde: m.desde, estado_hacia: m.hacia,
-    cliente: m.desde === null ? null : nombre,
+    // También en el alta del vacío devuelto sin figurar: la base exige saber
+    // de quién vino para dejar que el Técnico la registre (migración 27).
+    cliente: nombre,
     documento: extra.documento?.trim() || null,
     // El alta de un vacío que el cliente devolvió sin figurar: se anota de quién vino.
     nota: m.desde === null ? `${m.nota} Cliente: ${nombre}.` : null,
@@ -241,47 +243,80 @@ export async function cambiarEstado(
   return { ok: true };
 }
 
+export type ConteoRampa = {
+  id: number;
+  numero: string;
+  creadoEn: string;
+  creadoNombre: string;
+  motivo: string;
+  estado: "pendiente" | "aprobado" | "rechazado";
+  resueltoEn: string | null;
+  resueltoNombre: string | null;
+  resueltoNota: string | null;
+  movimientos: number | null;
+  renglones: RenglonConteo[];
+};
+
 /**
- * Conteo de la Rampa: lo que se ve en el galpón pasa a ser el saldo. Por cada
- * número que cambia se registra un movimiento (sobrante entra, faltante sale)
- * con el motivo, y la gerencia lo ve en el historial y puede corregirlo.
- *
- * Lo hacen Owner, Administrador y Técnico, igual que el conteo del
- * inventario; la base lo vuelve a comprobar (cil_mov_inserta).
+ * Envía un conteo de la Rampa a aprobación. No toca el parque: eso pasa
+ * cuando el Owner o un Administrador lo aprueba en el Historial.
+ * Lo pueden enviar Owner, Administrador y Técnico (registrar_conteo_cilindros).
  */
 export async function contarRampa(
   empresa: string,
   lineas: LineaConteoRampa[],
   motivo: string,
-): Promise<{ ok: true; ajustes: AjusteRampa[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; numero: string; diferencias: number } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
-  if (!["owner", "admin", "tecnico"].includes(usuario.rol) || !sesionPuede(usuario, "cylinders") || !puedeEntrarAEmpresa(usuario, empresa)) {
-    return { ok: false, error: "Contar la Rampa lo hacen el Owner, un Administrador o un Técnico." };
-  }
-
-  const sb = await createClient();
-  const [activos, lleno, vacio] = await Promise.all([gases(empresa), enEstado(sb, empresa, "lleno"), enEstado(sb, empresa, "vacio")]);
-  const plan = planConteoRampa(lineas, { lleno, vacio }, activos.map((g) => g.nombre));
-  if (!plan.ok) return plan;
-  if (plan.ajustes.length === 0) return plan;
   if (!motivo.trim()) return { ok: false, error: "Explica por qué no cuadra: queda en el historial." };
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("registrar_conteo_cilindros", {
+    p_empresa: empresa, p_lineas: cargaConteo(lineas), p_motivo: motivo.trim(),
+  });
+  if (error) return { ok: false, error: error.message };
+  const fila = (Array.isArray(data) ? data[0] : data) as { numero: string; diferencias: number } | undefined;
+  return { ok: true, numero: fila?.numero ?? "", diferencias: fila?.diferencias ?? 0 };
+}
 
-  // Un solo insert: o entran todos los ajustes o ninguno.
-  const { error } = await sb.from("cilindros_mov").insert(plan.ajustes.map((a) => {
-    const m = movimientoDeAjuste(a);
-    return {
-      empresa_id: empresa,
-      gas: m.gas,
-      cantidad: m.cantidad,
-      estado_desde: m.desde,
-      estado_hacia: m.hacia,
-      nota: `${NOTA_CONTEO_RAMPA} · ${motivo.trim()} (${a.antes} → ${a.ahora})`,
-      usuario_id: usuario.id,
-    };
+/** Conteos de la Rampa, del más reciente al más antiguo, con sus renglones. */
+export async function conteosRampa(empresa: string, limite = 50): Promise<ConteoRampa[]> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("cilindros_conteos")
+    .select("id, numero, creado_en, creado_nombre, motivo, estado, resuelto_en, resuelto_nombre, resuelto_nota, movimientos, cilindros_conteo_lineas(gas, estado, sistema, contado)")
+    .eq("empresa_id", empresa)
+    .order("creado_en", { ascending: false })
+    .limit(limite);
+  if (error) throw new Error(`No se pudieron leer los conteos: ${error.message}`);
+  type Fila = {
+    id: number; numero: string; creado_en: string; creado_nombre: string; motivo: string; estado: ConteoRampa["estado"];
+    resuelto_en: string | null; resuelto_nombre: string | null; resuelto_nota: string | null; movimientos: number | null;
+    cilindros_conteo_lineas: { gas: string; estado: EstadoRampa; sistema: number; contado: number }[];
+  };
+  const orden = (e: EstadoRampa) => ESTADOS_RAMPA.indexOf(e);
+  return ((data as Fila[] | null) ?? []).map((c) => ({
+    id: c.id, numero: c.numero, creadoEn: c.creado_en, creadoNombre: c.creado_nombre, motivo: c.motivo, estado: c.estado,
+    resueltoEn: c.resuelto_en, resueltoNombre: c.resuelto_nombre, resueltoNota: c.resuelto_nota, movimientos: c.movimientos,
+    renglones: [...(c.cilindros_conteo_lineas ?? [])]
+      .sort((a, b) => a.gas.localeCompare(b.gas) || orden(a.estado) - orden(b.estado))
+      .map((l) => ({ gas: l.gas, estado: l.estado, sistema: Number(l.sistema), contado: Number(l.contado) })),
   }));
-  if (error) return { ok: false, error: `No se pudo guardar el conteo: ${error.message}` };
-  return plan;
+}
+
+/** Aprueba un conteo: cada diferencia pasa a ser un movimiento del parque. */
+export async function aprobarConteoRampa(id: number, nota?: string): Promise<{ ok: true; movimientos: number } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("aprobar_conteo_cilindros", { p_id: id, p_nota: nota?.trim() || null });
+  return error ? { ok: false, error: error.message } : { ok: true, movimientos: Number(data) || 0 };
+}
+
+/** Rechaza un conteo con motivo. El parque no cambia. */
+export async function rechazarConteoRampa(id: number, nota: string): Promise<{ ok: boolean; error?: string }> {
+  if (!nota.trim()) return { ok: false, error: "Indica por qué se rechaza: sin motivo nadie sabe qué recontar." };
+  const sb = await createClient();
+  const { error } = await sb.rpc("rechazar_conteo_cilindros", { p_id: id, p_nota: nota.trim() });
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
 /**
