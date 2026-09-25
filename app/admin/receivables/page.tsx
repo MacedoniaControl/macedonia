@@ -25,7 +25,9 @@ import { Button } from "@/components/ui/Button";
 import { fmtUsd } from "@/lib/ux/format";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
-import { textoCelda } from "@/lib/ux/tabla-export";
+import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
+import { agruparPorCliente } from "@/lib/finanzas/cartera";
+import { Icon } from "@/components/ui/Icon";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
 
@@ -156,6 +158,18 @@ function CuentasPorCobrar() {
   const porVencer = conSaldo.filter((c) => c.saldo > 0 && c.dias >= 0 && c.dias <= 8).reduce((a, c) => a + c.saldo, 0);
   const nVencidas = conSaldo.filter((c) => c.saldo > 0 && c.dias < 0).length;
 
+  // La cartera por cliente: una fila con lo que debe, y sus documentos adentro.
+  const [buscaCliente, setBuscaCliente] = useState("");
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const clientes = agruparPorCliente(conSaldo);
+  const tc = buscaCliente.trim().toLowerCase();
+  const clientesVisibles = tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes;
+  const alternar = (k: string) => setAbiertos((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const todosAbiertos = clientesVisibles.length > 0 && clientesVisibles.every((g) => abiertos.has(g.cliente));
+  const nombreClase = (id: string) => CLASES.find((x) => x.id === id)?.label ?? id;
+  const resumenClases = (pc: Record<string, number>) =>
+    Object.entries(pc).map(([k, v]) => `${v} ${k === "nota_entrega" ? "NE" : nombreClase(k).toLowerCase()}`).join(" · ");
+
   useExportable(() => ({
     modulo: "",
     seccion: "Cuentas por Cobrar",
@@ -163,18 +177,25 @@ function CuentasPorCobrar() {
     detalle: [
       filtroClase === "todas" ? "Todas las clases" : `Clase: ${CLASES.find((x) => x.id === filtroClase)?.label ?? filtroClase}`,
       `Por cobrar ${textoCelda(totalSaldo, "usd")} · Vencido ${textoCelda(vencido, "usd")} · Por vencer ${textoCelda(porVencer, "usd")}`,
+      `${clientesVisibles.length} cliente(s)${tc ? ` · búsqueda «${buscaCliente.trim()}»` : ""}`,
     ],
     columnas: [
       { titulo: "Cliente" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Clase" }, { titulo: "Monto", tipo: "usd" },
       { titulo: "Abonado", tipo: "usd" }, { titulo: "Saldo", tipo: "usd" }, { titulo: "Vence", tipo: "fecha" }, { titulo: "Estado" },
     ],
-    filas: conSaldo.map((c) => [
-      c.contraparte, c.documento, CLASES.find((x) => x.id === c.clase)?.label ?? null, c.monto, c.abonado, c.saldo, c.vence,
-      c.estado === "liquidada" ? "Liquidada" : estadoDe(c.saldo, c.dias).label,
+    // Por cliente: sus documentos y, al final de cada uno, lo que debe en total.
+    filas: clientesVisibles.flatMap((g) => [
+      ...g.cuentas.map((c) => [
+        c.contraparte, c.documento, CLASES.find((x) => x.id === c.clase)?.label ?? null, c.monto, c.abonado, c.saldo, c.vence,
+        c.estado === "liquidada" ? "Liquidada" : estadoDe(c.saldo, c.dias).label,
+      ]),
+      [`Total ${g.cliente}`, `${g.documentos} documento(s)`, null, g.monto, g.abonado, g.saldo, null,
+       g.masVieja && g.masVieja.dias < 0 ? `Vencido ${textoCelda(g.vencido, "usd")}` : null],
     ]),
     totales: [
-      `Total · ${conSaldo.length} cuenta(s)`, "", "", conSaldo.reduce((a, c) => a + c.monto, 0),
-      conSaldo.reduce((a, c) => a + c.abonado, 0), totalSaldo, "", "",
+      `Total · ${clientesVisibles.length} cliente(s)`, `${clientesVisibles.reduce((a, g) => a + g.documentos, 0)} documento(s)`, "",
+      clientesVisibles.reduce((a, g) => a + g.monto, 0), clientesVisibles.reduce((a, g) => a + g.abonado, 0),
+      clientesVisibles.reduce((a, g) => a + g.saldo, 0), "", "",
     ],
     nota: "Montos en USD. El saldo es el monto menos lo abonado.",
   }));
@@ -221,58 +242,86 @@ function CuentasPorCobrar() {
       )}
 
       <div className="mt-6">
-      <SectionCard title="Cartera" description="Saldos y vencimientos por documento.">
+      <SectionCard title="Cartera" description="Lo que debe cada cliente. Toca un cliente para ver sus documentos.">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input type="search" className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1 sm:max-w-sm" placeholder="Buscar cliente"
+              aria-label="Buscar cliente" value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} />
+            <Button variant="ghost" onClick={() => setAbiertos(todosAbiertos ? new Set() : new Set(clientesVisibles.map((g) => g.cliente)))}>
+              {todosAbiertos ? "Contraer todos" : "Desplegar todos"}
+            </Button>
+            <span className="text-xs text-muted">{clientesVisibles.length} cliente(s)</span>
+          </div>
           <EstadoDatos
             cargando={carga.cargando}
             error={carga.error}
-            vacio={conSaldo.length === 0}
-            tituloVacio="Sin Cuentas por Cobrar"
+            vacio={clientesVisibles.length === 0}
+            tituloVacio={tc ? "Ningún cliente coincide" : "Sin Cuentas por Cobrar"}
             mensajeVacio={
-              filtroClase === "todas"
+              tc ? `No hay clientes con «${buscaCliente.trim()}».`
+                : filtroClase === "todas"
                 ? "Nadie debe nada todavía. Carga una con «Nueva cuenta» o importa la cartera."
                 : `No hay ninguna cuenta de esa clase. Hay ${cuentas.length} en total: toca «Todas».`
             }
           >
             <div className="sumi-scroll max-w-full overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
                   <th className="py-2.5 pr-3 font-medium">Cliente</th>
-                  <th className="py-2.5 pr-3 font-medium">Documento</th>
-                  <th className="py-2.5 pr-3 font-medium">Clase</th>
+                  <th className="py-2.5 pr-3 font-medium">Documentos</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Monto</th>
                   <th className="py-2.5 pr-3 text-right font-medium">Saldo</th>
                   <th className="py-2.5 pr-3 font-medium">Vence</th>
                   <th className="py-2.5 font-medium">Estado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
-                {conSaldo.map((c) => {
-                  const e = estadoDe(c.saldo, c.dias);
-                  return (
-                    <tr key={c.id} onClick={() => setAbierta(c.id)}
-                      tabIndex={0}
-                      onKeyDown={(ev) => { if (ev.key === "Enter") setAbierta(c.id); }}
-                      className="cursor-pointer hover:bg-surface-2">
-                      <td className="py-2.5 pr-3 text-text">{c.contraparte}</td>
-                      <td className="py-2.5 pr-3 font-mono text-xs text-muted">{c.documento}</td>
-                      <td className="py-2.5 pr-3 text-xs text-muted">
-                        {CLASES.find((x) => x.id === c.clase)?.label ?? "—"}
+              {clientesVisibles.map((g) => {
+                const abierto = abiertos.has(g.cliente);
+                const eg = g.masVieja ? estadoDe(g.saldo, g.masVieja.dias) : { label: "Pagado", tone: "ok" as Tone };
+                return (
+                  <tbody key={g.cliente} className="border-b border-border">
+                    <tr onClick={() => alternar(g.cliente)} tabIndex={0} aria-expanded={abierto}
+                      onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); alternar(g.cliente); } }}
+                      className="cursor-pointer bg-surface hover:bg-surface-2">
+                      <td className="py-3 pr-3">
+                        <span className="flex items-center gap-2">
+                          <span className={`text-muted transition ${abierto ? "rotate-90" : ""}`} aria-hidden><Icon name="chevronRight" size={14} /></span>
+                          <b className="font-semibold text-text">{g.cliente}</b>
+                        </span>
                       </td>
-                      <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(c.monto)}</td>
-                      <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.saldo)}</td>
-                      <td className="py-2.5 pr-3 text-muted">{c.vence}</td>
-                      <td className="py-2.5">
-                        {/* Liquidada gana sobre vencida: una cuenta cerrada ya
-                            no le debe nada a nadie, aunque su fecha pasara. */}
-                        {c.estado === "liquidada"
-                          ? <StatusBadge tone="ok">Liquidada</StatusBadge>
-                          : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                      <td className="py-3 pr-3 text-xs text-muted">{g.documentos} · {resumenClases(g.porClase)}</td>
+                      <td className="py-3 pr-3 text-right tabular-nums text-muted">{fmtUsd(g.monto)}</td>
+                      <td className="py-3 pr-3 text-right font-semibold tabular-nums text-text">
+                        {fmtUsd(g.saldo)}
+                        {g.vencido > 0 && g.vencido < g.saldo && <span className="block text-[11px] font-normal text-danger">vencido {fmtUsd(g.vencido)}</span>}
                       </td>
+                      <td className="whitespace-nowrap py-3 pr-3 text-xs text-muted">{g.masVieja ? `desde ${fechaVista(g.masVieja.vence)}` : "—"}</td>
+                      <td className="py-3"><StatusBadge tone={eg.tone}>{eg.label}</StatusBadge></td>
                     </tr>
-                  );
-                })}
-              </tbody>
+                    {abierto && g.cuentas.map((c) => {
+                      const e = estadoDe(c.saldo, c.dias);
+                      return (
+                        <tr key={c.id} onClick={() => setAbierta(c.id)} tabIndex={0}
+                          onKeyDown={(ev) => { if (ev.key === "Enter") setAbierta(c.id); }}
+                          className="cursor-pointer bg-surface-2/60 text-xs hover:bg-surface-2">
+                          <td className="py-2 pl-8 pr-3 font-mono text-muted">{c.documento}</td>
+                          <td className="py-2 pr-3 text-muted">{nombreClase(c.clase)}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums text-muted">{fmtUsd(c.monto)}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums text-text">{fmtUsd(c.saldo)}</td>
+                          <td className="whitespace-nowrap py-2 pr-3 text-muted">{fechaVista(c.vence)}</td>
+                          <td className="py-2">
+                            {/* Liquidada gana sobre vencida: una cuenta cerrada ya
+                                no le debe nada a nadie, aunque su fecha pasara. */}
+                            {c.estado === "liquidada"
+                              ? <StatusBadge tone="ok">Liquidada</StatusBadge>
+                              : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                );
+              })}
             </table>
           </div>
           </EstadoDatos>
