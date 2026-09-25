@@ -667,3 +667,7 @@ end $prueba$;
 
 -- Nadie la puede llamar desde la app: solo el editor SQL.
 revoke execute on function public.probar_cilindros_tmp() from public, anon, authenticated;
+
+-- Si ves «funcion_creada = 1», sigue con el paso 2.
+select count(*) as funcion_creada from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+ where s.nspname = 'public' and p.proname = 'probar_cilindros_tmp';
