@@ -22,7 +22,7 @@ import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar } from "@/lib/ux/exportar";
 import { esGerencia, puedeContar, useRol } from "@/lib/ux/session";
 
-type Tab = "entrega" | "parque" | "saldos" | "alta" | "historial";
+type Tab = "entrega" | "parque" | "saldos" | "historial";
 
 // «Descargar» baja la pestaña abierta (Parque, Rampa o Historial).
 export default function CylindersPage() {
@@ -44,11 +44,11 @@ function Cilindros() {
     // Entrega va primero: es lo que hacen seis técnicos todos los días.
     { id: "entrega", label: "Registrar Entrega" },
     // Parque va antes que Rampa: responde "cuantos tengo y donde estan", que es
-    // la pregunta de quien mira; Rampa es el detalle por gas y estado.
+    // la pregunta de quien mira; Rampa es el detalle por gas y estado. Dentro
+    // de Parque también se mueve: cambiar de estado (todos) y dar de alta
+    // (la gerencia), que antes era una pestaña aparte.
     { id: "parque", label: "Parque" },
     { id: "saldos", label: "Rampa" },
-    // Dar de alta es de la gerencia; cambiar de estado (llenado, daño), de todos.
-    { id: "alta", label: gerencia ? "Estados y Altas" : "Cambiar Estado" },
     ...(gerencia ? [{ id: "historial" as const, label: "Historial" }] : []),
   ];
 
@@ -85,9 +85,11 @@ function Cilindros() {
       </div>
 
       {tab === "entrega" && <EntregaCilindros empresa={empresa} recarga={recarga} onRegistrada={refrescar} />}
-      {tab === "parque" && <ResumenParque empresa={empresa} recarga={recarga} />}
+      {tab === "parque" && (
+        <ResumenParque empresa={empresa} recarga={recarga}
+          acciones={<AltaCilindros empresa={empresa} gerencia={gerencia} recarga={recarga} onRegistrada={refrescar} />} />
+      )}
       {tab === "saldos" && <SaldosCilindros empresa={empresa} puedeContar={puedeContar(rol)} gerencia={gerencia} recarga={recarga} onCambio={refrescar} onIrAHistorial={() => setTab("historial")} />}
-      {tab === "alta" && <AltaCilindros empresa={empresa} gerencia={gerencia} recarga={recarga} onRegistrada={refrescar} />}
       {tab === "historial" && (
         <div className="grid gap-4">
           {/* Primero lo que espera una decisión: los conteos por aprobar. */}

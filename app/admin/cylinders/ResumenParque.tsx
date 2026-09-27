@@ -17,21 +17,22 @@ import { useExportable } from "@/lib/ux/exportar";
 
 const n = (v: number) => v.toLocaleString("es-VE");
 
-export function ResumenParque({ empresa, recarga }: { empresa: string; recarga: number }) {
+export function ResumenParque({ empresa, recarga, acciones }: { empresa: string; recarga: number; acciones?: React.ReactNode }) {
   const carga = useCarga(`${empresa}:${recarga}`, () => saldos(empresa));
   return (
     <VistaParque
       parque={resumirParque(carga.datos ?? [])}
       cargando={carga.cargando}
       error={carga.error}
+      acciones={acciones}
     />
   );
 }
 
 /** La vista, separada de la carga para poder verla con datos fijos. */
 export function VistaParque({
-  parque: p, cargando, error,
-}: { parque: Parque; cargando: boolean; error?: string | null }) {
+  parque: p, cargando, error, acciones,
+}: { parque: Parque; cargando: boolean; error?: string | null; acciones?: React.ReactNode }) {
   const mayor = Math.max(1, ...p.porGas.map((g) => g.total));
 
   useExportable(() => ({
@@ -56,6 +57,9 @@ export function VistaParque({
         <StatCard label="Prestados" value={n(p.afuera)} sub="hay que recuperarlos" />
         <StatCard label="Gases" value={n(p.porGas.length)} sub="con parque" />
       </div>
+
+      {/* Cambiar de estado y dar de alta: se mueve el parque donde se mira. */}
+      {acciones}
 
       <SectionCard
         title="Ubicación del Parque"

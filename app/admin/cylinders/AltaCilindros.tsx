@@ -1,7 +1,7 @@
 "use client";
 
-// Cambiar de estado dentro del almacén (llenado, baja por daño), y dar de alta
-// cilindros nuevos. Cambiar de estado lo hace cualquiera que opere cilindros;
+// Vive dentro de Parque. Cambiar de estado dentro del almacén (llenado, daño,
+// reparación) y dar de alta cilindros nuevos. Cambiar de estado lo hace cualquiera que opere cilindros;
 // dar de alta es de la gerencia (Owner y Administrador): son activos que entran,
 // como una compra, y la base del servidor lo vuelve a comprobar.
 
@@ -105,36 +105,8 @@ export function AltaCilindros({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {gerencia && (
-      <SectionCard title="Dar de Alta" description="Cilindros nuevos que entran al parque.">
-        <div className="space-y-3">
-          <div>
-            <label htmlFor="alta-gas" className="mb-1.5 block text-sm font-medium text-text">Gas</label>
-            {selGas(gasAlta, setGasAlta, "alta-gas")}
-          </div>
-          <div>
-            <label htmlFor="alta-cant" className="mb-1.5 block text-sm font-medium text-text">Cantidad</label>
-            <CampoNumero id="alta-cant" valor={cantAlta} onChange={setCantAlta} className={campo} />
-          </div>
-          <div>
-            <label htmlFor="alta-estado" className="mb-1.5 block text-sm font-medium text-text">Entran</label>
-            <select id="alta-estado" value={estadoAlta}
-              onChange={(e) => setEstadoAlta(e.target.value as "lleno" | "vacio")} className={campo}>
-              <option value="lleno">Llenos</option>
-              <option value="vacio">Vacíos</option>
-            </select>
-          </div>
-          <button type="button" onClick={darAlta} disabled={guardando}
-            className="h-12 w-full rounded-xl bg-brand-strong text-sm font-semibold text-white
-                       transition disabled:cursor-not-allowed disabled:opacity-60">
-            {guardando ? "Guardando…" : "Dar de alta"}
-          </button>
-        </div>
-      </SectionCard>
-      )}
-
-      <SectionCard title="Cambiar de Estado" description="Llenado en planta, baja por daño, corrección.">
+    <div className={`grid grid-cols-1 gap-4 ${gerencia ? "lg:grid-cols-2" : ""}`}>
+      <SectionCard title="Cambiar de Estado" description="Llenado en planta, daños y reparaciones. No cambia el total del parque.">
         <div className="space-y-3">
           <div>
             <label htmlFor="mov-gas" className="mb-1.5 block text-sm font-medium text-text">Gas</label>
@@ -176,6 +148,35 @@ export function AltaCilindros({
           </button>
         </div>
       </SectionCard>
+
+      {gerencia && (
+      <SectionCard title="Dar de Alta" description="Cilindros nuevos que entran al parque: suman al total.">
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="alta-gas" className="mb-1.5 block text-sm font-medium text-text">Gas</label>
+            {selGas(gasAlta, setGasAlta, "alta-gas")}
+          </div>
+          <div>
+            <label htmlFor="alta-cant" className="mb-1.5 block text-sm font-medium text-text">Cantidad</label>
+            <CampoNumero id="alta-cant" valor={cantAlta} onChange={setCantAlta} className={campo} />
+          </div>
+          <div>
+            <label htmlFor="alta-estado" className="mb-1.5 block text-sm font-medium text-text">Entran</label>
+            <select id="alta-estado" value={estadoAlta}
+              onChange={(e) => setEstadoAlta(e.target.value as "lleno" | "vacio")} className={campo}>
+              <option value="lleno">Llenos</option>
+              <option value="vacio">Vacíos</option>
+            </select>
+          </div>
+          <button type="button" onClick={darAlta} disabled={guardando}
+            className="h-12 w-full rounded-xl bg-brand-strong text-sm font-semibold text-white
+                       transition disabled:cursor-not-allowed disabled:opacity-60">
+            {guardando ? "Guardando…" : "Dar de alta"}
+          </button>
+        </div>
+      </SectionCard>
+      )}
+
 
       {msg && (
         <p role={msg.ok ? "status" : "alert"}
