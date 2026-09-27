@@ -24,12 +24,13 @@ import { StatCard } from "@/components/ui/StatCard";
 import { resumirParque } from "@/lib/cilindros/parque";
 import { AccionesParque } from "./AccionesParque";
 
-const ESTADOS: { id: string; label: string; tone: Tone }[] = [
-  { id: "lleno", label: "Llenos", tone: "ok" },
-  { id: "vacio", label: "Vacíos", tone: "muted" },
-  { id: "en_cliente", label: "En Cliente", tone: "info" },
-  { id: "en_llenado", label: "En Llenado", tone: "warn" },
-  { id: "fuera_servicio", label: "Fuera de Servicio", tone: "danger" },
+// «color» pinta el punto de la columna y su tramo en la barra de cada gas.
+const ESTADOS: { id: string; label: string; tone: Tone; color: string; siempre?: boolean }[] = [
+  { id: "lleno", label: "Llenos", tone: "ok", color: "bg-ok", siempre: true },
+  { id: "vacio", label: "Vacíos", tone: "muted", color: "bg-muted", siempre: true },
+  { id: "en_cliente", label: "En Cliente", tone: "info", color: "bg-info" },
+  { id: "en_llenado", label: "En Llenado", tone: "warn", color: "bg-warn" },
+  { id: "fuera_servicio", label: "Fuera de Servicio", tone: "danger", color: "bg-danger" },
 ];
 
 const campo = "sumi-campo";
@@ -53,6 +54,9 @@ export function SaldosCilindros({
   const totalGas = (gas: string) => ESTADOS.reduce((a, e) => a + cant(gas, e.id), 0);
   const totalEstado = (estado: string) => gases.reduce((a, g) => a + cant(g, estado), 0);
   const totalParque = gases.reduce((a, g) => a + totalGas(g), 0);
+  // Llenos y vacíos siempre; los demás estados solo cuando tienen cilindros.
+  const visibles = ESTADOS.filter((e) => e.siempre || totalEstado(e.id) > 0);
+  const mayor = Math.max(1, ...gases.map(totalGas));
   const p = resumirParque(s);
   const n = (v: number) => v.toLocaleString("es-VE");
 
@@ -126,10 +130,7 @@ export function SaldosCilindros({
           <Button icon="inventory" variant="secondary" onClick={empezar}>Contar rampa</Button>
         )} />
 
-      <SectionCard
-        title="Rampa"
-        description="Cada gas por estado, calculado de los movimientos. Si no cuadra con el galpón, cuéntala: el cambio se aplica cuando se verifica."
-      >
+      <SectionCard title="Rampa">
         {pendiente && !contando && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
             <p className="text-text">
@@ -203,40 +204,56 @@ export function SaldosCilindros({
           </p>
         )}
         {!contando && gases.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="-mx-1 overflow-x-auto px-1">
+            {/* Con solo llenos y vacíos entra en el teléfono sin deslizar; con más
+                estados, la tabla se desliza y el gas queda fijo a la izquierda. */}
+            <table className={`w-full text-sm ${visibles.length > 2 ? "min-w-[32rem]" : ""}`}>
               <thead>
-                <tr className="border-b border-border text-left text-muted">
-                  <th className="py-2 pr-3 font-medium">Gas</th>
-                  {ESTADOS.map((e) => (
-                    <th key={e.id} className="py-2 pr-3 text-right font-medium">{e.label}</th>
+                <tr className="text-[11px] uppercase tracking-wide text-muted">
+                  <th scope="col" className="sticky left-0 bg-surface pb-2.5 pr-3 text-left font-medium">Gas</th>
+                  {visibles.map((e) => (
+                    <th key={e.id} scope="col" className="whitespace-nowrap pb-2.5 pl-2 text-right font-medium sm:pl-3">
+                      <span className={`mr-1.5 inline-block h-2 w-2 rounded-full align-middle ${e.color}`} aria-hidden />{e.label}
+                    </th>
                   ))}
-                  <th className="py-2 pr-3 text-right font-semibold text-text">Total</th>
+                  <th scope="col" className="rounded-t-lg bg-surface-2 px-3 pb-2.5 pt-2 text-right font-semibold text-text">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {gases.map((g) => (
-                  <tr key={g} className="border-b border-border/60">
-                    <td className="py-2.5 pr-3 font-medium text-text">{g}</td>
-                    {ESTADOS.map((e) => {
-                      const n = cant(g, e.id);
-                      return (
-                        <td key={e.id} className="py-2.5 pr-3 text-right tabular-nums">
-                          {n === 0 ? <span className="text-muted">—</span> : n}
-                        </td>
-                      );
-                    })}
-                    <td className="py-2.5 pr-3 text-right font-semibold tabular-nums text-text">{totalGas(g)}</td>
-                  </tr>
-                ))}
+                {gases.map((g) => {
+                  const t = totalGas(g);
+                  return (
+                    <tr key={g} className="group border-t border-border/60">
+                      <td className="sticky left-0 bg-surface py-2.5 pr-3 group-hover:bg-surface-2/60">
+                        <span className="block font-medium text-text">{g}</span>
+                        {/* Cuántos son y cómo se reparten, de un vistazo. */}
+                        <span className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-surface-2" style={{ width: `${Math.max(8, (t / mayor) * 100)}%` }} aria-hidden>
+                          {ESTADOS.map((e) => {
+                            const v = cant(g, e.id);
+                            return v > 0 ? <span key={e.id} className={e.color} style={{ width: `${(v / t) * 100}%` }} /> : null;
+                          })}
+                        </span>
+                      </td>
+                      {visibles.map((e) => {
+                        const v = cant(g, e.id);
+                        return (
+                          <td key={e.id} className="py-2.5 pl-2 text-right tabular-nums group-hover:bg-surface-2/60 sm:pl-3">
+                            {v === 0 ? <span className="text-muted/50">0</span> : <span className="text-text">{v}</span>}
+                          </td>
+                        );
+                      })}
+                      <td className="bg-surface-2 px-3 py-2.5 text-right text-base font-semibold tabular-nums text-text">{t}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-border font-semibold text-text">
-                  <td className="py-2.5 pr-3">Total</td>
-                  {ESTADOS.map((e) => (
-                    <td key={e.id} className="py-2.5 pr-3 text-right tabular-nums">{totalEstado(e.id)}</td>
+                <tr className="border-t-2 border-border-strong font-semibold text-text">
+                  <td className="sticky left-0 bg-surface pt-3 pr-3">Total</td>
+                  {visibles.map((e) => (
+                    <td key={e.id} className="pt-3 pl-3 text-right tabular-nums">{totalEstado(e.id)}</td>
                   ))}
-                  <td className="py-2.5 pr-3 text-right tabular-nums">{totalParque}</td>
+                  <td className="rounded-b-lg bg-brand-soft px-3 pb-2.5 pt-3 text-right text-base tabular-nums text-brand-strong">{totalParque}</td>
                 </tr>
               </tfoot>
             </table>
