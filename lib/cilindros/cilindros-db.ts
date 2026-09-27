@@ -213,7 +213,13 @@ export async function ingresarCilindros(
   return { ok: true };
 }
 
-/** Cambio de estado dentro del almacén: llenado, baja por daño, etc. */
+/**
+ * Fuera de servicio: marcar cilindros dañados (lleno o vacío → fuera de
+ * servicio) o reinsertarlos reparados (fuera de servicio → lleno o vacío).
+ * Es el único cambio de estado que se hace a mano: el cilindro no sale del
+ * parque, solo cambia de denominación. Las entregas y retornos van por
+ * registrarEntrega, y las diferencias con el galpón, por el conteo de Rampa.
+ */
 export async function cambiarEstado(
   gas: string,
   cantidad: number,
@@ -226,8 +232,10 @@ export async function cambiarEstado(
   if (!usuario) return { ok: false, error: "Sin sesión." };
   if (desde === hacia) return { ok: false, error: "El estado de origen y destino son el mismo." };
   if (!(cantidad > 0)) return { ok: false, error: "La cantidad debe ser mayor que cero." };
-  // Los que están en clientes se mueven con la entrega, que sabe de quién son.
-  if (desde === "en_cliente" || hacia === "en_cliente") return { ok: false, error: "Los cilindros de clientes se mueven con «Registrar entrega»." };
+  const enPlanta = (e: EstadoCilindro) => e === "lleno" || e === "vacio";
+  const marca = enPlanta(desde) && hacia === "fuera_servicio";
+  const reinserta = desde === "fuera_servicio" && enPlanta(hacia);
+  if (!marca && !reinserta) return { ok: false, error: "Aquí solo se marca un cilindro fuera de servicio o se reinserta reparado. Las entregas van por «Registrar Entrega»." };
   if (hacia === "fuera_servicio" && !nota?.trim()) return { ok: false, error: "Indica qué daño tiene: un cilindro fuera de servicio sin motivo no se puede reclamar ni reparar." };
 
   const sb = await createClient();

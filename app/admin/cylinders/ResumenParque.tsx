@@ -58,7 +58,7 @@ export function VistaParque({
         <StatCard label="Gases" value={n(p.porGas.length)} sub="con parque" />
       </div>
 
-      {/* Cambiar de estado y dar de alta: se mueve el parque donde se mira. */}
+      {/* Agregar un Gas y Fuera de Servicio: se mueve el parque donde se mira. */}
       {acciones}
 
       <SectionCard
