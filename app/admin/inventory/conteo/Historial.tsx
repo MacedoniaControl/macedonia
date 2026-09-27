@@ -76,7 +76,7 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
       <div className="space-y-1 p-4">
         <h2 className="text-base font-semibold text-text">Historial de Conteos</h2>
         <p className="max-w-[70ch] text-sm text-muted">
-          Cada conteo cerrado queda con su número y su acta en Excel y PDF. Las diferencias entran a la existencia cuando el Owner o un Administrador aprueban el ajuste.
+          Cada conteo cerrado queda con su número y su acta en Excel y PDF. Las diferencias entran a la existencia cuando el Owner o un Administrador lo verifican.
         </p>
       </div>
       {/* Lo que espera una decisión va arriba: contar no ajusta, aprobar sí. */}

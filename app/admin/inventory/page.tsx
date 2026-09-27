@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -28,13 +29,26 @@ type Tab = "master" | "conteo" | "movimientos" | "valery" | "productos";
 // El boton "Descargar" de la cabecera baja la pestaña que este abierta: cada
 // una declara su tabla adentro de este proveedor.
 export default function InventoryPage() {
-  return <ProveedorExportar><Inventario /></ProveedorExportar>;
+  return <Suspense fallback={null}><ConVista /></Suspense>;
 }
 
-function Inventario() {
+// ?vista=conteo-historial&conteo=ID abre el Historial de Conteos con ese
+// conteo desplegado: así llegan las alertas de «por verificar».
+function ConVista() {
+  const p = useSearchParams();
+  const historial = p.get("vista") === "conteo-historial";
+  const conteo = Number(p.get("conteo")) || null;
+  return (
+    <ProveedorExportar>
+      <Inventario key={`${historial}:${conteo}`} inicial={historial ? { vista: "historial", abrir: conteo } : null} />
+    </ProveedorExportar>
+  );
+}
+
+function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number | null } | null }) {
   // Empresa activa según la ruta (consolidado -> sumigases).
   const empresa = useEmpresaActiva();
-  const [tabElegida, setTab] = useState<Tab>("master");
+  const [tabElegida, setTab] = useState<Tab>(inicial ? "conteo" : "master");
   // Movimientos: Owner y Administrador. Conteo: además el Técnico. La base lo
   // vuelve a comprobar; aca solo no se ofrece lo que no se puede abrir.
   const { rol } = useRol();
@@ -121,7 +135,7 @@ function Inventario() {
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 
       {/* El conteo fisico: planilla, historial y actas. */}
-      {tab === "conteo" && <ConteoFisico empresa={empresa} gerencia={gerencia} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
+      {tab === "conteo" && <ConteoFisico empresa={empresa} gerencia={gerencia} inicial={inicial} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
 
 
       {/* -------- MASTER dividido en 3 apartados -------- */}
