@@ -27,6 +27,18 @@ import { master, type FilaMaster } from "@/lib/inventory/conteos-db";
 import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
 
+// Cuatro filtros con su cantidad, para que siempre se vea qué hay. Antes era
+// una casilla «Solo los que no cuadran» marcada de fábrica: con un solo
+// producto contado y cuadrando, la tabla quedaba vacía y la etiqueta decía
+// «todo cuadra» aunque faltaran 2.207 por contar y 49 estuvieran en negativo.
+type Filtro = "nocuadran" | "negativo" | "sincontar" | "todos";
+const FILTROS: { id: Filtro; label: string }[] = [
+  { id: "nocuadran", label: "No cuadran" },
+  { id: "negativo", label: "En negativo" },
+  { id: "sincontar", label: "Sin contar" },
+  { id: "todos", label: "Todos" },
+];
+
 const dias = (iso: string) =>
   Math.round((Date.now() - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
 
@@ -35,23 +47,37 @@ export function MasterInventario({
 }: { empresa: string; filtro: string; recarga?: number }) {
   const carga = useCarga(`${empresa}:${recarga}`, () => master(empresa));
   const filas: FilaMaster[] = carga.datos ?? [];
-  const [soloDiferencias, setSoloDiferencias] = useState(true);
+  const [elegido, setElegido] = useState<Filtro | null>(null);
 
   const contados = filas.filter((f) => f.contado !== null).length;
   const conDiferencia = filas.filter((f) => f.diferencia !== null && f.diferencia !== 0).length;
   const sinEntrada = filas.filter((f) => f.valery < 0).length;
+  const cuantos: Record<Filtro, number> = {
+    nocuadran: conDiferencia, negativo: sinEntrada, sincontar: filas.length - contados, todos: filas.length,
+  };
+  // Sin elegir: lo que no cuadra; si no hay, lo que está en negativo (lo que
+  // más urge contar); si tampoco, todo.
+  const vista: Filtro = elegido ?? (conDiferencia > 0 ? "nocuadran" : sinEntrada > 0 ? "negativo" : "todos");
 
   const visibles = useMemo(() => {
     const t = filtro.trim().toLowerCase();
+    const entra: Record<Filtro, (f: FilaMaster) => boolean> = {
+      nocuadran: (f) => f.diferencia !== null && f.diferencia !== 0,
+      negativo: (f) => f.valery < 0,
+      sincontar: (f) => f.contado === null,
+      todos: () => true,
+    };
+    const orden: Record<Filtro, (a: FilaMaster, b: FilaMaster) => number> = {
+      nocuadran: (a, b) => Math.abs(b.diferencia ?? 0) - Math.abs(a.diferencia ?? 0),
+      negativo: (a, b) => a.valery - b.valery,
+      sincontar: (a, b) => a.codigo.localeCompare(b.codigo),
+      todos: (a, b) => Math.abs(b.diferencia ?? 0) - Math.abs(a.diferencia ?? 0) || a.codigo.localeCompare(b.codigo),
+    };
     return filas
       .filter((f) => !t || f.codigo.toLowerCase().includes(t) || f.nombre.toLowerCase().includes(t))
-      // Por defecto solo lo que NO cuadra: con 4.303 productos, la lista
-      // completa esconde justo lo que hay que mirar.
-      // Con cero conteos no hay diferencias que aislar, y el filtro dejaria la
-      // tabla vacia justo cuando lo unico que hay para ver es Valery.
-      .filter((f) => !soloDiferencias || contados === 0 || (f.diferencia !== null && f.diferencia !== 0))
-      .sort((a, b) => Math.abs(b.diferencia ?? 0) - Math.abs(a.diferencia ?? 0));
-  }, [filas, filtro, soloDiferencias, contados]);
+      .filter(entra[vista])
+      .sort(orden[vista]);
+  }, [filas, filtro, vista]);
 
   const consolidado = useMemo(
     () => filas.reduce(
@@ -68,9 +94,9 @@ export function MasterInventario({
     seccion: "Master",
     titulo: "Inventario Master",
     detalle: [
-      soloDiferencias && contados > 0 ? "Solo los que no cuadran" : "Todos los productos",
+      `Filtro: ${FILTROS.find((x) => x.id === vista)?.label} (${num(visibles.length)})`,
       ...(filtro.trim() ? [`Búsqueda: «${filtro.trim()}»`] : []),
-      "Ordenado por diferencia, de mayor a menor",
+      vista === "negativo" ? "Ordenado del más negativo al menos" : vista === "sincontar" ? "Ordenado por código" : "Ordenado por diferencia, de mayor a menor",
       `${contados.toLocaleString("es-VE")} de ${filas.length.toLocaleString("es-VE")} productos contados`,
     ],
     columnas: [
@@ -91,51 +117,62 @@ export function MasterInventario({
     <SectionCard
       title="Master"
       action={
-        contados > 0
-          ? <StatusBadge tone={conDiferencia > 0 ? "warn" : "ok"}>
-              {conDiferencia > 0 ? `${conDiferencia} no cuadran` : "todo cuadra"}
-            </StatusBadge>
-          : undefined
+        !carga.cargando && (
+          <StatusBadge tone={contados === 0 ? "muted" : conDiferencia > 0 ? "warn" : "ok"}>
+            {contados === 0
+              ? "Sin conteos"
+              : `${num(contados)} de ${num(filas.length)} contados · ${conDiferencia > 0 ? `${num(conDiferencia)} no cuadran` : "cuadra"}`}
+          </StatusBadge>
+        )
       }
     >
       {carga.error && <p className="text-sm text-danger">{carga.error}</p>}
 
-      {!carga.cargando && contados === 0 && (
-        <p className="mb-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
-          Todavía no hay conteos: la columna <strong>Contado</strong> está en cero.
-          Carga uno con el botón <strong>Cargar conteo</strong>.
-        </p>
-      )}
-
-      {sinEntrada > 0 && (
-        <p className="mb-3 rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-xs text-warn">
-          {num(sinEntrada)} productos tienen salidas sin entrada registrada, por eso Valery
-          los marca en negativo. Al contarlos, la existencia se corrige.
-        </p>
-      )}
-
       {!carga.cargando && (
         <>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-muted">
-              {contados.toLocaleString("es-VE")} de {filas.length.toLocaleString("es-VE")} productos contados
-            </p>
-            <label className={`flex min-h-11 items-center gap-2 text-sm ${contados === 0 ? "text-muted/50" : "text-muted"}`}>
-              <input
-                type="checkbox"
-                checked={soloDiferencias}
-                disabled={contados === 0}
-                onChange={(e) => setSoloDiferencias(e.target.checked)}
-                className="h-5 w-5 rounded border-border-strong"
-              />
-              Solo los que no cuadran
-            </label>
+          <div role="tablist" aria-label="Qué mostrar" className="sumi-scroll -mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            {FILTROS.map((x) => (
+              <button key={x.id} type="button" role="tab" aria-selected={vista === x.id} onClick={() => setElegido(x.id)}
+                className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm font-medium transition ${
+                  vista === x.id ? "bg-brand-strong text-white" : "border border-border text-muted hover:text-text"}`}>
+                {x.label}
+                <span className={`rounded-md px-1.5 text-xs tabular-nums ${vista === x.id ? "bg-white/20" : "bg-surface-2"}`}>{num(cuantos[x.id])}</span>
+              </button>
+            ))}
           </div>
 
-          {visibles.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted">
-              {soloDiferencias && contados > 0 ? "Todo lo contado cuadra con Valery." : "Nada coincide con la búsqueda."}
+          {vista === "negativo" && visibles.length > 0 && (
+            <p className="mb-3 text-xs text-muted">
+              Salió mercancía sin que se registrara su entrada, por eso Valery los marca en negativo. Al contarlos, la existencia se corrige.
             </p>
+          )}
+
+          {visibles.length === 0 ? (
+            <div className="space-y-3 py-8 text-center text-sm text-muted">
+              <p>
+                {filtro.trim()
+                  ? "Nada coincide con la búsqueda en este filtro."
+                  : vista === "nocuadran"
+                    ? (contados === 0 ? "Todavía no se contó ningún producto." : `Todo lo contado cuadra con Valery (${num(contados)} producto${contados === 1 ? "" : "s"}).`)
+                    : vista === "negativo" ? "Ningún producto está en negativo."
+                    : vista === "sincontar" ? "Ya se contaron todos los productos."
+                    : "No hay productos en el catálogo."}
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {vista !== "negativo" && sinEntrada > 0 && (
+                  <button type="button" onClick={() => setElegido("negativo")}
+                    className="min-h-10 rounded-xl border border-border px-3 text-sm font-medium text-text hover:bg-surface-2">
+                    Ver en negativo ({num(sinEntrada)})
+                  </button>
+                )}
+                {vista !== "todos" && (
+                  <button type="button" onClick={() => setElegido("todos")}
+                    className="min-h-10 rounded-xl border border-border px-3 text-sm font-medium text-text hover:bg-surface-2">
+                    Ver todos ({num(filas.length)})
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="sumi-scroll max-w-full overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
@@ -147,7 +184,7 @@ export function MasterInventario({
                     <th className="py-2.5 pr-3 text-right font-medium">Contado</th>
                     <th className="py-2.5 pr-3 text-right font-medium">Diferencia</th>
                     <th className="py-2.5 pr-3 font-medium">Estado</th>
-                    <th className="py-2.5 font-medium">Contado el</th>
+                    <th className="whitespace-nowrap py-2.5 font-medium">Contado el</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -173,7 +210,9 @@ export function MasterInventario({
                           {/* Un negativo suelto se lee como error del sistema.
                               Rotulado dice lo que de verdad pasó. */}
                           {f.valery < 0 ? (
-                            <StatusBadge tone="warn">Despacho sin entrada registrada</StatusBadge>
+                            <span title="Salió mercancía sin que se registrara su entrada" className="whitespace-nowrap">
+                              <StatusBadge tone="warn">Sin entrada</StatusBadge>
+                            </span>
                           ) : f.contado === null ? (
                             <span className="text-muted">Sin contar</span>
                           ) : (
@@ -225,7 +264,7 @@ export function MasterInventario({
 
 /** El estado de una fila, con las mismas palabras que la pantalla. */
 function estadoMaster(f: FilaMaster): string {
-  if (f.valery < 0) return "Despacho sin entrada registrada";
+  if (f.valery < 0) return "Sin entrada registrada";
   if (f.contado === null) return "Sin contar";
   return f.diferencia === 0 ? "Cuadra" : "No cuadra";
 }
