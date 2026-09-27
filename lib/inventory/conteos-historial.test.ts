@@ -94,3 +94,13 @@ describe("la app cierra con cerrar_conteo() cuando la 23 existe", () => {
     assert.match(db, /if \(r\.error\.code !== "PGRST202"\) return \{ ok: false, error: r\.error\.message \}/);
   });
 });
+
+test("29: todo conteo cerrado se verifica, también sin diferencias", () => {
+  const sql29 = fs.readFileSync("supabase/29-conteo-verificado.sql", "utf8");
+  const aprobar = sql29.slice(sql29.indexOf("function public.aprobar_ajuste"), sql29.indexOf("function public.rechazar_ajuste"));
+  assert.match(aprobar, /c\.ajuste not in \('pendiente', 'sin_diferencias'\)/);
+  assert.match(aprobar, /public\.puede_finanzas\(\)/);
+  assert.match(aprobar, /insert into public\.movimientos_inventario/);
+  assert.match(aprobar, /sin diferencias, la existencia no cambia/);
+  assert.match(sql29, /rechazar_ajuste[\s\S]*sin motivo nadie sabe qué recontar/);
+});

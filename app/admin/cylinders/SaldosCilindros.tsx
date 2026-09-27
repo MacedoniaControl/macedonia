@@ -5,7 +5,7 @@
 // Los números NO se guardan: los calcula la base sumando movimientos. Por eso
 // siempre cuadran con su propio historial. Para corregirlos se CUENTA: se
 // escribe lo que hay en el galpón y el conteo queda pendiente hasta que el
-// Owner o un Administrador lo aprueba en el Historial.
+// Owner o un Administrador lo verifica en el Historial.
 
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -77,7 +77,7 @@ export function SaldosCilindros({
       const r = await contarRampa(empresa, lineas, motivo);
       if (!r.ok) return setMsg({ ok: false, texto: r.error });
       setContando(false);
-      setMsg({ ok: true, texto: `Conteo ${r.numero} enviado con ${r.diferencias} diferencia(s). La Rampa cambia cuando el Owner o un Administrador lo apruebe.` });
+      setMsg({ ok: true, texto: `Conteo ${r.numero} enviado con ${r.diferencias} diferencia(s). La Rampa cambia cuando el Owner o un Administrador lo verifique.` });
       onCambio?.();
     } catch (e) {
       setMsg({ ok: false, texto: e instanceof Error ? e.message : "No se pudo guardar el conteo." });
@@ -106,7 +106,7 @@ export function SaldosCilindros({
     <div className="grid gap-4">
       <SectionCard
         title="Rampa"
-        description="Calculado de los movimientos. Si no cuadra con el galpón, cuéntala: el cambio se aplica cuando se aprueba."
+        description="Calculado de los movimientos. Si no cuadra con el galpón, cuéntala: el cambio se aplica cuando se verifica."
         action={puedeContar && !contando && !pendiente && listo && !error && (
           <Button icon="inventory" variant="secondary" onClick={empezar}>Contar rampa</Button>
         )}
@@ -114,10 +114,10 @@ export function SaldosCilindros({
         {pendiente && !contando && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
             <p className="text-text">
-              <b>Conteo {pendiente.numero}</b> de {pendiente.creadoNombre} espera aprobación: {diferencias(pendiente.renglones).map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}.
-              {!gerencia && " Los números de abajo cambian cuando el Owner o un Administrador lo apruebe."}
+              <b>Conteo {pendiente.numero}</b> de {pendiente.creadoNombre} espera verificación: {diferencias(pendiente.renglones).map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}.
+              {!gerencia && " Los números de abajo cambian cuando el Owner o un Administrador lo verifique."}
             </p>
-            {gerencia && <Button variant="secondary" onClick={onIrAHistorial}>Revisar y aprobar</Button>}
+            {gerencia && <Button variant="secondary" onClick={onIrAHistorial}>Revisar y verificar</Button>}
           </div>
         )}
         {msg && !contando && (
@@ -130,7 +130,7 @@ export function SaldosCilindros({
           <div className="space-y-3">
             <p className="text-sm text-muted">
               Escribe cuántos hay <b className="text-text">en el galpón</b> de cada gas. Arranca con lo registrado: cambia solo lo que no cuadre.
-              Los que están en clientes o en llenado no se cuentan aquí. El conteo va a aprobación del Owner o un Administrador.
+              Los que están en clientes o en llenado no se cuentan aquí. El conteo lo verifica el Owner o un Administrador.
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {aContar.map((g) => (
@@ -171,7 +171,7 @@ export function SaldosCilindros({
             )}
             <div className="flex flex-wrap gap-2">
               <Button icon="check" className="flex-1" disabled={guardando} onClick={guardar}>
-                {guardando ? "Enviando…" : dif.length ? `Enviar a aprobación · ${dif.length} diferencia(s)` : "Enviar conteo"}
+                {guardando ? "Enviando…" : dif.length ? `Enviar a verificación · ${dif.length} diferencia(s)` : "Enviar conteo"}
               </Button>
               <Button variant="secondary" disabled={guardando} onClick={() => { setContando(false); setMsg(null); }}>Cancelar</Button>
             </div>

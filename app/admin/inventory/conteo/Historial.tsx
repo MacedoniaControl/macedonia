@@ -6,8 +6,11 @@
 // el sistema, quien lo hizo, sus actas en Excel y PDF, y su linea de tiempo.
 // Las actas no se modifican: si algo salio mal, se hace un conteo nuevo.
 //
-// Aprobar o rechazar el ajuste solo lo ven owner y admin, y la base lo vuelve
-// a comprobar: esconder el boton es comodidad, no seguridad.
+// Todo conteo cerrado espera que el Owner o un Administrador lo VERIFIQUE:
+// certifica que es correcto y, si tiene diferencias, cada una entra a la
+// existencia. Sin diferencias también se verifica (migración 29). Verificar o
+// rechazar solo lo ven owner y admin, y la base lo vuelve a comprobar:
+// esconder el boton es comodidad, no seguridad.
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -25,12 +28,15 @@ import {
 import { Descarga } from "./RevisarCierre";
 import { useExportable } from "@/lib/ux/exportar";
 
+/** Cerrado y esperando que el Owner o un Administrador lo certifique. */
+const porVerificar = (a: ResumenConteo["ajuste"]) => a === "pendiente" || a === "sin_diferencias";
+
 const ESTADO: Record<string, { t: string; tone: "info" | "warn" | "ok" | "danger" | "muted" }> = {
   abierto: { t: "En curso", tone: "info" },
-  pendiente: { t: "Ajuste pendiente", tone: "warn" },
-  aprobado: { t: "Ajustado", tone: "ok" },
-  rechazado: { t: "Ajuste rechazado", tone: "danger" },
-  sin_diferencias: { t: "Sin diferencias", tone: "ok" },
+  pendiente: { t: "Por verificar", tone: "warn" },
+  aprobado: { t: "Verificado", tone: "ok" },
+  rechazado: { t: "Rechazado", tone: "danger" },
+  sin_diferencias: { t: "Por verificar", tone: "warn" },
 };
 
 export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
@@ -42,7 +48,7 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
     return { lista, aprueba };
   });
   const [abierta, setAbierta] = useState<number | null>(abrirId);
-  const pendientes = (carga.datos?.lista ?? []).filter((c) => !c.eliminado && c.cerrado && c.ajuste === "pendiente");
+  const pendientes = (carga.datos?.lista ?? []).filter((c) => !c.eliminado && c.cerrado && porVerificar(c.ajuste));
 
   // La lista de conteos. Cada acta se baja aparte, desde su conteo.
   useExportable(() => {
@@ -77,8 +83,8 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
       {carga.datos?.aprueba && pendientes.length > 0 && (
         <div className="mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
           <p className="text-text">
-            <b>{pendientes.length === 1 ? "1 conteo espera" : `${pendientes.length} conteos esperan`} tu aprobación</b> ({pendientes.map((c) => c.numero).join(", ")}).
-            La existencia cambia cuando lo apruebas.
+            <b>{pendientes.length === 1 ? "1 conteo espera" : `${pendientes.length} conteos esperan`} tu verificación</b> ({pendientes.map((c) => c.numero).join(", ")}).
+            La existencia cambia cuando lo verificas.
           </p>
           <Button variant="secondary" onClick={() => setAbierta(pendientes[0].id)}>Revisar</Button>
         </div>
@@ -146,7 +152,8 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
     try {
       const r = que === "aprobar" ? await aprobarAjuste(c.id, nota) : que === "rechazar" ? await rechazarAjuste(c.id, nota) : await generarActas(c.id);
       if (!r.ok) return setMsg({ ok: false, t: r.error ?? "No se pudo." });
-      setMsg({ ok: true, t: que === "aprobar" ? `Ajuste aprobado: ${"movimientos" in r ? r.movimientos : ""} movimiento(s) de inventario.` : que === "rechazar" ? "Ajuste rechazado. Queda en el historial con el motivo." : "Actas generadas y archivadas." });
+      const n = "movimientos" in r ? r.movimientos ?? 0 : 0;
+      setMsg({ ok: true, t: que === "aprobar" ? (n ? `Conteo verificado: ${n} movimiento(s) de inventario. La existencia ya cambió.` : "Conteo verificado. Sin diferencias: la existencia no cambia.") : que === "rechazar" ? "Conteo rechazado. Queda en el historial con el motivo." : "Actas generadas y archivadas." });
       setNota(""); setVez((n) => n + 1); onCambio();
     } finally { setYendo(""); }
   };
@@ -208,19 +215,31 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
         </div>
       )}
 
-      {aprueba && c.ajuste === "pendiente" && (
+      {aprueba && porVerificar(c.ajuste) && (
         <div className="space-y-2 rounded-xl bg-warn/10 p-3">
           <p className="text-sm text-text">
-            <b>{c.diferencias} diferencia(s) para ajustar.</b> Al aprobar, cada una pasa a ser un movimiento de inventario con motivo «Conteo {c.numero}», y la aprobación queda en el historial.
+            {c.diferencias > 0
+              ? <><b>{c.diferencias} diferencia(s).</b> Al verificar, certificas que el conteo es correcto y cada diferencia entra a la existencia como un movimiento con motivo «Conteo {c.numero}».</>
+              : <><b>Sin diferencias.</b> Al verificar, certificas que el conteo es correcto. La existencia no cambia.</>}
           </p>
           <input className="sumi-campo" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota (obligatoria para rechazar)" />
           <div className="flex flex-wrap gap-2">
-            <Button icon="check" cargando={yendo === "aprobar"} textoCargando="Aprobando…" disabled={!!yendo} onClick={() => accion("aprobar")}>Aprobar ajuste</Button>
+            <ConfirmDialog
+              title="¿Verificar el conteo?"
+              message={c.diferencias > 0
+                ? `Certificas que ${c.numero} es correcto. Sus ${c.diferencias} diferencia(s) entran a la existencia del inventario y queda tu nombre en el historial.`
+                : `Certificas que ${c.numero} es correcto. No tiene diferencias: la existencia no cambia, y queda tu nombre en el historial.`}
+              confirmLabel="Sí, verificar" cancelLabel="No"
+              onConfirm={() => accion("aprobar")}
+              trigger={(abrir) => (
+                <Button icon="check" cargando={yendo === "aprobar"} textoCargando="Verificando…" disabled={!!yendo} onClick={abrir}>Verificar conteo</Button>
+              )}
+            />
             <Button variant="secondary" cargando={yendo === "rechazar"} textoCargando="Rechazando…" disabled={!!yendo || !nota.trim()} onClick={() => accion("rechazar")}>Rechazar</Button>
           </div>
         </div>
       )}
-      {c.ajusteNota && c.ajuste !== "pendiente" && <p className="text-sm text-muted">Nota del ajuste: {c.ajusteNota}</p>}
+      {c.ajusteNota && !porVerificar(c.ajuste) && <p className="text-sm text-muted">Nota: {c.ajusteNota}</p>}
       {msg && <p role="status" className={`rounded-xl px-3 py-2 text-sm ${msg.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>{msg.t}</p>}
 
       {aprueba && !corrigiendo && (
@@ -234,7 +253,7 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
         {acta.eventos.map((e, i) => (
           <li key={i} className="grid grid-cols-[8.5rem_0.75rem_minmax(0,1fr)] gap-3 pb-3 text-sm max-sm:grid-cols-[0.75rem_minmax(0,1fr)]">
             <span className="text-xs tabular-nums text-muted max-sm:col-start-2">{e.en}</span>
-            <span className={`mt-1.5 h-2.5 w-2.5 rounded-full max-sm:col-start-1 max-sm:row-start-1 ${/aprobado|generada/i.test(e.tipo) ? "bg-ok" : /rechazado/i.test(e.tipo) ? "bg-danger" : "bg-border-strong"}`} />
+            <span className={`mt-1.5 h-2.5 w-2.5 rounded-full max-sm:col-start-1 max-sm:row-start-1 ${/aprobado|verificado|generada/i.test(e.tipo) ? "bg-ok" : /rechazado/i.test(e.tipo) ? "bg-danger" : "bg-border-strong"}`} />
             <span className="max-sm:col-start-2"><b className="block font-semibold text-text">{e.tipo}</b><span className="text-muted">{e.detalle}</span></span>
           </li>
         ))}

@@ -187,7 +187,7 @@ export async function valorizadaPdf(a: ActaValorizada): Promise<Buffer> {
       { text: "Costo unitario sin IVA al momento del cierre. Queda fijo en esta acta aunque el costo cambie después. Solo se listan los renglones con diferencia.", fontSize: 7.5, color: C.gris, margin: [0, 0, 0, 10] },
       { table: { headerRows: 1, widths: [16, 64, "*", 26, 46, 50, 54], body: cuerpo }, layout: lineaFina },
       ...(v.sinCosto ? [{ table: { widths: ["*"], body: [[{ text: `${v.sinCosto} renglón(es) sin costo: artículos nuevos con la ficha incompleta o productos que nunca se compraron. Su valor aparece en el próximo conteo, cuando tengan costo: esta acta no se recalcula.`, fontSize: 8, color: C.ambar, fillColor: C.fondoAmbar }]] }, layout: "noBorders", margin: [0, 10, 0, 0] }] : []),
-      firmas("Revisado por (Owner o Administrador)", "Aprobó el ajuste"),
+      firmas("Revisado por (Owner o Administrador)", "Verificó el conteo"),
     ],
   };
   return pm.createPdf(def).getBuffer();

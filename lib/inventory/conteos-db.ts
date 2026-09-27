@@ -87,7 +87,7 @@ export type TipoArchivo = "acta_pdf" | "acta_xlsx" | "valorizada_pdf" | "valoriz
 
 const ETIQUETA_EVENTO: Record<string, string> = {
   abierto: "Conteo abierto", articulo_nuevo: "Artículo nuevo agregado", cerrado: "Conteo cerrado",
-  acta_generada: "Acta generada", ajuste_aprobado: "Ajuste aprobado", ajuste_rechazado: "Ajuste rechazado",
+  acta_generada: "Acta generada", ajuste_aprobado: "Conteo verificado", ajuste_rechazado: "Conteo rechazado",
   alcance: "Cambió lo que se cuenta", editado: "Conteo corregido",
 };
 
@@ -413,9 +413,11 @@ async function actaDe(admin: ReturnType<typeof createAdminClient>, id: number) {
   const sinContar = prods.filter((p) => !contados.has(p.codigo)).map((p) => ({ codigo: p.codigo, nombre: p.nombre, unidad: p.unidad, sistema: E.get(p.codigo) ?? 0 }));
 
   const eventos: EventoActa[] = (ev.data ?? []).map((e) => ({ en: fechaHora(e.en), tipo: ETIQUETA_EVENTO[e.tipo] ?? e.tipo, detalle: e.detalle ?? "" }));
-  if (c.ajuste === "pendiente") {
+  if (c.ajuste === "pendiente" || c.ajuste === "sin_diferencias") {
     const n = (lin.data ?? []).filter((l) => l.existencia_sistema !== null && Number(l.cantidad) !== Number(l.existencia_sistema)).length;
-    eventos.push({ en: "Pendiente", tipo: "Ajuste de inventario", detalle: `${n} diferencia(s) esperan la aprobación del Owner o de un Administrador.` });
+    eventos.push({ en: "Pendiente", tipo: "Verificación", detalle: n
+      ? `Espera que el Owner o un Administrador lo verifique: ${n} diferencia(s) entran a la existencia al verificarlo.`
+      : "Espera que el Owner o un Administrador lo verifique. Sin diferencias: la existencia no cambia." });
   }
   const acta = armarActa({
     numero: c.numero ?? "(sin número)", empresa: getEmpresa(c.empresa_id)?.nombre ?? c.empresa_id, departamento,
