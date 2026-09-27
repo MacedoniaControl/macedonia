@@ -320,45 +320,30 @@ export async function rechazarConteoRampa(id: number, nota: string): Promise<{ o
 }
 
 /**
- * Alta o edición de un gas y su depósito en garantía.
+ * Crea un gas nuevo, o vuelve a activar uno que se había quitado. Se usa desde
+ * «Dar de Alta» con «+ Gas nuevo…»: un gas existe para que haya cilindros de él.
  *
- * Hoy el depósito es 0 en todos los gases y eso es CORRECTO: Greeg confirmo el
- * 02-sep-2026 que no se cobra garantia. `garantias_cliente` devuelve vacio
- * porque no hay garantias que mostrar, no porque falte cargar un dato.
- *
- * Si algun dia se cobra, ademas de cargar el monto aquí hay que hacer que el
- * movimiento lo registre: hoy `registrarEntrega` y `registrarSalida` insertan
- * con `deposito_usd` en su valor por defecto, o sea cero. Cargar el monto solo
- * en el gas no alcanzaria.
- *
- * Se edita desde la pantalla y no se carga por SQL porque el precio del gas
- * cambia, y cada cambio no puede depender de que alguien escriba una consulta.
+ * No toca el depósito ni «se rellena»: quedan como estaban (o en sus valores
+ * por defecto, 0 y no). Hoy no se cobra depósito (Greeg, 02-sep-2026), así que
+ * la pantalla ya no los muestra. Si algún día se cobra, además de cargar el
+ * monto en `gases.deposito_usd` hay que hacer que la entrega lo registre: hoy
+ * inserta con `deposito_usd` en cero.
  */
-export async function guardarGas(
-  g: { nombre: string; depositoUsd: number; seRellena: boolean; activo?: boolean },
-  empresa: string,
-): Promise<{ ok: boolean; error?: string }> {
+export async function activarGas(nombreEscrito: string, empresa: string): Promise<{ ok: true; nombre: string } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
-
-  const nombre = g.nombre.trim().toUpperCase();
-  if (!nombre) return { ok: false, error: "Falta el nombre del gas." };
-  if (!(g.depositoUsd >= 0)) return { ok: false, error: "El depósito no puede ser negativo." };
+  if (!esGerenciaU(usuario)) return { ok: false, error: "Los gases los agrega el Owner o un Administrador." };
+  const nombre = nombreEscrito.trim().replace(/\s+/g, " ").toUpperCase();
+  if (!nombre) return { ok: false, error: "Escribe el nombre del gas nuevo." };
 
   const sb = await createClient();
-  const { error } = await sb.from("gases").upsert(
-    {
-      empresa_id: empresa,
-      nombre,
-      deposito_usd: g.depositoUsd,
-      se_rellena: g.seRellena,
-      activo: g.activo ?? true,
-    },
-    { onConflict: "empresa_id,nombre" },
-  );
-
-  if (error) return { ok: false, error: `No se pudo guardar: ${error.message}` };
-  return { ok: true };
+  const { data: hay, error: e1 } = await sb.from("gases").select("activo").eq("empresa_id", empresa).eq("nombre", nombre).maybeSingle();
+  if (e1) return { ok: false, error: `No se pudo revisar el gas: ${e1.message}` };
+  const { error } = hay
+    ? (hay.activo ? { error: null } : await sb.from("gases").update({ activo: true }).eq("empresa_id", empresa).eq("nombre", nombre))
+    : await sb.from("gases").insert({ empresa_id: empresa, nombre });
+  if (error) return { ok: false, error: `No se pudo agregar el gas: ${error.message}` };
+  return { ok: true, nombre };
 }
 
 /**

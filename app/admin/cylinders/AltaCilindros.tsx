@@ -1,22 +1,29 @@
 "use client";
 
 // Vive dentro de Parque. Cambiar de estado dentro del almacén (llenado, daño,
-// reparación) y dar de alta cilindros nuevos. Cambiar de estado lo hace cualquiera que opere cilindros;
+// reparación) y dar de alta cilindros nuevos. Los gases también se manejan
+// aquí: un gas nuevo entra con sus primeros cilindros («+ Gas nuevo…») y un
+// gas sin cilindros se puede quitar. Antes era un botón aparte, «Gases y
+// depósitos», que hacía lo mismo por otra puerta. Cambiar de estado lo hace cualquiera que opere cilindros;
 // dar de alta es de la gerencia (Owner y Administrador): son activos que entran,
 // como una compra, y la base del servidor lo vuelve a comprobar.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { CampoNumero } from "@/components/ui/CampoNumero";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
-  gases, ingresarCilindros, cambiarEstado, saldos,
-  type Gas, type EstadoCilindro,
+  activarGas, cambiarEstado, desactivarGas, gases, ingresarCilindros, saldos,
+  type EstadoCilindro,
 } from "@/lib/cilindros/cilindros-db";
 
 const campo =
   "h-12 w-full rounded-xl border border-border-strong bg-surface px-3.5 text-base text-text " +
   "outline-none focus:border-brand focus:ring-2 focus:ring-brand/30";
+
+/** Valor del selector para «+ Gas nuevo…»: ningún gas se llama así. */
+const NUEVO = "__nuevo__";
 
 const ESTADOS: { id: EstadoCilindro; label: string }[] = [
   { id: "lleno", label: "Lleno" },
@@ -36,17 +43,21 @@ export function AltaCilindros({
   recarga: number;
   onRegistrada: () => void;
 }) {
-  const [lista, setLista] = useState<Gas[]>([]);
+  const g = useCarga(`gases:${empresa}:${recarga}`, () => gases(empresa));
+  const lista = g.datos ?? [];
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  // Alta
-  const [gasAlta, setGasAlta] = useState("");
+  // Alta. Sin elegir, el primer gas de la lista.
+  const [gasAltaElegido, setGasAlta] = useState("");
+  const gasAlta = gasAltaElegido || lista[0]?.nombre || "";
+  const [nombreNuevo, setNombreNuevo] = useState("");
   const [cantAlta, setCantAlta] = useState(0);
   const [estadoAlta, setEstadoAlta] = useState<"lleno" | "vacio">("lleno");
 
   // Cambio de estado
-  const [gasMov, setGasMov] = useState("");
+  const [gasMovElegido, setGasMov] = useState("");
+  const gasMov = gasMovElegido || lista[0]?.nombre || "";
   const [cantMov, setCantMov] = useState(0);
   const [desde, setDesde] = useState<EstadoCilindro>("vacio");
   const [hacia, setHacia] = useState<EstadoCilindro>("lleno");
@@ -55,27 +66,32 @@ export function AltaCilindros({
   const s = useCarga(`estados:${empresa}:${recarga}`, () => saldos(empresa));
   const hay = (gas: string, estado: EstadoCilindro) => (s.datos ?? []).find((x) => x.gas === gas && x.estado === estado)?.cantidad ?? 0;
 
-  useEffect(() => {
-    let vigente = true;
-    gases(empresa)
-      .then((g) => {
-        if (!vigente) return;
-        setLista(g);
-        if (g[0]) { setGasAlta(g[0].nombre); setGasMov(g[0].nombre); }
-      })
-      .catch((e) => { if (vigente) setMsg({ ok: false, texto: (e as Error).message }); });
-    return () => { vigente = false; };
-  }, [empresa]);
+  // Gases activos que ya no tienen ni un cilindro: son los únicos que se pueden quitar.
+  const sinCilindros = s.datos
+    ? lista.filter((x) => (s.datos ?? []).filter((y) => y.gas === x.nombre).reduce((a, y) => a + y.cantidad, 0) === 0)
+    : [];
 
   async function darAlta() {
     setMsg(null);
     if (cantAlta <= 0) return setMsg({ ok: false, texto: "La cantidad debe ser mayor que cero." });
+    const esNuevo = gasAlta === NUEVO;
+    if (esNuevo && !nombreNuevo.trim()) return setMsg({ ok: false, texto: "Escribe el nombre del gas nuevo." });
     setGuardando(true);
     try {
-      const r = await ingresarCilindros(gasAlta, cantAlta, estadoAlta, empresa);
-      if (!r.ok) return setMsg({ ok: false, texto: r.error ?? "No se pudo dar de alta." });
-      setMsg({ ok: true, texto: `${cantAlta} cilindro(s) de ${gasAlta} agregados al parque.` });
+      let gas = gasAlta;
+      if (esNuevo) {
+        const a = await activarGas(nombreNuevo, empresa);
+        if (!a.ok) return setMsg({ ok: false, texto: a.error });
+        gas = a.nombre;
+      }
+      const r = await ingresarCilindros(gas, cantAlta, estadoAlta, empresa);
+      if (!r.ok) {
+        if (esNuevo) { setGasAlta(gas); setNombreNuevo(""); onRegistrada(); }
+        return setMsg({ ok: false, texto: `${r.error ?? "No se pudo dar de alta."}${esNuevo ? ` El gas ${gas} quedó agregado, sin cilindros.` : ""}` });
+      }
+      setMsg({ ok: true, texto: `${cantAlta} cilindro(s) de ${gas} agregados al parque.${esNuevo ? " Gas nuevo en la lista." : ""}` });
       setCantAlta(0);
+      if (esNuevo) { setGasAlta(gas); setNombreNuevo(""); }
       onRegistrada();
     } finally {
       setGuardando(false);
@@ -154,8 +170,18 @@ export function AltaCilindros({
         <div className="space-y-3">
           <div>
             <label htmlFor="alta-gas" className="mb-1.5 block text-sm font-medium text-text">Gas</label>
-            {selGas(gasAlta, setGasAlta, "alta-gas")}
+            <select id="alta-gas" value={gasAlta} onChange={(e) => setGasAlta(e.target.value)} className={campo}>
+              {lista.map((x) => <option key={x.nombre} value={x.nombre}>{x.nombre}</option>)}
+              <option value={NUEVO}>+ Gas nuevo…</option>
+            </select>
           </div>
+          {gasAlta === NUEVO && (
+            <div>
+              <label htmlFor="alta-nuevo" className="mb-1.5 block text-sm font-medium text-text">Nombre del gas nuevo</label>
+              <input id="alta-nuevo" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)}
+                placeholder="HELIO, ACETILENO 8K…" autoCapitalize="characters" autoComplete="off" className={campo} />
+            </div>
+          )}
           <div>
             <label htmlFor="alta-cant" className="mb-1.5 block text-sm font-medium text-text">Cantidad</label>
             <CampoNumero id="alta-cant" valor={cantAlta} onChange={setCantAlta} className={campo} />
@@ -173,11 +199,46 @@ export function AltaCilindros({
                        transition disabled:cursor-not-allowed disabled:opacity-60">
             {guardando ? "Guardando…" : "Dar de alta"}
           </button>
+
+          {/* Quitar un gas: solo los que no tienen cilindros. Con cilindros
+              desaparecería de las listas y sus cilindros seguirían contando. */}
+          {sinCilindros.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="mb-2 text-xs text-muted">Gases sin cilindros. Si ya no los manejan, quítalos de las listas:</p>
+              <div className="flex flex-wrap gap-2">
+                {sinCilindros.map((x) => (
+                  <ConfirmDialog key={x.nombre}
+                    title={`¿Quitar ${x.nombre}?`}
+                    message="Deja de aparecer en Entrega, Rampa y Parque. Su historial se conserva. Para volver a usarlo, dale de alta con «+ Gas nuevo…» y el mismo nombre."
+                    confirmLabel="Sí, quitar" cancelLabel="No"
+                    onConfirm={async () => {
+                      setMsg(null);
+                      const r = await desactivarGas(x.nombre, empresa);
+                      if (!r.ok) return setMsg({ ok: false, texto: r.error ?? "No se pudo quitar." });
+                      setMsg({ ok: true, texto: `${x.nombre} ya no aparece en las listas.` });
+                      if (gasAlta === x.nombre) setGasAlta("");
+                      if (gasMov === x.nombre) setGasMov("");
+                      onRegistrada();
+                    }}
+                    trigger={(abrir) => (
+                      <button type="button" onClick={abrir}
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm text-text hover:border-danger/40 hover:text-danger">
+                        {x.nombre} <span aria-hidden>✕</span><span className="sr-only">Quitar</span>
+                      </button>
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </SectionCard>
       )}
 
 
+      {g.error && !msg && (
+        <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5 text-sm text-danger lg:col-span-2">{g.error}</p>
+      )}
       {msg && (
         <p role={msg.ok ? "status" : "alert"}
           className={`rounded-xl px-3 py-2.5 text-sm lg:col-span-2 ${
