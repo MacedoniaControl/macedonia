@@ -16,8 +16,8 @@ import { aprobarConteoRampa, conteosRampa, rechazarConteoRampa, type ConteoRampa
 import { conSigno, diferencias, ETIQUETA_RAMPA } from "@/lib/cilindros/rampa";
 
 const ESTADO: Record<ConteoRampa["estado"], { t: string; tone: Tone }> = {
-  pendiente: { t: "Por aprobar", tone: "warn" },
-  aprobado: { t: "Aprobado", tone: "ok" },
+  pendiente: { t: "Por verificar", tone: "warn" },
+  aprobado: { t: "Verificado", tone: "ok" },
   rechazado: { t: "Rechazado", tone: "danger" },
 };
 
@@ -38,8 +38,8 @@ export function ConteosRampa({ empresa, recarga, onCambio }: { empresa: string; 
     <SectionCard
       title="Conteos de Rampa"
       description={pendientes
-        ? "Hay un conteo esperando tu aprobación. El parque cambia recién cuando lo apruebas."
-        : "Lo que se contó en el galpón y qué se decidió. Al aprobar, cada diferencia entra al parque."}
+        ? "Hay un conteo esperando tu verificación. El parque cambia recién cuando lo verificas."
+        : "Lo que se contó en el galpón y qué se decidió. Al verificar, cada diferencia entra al parque."}
     >
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
         {lista.map((c) => (
@@ -121,18 +121,18 @@ function Detalle({ c, onCambio }: { c: ConteoRampa; onCambio: () => void }) {
       {c.estado === "pendiente" ? (
         <div className="space-y-2 rounded-xl bg-warn/10 p-3">
           <p className="text-sm text-text">
-            Al aprobar, cada diferencia pasa a ser un movimiento del parque con motivo «Conteo de rampa {c.numero}». Si después del conteo hubo entregas, siguen valiendo: se aplica la diferencia, no se pisa el saldo.
+            Al verificar, certificas que el conteo es correcto y cada diferencia pasa a ser un movimiento del parque con motivo «Conteo de rampa {c.numero}». Si después del conteo hubo entregas, siguen valiendo: se aplica la diferencia, no se pisa el saldo.
           </p>
           <input className="sumi-campo" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota (obligatoria para rechazar)" />
           <div className="flex flex-wrap gap-2">
             <ConfirmDialog
-              title="¿Aprobar el conteo?"
+              title="¿Verificar el conteo?"
               message={`${dif.map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}. Estas diferencias entran al parque y quedan en el historial con tu nombre.`}
-              confirmLabel="Sí, aprobar"
+              confirmLabel="Sí, verificar"
               cancelLabel="No"
               onConfirm={() => accion("aprobar")}
               trigger={(abrir) => (
-                <Button icon="check" cargando={yendo === "aprobar"} textoCargando="Aprobando…" disabled={!!yendo} onClick={abrir}>Aprobar conteo</Button>
+                <Button icon="check" cargando={yendo === "aprobar"} textoCargando="Verificando…" disabled={!!yendo} onClick={abrir}>Verificar conteo</Button>
               )}
             />
             <Button variant="secondary" cargando={yendo === "rechazar"} textoCargando="Rechazando…" disabled={!!yendo || !nota.trim()} onClick={() => accion("rechazar")}>Rechazar</Button>
@@ -140,7 +140,7 @@ function Detalle({ c, onCambio }: { c: ConteoRampa; onCambio: () => void }) {
         </div>
       ) : (
         <p className="text-sm text-muted">
-          {c.estado === "aprobado" ? "Aprobó" : "Rechazó"} {c.resueltoNombre} el {c.resueltoEn ? hora(c.resueltoEn) : "—"}
+          {c.estado === "aprobado" ? "Verificó" : "Rechazó"} {c.resueltoNombre} el {c.resueltoEn ? hora(c.resueltoEn) : "—"}
           {c.estado === "aprobado" ? ` · ${c.movimientos ?? 0} movimiento(s) en el parque` : ""}
           {c.resueltoNota ? ` · «${c.resueltoNota}»` : ""}
         </p>

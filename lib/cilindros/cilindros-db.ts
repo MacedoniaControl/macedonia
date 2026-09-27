@@ -370,7 +370,7 @@ export async function desactivarGas(nombre: string, empresa: string): Promise<{ 
   const { data: s, error: e1 } = await sb.from("cilindros_saldo").select("cantidad").eq("empresa_id", empresa).eq("gas", nombre);
   if (e1) return { ok: false, error: `No se pudo revisar el parque: ${e1.message}` };
   const tiene = (s ?? []).reduce((a, x) => a + (Number(x.cantidad) || 0), 0);
-  if (tiene > 0) return { ok: false, error: `${nombre} tiene ${tiene} cilindro(s) en el parque. Para quitarlo, primero tienen que salir con un conteo de Rampa aprobado.` };
+  if (tiene > 0) return { ok: false, error: `${nombre} tiene ${tiene} cilindro(s) en el parque. Para quitarlo, primero tienen que salir con un conteo de Rampa verificado.` };
   const { error } = await sb
     .from("gases")
     .update({ activo: false })
