@@ -368,7 +368,16 @@ export async function guardarGas(
  * huérfano todo lo que ya pasó por él.
  */
 export async function desactivarGas(nombre: string, empresa: string): Promise<{ ok: boolean; error?: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+  if (!esGerenciaU(usuario)) return { ok: false, error: "Los gases los maneja el Owner o un Administrador." };
   const sb = await createClient();
+  // Un gas con cilindros no se quita: desaparecería de Entrega, Rampa y
+  // Estados, pero sus cilindros seguirían contando en el parque.
+  const { data: s, error: e1 } = await sb.from("cilindros_saldo").select("cantidad").eq("empresa_id", empresa).eq("gas", nombre);
+  if (e1) return { ok: false, error: `No se pudo revisar el parque: ${e1.message}` };
+  const tiene = (s ?? []).reduce((a, x) => a + (Number(x.cantidad) || 0), 0);
+  if (tiene > 0) return { ok: false, error: `${nombre} tiene ${tiene} cilindro(s) en el parque. Para quitarlo, primero tienen que salir con un conteo de Rampa aprobado.` };
   const { error } = await sb
     .from("gases")
     .update({ activo: false })
