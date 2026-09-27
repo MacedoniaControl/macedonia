@@ -77,7 +77,7 @@ export async function alertasDe(empresa: string): Promise<Alerta[]> {
             mensaje: `Lo contó ${c.creado_nombre}. El parque cambia cuando lo verificas.`, enlace: `${base}/cylinders?vista=historial` }
         : { id: "conteo-rampa", tono: "info",
             titulo: c.creado_por === u.id ? `Tu conteo de Rampa ${c.numero} espera verificación` : `El conteo de Rampa ${c.numero} espera verificación`,
-            mensaje: "La Rampa cambia cuando el Owner o un Administrador lo verifique.", enlace: `${base}/cylinders?vista=saldos` }] satisfies Alerta[];
+            mensaje: "La Rampa cambia cuando el Owner o un Administrador lo verifique.", enlace: `${base}/cylinders?vista=parque` }] satisfies Alerta[];
     }) : [],
 
     // Existencia negativa: salió mercancía sin que se registrara su entrada.
@@ -112,7 +112,7 @@ export async function alertasDe(empresa: string): Promise<Alerta[]> {
         id: "comodato", tono: "info",
         titulo: `${clientes.size} cliente(s) con cilindros hace más de ${DIAS_COMODATO} días`,
         mensaje: `${cilindros} cilindro(s) por recuperar: ${[...clientes].slice(0, 3).join(", ")}${clientes.size > 3 ? "…" : ""}.`,
-        enlace: `${base}/cylinders?vista=saldos`,
+        enlace: `${base}/cylinders?vista=parque`,
       } satisfies Alerta];
     }) : [],
 

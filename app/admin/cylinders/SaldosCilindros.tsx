@@ -1,6 +1,9 @@
 "use client";
 
-// Rampa: dónde está cada cilindro y quién tiene los que faltan.
+// Parque: cuántos cilindros son, dónde está cada uno (la Rampa: gas por
+// estado) y quién tiene los que faltan. Antes Parque y Rampa eran dos
+// pestañas con los mismos números; «Parque por Gas» era la columna Total de
+// la Rampa y «Ubicación del Parque», su fila de totales.
 //
 // Los números NO se guardan: los calcula la base sumando movimientos. Por eso
 // siempre cuadran con su propio historial. Para corregirlos se CUENTA: se
@@ -17,6 +20,9 @@ import { fechaVista } from "@/lib/ux/tabla-export";
 import { Button } from "@/components/ui/Button";
 import { CampoNumero } from "@/components/ui/CampoNumero";
 import { useState } from "react";
+import { StatCard } from "@/components/ui/StatCard";
+import { resumirParque } from "@/lib/cilindros/parque";
+import { AccionesParque } from "./AccionesParque";
 
 const ESTADOS: { id: string; label: string; tone: Tone }[] = [
   { id: "lleno", label: "Llenos", tone: "ok" },
@@ -47,6 +53,8 @@ export function SaldosCilindros({
   const totalGas = (gas: string) => ESTADOS.reduce((a, e) => a + cant(gas, e.id), 0);
   const totalEstado = (estado: string) => gases.reduce((a, g) => a + cant(g, estado), 0);
   const totalParque = gases.reduce((a, g) => a + totalGas(g), 0);
+  const p = resumirParque(s);
+  const n = (v: number) => v.toLocaleString("es-VE");
 
   // ---- Conteo: lo que se ve en el galpón, por gas.
   const [contando, setContando] = useState(false);
@@ -87,9 +95,9 @@ export function SaldosCilindros({
   // La Rampa por gas y estado, y abajo los cilindros en poder de cada cliente.
   useExportable(() => ({
     modulo: "",
-    seccion: "Rampa de Cilindros",
-    titulo: "Rampa de Cilindros",
-    detalle: [`${gases.length} gas(es) · ${totalParque} cilindro(s) · ${c.length} cliente(s) con cilindros`],
+    seccion: "Parque de Cilindros",
+    titulo: "Parque de Cilindros",
+    detalle: [`${n(p.total)} cilindro(s) · ${n(p.enPlanta)} en planta · ${n(p.afuera)} prestados · ${gases.length} gas(es) · ${c.length} cliente(s) con cilindros`],
     columnas: [
       { titulo: "Gas / Cliente" }, ...ESTADOS.map((e) => ({ titulo: e.label, tipo: "num" as const })),
       { titulo: "Total", tipo: "num" }, { titulo: "Desde", tipo: "fecha" },
@@ -104,12 +112,23 @@ export function SaldosCilindros({
 
   return (
     <div className="grid gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Parque Total" value={listo ? n(p.total) : "…"} sub="cilindros de la empresa" accent />
+        <StatCard label="En Planta" value={listo ? n(p.enPlanta) : "…"} sub="llenos + vacíos" />
+        <StatCard label="Prestados" value={listo ? n(p.afuera) : "…"} sub="hay que recuperarlos" />
+        <StatCard label="Gases" value={listo ? n(p.porGas.length) : "…"} sub="con parque" />
+      </div>
+
+      {/* Los tres movimientos que se hacen aquí: entran cilindros, se dañan o
+          se reparan, y se cuenta lo que hay en el galpón. */}
+      <AccionesParque empresa={empresa} gerencia={gerencia} recarga={recarga} onRegistrada={() => onCambio?.()}
+        extra={puedeContar && !contando && !pendiente && listo && !error && (
+          <Button icon="inventory" variant="secondary" onClick={empezar}>Contar rampa</Button>
+        )} />
+
       <SectionCard
         title="Rampa"
-        description="Calculado de los movimientos. Si no cuadra con el galpón, cuéntala: el cambio se aplica cuando se verifica."
-        action={puedeContar && !contando && !pendiente && listo && !error && (
-          <Button icon="inventory" variant="secondary" onClick={empezar}>Contar rampa</Button>
-        )}
+        description="Cada gas por estado, calculado de los movimientos. Si no cuadra con el galpón, cuéntala: el cambio se aplica cuando se verifica."
       >
         {pendiente && !contando && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
