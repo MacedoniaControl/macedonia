@@ -11,9 +11,13 @@ import { Contar } from "./Contar";
 import { Historial } from "./Historial";
 
 // El historial es del Owner y el Administrador: el Técnico solo cuenta.
-export function ConteoFisico({ empresa, gerencia, onCerrado }: { empresa: string; gerencia: boolean; onCerrado: () => void }) {
-  const [vista, setVista] = useState<"contar" | "historial">("contar");
-  const [abrir, setAbrir] = useState<number | null>(null);
+export function ConteoFisico({ empresa, gerencia, inicial, onCerrado }: {
+  empresa: string; gerencia: boolean; onCerrado: () => void;
+  /** Para llegar desde una alerta directo al historial, con un conteo abierto. */
+  inicial?: { vista: "historial"; abrir: number | null } | null;
+}) {
+  const [vista, setVista] = useState<"contar" | "historial">(inicial?.vista ?? "contar");
+  const [abrir, setAbrir] = useState<number | null>(inicial?.abrir ?? null);
   const [recarga, setRecarga] = useState(0);
 
   return (

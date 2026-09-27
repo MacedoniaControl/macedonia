@@ -34,7 +34,8 @@ import { useCarga } from "@/lib/ux/use-carga";
 import { SelectorRango } from "@/components/ui/SelectorRango";
 import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { Icon } from "@/components/ui/Icon";
-import { alertasOperativas } from "@/lib/ux/dashboard-data";
+import { alertasDe } from "@/lib/ux/alertas-db";
+import Link from "next/link";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 import { useSesion } from "@/components/auth/SesionProvider";
 import { puedeVer } from "@/lib/auth/permisos";
@@ -60,6 +61,8 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   const ve = (clave: string) => !sesion?.permisos || puedeVer(sesion.permisos, rol, clave);
 
   const op = useCarga(`op:${empresa}`, () => resumenOperativo(empresa));
+  const alertas = useCarga(`alertas:${empresa}`, () => alertasDe(empresa));
+  const alertasOperativas = alertas.datos ?? [];
   const cilindros = useCarga(`cil:${empresa}`, () => (ve("cylinders") ? saldos(empresa) : Promise.resolve([] as SaldoCilindro[])));
 
   const porEstado = useMemo(() => {
@@ -321,15 +324,21 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Alertas Operativas" description="Atención requerida.">
-          {alertasOperativas.length === 0 ? (
+        <SectionCard title="Alertas Operativas" description="Lo que pide acción, con el enlace a donde se resuelve.">
+          {alertas.cargando ? (
+            <p className="py-6 text-center text-sm text-muted">Cargando…</p>
+          ) : alertasOperativas.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted">
               Nada que atender por ahora.
             </p>
           ) : (
             <div className="space-y-3">
-              {alertasOperativas.map((a) => (
-                <AlertCard key={a.titulo} tone={a.tone} titulo={a.titulo} mensaje={a.mensaje} />
+              {alertasOperativas.map((a) => a.enlace ? (
+                <Link key={a.id} href={a.enlace} className="block rounded-xl transition hover:brightness-95">
+                  <AlertCard tone={a.tono} titulo={a.titulo} mensaje={a.mensaje} />
+                </Link>
+              ) : (
+                <AlertCard key={a.id} tone={a.tono} titulo={a.titulo} mensaje={a.mensaje} />
               ))}
             </div>
           )}

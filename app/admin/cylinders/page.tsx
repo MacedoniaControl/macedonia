@@ -8,7 +8,8 @@
 //
 // El modelo y sus porqués están en supabase/11-cilindros.sql.
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EntregaCilindros } from "./EntregaCilindros";
@@ -25,12 +26,21 @@ type Tab = "entrega" | "parque" | "saldos" | "historial";
 
 // «Descargar» baja la pestaña abierta (Parque, Rampa o Historial).
 export default function CylindersPage() {
-  return <ProveedorExportar><Cilindros /></ProveedorExportar>;
+  return <Suspense fallback={null}><ConVista /></Suspense>;
 }
 
-function Cilindros() {
+// ?vista=parque|saldos|historial abre esa pestaña: así llegan las alertas.
+// La clave vuelve a montar la pantalla si se llega con otra vista.
+const TABS: Tab[] = ["entrega", "parque", "saldos", "historial"];
+function ConVista() {
+  const vista = useSearchParams().get("vista");
+  const inicial = TABS.find((t) => t === vista) ?? "entrega";
+  return <ProveedorExportar><Cilindros key={inicial} inicial={inicial} /></ProveedorExportar>;
+}
+
+function Cilindros({ inicial }: { inicial: Tab }) {
   const empresa = useEmpresaActiva();
-  const [tabElegida, setTab] = useState<Tab>("entrega");
+  const [tabElegida, setTab] = useState<Tab>(inicial);
   // El historial es del Owner y el Administrador, como en el inventario.
   const { rol } = useRol();
   const gerencia = esGerencia(rol);
