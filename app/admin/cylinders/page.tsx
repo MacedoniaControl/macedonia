@@ -11,7 +11,6 @@
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { PanelGases } from "./PanelGases";
 import { EntregaCilindros } from "./EntregaCilindros";
 import { SaldosCilindros } from "./SaldosCilindros";
 import { ConteosRampa } from "./ConteosRampa";
@@ -58,11 +57,8 @@ function Cilindros() {
         title="Cilindros"
         breadcrumbs={[{ label: "Inventario" }, { label: "Cilindros" }]}
         actions={
-          <div className="flex flex-wrap gap-2">
-            {/* Los gases y sus depósitos los configura la gerencia (gases_escribe). */}
-            {gerencia && <PanelGases empresa={empresa} onCambio={refrescar} />}
-            <BotonDescargar empresa={empresa} />
-          </div>
+          // Los gases se agregan y se quitan en Parque → Dar de Alta.
+          <BotonDescargar empresa={empresa} />
         }
       />
 

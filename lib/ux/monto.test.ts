@@ -82,7 +82,6 @@ describe("las pantallas de dinero no usan el control nativo", () => {
     "app/admin/receivables/page.tsx",
     "components/finanzas/FormularioCuenta.tsx",
     "app/admin/expenses/page.tsx",
-    "app/admin/cylinders/PanelGases.tsx",
     "app/admin/quotes/page.tsx",
     "app/admin/delivery-notes/page.tsx",
     "app/admin/purchases/page.tsx",
