@@ -47,8 +47,8 @@ function Etiqueta({ htmlFor, children }: { htmlFor: string; children: React.Reac
 }
 
 export function AccionesParque({
-  empresa, gerencia, recarga, onRegistrada,
-}: { empresa: string; gerencia: boolean; recarga: number; onRegistrada: () => void }) {
+  empresa, gerencia, recarga, onRegistrada, extra,
+}: { empresa: string; gerencia: boolean; recarga: number; onRegistrada: () => void; extra?: React.ReactNode }) {
   const g = useCarga(`gases:${empresa}:${recarga}`, () => gases(empresa));
   const s = useCarga(`estados:${empresa}:${recarga}`, () => saldos(empresa));
   const lista = (g.datos ?? []).map((x) => x.nombre);
@@ -68,6 +68,7 @@ export function AccionesParque({
         <Button variant="secondary" icon="alert" onClick={() => { setAviso(null); setAbierto("fuera"); }}>
           Fuera de Servicio{fueraTotal > 0 ? ` · ${fueraTotal}` : ""}
         </Button>
+        {extra}
       </div>
       <Aviso msg={aviso ?? (g.error ? { ok: false, texto: g.error } : null)} />
 
