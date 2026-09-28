@@ -27,8 +27,12 @@ let pedido: Promise<void> | null = null;
 let ultimaLectura = 0;
 const oyentes = new Set<(v: BcvRate | null) => void>();
 
+// El BCV publica ocho decimales; aquí se usan dos, como en Valery y en el
+// papel: así la tasa que se ve es la misma con la que se convierte.
+const dos = (n: number) => Math.round(n * 100) / 100;
 const aRate = (t: TasaBcv | null): BcvRate | null =>
-  t ? { tasa: t.tasa, fecha: t.fechaValor, fetchedAt: t.actualizada, error: t.error, proxima: t.proxima } : null;
+  t ? { tasa: dos(t.tasa), fecha: t.fechaValor, fetchedAt: t.actualizada, error: t.error,
+        proxima: t.proxima ? { ...t.proxima, tasa: dos(t.proxima.tasa) } : null } : null;
 
 function publicar(v: BcvRate | null) {
   actual = v;
