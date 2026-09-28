@@ -33,18 +33,28 @@ import { vendedoresDe } from "@/lib/auth/vendedores";
 import { leerConfig } from "@/lib/config/config-db";
 import { useTasaViva } from "@/lib/ux/bcv-rate";
 import type { Cliente } from "@/lib/directorio/directorio-db";
+import { autorizantes, cilindrosParaNota, type LineaEntrega } from "@/lib/cilindros/cilindros-db";
+import { useSesion } from "@/components/auth/SesionProvider";
 
-/** Lo que se emite: se guarda `lineas` (en dólares) y se imprime `lineasImpresas`. */
-export type NEEmitir = NEDoc & { lineasImpresas: NEDoc["lineas"] };
+/**
+ * Lo que se emite: se guarda `lineas` (en dólares), se imprime `lineasImpresas`
+ * y, si hay cilindros, se registran en el parque como una entrega.
+ */
+export type NEEmitir = NEDoc & {
+  lineasImpresas: NEDoc["lineas"];
+  cilindrosEntrega: { lineas: LineaEntrega[]; autorizadoPor: string | null; retiradoPor: string | null };
+};
 
-// El formato de la nota trae estos cuatro gases, en este orden.
+// El papel de la nota trae estos cuatro gases, en este orden. Los acetilenos
+// (2K, 4K, 6K) van juntos en su casilla; los que no tienen casilla, en las notas.
 const GASES_NE = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"];
+const casillaDe = (gas: string) => (gas.startsWith("ACETILENO") ? "ACETILENO" : GASES_NE.includes(gas) ? gas : null);
+type Cuenta = { llenos: number; vacios: number };
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
 const bs = (n: number) => `${n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs`;
 const formularioVacio = () => ({ rif: "", tlf: "", direccion: "", ordenCompra: "", notas: "", vendedor: "", tipoPrecio: TIPOS_PRECIO[0] as string, divisa: "Dólar" });
-const cilVacios = (): NECil[] => GASES_NE.map((g) => ({ gas: g, llenos: 0, vacios: 0 }));
 
 /** Un número con − y +: en el teléfono, teclear cantidades chicas es un estorbo. */
 function Paso({ valor, onChange, etiqueta }: { valor: number; onChange: (n: number) => void; etiqueta: string }) {
@@ -58,16 +68,39 @@ function Paso({ valor, onChange, etiqueta }: { valor: number; onChange: (n: numb
   );
 }
 
-export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEEmitir) => Promise<{ error: string | null }> }) {
+export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEEmitir) => Promise<{ error: string | null; aviso?: string }> }) {
   const empresaKey = useEmpresaActiva();
+  const sesion = useSesion();
   const tasa = useTasaViva();
   const [guardando, setGuardando] = useState(false);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [f, setF] = useState(formularioVacio());
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
   const [lineas, setLineas] = useState<Renglon[]>([]);
-  const [cil, setCil] = useState<NECil[]>(cilVacios());
+  const [cuentas, setCuentas] = useState<Record<string, Cuenta>>({});
+  const [autoriza, setAutoriza] = useState("");
+  const [retira, setRetira] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [avisoFinal, setAvisoFinal] = useState<string | null>(null);
+
+  // Los gases y los llenos se leen con el servidor: el vendedor no opera Cilindros.
+  const [recargaCil, setRecargaCil] = useState(0);
+  const parque = useCarga(`ne-cil:${empresaKey}:${recargaCil}`, async () => {
+    const [p, a] = await Promise.all([cilindrosParaNota(empresaKey), autorizantes(empresaKey)]);
+    return { ...p, autorizan: a };
+  });
+  const gasesCil = parque.datos?.gases ?? [];
+  const cuenta = (g: string): Cuenta => cuentas[g] ?? { llenos: 0, vacios: 0 };
+  const setCuenta = (g: string, k: keyof Cuenta, n: number) => setCuentas((p) => ({ ...p, [g]: { ...cuenta(g), [k]: n } }));
+  const conCilindros = gasesCil.filter((g) => cuenta(g).llenos > 0 || cuenta(g).vacios > 0);
+  const dejaLlenos = conCilindros.some((g) => cuenta(g).llenos > 0);
+  const quienSeLosLleva = retira ?? sesion?.nombre ?? "";
+  // Para el papel: los cuatro gases del formato, y el resto en una línea.
+  const cil: NECil[] = GASES_NE.map((casilla) => {
+    const suyos = conCilindros.filter((g) => casillaDe(g) === casilla);
+    return { gas: casilla, llenos: suyos.reduce((a, g) => a + cuenta(g).llenos, 0), vacios: suyos.reduce((a, g) => a + cuenta(g).vacios, 0) };
+  });
+  const sinCasilla = conCilindros.filter((g) => !casillaDe(g));
 
   const cfg = useCarga(empresaKey, () => leerConfig(empresaKey));
   const ivaPct = Number(cfg.datos?.iva_pct) || 16;
@@ -86,14 +119,21 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
     ...f, cliente: cliente?.nombre ?? "", correlativo, fecha: hoyISO(), deposito, lineas: ls, cilindros: cil, llevaIva, ivaPct,
   });
   const t = neTotals(doc(""), ivaPct);
-  const conCilindros = cil.filter((c) => c.llenos > 0 || c.vacios > 0);
 
   // En bolívares el papel sale convertido a la tasa BCV; se guarda en dólares.
   function paraEmitir(correlativo: string): NEEmitir {
     const factor = enBolivares && tasa ? tasa : 1;
     const impresas = lineas.map((l) => ({ ...l, precio: Math.round(l.precio * factor * 100) / 100 }));
     const nota = enBolivares && tasa ? `Montos en bolívares, tasa BCV ${tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })}.` : "";
-    return { ...doc(correlativo), notas: [f.notas, nota].filter(Boolean).join(" · "), lineasImpresas: impresas };
+    const otros = sinCasilla.length ? `Cilindros: ${sinCasilla.map((g) => `${g} ${cuenta(g).llenos} lleno(s) / ${cuenta(g).vacios} vacío(s)`).join(", ")}.` : "";
+    return {
+      ...doc(correlativo), notas: [f.notas, otros, nota].filter(Boolean).join(" · "), lineasImpresas: impresas,
+      cilindrosEntrega: {
+        lineas: conCilindros.map((g) => ({ gas: g, llenosEntregados: cuenta(g).llenos, vaciosRecibidos: cuenta(g).vacios })),
+        autorizadoPor: dejaLlenos ? autoriza || null : null,
+        retiradoPor: dejaLlenos ? quienSeLosLleva.trim() || null : null,
+      },
+    };
   }
   function validar(): string | null {
     if (!cliente) return "Elige el cliente de la cartera.";
@@ -101,6 +141,10 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
     const sinPrecio = lineas.filter((l) => l.precio <= 0).length;
     if (sinPrecio) return `${sinPrecio} renglón(es) sin precio, marcados en rojo. Complétalos antes de emitir.`;
     if (enBolivares && !tasa) return "Todavía no hay tasa BCV: no emitas en bolívares hasta que cargue.";
+    const faltan = conCilindros.filter((g) => cuenta(g).llenos > (parque.datos?.llenos[g] ?? 0));
+    if (faltan.length) return `No hay tantos llenos en planta: ${faltan.map((g) => `${g} (hay ${parque.datos?.llenos[g] ?? 0})`).join(", ")}.`;
+    if (dejaLlenos && !autoriza) return "Elige quién autoriza que salgan los cilindros llenos.";
+    if (dejaLlenos && !quienSeLosLleva.trim()) return "Indica quién se lleva los cilindros.";
     return null;
   }
   async function emitir() {
@@ -110,7 +154,11 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
       const r = await onSave(paraEmitir(seq));
       // Se suelta el cliente: si queda elegido, la siguiente nota sale al mismo sin que nadie lo pida.
       if (r.error) setMsg(r.error);
-      else { setLineas([]); setF(formularioVacio()); setCliente(null); setCil(cilVacios()); setIvaManual(null); }
+      else {
+        setLineas([]); setF(formularioVacio()); setCliente(null); setCuentas({}); setAutoriza(""); setRetira(null); setIvaManual(null);
+        setAvisoFinal(r.aviso ?? null);
+        setRecargaCil((n) => n + 1);
+      }
     } finally { setGuardando(false); }
   }
   function borrador() {
@@ -156,24 +204,52 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
 
       {/* ---------------- Cilindros: van aparte del total, son de la empresa y vuelven. */}
       <SectionCard title="Cilindros" className="xl:[grid-area:cil]"
-        description="Los que se dejan llenos y los que se traen vacíos. Salen impresos en la nota.">
-        <div className="grid grid-cols-[minmax(4.5rem,1fr)_auto_auto] items-center gap-x-3 gap-y-2">
-          <span />
-          <span className="text-center text-[11px] font-medium uppercase tracking-wide text-muted">Llenos</span>
-          <span className="text-center text-[11px] font-medium uppercase tracking-wide text-muted">Vacíos</span>
-          {cil.map((c, i) => (
-            <div key={c.gas} className="contents">
-              <span className="truncate text-sm font-medium text-text">{NOMBRE_GAS[c.gas] ?? c.gas}</span>
-              <Paso valor={c.llenos} etiqueta={`${c.gas} llenos`} onChange={(n) => setCil((p) => p.map((x, j) => (j === i ? { ...x, llenos: n } : x)))} />
-              <Paso valor={c.vacios} etiqueta={`${c.gas} vacíos`} onChange={(n) => setCil((p) => p.map((x, j) => (j === i ? { ...x, vacios: n } : x)))} />
-            </div>
-          ))}
-        </div>
-        {conCilindros.some((c) => c.llenos !== c.vacios) && (
+        description="Los que se dejan llenos y los que se traen vacíos. Al emitir, se registran en el parque.">
+        {parque.error && <p className="mb-2 text-sm text-danger">{parque.error}</p>}
+        {!parque.cargando && gasesCil.length === 0 && !parque.error && <p className="text-sm text-muted">No hay gases cargados en esta empresa.</p>}
+        {gasesCil.length > 0 && (
+          <div className="grid grid-cols-[minmax(4.5rem,1fr)_auto_auto] items-center gap-x-3 gap-y-2">
+            <span />
+            <span className="text-center text-[11px] font-medium uppercase tracking-wide text-muted">Llenos</span>
+            <span className="text-center text-[11px] font-medium uppercase tracking-wide text-muted">Vacíos</span>
+            {gasesCil.map((g) => {
+              const hay = parque.datos?.llenos[g] ?? 0;
+              const c = cuenta(g);
+              return (
+                <div key={g} className="contents">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-text">{NOMBRE_GAS[g] ?? g}</span>
+                    <span className={`block text-[11px] tabular-nums ${c.llenos > hay ? "font-medium text-danger" : "text-muted"}`}>{hay} en planta</span>
+                  </span>
+                  <Paso valor={c.llenos} etiqueta={`${g} llenos`} onChange={(n) => setCuenta(g, "llenos", n)} />
+                  <Paso valor={c.vacios} etiqueta={`${g} vacíos`} onChange={(n) => setCuenta(g, "vacios", n)} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {conCilindros.some((g) => cuenta(g).llenos !== cuenta(g).vacios) && (
           <p className="mt-3 text-xs text-muted">
-            {conCilindros.filter((c) => c.llenos !== c.vacios).map((c) =>
-              `${NOMBRE_GAS[c.gas] ?? c.gas}: el cliente queda con ${Math.abs(c.llenos - c.vacios)} ${c.llenos > c.vacios ? "más" : "menos"}`).join(" · ")}.
+            {conCilindros.filter((g) => cuenta(g).llenos !== cuenta(g).vacios).map((g) =>
+              `${NOMBRE_GAS[g] ?? g}: el cliente queda con ${Math.abs(cuenta(g).llenos - cuenta(g).vacios)} ${cuenta(g).llenos > cuenta(g).vacios ? "más" : "menos"}`).join(" · ")}.
           </p>
+        )}
+        {/* Salida de llenos: quien autoriza y quien se los lleva. Si un cilindro
+            no vuelve, es a quien se le reclama (la base lo exige). */}
+        {dejaLlenos && (
+          <div className="mt-3 space-y-2 rounded-xl border border-brand/30 bg-brand/5 p-3">
+            <label className="block">
+              <span className={lbl}>Autoriza la salida *</span>
+              <select className={campo} value={autoriza} onChange={(e) => setAutoriza(e.target.value)}>
+                <option value="">Elige…</option>
+                {(parque.datos?.autorizan ?? []).map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className={lbl}>Quién se los lleva *</span>
+              <input className={campo} value={quienSeLosLleva} onChange={(e) => setRetira(e.target.value)} placeholder="Chofer, vendedor o el cliente" />
+            </label>
+          </div>
         )}
       </SectionCard>
 
@@ -240,18 +316,19 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
             <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">No se pudo leer la tasa BCV. No emitas en bolívares hasta que cargue.</p>
           )}
           {msg && <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
+          {avisoFinal && <p role="status" className="mt-3 rounded-xl bg-warn/10 px-3 py-2 text-sm text-warn">{avisoFinal}</p>}
 
           {/* Se confirma antes de emitir: el número se gasta y el papel sale al
               cliente. El resumen repite CLIENTE y TOTAL, los dos datos que duelen
               si están mal. Se valida ANTES de abrir la confirmación. */}
           <ConfirmDialog
             title="¿Emitir la nota de entrega?"
-            message={`${cliente?.nombre ?? "Sin cliente"} · ${lineas.length} renglón(es) · ${totalVisible}${conCilindros.length ? ` · ${conCilindros.length} gas(es) con cilindros` : ""}. Se usa el número ${seq} y no se puede deshacer.`}
+            message={`${cliente?.nombre ?? "Sin cliente"} · ${lineas.length} renglón(es) · ${totalVisible}${conCilindros.length ? ` · cilindros: ${conCilindros.map((g) => `${g} ${cuenta(g).llenos}/${cuenta(g).vacios}`).join(", ")} (llenos/vacíos), que entran al parque` : ""}. Se usa el número ${seq} y no se puede deshacer.`}
             confirmLabel="Sí, emitir" cancelLabel="No"
             onConfirm={emitir}
             trigger={(abrir) => (
               <Button icon="delivery" className="mt-3 w-full" cargando={guardando} textoCargando="Guardando…"
-                onClick={() => { setMsg(""); const e = validar(); if (e) return setMsg(e); abrir(); }}>
+                onClick={() => { setMsg(""); setAvisoFinal(null); const e = validar(); if (e) return setMsg(e); abrir(); }}>
                 Registrar y generar PDF
               </Button>
             )}
