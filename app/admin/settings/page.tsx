@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { leerConfig, guardarConfig, type Configuracion } from "@/lib/config/config-db";
+import { fetchBcvRate, useBcvRate } from "@/lib/ux/bcv-rate";
 
 const inputClass = "sumi-campo";
 
@@ -79,7 +80,6 @@ export default function SettingsPage() {
     try {
       const r = await guardarConfig({
         iva_pct: form.iva,
-        tasa_manual: form.tasa,
         dias_vencimiento_cotizacion: form.rangoTasa,
       }, empresaKey);
       // Decir "guardado" cuando la base rechazó es peor que no decir nada: la
@@ -92,22 +92,17 @@ export default function SettingsPage() {
     }
   }
 
+  // La tasa BCV ya no se escribe a mano ni se guarda aquí: la base la trae
+  // sola cada 30 minutos y toda la app usa esa (migración 30). Antes este campo
+  // era editable, arrancaba en 49,50 y ninguna pantalla lo leía.
+  const tasaBcv = useBcvRate();
   const [bcv, setBcv] = useState<{ loading: boolean; msg: string; err: boolean }>({ loading: false, msg: "", err: false });
   async function actualizarBCV() {
-    setBcv({ loading: true, msg: "Consultando bcv.org.ve…", err: false });
-    try {
-      const r = await fetch("/api/bcv", { cache: "no-store" });
-      const d = await r.json();
-      if (!d.ok) throw new Error(d.error || "No disponible");
-      const next = { ...form, tasa: String(d.tasa) };
-      setForm(next);
-      // La tasa del BCV se guarda para toda la empresa: si cada quien tuviera la
-      // suya, dos personas convertirían el mismo monto a dólares distintos.
-      await guardarConfig({ tasa_manual: String(d.tasa) }, empresaKey);
-      setBcv({ loading: false, err: false, msg: `Tasa BCV actualizada a ${d.tasa} Bs/USD${d.fecha ? ` · ${d.fecha}` : ""}.` });
-    } catch (e) {
-      setBcv({ loading: false, err: true, msg: `No se pudo actualizar desde el BCV (${String(e)}). Ingrésala manual.` });
-    }
+    setBcv({ loading: true, msg: "", err: false });
+    const r = await fetchBcvRate();
+    setBcv(r.ok
+      ? { loading: false, err: false, msg: "Consultada al BCV en este momento." }
+      : { loading: false, err: true, msg: `No se pudo consultar el BCV: ${r.error ?? "sin respuesta"}. Se sigue usando la última guardada.` });
   }
 
   return (
@@ -140,17 +135,19 @@ export default function SettingsPage() {
 
         <SectionCard title="Moneda y Tasa" description="USD/Bs, tasa BCV e IVA." >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Tasa BCV (Bs/USD)"><input className={inputClass} value={form.tasa} onChange={set("tasa")} /></Field>
+            <Field label="Tasa BCV (Bs/USD)" hint={tasaBcv ? `Vale el ${tasaBcv.fecha.split("-").reverse().join("-")} · actualizada ${new Date(tasaBcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}` : undefined}>
+              <input className={inputClass} value={tasaBcv ? tasaBcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 }) : "…"} readOnly />
+            </Field>
             <Field label="IVA (%)"><input className={inputClass} value={form.iva} onChange={set("iva")} /></Field>
             <Field label="Tasa especial sin aprobación (±%)" hint="Fuera de ese rango la aprueba el Owner o un Administrador."><input className={inputClass} value={form.rangoTasa} onChange={set("rangoTasa")} /></Field>
             <Field label="Moneda base"><input className={inputClass} value="USD" readOnly /></Field>
           </div>
           <div className="mt-3">
             <Button variant="secondary" icon="roi" onClick={actualizarBCV} disabled={bcv.loading}>
-              {bcv.loading ? "Consultando BCV…" : "Actualizar desde BCV"}
+              {bcv.loading ? "Consultando BCV…" : "Consultar ahora"}
             </Button>
             {bcv.msg && <p className={`mt-2 rounded-xl px-3 py-2 text-sm ${bcv.err ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>{bcv.msg}</p>}
-            <p className="mt-1 text-[11px] text-muted">Trae el precio oficial del dólar de bcv.org.ve y actualiza la tasa.</p>
+            <p className="mt-1 text-[11px] text-muted">Se actualiza sola cada 30 minutos desde bcv.org.ve, la misma para todos los equipos.</p>
           </div>
         </SectionCard>
 
