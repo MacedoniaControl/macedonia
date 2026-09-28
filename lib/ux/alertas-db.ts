@@ -13,6 +13,7 @@
 //     (el Técnico ve que el suyo sigue esperando)
 //   · Productos con existencia negativa ............ Owner y Administrador
 //   · Clientes con cilindros hace más de 60 días ... quien opera cilindros
+//   · Tasa BCV sin actualizar hace más de 2 horas ... Owner y Administrador
 //   · Intentos de acceso fallidos .................. solo el Owner
 //
 // Cada regla va por separado: si una falla, las demás igual se muestran.
@@ -113,6 +114,20 @@ export async function alertasDe(empresa: string): Promise<Alerta[]> {
         titulo: `${clientes.size} cliente(s) con cilindros hace más de ${DIAS_COMODATO} días`,
         mensaje: `${cilindros} cilindro(s) por recuperar: ${[...clientes].slice(0, 3).join(", ")}${clientes.size > 3 ? "…" : ""}.`,
         enlace: `${base}/cylinders?vista=parque`,
+      } satisfies Alerta];
+    }) : [],
+
+    // La tasa BCV se trae sola cada 30 minutos (migración 30). Si lleva más de
+    // dos horas sin confirmarse, los montos en Bs pueden estar con una vieja.
+    gerencia ? regla(async () => {
+      const { data, error } = await sb.from("bcv_estado").select("ultimo_ok, ultimo_error").eq("id", 1).maybeSingle();
+      if (error || !data) return [];
+      const hace = data.ultimo_ok ? Date.now() - new Date(data.ultimo_ok as string).getTime() : Infinity;
+      if (hace < 2 * 3600_000) return [];
+      return [{
+        id: "tasa-bcv", tono: "warn",
+        titulo: data.ultimo_ok ? `La tasa BCV no se actualiza desde ${fechaHora(data.ultimo_ok as string)}` : "La tasa BCV todavía no se ha consultado",
+        mensaje: `${data.ultimo_error ? `${data.ultimo_error} ` : ""}Se sigue usando la última guardada. Toca «Tasa BCV» arriba para consultar ya.`,
       } satisfies Alerta];
     }) : [],
 

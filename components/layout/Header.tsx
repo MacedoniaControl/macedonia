@@ -26,6 +26,8 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   }
 
   const bcv = useBcvRate();
+  const viejaBcv = !!bcv && Date.now() - new Date(bcv.fetchedAt).getTime() > 90 * 60_000;
+  const ddmm = (ymd: string) => ymd.split("-").reverse().slice(0, 2).join("-");
   // Las alertas salen de la base (alertas-db). Se piden al entrar a cada
   // pantalla, al abrir la campana y cada 5 minutos. Mientras llega la
   // respuesta se deja la lista anterior: que el número no parpadee.
@@ -59,7 +61,8 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         type="button"
         onClick={dolarPrice}
         disabled={bcvLoading}
-        aria-label="Actualizar precio del dólar BCV"
+        aria-label="Consultar ahora el dólar BCV"
+        title="Se actualiza sola cada 30 minutos. Toca para consultar ya."
         className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border-strong bg-surface px-3 text-sm font-medium text-text transition hover:bg-surface-2 disabled:opacity-60"
       >
         <Icon name="dollar" size={16} />
@@ -83,8 +86,13 @@ export function Header({ onMenu }: { onMenu: () => void }) {
             <p className="text-sm font-semibold tabular-nums text-text">
               {bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs
             </p>
-            <p className="text-[10px] text-muted">
-              Consultado: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
+            {/* La fecha valor es el día para el que vale; la hora, la última vez
+                que el BCV la confirmó. Con más de hora y media sin confirmarse,
+                se avisa: la base la pide cada 30 minutos. */}
+            <p className={`text-[10px] ${viejaBcv ? "font-medium text-warn" : "text-muted"}`}
+              title={bcv.proxima ? `Ya publicada la del ${ddmm(bcv.proxima.fechaValor)}: ${bcv.proxima.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : undefined}>
+              {viejaBcv ? "Sin actualizar desde " : `Vale el ${ddmm(bcv.fecha)} · `}
+              {new Date(bcv.fetchedAt).toLocaleString("es-VE", viejaBcv ? { dateStyle: "short", timeStyle: "short" } : { timeStyle: "short" })}
             </p>
           </>
         ) : (

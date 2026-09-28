@@ -189,7 +189,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
             <>
               <p className="mt-2 text-xl font-semibold tabular-nums text-text sm:text-2xl">{bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs</p>
               <p className="mt-1 text-xs text-muted">
-                {bcv.fecha ? `Fecha valor BCV: ${bcv.fecha} · ` : ""}Consultado: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
+                Fecha valor BCV: {bcv.fecha.split("-").reverse().join("-")} · Actualizada: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
               </p>
               <p className="mt-1 text-xs text-muted">Los bolívares de esta pantalla se calculan a esta tasa.</p>
             </>

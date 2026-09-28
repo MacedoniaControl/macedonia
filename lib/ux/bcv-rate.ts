@@ -1,80 +1,80 @@
 "use client";
 
+// La tasa BCV en la pantalla: la de la BASE, la misma para todos.
+//
+// Antes cada navegador consultaba el BCV y guardaba la tasa en su propio
+// almacenamiento: cada computadora y cada teléfono podía tener una distinta,
+// y si nadie abría las pantallas que la piden se quedaba vieja. Ahora la base
+// la trae sola cada 30 minutos (migración 30) y aquí solo se lee: una vez por
+// página, compartida entre todos los componentes, y de nuevo cada 5 minutos.
+
 import { useEffect, useState } from "react";
+import { actualizarTasaAhora, tasaVigente, type TasaBcv } from "@/lib/bcv/tasa-db";
 
-export type BcvRate = { tasa: number; fecha: string; fetchedAt: string };
+export type BcvRate = {
+  tasa: number;
+  /** Fecha valor (YYYY-MM-DD): el día para el que vale. */
+  fecha: string;
+  /** Cuándo la confirmó el BCV por última vez (ISO). */
+  fetchedAt: string;
+  error: string | null;
+  proxima: TasaBcv["proxima"];
+};
 
-const KEY = "sumi:bcvrate";
-const EV = "sumi:bcvrate";
+const CADA = 5 * 60_000;
+let actual: BcvRate | null = null;
+let pedido: Promise<void> | null = null;
+let ultimaLectura = 0;
+const oyentes = new Set<(v: BcvRate | null) => void>();
 
+const aRate = (t: TasaBcv | null): BcvRate | null =>
+  t ? { tasa: t.tasa, fecha: t.fechaValor, fetchedAt: t.actualizada, error: t.error, proxima: t.proxima } : null;
+
+function publicar(v: BcvRate | null) {
+  actual = v;
+  for (const o of oyentes) o(v);
+}
+
+function leer(forzar = false): Promise<void> {
+  if (pedido) return pedido;
+  if (!forzar && Date.now() - ultimaLectura < CADA && actual) return Promise.resolve();
+  pedido = tasaVigente()
+    .then((t) => { ultimaLectura = Date.now(); publicar(aRate(t)); })
+    .catch(() => {})
+    .finally(() => { pedido = null; });
+  return pedido;
+}
+
+/** La última tasa leída en esta página (null si todavía no llegó). */
 export function getBcvRate(): BcvRate | null {
-  if (typeof localStorage === "undefined") return null;
-  try {
-    const r = localStorage.getItem(KEY);
-    return r ? (JSON.parse(r) as BcvRate) : null;
-  } catch {
-    return null;
-  }
+  return actual;
 }
 
-function save(v: BcvRate) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(v));
-  } catch {
-    /* ignore */
-  }
-  window.dispatchEvent(new Event(EV));
-}
-
-/** Llama a la API interna que consulta el BCV y guarda el resultado con la marca de tiempo del call. */
+/** El botón «Tasa BCV»: pide al servidor que consulte ya al BCV. */
 export async function fetchBcvRate(): Promise<{ ok: boolean; error?: string; rate?: BcvRate }> {
   try {
-    const r = await fetch("/api/bcv", { cache: "no-store" });
-    const d = await r.json();
-    if (!d.ok) return { ok: false, error: d.error || "No disponible" };
-    const rate: BcvRate = { tasa: d.tasa, fecha: d.fecha || "", fetchedAt: new Date().toISOString() };
-    save(rate);
-    return { ok: true, rate };
+    const r = await actualizarTasaAhora();
+    const rate = aRate(r.tasa);
+    ultimaLectura = Date.now();
+    publicar(rate);
+    return r.ok ? { ok: true, rate: rate ?? undefined } : { ok: false, error: r.error };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
 }
 
-export function useBcvRate() {
-  const [v, setV] = useState<BcvRate | null>(null);
+export function useBcvRate(): BcvRate | null {
+  const [v, setV] = useState<BcvRate | null>(actual);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setV(getBcvRate());
-    const h = () => setV(getBcvRate());
-    window.addEventListener(EV, h);
-    window.addEventListener("storage", h);
-    return () => {
-      window.removeEventListener(EV, h);
-      window.removeEventListener("storage", h);
-    };
+    oyentes.add(setV);
+    leer().then(() => setV(actual));
+    const t = setInterval(() => { leer(); }, CADA);
+    return () => { oyentes.delete(setV); clearInterval(t); };
   }, []);
   return v;
 }
 
-/**
- * La tasa del BCV, traída del servidor al montar.
- *
- * `useBcvRate` solo LEE lo que alguien haya guardado antes; si nadie la
- * refrescó, devuelve null y la pantalla se queda con una constante vieja. Aquí
- * se pide de verdad. Devuelve `null` mientras no haya respuesta, para que quien
- * la use decida qué mostrar en vez de inventar un número.
- */
+/** Solo la cifra, para convertir a bolívares. null mientras no llegue. */
 export function useTasaViva(): number | null {
-  const guardada = useBcvRate();
-  const [tasa, setTasa] = useState<number | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    fetchBcvRate().then((r) => {
-      if (vigente && r.ok && r.rate) setTasa(r.rate.tasa);
-    });
-    return () => { vigente = false; };
-  }, []);
-
-  return tasa ?? guardada?.tasa ?? null;
+  return useBcvRate()?.tasa ?? null;
 }
