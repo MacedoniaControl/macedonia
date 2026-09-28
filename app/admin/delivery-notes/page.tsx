@@ -8,19 +8,18 @@ import { guardarDocumento, listarDocumentos, correlativoPrevisto, type Documento
 import { useCarga } from "@/lib/ux/use-carga";
 import { subirArchivo, listarArchivos, urlDeArchivo, type TipoArchivo } from "@/lib/documentos/archivos-db";
 import { SubirArchivo } from "@/components/ui/SubirArchivo";
-import { leerConfig } from "@/lib/config/config-db";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Button } from "@/components/ui/Button";
-import { InputMonto } from "@/components/ui/InputMonto";
 import { fmtUsd } from "@/lib/ux/format";
 import {
   notaEntregaHtml, devolucionHtml, printDoc,
-  type NEDoc, type DevDoc, type DevLinea,
+  type NEDoc, type DevDoc,
 } from "@/lib/ux/doc-templates";
 import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 import { NuevaNotaEntrega } from "./NuevaNotaEntrega";
+import { NuevaDevolucion } from "./NuevaDevolucion";
+import { registrarCilindrosDeNota } from "@/lib/cilindros/cilindros-db";
 
 type Tipo = "entrega" | "devolucion";
 type Doc = {
@@ -28,9 +27,6 @@ type Doc = {
   origen: "Macedonia" | "SumiControl" | "Valery"; fileName?: string; ruta?: string; ne?: NEDoc; dev?: DevDoc;
 };
 
-const hoyISO = () => new Date().toISOString().slice(0, 10);
-const inputClass = "sumi-campo";
-const label = "mb-1 block text-xs font-medium text-muted";
 
 
 function deDocumento(d: DocumentoGuardado): Doc {
@@ -170,7 +166,7 @@ export default function DeliveryNotesPage() {
       <div className="sumi-tabs mb-4 gap-2">
         {([
           ["ne", "Nueva Nota de Entrega"] as const,
-          ["dev", "Generar Devolución"] as const,
+          ["dev", "Nueva Devolución"] as const,
           ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
         ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
@@ -236,10 +232,22 @@ export default function DeliveryNotesPage() {
         setRecarga((n) => n + 1);
         setPrevistoNE(String(Number(r.documento.correlativo) + 1).padStart(10, "0"));
         printDoc(notaEntregaHtml(conNumero, empresaKey));
-        return { error: null };
+
+        // Los cilindros de la nota entran al parque, como una entrega. Si esto
+        // falla, la nota ya está emitida: se avisa y se registran a mano.
+        let aviso: string | undefined;
+        const ce = ne.cilindrosEntrega;
+        if (ce.lineas.length) {
+          const c = await registrarCilindrosDeNota(r.documento.id, ce.lineas, { autorizadoPor: ce.autorizadoPor, retiradoPor: ce.retiradoPor })
+            .catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }));
+          aviso = c.ok
+            ? (c.avisos.length ? `Cilindros registrados en el parque. ${c.avisos.join(" ")}` : undefined)
+            : `La nota ${r.documento.correlativo} se emitió, pero sus cilindros no entraron al parque: ${c.error} Regístralos en Cilindros → Registrar Entrega.`;
+        }
+        return { error: null, aviso };
       }} seq={previstoNE} />}
 
-      {tab === "dev" && <GenerarDev onSave={async (dev) => {
+      {tab === "dev" && <NuevaDevolucion onSave={async (dev) => {
         // Antes la devolucion solo se imprimia: no quedaba registro en ningun
         // lado. Una devolucion que no se guarda es mercaderia que volvio y que
         // el sistema sigue dando por vendida.
@@ -247,6 +255,7 @@ export default function DeliveryNotesPage() {
           tipo: "devolucion",
           cliente: dev.razonSocial,
           clienteRif: dev.rif,
+          clienteDireccion: dev.direccion,
           lineas: dev.lineas.map((l) => ({
             codigo: l.codigo ?? "", descripcion: l.descripcion,
             cantidad: l.cantidad, unidad: l.unidad,
@@ -264,75 +273,5 @@ export default function DeliveryNotesPage() {
       }} seq={previstoDev} />}
 
     </>
-  );
-}
-
-
-// ---- Generar Devolución (Nota de Crédito) ----
-function GenerarDev({ onSave, seq }: { onSave: (d: DevDoc) => Promise<{ error: string | null }>; seq: string }) {
-  const empresaDev = useEmpresaActiva();
-  const [guardando, setGuardando] = useState(false);
-  const [f, setF] = useState({ razonSocial: "", rif: "", direccion: "", telefonos: "", referencia: "", nota: "", formaPago: "" });
-  const [lineas, setLineas] = useState<DevLinea[]>([]);
-  const [ln, setLn] = useState<DevLinea>({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0 });
-  const [msg, setMsg] = useState("");
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
-  const sub = lineas.reduce((a, l) => a + l.cantidad * l.precio * (1 - l.descuento / 100), 0);
-  // El IVA sale de la configuracion de la empresa, no de un 16 escrito aquí:
-  // si cambia la alicuota, cambiarla en un solo lugar y no buscarla por el codigo.
-  const cfgDev = useCarga(empresaDev, () => leerConfig(empresaDev));
-  const ivaPctDev = Number(cfgDev.datos?.iva_pct) || 16;
-  const total = sub * (1 + ivaPctDev / 100);
-
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <SectionCard title="Datos de la Devolución (Nota de Crédito)" description={`N° ${seq}`}>
-        <div className="space-y-3">
-          <div><label className={label}>Razón social</label><input className={inputClass} value={f.razonSocial} onChange={set("razonSocial")} /></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className={label}>RIF</label><input className={inputClass} value={f.rif} onChange={set("rif")} /></div>
-            <div><label className={label}>Teléfonos</label><input className={inputClass} value={f.telefonos} onChange={set("telefonos")} /></div>
-          </div>
-          <div><label className={label}>Dirección</label><input className={inputClass} value={f.direccion} onChange={set("direccion")} /></div>
-          <div><label className={label}>Referencia (Nota de entrega, ej. NET-0000008216)</label><input className={inputClass} value={f.referencia} onChange={set("referencia")} /></div>
-          <div><label className={label}>Nota</label><input className={inputClass} value={f.nota} onChange={set("nota")} /></div>
-          <div><label className={label}>Forma de pago</label><input className={inputClass} value={f.formaPago} onChange={set("formaPago")} /></div>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Productos Devueltos">
-        <div className="grid grid-cols-2 gap-2">
-          <div><label className={label}>Código</label><input className={inputClass} value={ln.codigo} onChange={(e) => setLn({ ...ln, codigo: e.target.value })} /></div>
-          <div><label className={label}>Cantidad</label><input type="number" min={1} className={inputClass} value={ln.cantidad} onChange={(e) => setLn({ ...ln, cantidad: Number(e.target.value) })} /></div>
-          <div className="col-span-2"><label className={label}>Descripción</label><input className={inputClass} value={ln.descripcion} onChange={(e) => setLn({ ...ln, descripcion: e.target.value })} /></div>
-          <div><label className={label}>Precio unit.</label><InputMonto className={inputClass} valor={ln.precio} onChange={(n) => setLn({ ...ln, precio: n })} /></div>
-          <div><label className={label}>Descuento %</label><input type="number" min={0} max={100} className={inputClass} value={ln.descuento} onChange={(e) => setLn({ ...ln, descuento: Number(e.target.value) })} /></div>
-        </div>
-        <Button variant="secondary" icon="plus" className="mt-2" onClick={() => { if (ln.descripcion && ln.precio > 0) { setLineas([...lineas, ln]); setLn({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0 }); } }}>Agregar línea</Button>
-        {lineas.length > 0 && (
-          <ul className="mt-3 space-y-1 border-t border-border pt-2 text-sm">
-            {lineas.map((l, i) => <li key={i} className="flex justify-between"><span className="truncate text-text">{l.cantidad} × {l.descripcion}</span><span className="text-muted">{fmtUsd(l.cantidad * l.precio * (1 - l.descuento / 100))}</span></li>)}
-            <li className="flex justify-between border-t border-border pt-1 font-semibold"><span>Total operación (IVA {ivaPctDev}% incl.)</span><span>{fmtUsd(total)}</span></li>
-          </ul>
-        )}
-        {msg && <p className="mt-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
-        <Button icon="quote" className="mt-3 w-full" disabled={guardando} onClick={async () => {
-          setMsg("");
-          if (!f.razonSocial.trim()) return setMsg("La razón social es obligatoria.");
-          if (lineas.length === 0) return setMsg("Agrega al menos un producto devuelto.");
-          if (guardando) return;                    // doble clic: no emitir dos veces
-          setGuardando(true);
-          try {
-            // Se ESPERA el resultado. Antes no se esperaba, asi que un fallo al
-            // guardar pasaba desapercibido y el PDF salia igual.
-            const r = await onSave({ ...f, correlativo: seq, fechaEmision: hoyISO(), fechaVenc: hoyISO(), lineas });
-            if (r.error) setMsg(r.error);
-            else { setLineas([]); setF({ razonSocial: "", rif: "", direccion: "", telefonos: "", referencia: "", nota: "", formaPago: "" }); }
-          } finally {
-            setGuardando(false);
-          }
-        }} cargando={guardando} textoCargando="Guardando…">Generar y guardar (PDF)</Button>
-      </SectionCard>
-    </div>
   );
 }

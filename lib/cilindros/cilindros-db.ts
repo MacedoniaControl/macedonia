@@ -385,11 +385,12 @@ export async function desactivarGas(nombre: string, empresa: string): Promise<{ 
 export type Autorizante = { id: string; nombre: string; rol: string };
 
 export async function autorizantes(empresa: string): Promise<Autorizante[]> {
-  // Quien registra (el Técnico) solo puede leer su propia fila en usuarios:
-  // la lista salía vacía y nadie podía declarar una salida. Se lee con el
-  // servidor, y solo para quien opera cilindros en esa empresa.
+  // Quien registra (el Técnico, o el vendedor que emite una nota de entrega)
+  // solo puede leer su propia fila en usuarios: la lista salía vacía y nadie
+  // podía declarar una salida. Se lee con el servidor, y solo para quien opera
+  // cilindros o emite notas en esa empresa.
   const u = await getUsuarioSesion();
-  if (!u || !sesionPuede(u, "cylinders") || !puedeEntrarAEmpresa(u, empresa)) return [];
+  if (!u || !(sesionPuede(u, "cylinders") || sesionPuede(u, "delivery-notes")) || !puedeEntrarAEmpresa(u, empresa)) return [];
   const { data, error } = await createAdminClient()
     .from("usuarios")
     .select("id, nombre, rol, empresa_id, activo")
@@ -403,6 +404,94 @@ export async function autorizantes(empresa: string): Promise<Autorizante[]> {
     // empresa_id null = owner, entra a todas las empresas.
     .filter((u) => u.empresa_id === null || u.empresa_id === empresa)
     .map((u) => ({ id: u.id, nombre: u.nombre, rol: u.rol }));
+}
+
+// ---------------------------------------------------------------- cilindros de una nota de entrega
+//
+// La nota de entrega la emite el vendedor, que no opera Cilindros (no ve el
+// parque ni puede insertar movimientos). Antes los cilindros de la nota solo
+// salían impresos y el parque no se enteraba. Ahora, al emitirla, el servidor
+// registra esos cilindros como una entrega más — con las mismas reglas: quien
+// autoriza los llenos, quien se los lleva, y no más llenos de los que hay —,
+// y solo si quien lo pide acaba de emitir esa misma nota.
+
+type MovSaldo = { gas: string; cantidad: number; estado_desde: string | null; estado_hacia: string | null; cliente: string | null };
+
+async function movimientosVivos(empresa: string): Promise<MovSaldo[]> {
+  const { data, error } = await createAdminClient().from("cilindros_mov")
+    .select("gas, cantidad, estado_desde, estado_hacia, cliente").eq("empresa_id", empresa).is("eliminado_en", null);
+  if (error) throw new Error(`No se pudo leer el parque: ${error.message}`);
+  return (data ?? []) as MovSaldo[];
+}
+const llenosDe = (ms: MovSaldo[]) => {
+  const r: Record<string, number> = {};
+  for (const m of ms) r[m.gas] = (r[m.gas] ?? 0) + (m.estado_hacia === "lleno" ? m.cantidad : 0) - (m.estado_desde === "lleno" ? m.cantidad : 0);
+  return r;
+};
+const enPoderDe = (ms: MovSaldo[], cliente: string) => {
+  const r: Record<string, number> = {};
+  for (const m of ms) if (m.cliente === cliente) r[m.gas] = (r[m.gas] ?? 0) + (m.estado_hacia === "en_cliente" ? m.cantidad : 0) - (m.estado_desde === "en_cliente" ? m.cantidad : 0);
+  return r;
+};
+
+/** Los gases de la empresa y los llenos en planta, para la tarjeta Cilindros de la nota. */
+export async function cilindrosParaNota(empresa: string): Promise<{ gases: string[]; llenos: Record<string, number> }> {
+  const u = await getUsuarioSesion();
+  if (!u || !(sesionPuede(u, "delivery-notes") || sesionPuede(u, "cylinders")) || !puedeEntrarAEmpresa(u, empresa)) return { gases: [], llenos: {} };
+  const [g, ms] = await Promise.all([
+    createAdminClient().from("gases").select("nombre").eq("empresa_id", empresa).eq("activo", true).order("nombre"),
+    movimientosVivos(empresa),
+  ]);
+  if (g.error) throw new Error(`No se pudieron leer los gases: ${g.error.message}`);
+  return { gases: (g.data ?? []).map((x) => x.nombre as string), llenos: llenosDe(ms) };
+}
+
+/** Registra en el parque los cilindros de una nota de entrega recién emitida. */
+export async function registrarCilindrosDeNota(
+  documentoId: number,
+  lineas: LineaEntrega[],
+  extra: { autorizadoPor?: string | null; retiradoPor?: string | null },
+): Promise<{ ok: true; avisos: string[] } | { ok: false; error: string }> {
+  const u = await getUsuarioSesion();
+  if (!u) return { ok: false, error: "Sin sesión." };
+  const utiles = lineas.filter((l) => l.llenosEntregados > 0 || l.vaciosRecibidos > 0);
+  if (utiles.length === 0) return { ok: true, avisos: [] };
+  const admin = createAdminClient();
+
+  // Solo la nota que esta misma persona acaba de emitir: no sirve para mover
+  // el parque con cualquier número.
+  const { data: doc } = await admin.from("documentos").select("empresa_id, tipo, correlativo, cliente, creado_por, created_at").eq("id", documentoId).maybeSingle();
+  if (!doc || doc.tipo !== "nota_entrega" || doc.creado_por !== u.id) return { ok: false, error: "No se encontró la nota recién emitida." };
+  const empresa = doc.empresa_id as string;
+  if (!puedeEntrarAEmpresa(u, empresa) || !(sesionPuede(u, "delivery-notes") || sesionPuede(u, "cylinders"))) return { ok: false, error: "Sin permiso para esta empresa." };
+  if (Date.now() - new Date(doc.created_at as string).getTime() > 15 * 60_000) return { ok: false, error: "La nota ya no es reciente: registra los cilindros en Cilindros → Registrar Entrega." };
+  const { count } = await admin.from("cilindros_mov").select("id", { count: "exact", head: true }).eq("empresa_id", empresa).eq("documento", doc.correlativo);
+  if (count) return { ok: false, error: "Los cilindros de esta nota ya estaban registrados." };
+
+  const dejaLlenos = utiles.some((l) => l.llenosEntregados > 0);
+  if (dejaLlenos) {
+    if (!extra.autorizadoPor) return { ok: false, error: "Falta quién autoriza que salgan los llenos." };
+    if (!extra.retiradoPor?.trim()) return { ok: false, error: "Falta quién se lleva los cilindros." };
+    const permitidos = await autorizantes(empresa);
+    if (!permitidos.some((a) => a.id === extra.autorizadoPor)) return { ok: false, error: "Quien autoriza tiene que ser el Owner o un Administrador." };
+  }
+
+  const nombre = normalizarCliente(doc.cliente as string);
+  const ms = await movimientosVivos(empresa);
+  const plan = planEntrega(utiles, llenosDe(ms), enPoderDe(ms, nombre));
+  if (plan.errores.length) return { ok: false, error: plan.errores.join(" ") };
+
+  const filas = plan.movimientos.map((m) => ({
+    empresa_id: empresa, gas: m.gas, cantidad: m.cantidad, estado_desde: m.desde, estado_hacia: m.hacia,
+    cliente: nombre, documento: doc.correlativo as string,
+    nota: m.desde === null ? `${m.nota} Cliente: ${nombre}. Nota de entrega ${doc.correlativo}.` : `Nota de entrega ${doc.correlativo}`,
+    usuario_id: u.id,
+    ...(m.hacia === "en_cliente" ? { autorizado_por: extra.autorizadoPor, retirado_por: extra.retiradoPor!.trim() } : {}),
+  }));
+  // El servidor escribe (el vendedor no puede); la base igual impide negativos.
+  const { error } = await admin.from("cilindros_mov").insert(filas);
+  if (error) return { ok: false, error: `No se pudieron registrar los cilindros: ${error.message}` };
+  return { ok: true, avisos: plan.avisos };
 }
 
 // ---------------------------------------------------------------- historial (Owner y Administrador)
