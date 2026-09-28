@@ -101,6 +101,8 @@ export type CuentaNueva = {
   /** Lo que se debe. Con desglose sale de BI + IVA - retencion. */
   monto: number;
   vence: string;
+  /** Fecha del documento. Sin ella, la de hoy (y una cuenta ya vencida no entra). */
+  emitida?: string;
   nota?: string;
   // Desglose fiscal, opcional: una cuenta sin factura -un anticipo, un
   // prestamo entre empresas- no tiene ninguno de los tres.
@@ -224,6 +226,7 @@ export async function crearCuenta(
     iva: c.iva ?? null,
     iva_retenido: c.ivaRetenido ?? null,
     vence: c.vence,
+    ...(c.emitida ? { emitida: c.emitida } : {}),
     nota: c.nota?.trim() || null,
     usuario_id: usuario.id,
   };
@@ -470,6 +473,7 @@ export async function editarCuenta(
     iva_retenido: c.ivaRetenido,
     emitida: c.emitida,
     vence: c.vence,
+    ...(c.emitida ? { emitida: c.emitida } : {}),
     nota: c.nota?.trim() || null,
   };
 
