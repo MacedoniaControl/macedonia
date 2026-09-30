@@ -1,9 +1,9 @@
 "use client";
 
-// Conteos de la Rampa, en el Historial: el Técnico cuenta, el Owner o un
-// Administrador aprueba. Contar no ajusta; aprobar convierte cada diferencia
-// en un movimiento del parque. La base lo vuelve a comprobar
-// (aprobar_conteo_cilindros): esconder los botones es comodidad, no seguridad.
+// Conteos de la Rampa, en el Historial: el Técnico cuenta y la Rampa cambia al
+// momento; el Owner o un Administrador lo verifica o lo rechaza. Rechazar
+// deshace el ajuste. La base lo vuelve a comprobar (migración 31): esconder
+// los botones es comodidad, no seguridad.
 
 import { useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -38,8 +38,8 @@ export function ConteosRampa({ empresa, recarga, onCambio }: { empresa: string; 
     <SectionCard
       title="Conteos de Rampa"
       description={pendientes
-        ? "Hay un conteo esperando tu verificación. El parque cambia recién cuando lo verificas."
-        : "Lo que se contó en el galpón y qué se decidió. Al verificar, cada diferencia entra al parque."}
+        ? "Hay un conteo por verificar. La Rampa ya cambió al contarse: verifícalo o recházalo (rechazar lo deshace)."
+        : "Lo que se contó en el galpón y qué se decidió. Cada conteo ajusta la Rampa al guardarse."}
     >
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
         {lista.map((c) => (
@@ -121,13 +121,15 @@ function Detalle({ c, onCambio }: { c: ConteoRampa; onCambio: () => void }) {
       {c.estado === "pendiente" ? (
         <div className="space-y-2 rounded-xl bg-warn/10 p-3">
           <p className="text-sm text-text">
-            Al verificar, certificas que el conteo es correcto y cada diferencia pasa a ser un movimiento del parque con motivo «Conteo de rampa {c.numero}». Si después del conteo hubo entregas, siguen valiendo: se aplica la diferencia, no se pisa el saldo.
+            {c.movimientos === null
+              ? <>Este conteo es de antes del cambio y todavía no entró a la Rampa: al verificarlo, cada diferencia pasa a ser un movimiento del parque con motivo «Conteo de rampa {c.numero}».</>
+              : <>La Rampa ya cambió al contarse ({c.movimientos} movimiento(s) con motivo «Conteo de rampa {c.numero}»). Verificar certifica que el conteo es correcto. Rechazar lo deshace: esos movimientos quedan eliminados en el historial con tu nombre.</>}
           </p>
           <input className="sumi-campo" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota (obligatoria para rechazar)" />
           <div className="flex flex-wrap gap-2">
             <ConfirmDialog
               title="¿Verificar el conteo?"
-              message={`${dif.map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}. Estas diferencias entran al parque y quedan en el historial con tu nombre.`}
+              message={`${dif.map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}. ${c.movimientos === null ? "Estas diferencias entran al parque" : "Certificas este ajuste"} y queda en el historial con tu nombre.`}
               confirmLabel="Sí, verificar"
               cancelLabel="No"
               onConfirm={() => accion("aprobar")}
@@ -141,7 +143,7 @@ function Detalle({ c, onCambio }: { c: ConteoRampa; onCambio: () => void }) {
       ) : (
         <p className="text-sm text-muted">
           {c.estado === "aprobado" ? "Verificó" : "Rechazó"} {c.resueltoNombre} el {c.resueltoEn ? hora(c.resueltoEn) : "—"}
-          {c.estado === "aprobado" ? ` · ${c.movimientos ?? 0} movimiento(s) en el parque` : ""}
+          {c.estado === "aprobado" ? ` · ${c.movimientos ?? 0} movimiento(s) en el parque` : " · el ajuste se deshizo"}
           {c.resueltoNota ? ` · «${c.resueltoNota}»` : ""}
         </p>
       )}

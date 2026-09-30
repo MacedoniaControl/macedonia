@@ -75,10 +75,10 @@ export async function alertasDe(empresa: string): Promise<Alerta[]> {
       if (!c) return [];
       return [gerencia
         ? { id: "conteo-rampa", tono: "warn", titulo: `Conteo de Rampa ${c.numero} por verificar`,
-            mensaje: `Lo contó ${c.creado_nombre}. El parque cambia cuando lo verificas.`, enlace: `${base}/cylinders?vista=historial` }
+            mensaje: `Lo contó ${c.creado_nombre} y la Rampa ya cambió. Verifícalo o recházalo (rechazar lo deshace).`, enlace: `${base}/cylinders?vista=historial` }
         : { id: "conteo-rampa", tono: "info",
             titulo: c.creado_por === u.id ? `Tu conteo de Rampa ${c.numero} espera verificación` : `El conteo de Rampa ${c.numero} espera verificación`,
-            mensaje: "La Rampa cambia cuando el Owner o un Administrador lo verifique.", enlace: `${base}/cylinders?vista=parque` }] satisfies Alerta[];
+            mensaje: "La Rampa ya quedó como se contó. Falta que el Owner o un Administrador lo verifique.", enlace: `${base}/cylinders?vista=parque` }] satisfies Alerta[];
     }) : [],
 
     // Existencia negativa: salió mercancía sin que se registrara su entrada.

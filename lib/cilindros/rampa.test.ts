@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { cargaConteo, conSigno, diferencias, leerCantidad, renglonesDe, saldoAlAprobar } from "./rampa.ts";
+import { cargaConteo, conSigno, diferencias, leerCantidad, renglonesDe } from "./rampa.ts";
 
 const lineas = [
   { gas: "OXIGENO", contado: { lleno: 50, vacio: 4 }, visto: { lleno: 56, vacio: 0 } },
@@ -23,11 +23,6 @@ test("lo que se envía lleva lo contado y lo que se vio", () => {
   assert.deepEqual(cargaConteo([lineas[0]]), [{ gas: "OXIGENO", lleno: 50, vacio: 4, visto_lleno: 56, visto_vacio: 0 }]);
 });
 
-test("aprobar aplica la diferencia vista al contar, no pisa lo que pasó después", () => {
-  // Se contaron 50 de 56 (faltan 6). Antes de aprobar salió una entrega de 3: hoy hay 53.
-  assert.equal(saldoAlAprobar(53, { diferencia: -6 }), 47);
-});
-
 test("signos legibles", () => {
   assert.equal(conSigno(4), "+4");
   assert.equal(conSigno(-6), "−6");
@@ -44,7 +39,7 @@ test("el campo de cantidad acepta quedar vacío mientras se escribe", () => {
 
 const sql = readFileSync(new URL("../../supabase/27-conteos-cilindros.sql", import.meta.url), "utf8");
 
-test("27: contar no ajusta y aprobar es de la gerencia", () => {
+test("27 (reemplazada por 31): contar no ajustaba y aprobar era de la gerencia", () => {
   const registrar = sql.slice(sql.indexOf("function public.registrar_conteo_cilindros"), sql.indexOf("-- ---------------------------------------------------------------- 6."));
   assert.doesNotMatch(registrar, /insert into public\.cilindros_mov/);
   assert.match(registrar, /puede_operar_cilindros\(\)/);
@@ -60,6 +55,28 @@ test("27: un solo pendiente por empresa y el técnico sin altas ni bajas sueltas
   assert.match(politica, /estado_desde is not null and estado_hacia is not null/);
   assert.match(politica, /estado_hacia = 'vacio' and cliente is not null/);
   assert.match(sql, /rechazar_conteo_cilindros[\s\S]*Indica por qué se rechaza/);
+});
+
+const sql31 = readFileSync(new URL("../../supabase/31-conteo-rampa-ajusta-al-contar.sql", import.meta.url), "utf8");
+const bloque31 = (desde: string, hasta: string) => sql31.slice(sql31.indexOf(desde), sql31.indexOf(hasta));
+
+test("31: contar ajusta la Rampa al guardarse y queda por verificar", () => {
+  const registrar = bloque31("function public.registrar_conteo_cilindros", "-- ---------------------------------------------------------------- 3.");
+  assert.match(registrar, /puede_operar_cilindros\(\)/);
+  assert.match(registrar, /perform public\.aplicar_conteo_cilindros\(v_id\)/);
+  assert.match(registrar, /todavía no está verificado/);
+  // El aplicador es interno: la app no lo llama directo.
+  assert.match(sql31, /revoke execute on function public\.aplicar_conteo_cilindros\(bigint, text\) from public, anon, authenticated/);
+});
+
+test("31: verificar es de la gerencia; rechazar deshace el ajuste sin dejar negativos", () => {
+  const aprobar = bloque31("function public.aprobar_conteo_cilindros", "-- ---------------------------------------------------------------- 4.");
+  assert.match(aprobar, /puede_finanzas\(\)/);
+  assert.doesNotMatch(aprobar, /insert into public\.cilindros_mov/);
+  const rechazar = bloque31("function public.rechazar_conteo_cilindros", "-- ---------------------------------------------------------------- 5.");
+  assert.match(rechazar, /puede_finanzas\(\)/);
+  assert.match(rechazar, /queda < 0/);
+  assert.match(rechazar, /set eliminado_en = now\(\), eliminado_por = auth\.uid\(\)/);
 });
 
 const sql28 = readFileSync(new URL("../../supabase/28-cilindros-sin-negativos.sql", import.meta.url), "utf8");
