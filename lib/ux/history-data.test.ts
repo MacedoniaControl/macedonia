@@ -84,3 +84,11 @@ test("agosto 2026 de Sudematin no se suma a Sumigases", () => {
   assert.equal(HISTORY.sudematin.meta.ventasHasta, "2026-08-31");
   assert.ok(HISTORY.sudematin.months.some((m) => m.ym === "2026-08" && m.venta > 0));
 });
+
+test("renglones a revisar: el precio mal cargado no suma; el costo mal cargado sí", () => {
+  const s = HISTORY.sumigases.meta.revisar;
+  assert.equal(s.find((r) => /MASCARILLA/.test(r.producto))?.motivo, "precio");
+  assert.equal(s.find((r) => /ENCERADOS/.test(r.producto))?.motivo, "costo");
+  assert.match(notaHistorico(HISTORY.sumigases), /con el precio mal cargado no suman/);
+  assert.ok(HISTORY.sudematin.meta.consumoPropio > 0);
+});

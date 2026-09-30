@@ -32,10 +32,16 @@ Reglas (todas en dólares, SIN IVA):
     Probado contra el control (buscar las notas DESPUÉS de la factura, que
     solo coinciden por casualidad): 86–96 % de lo que descarta es doble.
   · Un renglón con utilidad fuera de rango (más de 20 veces su costo y más de
-    $2.000, o sin costo) NO entra a los rankings de productos y clientes y se
-    lista para revisar. Sí entra a los totales: el caso que lo originó (1
-    mascarilla de $0,20 facturada en 8.278.489,80 Bs, FAC 497 del 26-08-2024)
-    se anula con la devolución 162 del mismo día, y sumadas dan $0,01.
+    $2.000, o sin costo) se lista para revisar y NO entra a los rankings. Si
+    el error es del PRECIO (8 veces o más el precio habitual del producto, o
+    un producto sin otras ventas) tampoco entra a los totales: es un monto mal
+    cargado, no una venta. Si el precio es el habitual y lo raro es el costo,
+    la venta es real y sí suma. (Confirmado por el usuario.) El caso que lo
+    originó: 1 mascarilla de $0,20 facturada en 8.278.489,80 Bs (FAC 497 del
+    26-08-2024), anulada con la devolución 162 del mismo día; salen las dos.
+  · Lo que una empresa se «vende» a sí misma (consumo interno) no es venta.
+  · La factura 70693 de Star Gas es de Sudematin; Sumigases la registró como
+    recepción y no cuenta en sus compras. (Confirmado por el usuario.)
   · Un mes con un hueco de más de 7 días sin ventas se marca incompleto.
   · Lo que Sumigases y Sudematin se venden entre sí NO cuenta: ni como venta
     de una ni como compra de la otra (es mover mercancía dentro del grupo, no
@@ -84,6 +90,11 @@ HERMANA = {
     "sumigases": {"rif": set(), "nombre": re.compile(r"^(SUDEMATIN|SUMINISTROS? DE MATERIALES INDUSTRIALES)")},
     "sudematin": {"rif": {"J502789510"}, "nombre": re.compile(r"^SUMIGASES ORIENTE")},
 }
+
+# Ella misma, vista en su propio exporte de ventas.
+PROPIA = {"sumigases": HERMANA["sudematin"]["nombre"], "sudematin": HERMANA["sumigases"]["nombre"]}
+# Documentos de compra que están en el libro de una empresa pero son de la otra.
+AJENAS = {"sumigases": {("J311377140", "70693")}, "sudematin": set()}
 
 def fecha(v):
     if isinstance(v, float) and v > 20000:
@@ -158,9 +169,27 @@ def ventas(emp):
     unicas = [f for f in filas if f["_i"] not in fuera]
     entre = [f for f in unicas if f["hermana"]]
     unicas = [f for f in unicas if not f["hermana"]]
+    propias = [f for f in unicas if PROPIA[emp].match(normal(html.unescape(f["cliente"])))]
+    unicas = [f for f in unicas if not PROPIA[emp].match(normal(html.unescape(f["cliente"])))]
+    motivo_revisar(unicas)
+    separados = [f for f in unicas if f["revisar"]]
+    unicas = [f for f in unicas if f.get("motivo") != "precio"]
     archivos += [("facturas gemelas de una nota (no se suman)", -gemelas),
-                 (f"renglones de {despues[0]} facturas de notas de días antes (no se suman)", -despues[1]), ("ventas a la otra empresa del grupo (no se suman)", -len(entre))]
-    return unicas, [f for f in separados if f in unicas], archivos, entre
+                 (f"renglones de {despues[0]} facturas de notas de días antes (no se suman)", -despues[1]), ("ventas a la otra empresa del grupo (no se suman)", -len(entre)),
+                 ("ventas a sí misma (no se suman)", -len(propias)),
+                 ("renglones con precio mal cargado (no se suman)", -sum(1 for f in separados if f["motivo"] == "precio"))]
+    return unicas, separados, archivos, entre, propias
+
+def motivo_revisar(filas):
+    """A cada renglón a revisar le pone el motivo: «precio» (mal cargado: no suma) o «costo» (la venta es real)."""
+    pu = collections.defaultdict(list)
+    for f in filas:
+        if f["tipo"] != "DEV" and f["cantidad"] > 0 and not f["revisar"]: pu[f["codigo"]].append(f["venta"] / f["cantidad"])
+    for f in filas:
+        if not f["revisar"]: continue
+        habitual = sorted(pu[f["codigo"]])[len(pu[f["codigo"]]) // 2] if pu[f["codigo"]] else None
+        unitario = abs(f["venta"]) / (abs(f["cantidad"]) or 1)
+        f["motivo"] = "precio" if habitual is None or unitario > 8 * habitual else "costo"
 
 def facturadas_despues(filas, consumidas, fuera):
     """Marca en `fuera` las facturas que facturan notas de días antes (reglas arriba).
@@ -235,15 +264,15 @@ def compras(emp, tasas):
             if factor > 0: neta = neto_bs / factor
             elif total_bs: neta = total_usd * (neto_bs / total_bs)
             else: neta = 0
-            filas.append({"fecha": d, "tipo": tipo, "proveedor": str(v[col("Razon Social")]).strip(), "rif": rif, "neta": neta})
+            filas.append({"fecha": d, "tipo": tipo, "doc": doc, "proveedor": str(v[col("Razon Social")]).strip(), "rif": rif, "neta": neta})
         archivos.append((os.path.basename(f), n))
     entre = [c for c in filas if c["rif"] in HERMANA[emp]["rif"]]
-    filas = [c for c in filas if c["rif"] not in HERMANA[emp]["rif"]]
+    filas = [c for c in filas if c["rif"] not in HERMANA[emp]["rif"] and (c["rif"], c["doc"]) not in AJENAS[emp]]
     archivos.append(("compras a la otra empresa del grupo (no se suman)", -len(entre)))
     return filas, archivos, entre
 
 def resumen(emp):
-    vs, sep, av, ev = ventas(emp)
+    vs, sep, av, ev, propias = ventas(emp)
     tasas = {}
     for f in vs + sep + ev:
         if f["tasa"] > 0: tasas.setdefault(f["fecha"], f["tasa"])
@@ -255,7 +284,8 @@ def resumen(emp):
         meses[c["fecha"][:7]]["compra"] += c["neta"]
     entre = {"ventas": round(sum(f["venta"] for f in ev)), "compras": round(sum(c["neta"] for c in ec)),
              # Hasta dónde llega cada archivo, con o sin la otra empresa.
-             "_ventas_hasta": max(f["fecha"] for f in vs + ev), "_compras_hasta": max(c["fecha"] for c in cs + ec)}
+             "_ventas_hasta": max(f["fecha"] for f in vs + ev), "_compras_hasta": max(c["fecha"] for c in cs + ec),
+             "_propio": round(sum(f["venta"] for f in propias))}
     return vs, sep, av, cs, ac, meses, entre
 
 def nombre_mas_usado(nombres):
@@ -306,12 +336,12 @@ def armar(emp):
     # Las compras de terceros que Sumigases registra a nombre de Sudematin.
     nombre_prov = lambda k, p: "Por medio de Sudematin (GUV, traslados, importaciones)" if k == "J316971414" else nombre_mas_usado(p["nombres"])
     topProveedores = [{"nombre": nombre_prov(k, p), "compra": r2(p["compra"])} for k, p in sorted(prov.items(), key=lambda x: -x[1]["compra"])[:6]]
-    ventas_hasta, compras_hasta = entre.pop("_ventas_hasta"), entre.pop("_compras_hasta")
+    ventas_hasta, compras_hasta, propio = entre.pop("_ventas_hasta"), entre.pop("_compras_hasta"), entre.pop("_propio")
     incompletos = [{"ym": ym, "motivo": m} for ym, m in sorted(huecos([f["fecha"] for f in vs], primero, ventas_hasta).items())]
     revisar = [{"fecha": f["fecha"], "tipo": f["tipo"], "documento": f["doc"], "cliente": re.sub(r"\s*\(.*$", "", html.unescape(f["cliente"])).strip(),
-                "producto": f["producto"], "cantidad": f["cantidad"], "venta": round(f["venta"], 2), "costo": round(f["costo"], 2)}
+                "producto": f["producto"], "cantidad": f["cantidad"], "venta": round(f["venta"], 2), "costo": round(f["costo"], 2), "motivo": f["motivo"]}
                for f in sorted(sep, key=lambda x: -abs(x["venta"]))]
-    meta = {"desde": yms[0], "hasta": yms[-1], "ventasHasta": ventas_hasta, "comprasHasta": compras_hasta, "incompletos": incompletos, "revisar": revisar, "entreEmpresas": entre}
+    meta = {"desde": yms[0], "hasta": yms[-1], "ventasHasta": ventas_hasta, "comprasHasta": compras_hasta, "incompletos": incompletos, "revisar": revisar, "entreEmpresas": entre, "consumoPropio": propio}
     return {"meta": meta, "totals": totals, "years": years, "months": months, "topProductos": topProductos, "topClientes": topClientes, "topProveedores": topProveedores}
 
 def escribir():
@@ -336,7 +366,9 @@ HEAD = """// Datos históricos REALES por empresa (Valery), en dólares y SIN IV
 //     o días después) no se vuelve a sumar;
 //   · renglones con utilidad fuera de rango no entran a los rankings y quedan
 //     en meta.revisar; los meses con huecos, en meta.incompletos;
-//   · lo que Sumigases y Sudematin se venden entre sí no cuenta (meta.entreEmpresas).
+//   · lo que Sumigases y Sudematin se venden entre sí no cuenta (meta.entreEmpresas),
+//     ni lo que cada una se vende a sí misma (meta.consumoPropio);
+//   · un renglón con el precio mal cargado no suma a nada (meta.revisar, motivo «precio»).
 // No editar a mano: volver a correr el script."""
 
 if __name__ == "__main__" and ESCRIBIR:
@@ -353,6 +385,7 @@ if __name__ == "__main__" and ESCRIBIR:
 if __name__ == "__main__":
     for emp in FUENTES:
         vs, sep, av, cs, ac, meses, entre = resumen(emp)
+        entre = {k: v for k, v in entre.items() if not k.startswith("_")}
         print(f"\n  entre empresas (fuera): {entre}")
         print(f"\n===== {emp}")
         for a, n in av: print("  ventas ", n, a)
