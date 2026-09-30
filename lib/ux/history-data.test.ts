@@ -77,3 +77,10 @@ test("lo que se venden entre sí Sumigases y Sudematin no está en ningún ranki
   assert.ok(HISTORY.sudematin.meta.entreEmpresas.compras > 0);
   assert.match(notaHistorico(HISTORY.sudematin), /No incluye lo que Sumigases y Sudematin se venden entre sí/);
 });
+
+test("agosto 2026 de Sudematin no se suma a Sumigases", () => {
+  // «29-07 AL 31-08-2026.xls» está en la carpeta de Sumigases pero es de Sudematin (serie de facturas 23014+).
+  assert.equal(HISTORY.sumigases.meta.ventasHasta, "2026-08-24");
+  assert.equal(HISTORY.sudematin.meta.ventasHasta, "2026-08-31");
+  assert.ok(HISTORY.sudematin.months.some((m) => m.ym === "2026-08" && m.venta > 0));
+});
