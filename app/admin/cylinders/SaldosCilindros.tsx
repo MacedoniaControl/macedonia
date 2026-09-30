@@ -7,8 +7,9 @@
 //
 // Los números NO se guardan: los calcula la base sumando movimientos. Por eso
 // siempre cuadran con su propio historial. Para corregirlos se CUENTA: se
-// escribe lo que hay en el galpón y el conteo queda pendiente hasta que el
-// Owner o un Administrador lo verifica en el Historial.
+// escribe lo que hay en el galpón y la Rampa queda así al guardar. El conteo
+// queda por verificar: el Owner o un Administrador lo verifica o lo rechaza
+// (rechazar lo deshace) en el Historial.
 
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -89,7 +90,7 @@ export function SaldosCilindros({
       const r = await contarRampa(empresa, lineas, motivo);
       if (!r.ok) return setMsg({ ok: false, texto: r.error });
       setContando(false);
-      setMsg({ ok: true, texto: `Conteo ${r.numero} enviado con ${r.diferencias} diferencia(s). La Rampa cambia cuando el Owner o un Administrador lo verifique.` });
+      setMsg({ ok: true, texto: `Conteo ${r.numero} guardado: la Rampa ya quedó como la contaste (${r.diferencias} diferencia(s)). Queda por verificar por el Owner o un Administrador.` });
       onCambio?.();
     } catch (e) {
       setMsg({ ok: false, texto: e instanceof Error ? e.message : "No se pudo guardar el conteo." });
@@ -134,8 +135,11 @@ export function SaldosCilindros({
         {pendiente && !contando && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
             <p className="text-text">
-              <b>Conteo {pendiente.numero}</b> de {pendiente.creadoNombre} espera verificación: {diferencias(pendiente.renglones).map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}.
-              {!gerencia && " Los números de abajo cambian cuando el Owner o un Administrador lo verifique."}
+              <b>Conteo {pendiente.numero}</b> de {pendiente.creadoNombre} por verificar: {diferencias(pendiente.renglones).map((d) => `${d.gas} ${ETIQUETA_RAMPA[d.estado].toLowerCase()} ${conSigno(d.diferencia)}`).join(" · ")}.
+              {pendiente.movimientos === null
+                ? " Todavía no entró a la Rampa: entra cuando se verifique."
+                : " Ya está en los números de abajo."}
+              {!gerencia && " Hasta que el Owner o un Administrador lo verifique no se puede contar de nuevo."}
             </p>
             {gerencia && <Button variant="secondary" onClick={onIrAHistorial}>Revisar y verificar</Button>}
           </div>
@@ -150,7 +154,7 @@ export function SaldosCilindros({
           <div className="space-y-3">
             <p className="text-sm text-muted">
               Escribe cuántos hay <b className="text-text">en el galpón</b> de cada gas. Arranca con lo registrado: cambia solo lo que no cuadre.
-              Los que están en clientes o en llenado no se cuentan aquí. El conteo lo verifica el Owner o un Administrador.
+              Los que están en clientes o en llenado no se cuentan aquí. Al guardar, la Rampa queda como la contaste; después el Owner o un Administrador lo verifica.
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {aContar.map((g) => (
@@ -191,7 +195,7 @@ export function SaldosCilindros({
             )}
             <div className="flex flex-wrap gap-2">
               <Button icon="check" className="flex-1" disabled={guardando} onClick={guardar}>
-                {guardando ? "Enviando…" : dif.length ? `Enviar a verificación · ${dif.length} diferencia(s)` : "Enviar conteo"}
+                {guardando ? "Guardando…" : dif.length ? `Guardar conteo · ${dif.length} diferencia(s)` : "Guardar conteo"}
               </Button>
               <Button variant="secondary" disabled={guardando} onClick={() => { setContando(false); setMsg(null); }}>Cancelar</Button>
             </div>

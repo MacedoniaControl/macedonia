@@ -483,16 +483,16 @@ perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases',
     select id, numero, diferencias into cid, num, x from public.registrar_conteo_cilindros('sumigases', lin, 'Conteo de prueba');
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'Técnico envía el conteo (−2 llenos, +1 vacío)'::text; oks := oks || (case when x = 2 and num ~ '^CR-\d{4}-\d{6}$' and public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') = l0 and public.saldo_cilindro('sumigases', 'OXIGENO', 'vacio') = v0 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((num || ' · ' || x || ' diferencia(s) · la Rampa no cambió')::text, '');
-  exception when others then casos := casos || 'Técnico envía el conteo (−2 llenos, +1 vacío)'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'Técnico envía el conteo (−2 llenos, +1 vacío): la Rampa cambia al terminar'::text; oks := oks || (case when x = 2 and num ~ '^CR-\d{4}-\d{6}$' and public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') = l0 - 2 and public.saldo_cilindro('sumigases', 'OXIGENO', 'vacio') = v0 + 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((num || ' · ' || x || ' diferencia(s) · llenos ' || l0 || ' → ' || public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') || ' · vacíos ' || v0 || ' → ' || public.saldo_cilindro('sumigases', 'OXIGENO', 'vacio'))::text, '');
+  exception when others then casos := casos || 'Técnico envía el conteo (−2 llenos, +1 vacío): la Rampa cambia al terminar'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(T);
     select count(*) into x from public.cilindros_conteos where id = cid and estado = 'pendiente'; select count(*) into y from public.cilindros_conteo_lineas where conteo_id = cid;
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'El técnico ve su conteo pendiente'::text; oks := oks || (case when x = 1 and y = 2 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((y || ' renglón(es)')::text, '');
-  exception when others then casos := casos || 'El técnico ve su conteo pendiente'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'El técnico ve su conteo por verificar'::text; oks := oks || (case when x = 1 and y = 2 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((y || ' renglón(es)')::text, '');
+  exception when others then casos := casos || 'El técnico ve su conteo por verificar'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(T);
@@ -500,7 +500,7 @@ perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases',
     raise exception 'CENTINELA_PASO';
   exception when others then
     if sqlerrm = 'CENTINELA_PASO' then casos := casos || 'Segundo conteo con uno pendiente'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Se permitió y no debía (se deshizo)')::text, '');
-    else casos := casos || 'Segundo conteo con uno pendiente'::text; oks := oks || (case when sqlerrm ~* 'Ya hay un conteo' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((sqlerrm)::text, ''); end if;
+    else casos := casos || 'Segundo conteo con uno pendiente'::text; oks := oks || (case when sqlerrm ~* 'todavía no está verificado' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((sqlerrm)::text, ''); end if;
   end;
 
   begin perform prueba_tmp.como(T);
@@ -539,16 +539,16 @@ perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases',
     insert into public.cilindros_mov (empresa_id, gas, cantidad, estado_desde, estado_hacia, usuario_id, cliente, autorizado_por, retirado_por) values ('sumigases', 'OXIGENO', 1, 'lleno', 'en_cliente', auth.uid(), 'CLIENTE PRUEBA MACEDONIA', A, 'Chofer');
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'Entre el conteo y la aprobación sale 1 lleno'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') = l0 - 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
-  exception when others then casos := casos || 'Entre el conteo y la aprobación sale 1 lleno'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'Entre el conteo y la verificación sale 1 lleno'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') = l0 - 3 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
+  exception when others then casos := casos || 'Entre el conteo y la verificación sale 1 lleno'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(A);
     select public.aprobar_conteo_cilindros(cid, 'visto en planta') into x;
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'Administradora aprueba: se aplica la diferencia, la entrega sigue'::text; oks := oks || (case when x = 2 and public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') = l0 - 3 and public.saldo_cilindro('sumigases', 'OXIGENO', 'vacio') = v0 + 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((x || ' movimiento(s) · llenos ' || l0 || ' → ' || public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') || ' (−1 entrega −2 conteo) · vacíos ' || v0 || ' → ' || public.saldo_cilindro('sumigases', 'OXIGENO', 'vacio'))::text, '');
-  exception when others then casos := casos || 'Administradora aprueba: se aplica la diferencia, la entrega sigue'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'Administradora verifica: no mueve nada más, la entrega sigue'::text; oks := oks || (case when x = 2 and public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') = l0 - 3 and public.saldo_cilindro('sumigases', 'OXIGENO', 'vacio') = v0 + 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((x || ' movimiento(s) · llenos ' || l0 || ' → ' || public.saldo_cilindro('sumigases', 'OXIGENO', 'lleno') || ' (−2 conteo −1 entrega) · vacíos ' || v0 || ' → ' || public.saldo_cilindro('sumigases', 'OXIGENO', 'vacio'))::text, '');
+  exception when others then casos := casos || 'Administradora verifica: no mueve nada más, la entrega sigue'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(A);
@@ -563,41 +563,41 @@ perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases',
     select count(*) into x from public.cilindros_conteos where id = cid and estado = 'aprobado' and resuelto_nombre is not null and movimientos = 2;
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'El conteo queda aprobado con nombre'::text; oks := oks || (case when x = 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(((select resuelto_nombre from public.cilindros_conteos where id = cid))::text, '');
-  exception when others then casos := casos || 'El conteo queda aprobado con nombre'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'El conteo queda verificado con nombre'::text; oks := oks || (case when x = 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(((select resuelto_nombre from public.cilindros_conteos where id = cid))::text, '');
+  exception when others then casos := casos || 'El conteo queda verificado con nombre'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(A);
     perform public.aprobar_conteo_cilindros(cid, null);
     raise exception 'CENTINELA_PASO';
   exception when others then
-    if sqlerrm = 'CENTINELA_PASO' then casos := casos || 'Aprobar dos veces'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Se permitió y no debía (se deshizo)')::text, '');
-    else casos := casos || 'Aprobar dos veces'::text; oks := oks || (case when sqlerrm ~* 'ya está aprobado' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((sqlerrm)::text, ''); end if;
+    if sqlerrm = 'CENTINELA_PASO' then casos := casos || 'Verificar dos veces'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Se permitió y no debía (se deshizo)')::text, '');
+    else casos := casos || 'Verificar dos veces'::text; oks := oks || (case when sqlerrm ~* 'ya está verificado' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((sqlerrm)::text, ''); end if;
   end;
 perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases', 'ARGON', 'lleno'); v0 := public.saldo_cilindro('sumigases', 'ARGON', 'vacio');
 
   begin perform prueba_tmp.como(T);
-    select id into cid from public.registrar_conteo_cilindros('sumigases', jsonb_build_array(jsonb_build_object('gas', 'ARGON', 'lleno', 0, 'vacio', v0, 'visto_lleno', l0, 'visto_vacio', v0)), 'Prueba de negativo');
+    select id into cid from public.registrar_conteo_cilindros('sumigases', jsonb_build_array(jsonb_build_object('gas', 'ARGON', 'lleno', l0 + 2, 'vacio', v0, 'visto_lleno', l0, 'visto_vacio', v0)), 'Sobrante de prueba');
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'Técnico cuenta 0 llenos de ARGON'::text; oks := oks || (case when cid is not null then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
-  exception when others then casos := casos || 'Técnico cuenta 0 llenos de ARGON'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'Técnico cuenta 2 llenos de más de ARGON: la Rampa sube al instante'::text; oks := oks || (case when cid is not null and public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = l0 + 2 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
+  exception when others then casos := casos || 'Técnico cuenta 2 llenos de más de ARGON: la Rampa sube al instante'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(A);
-    insert into public.cilindros_mov (empresa_id, gas, cantidad, estado_desde, estado_hacia, usuario_id, nota) values ('sumigases', 'ARGON', 2, 'lleno', null, auth.uid(), 'Baja prueba');
+    insert into public.cilindros_mov (empresa_id, gas, cantidad, estado_desde, estado_hacia, usuario_id, nota) values ('sumigases', 'ARGON', l0 + 1, 'lleno', null, auth.uid(), 'Baja prueba');
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'Después salen 2 llenos de ARGON'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = l0 - 2 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
-  exception when others then casos := casos || 'Después salen 2 llenos de ARGON'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'Después salen los llenos de ARGON menos 1'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
+  exception when others then casos := casos || 'Después salen los llenos de ARGON menos 1'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(A);
-    perform public.aprobar_conteo_cilindros(cid, null);
+    perform public.rechazar_conteo_cilindros(cid, 'Recontar');
     raise exception 'CENTINELA_PASO';
   exception when others then
-    if sqlerrm = 'CENTINELA_PASO' then casos := casos || 'Aprobar dejaría ARGON en negativo'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Se permitió y no debía (se deshizo)')::text, '');
-    else casos := casos || 'Aprobar dejaría ARGON en negativo'::text; oks := oks || (case when sqlerrm ~* 'dejaría ARGON llenos en -2' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((sqlerrm)::text, ''); end if;
+    if sqlerrm = 'CENTINELA_PASO' then casos := casos || 'Rechazar dejaría ARGON en negativo'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Se permitió y no debía (se deshizo)')::text, '');
+    else casos := casos || 'Rechazar dejaría ARGON en negativo'::text; oks := oks || (case when sqlerrm ~* 'dejaría ARGON llenos en -1' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((sqlerrm)::text, ''); end if;
   end;
 
   begin perform prueba_tmp.como(A);
@@ -608,12 +608,20 @@ perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases',
     else casos := casos || 'Rechazar sin motivo'::text; oks := oks || (case when sqlerrm ~* 'Indica por qué' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce((sqlerrm)::text, ''); end if;
   end;
 
+  begin perform prueba_tmp.como(A);
+    insert into public.cilindros_mov (empresa_id, gas, cantidad, estado_desde, estado_hacia, usuario_id, nota) values ('sumigases', 'ARGON', 1, null, 'lleno', auth.uid(), 'Alta prueba');
+    perform prueba_tmp.como(A, 'postgres');
+    
+    casos := casos || 'Vuelve 1 lleno de ARGON'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = 2 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
+  exception when others then casos := casos || 'Vuelve 1 lleno de ARGON'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+  end;
+
   begin perform prueba_tmp.como(O);
     perform public.rechazar_conteo_cilindros(cid, 'Recontar');
     perform prueba_tmp.como(A, 'postgres');
     
-    casos := casos || 'Owner rechaza con motivo: la Rampa no cambia'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = l0 - 2 and (select estado from public.cilindros_conteos where id = cid) = 'rechazado' then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
-  exception when others then casos := casos || 'Owner rechaza con motivo: la Rampa no cambia'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+    casos := casos || 'Owner rechaza con motivo: se deshace el ajuste'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = 0 and (select estado from public.cilindros_conteos where id = cid) = 'rechazado' and not exists (select 1 from public.cilindros_mov where conteo_id = cid and eliminado_en is null) and exists (select 1 from public.cilindros_mov where conteo_id = cid and eliminado_nombre is not null) then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('llenos: ' || public.saldo_cilindro('sumigases', 'ARGON', 'lleno'))::text, '');
+  exception when others then casos := casos || 'Owner rechaza con motivo: se deshace el ajuste'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 
   begin perform prueba_tmp.como(A);
@@ -631,6 +639,13 @@ perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases',
     
     casos := casos || 'Owner cuenta y aprueba su propio conteo'::text; oks := oks || (case when public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = l0 + 1 then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
   exception when others then casos := casos || 'Owner cuenta y aprueba su propio conteo'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
+  end;
+  begin perform prueba_tmp.como(A);
+    perform prueba_tmp.como(A, 'postgres'); l0 := public.saldo_cilindro('sumigases', 'ARGON', 'lleno'); insert into public.cilindros_conteos (empresa_id, numero, creado_nombre, motivo) values ('sumigases', 'CR-PRUEBA-VIEJO', 'Prueba', 'Regla anterior') returning id into cid; insert into public.cilindros_conteo_lineas (conteo_id, gas, estado, sistema, contado) values (cid, 'ARGON', 'lleno', l0, l0 + 1), (cid, 'ARGON', 'vacio', public.saldo_cilindro('sumigases', 'ARGON', 'vacio'), public.saldo_cilindro('sumigases', 'ARGON', 'vacio')); perform prueba_tmp.como(A); select public.aprobar_conteo_cilindros(cid, null) into x;
+    perform prueba_tmp.como(A, 'postgres');
+    
+    casos := casos || 'Un conteo viejo sin aplicar se aplica al verificarlo'::text; oks := oks || (case when x = 1 and public.saldo_cilindro('sumigases', 'ARGON', 'lleno') = l0 + 1 and (select aplicado_en is not null and estado = 'aprobado' from public.cilindros_conteos where id = cid) then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('')::text, '');
+  exception when others then casos := casos || 'Un conteo viejo sin aplicar se aplica al verificarlo'::text; oks := oks || (case when false then 'OK' else 'FALLA' end)::text; dets := dets || coalesce(('Error: ' || sqlerrm)::text, '');
   end;
 -- ======== 6. LA MATEMÁTICA CUADRA
 

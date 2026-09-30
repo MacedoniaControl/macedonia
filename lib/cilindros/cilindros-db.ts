@@ -266,9 +266,10 @@ export type ConteoRampa = {
 };
 
 /**
- * Envía un conteo de la Rampa a aprobación. No toca el parque: eso pasa
- * cuando el Owner o un Administrador lo aprueba en el Historial.
- * Lo pueden enviar Owner, Administrador y Técnico (registrar_conteo_cilindros).
+ * Guarda un conteo de la Rampa: cada diferencia entra al parque al momento.
+ * Queda por verificar: el Owner o un Administrador lo verifica o lo rechaza en
+ * el Historial (rechazarlo deshace el ajuste).
+ * Lo pueden guardar Owner, Administrador y Técnico (registrar_conteo_cilindros).
  */
 export async function contarRampa(
   empresa: string,
@@ -312,14 +313,14 @@ export async function conteosRampa(empresa: string, limite = 50): Promise<Conteo
   }));
 }
 
-/** Aprueba un conteo: cada diferencia pasa a ser un movimiento del parque. */
+/** Verifica un conteo: certifica que es correcto. El ajuste ya se hizo al contar. */
 export async function aprobarConteoRampa(id: number, nota?: string): Promise<{ ok: true; movimientos: number } | { ok: false; error: string }> {
   const sb = await createClient();
   const { data, error } = await sb.rpc("aprobar_conteo_cilindros", { p_id: id, p_nota: nota?.trim() || null });
   return error ? { ok: false, error: error.message } : { ok: true, movimientos: Number(data) || 0 };
 }
 
-/** Rechaza un conteo con motivo. El parque no cambia. */
+/** Rechaza un conteo con motivo: deshace el ajuste que hizo al contarse. */
 export async function rechazarConteoRampa(id: number, nota: string): Promise<{ ok: boolean; error?: string }> {
   if (!nota.trim()) return { ok: false, error: "Indica por qué se rechaza: sin motivo nadie sabe qué recontar." };
   const sb = await createClient();
