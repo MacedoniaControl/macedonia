@@ -25,6 +25,12 @@ Reglas (todas en dólares, SIN IVA):
     mascarilla de $0,20 facturada en 8.278.489,80 Bs, FAC 497 del 26-08-2024)
     se anula con la devolución 162 del mismo día, y sumadas dan $0,01.
   · Un mes con un hueco de más de 7 días sin ventas se marca incompleto.
+  · Lo que Sumigases y Sudematin se venden entre sí NO cuenta: ni como venta
+    de una ni como compra de la otra (es mover mercancía dentro del grupo, no
+    vender). Compras: por el RIF del proveedor. Ventas: el exporte no trae
+    RIF, así que por la razón social (Sudematin & GM es «Suministros de
+    Materiales Industriales y Gases Medicinales»). Lo excluido queda sumado
+    en meta.entreEmpresas.
 
 Uso:  python3 scripts/historico-valery.py <carpeta Sumigases> [--escribir]
 Sin --escribir solo muestra el resumen y los renglones separados.
@@ -44,6 +50,12 @@ FUENTES = {
         "ventas": sorted(glob.glob(f"{RAIZ}/Sudematin/Ventas/*.xls")),
         "compras": sorted(glob.glob(f"{RAIZ}/Sudematin/Compras/*.xls")),
     },
+}
+
+# La otra empresa del grupo, vista desde cada una.
+HERMANA = {
+    "sumigases": {"rif": {"J316971414"}, "nombre": re.compile(r"^(SUDEMATIN|SUMINISTROS? DE MATERIALES INDUSTRIALES)")},
+    "sudematin": {"rif": {"J502789510"}, "nombre": re.compile(r"^SUMIGASES ORIENTE")},
 }
 
 def fecha(v):
@@ -86,6 +98,7 @@ def ventas(emp):
                     "neto_bs": neto_bs, "tasa": tasa}
             absurdo = abs(venta) >= 2000 and (abs(costo) <= 0.01 * abs(venta) or abs(venta) > 20 * abs(costo))
             fila["revisar"] = absurdo
+            fila["hermana"] = bool(HERMANA[emp]["nombre"].match(normal(html.unescape(fila["cliente"]))))
             filas.append(fila)
             if absurdo: separados.append(fila)
         archivos.append((os.path.basename(f), n))
@@ -97,7 +110,10 @@ def ventas(emp):
         if f["tipo"] == "FAC" and notas.get(k, 0) > 0:
             notas[k] -= 1; gemelas += 1; continue
         unicas.append(f)
-    return unicas, [f for f in separados if f in unicas], archivos + [(f"facturas gemelas de una nota (no se suman)", -gemelas)]
+    entre = [f for f in unicas if f["hermana"]]
+    unicas = [f for f in unicas if not f["hermana"]]
+    archivos += [("facturas gemelas de una nota (no se suman)", -gemelas), ("ventas a la otra empresa del grupo (no se suman)", -len(entre))]
+    return unicas, [f for f in separados if f in unicas], archivos, entre
 
 def sin_tildes(x):
     return unicodedata.normalize("NFD", str(x)).encode("ascii", "ignore").decode().strip().lower()
@@ -141,20 +157,26 @@ def compras(emp, tasas):
             else: neta = 0
             filas.append({"fecha": d, "tipo": tipo, "proveedor": str(v[col("Razon Social")]).strip(), "rif": rif, "neta": neta})
         archivos.append((os.path.basename(f), n))
-    return filas, archivos
+    entre = [c for c in filas if c["rif"] in HERMANA[emp]["rif"]]
+    filas = [c for c in filas if c["rif"] not in HERMANA[emp]["rif"]]
+    archivos.append(("compras a la otra empresa del grupo (no se suman)", -len(entre)))
+    return filas, archivos, entre
 
 def resumen(emp):
-    vs, sep, av = ventas(emp)
+    vs, sep, av, ev = ventas(emp)
     tasas = {}
-    for f in vs + sep:
+    for f in vs + sep + ev:
         if f["tasa"] > 0: tasas.setdefault(f["fecha"], f["tasa"])
-    cs, ac = compras(emp, tasas)
+    cs, ac, ec = compras(emp, tasas)
     meses = collections.defaultdict(lambda: {"venta": 0.0, "costo": 0.0, "util": 0.0, "compra": 0.0})
     for f in vs:
         m = meses[f["fecha"][:7]]; m["venta"] += f["venta"]; m["costo"] += f["costo"]; m["util"] += f["util"]
     for c in cs:
         meses[c["fecha"][:7]]["compra"] += c["neta"]
-    return vs, sep, av, cs, ac, meses
+    entre = {"ventas": round(sum(f["venta"] for f in ev)), "compras": round(sum(c["neta"] for c in ec)),
+             # Hasta dónde llega cada archivo, con o sin la otra empresa.
+             "_ventas_hasta": max(f["fecha"] for f in vs + ev), "_compras_hasta": max(c["fecha"] for c in cs + ec)}
+    return vs, sep, av, cs, ac, meses, entre
 
 def nombre_mas_usado(nombres):
     limpio = [re.sub(r"\s*\(.*$", "", html.unescape(n)).strip() for n in nombres]  # Valery exporta «&amp;»
@@ -174,12 +196,12 @@ def huecos(fechas, desde, hasta, dias=7):
     return malos
 
 def armar(emp):
-    vs, sep, av, cs, ac, meses = resumen(emp)
+    vs, sep, av, cs, ac, meses, entre = resumen(emp)
     yms = sorted(k for k in meses if meses[k]["venta"] or meses[k]["compra"])
     primero = min(f["fecha"] for f in vs)[:7]
     yms = [y for y in yms if y >= primero]
     r2 = lambda x: round(x)
-    months = [{"ym": y, "venta": r2(meses[y]["venta"]), "costo": r2(meses[y]["costo"]), "util": r2(meses[y]["util"]), "compra": r2(meses[y]["compra"])} for y in yms]
+    months = [{"ym": y, "venta": r2(meses[y]["venta"]), "costo": r2(meses[y]["costo"]), "util": r2(meses[y]["venta"]) - r2(meses[y]["costo"]), "compra": r2(meses[y]["compra"])} for y in yms]
     anios = collections.defaultdict(lambda: {"venta": 0, "costo": 0, "util": 0, "compra": 0})
     for m in months:
         a = anios[int(m["ym"][:4])]
@@ -202,12 +224,12 @@ def armar(emp):
     for c in cs:
         p = prov[c["rif"] or normal(c["proveedor"])]; p["compra"] += c["neta"]; p["nombres"].append(c["proveedor"])
     topProveedores = [{"nombre": nombre_mas_usado(p["nombres"]), "compra": r2(p["compra"])} for _, p in sorted(prov.items(), key=lambda x: -x[1]["compra"])[:6]]
-    ventas_hasta = max(f["fecha"] for f in vs); compras_hasta = max(c["fecha"] for c in cs)
+    ventas_hasta, compras_hasta = entre.pop("_ventas_hasta"), entre.pop("_compras_hasta")
     incompletos = [{"ym": ym, "motivo": m} for ym, m in sorted(huecos([f["fecha"] for f in vs], primero, ventas_hasta).items())]
     revisar = [{"fecha": f["fecha"], "tipo": f["tipo"], "documento": f["doc"], "cliente": re.sub(r"\s*\(.*$", "", html.unescape(f["cliente"])).strip(),
                 "producto": f["producto"], "cantidad": f["cantidad"], "venta": round(f["venta"], 2), "costo": round(f["costo"], 2)}
                for f in sorted(sep, key=lambda x: -abs(x["venta"]))]
-    meta = {"desde": yms[0], "hasta": yms[-1], "ventasHasta": ventas_hasta, "comprasHasta": compras_hasta, "incompletos": incompletos, "revisar": revisar}
+    meta = {"desde": yms[0], "hasta": yms[-1], "ventasHasta": ventas_hasta, "comprasHasta": compras_hasta, "incompletos": incompletos, "revisar": revisar, "entreEmpresas": entre}
     return {"meta": meta, "totals": totals, "years": years, "months": months, "topProductos": topProductos, "topClientes": topClientes, "topProveedores": topProveedores}
 
 def escribir():
@@ -231,14 +253,15 @@ HEAD = """// Datos históricos REALES por empresa (Valery), en dólares y SIN IV
 //   · la factura gemela de una nota de entrega (la nota que se facturó) no se
 //     vuelve a sumar;
 //   · renglones con utilidad fuera de rango no entran a los rankings y quedan
-//     en meta.revisar; los meses con huecos, en meta.incompletos.
+//     en meta.revisar; los meses con huecos, en meta.incompletos;
+//   · lo que Sumigases y Sudematin se venden entre sí no cuenta (meta.entreEmpresas).
 // No editar a mano: volver a correr el script."""
 
 if __name__ == "__main__" and ESCRIBIR:
     d = escribir()
     for emp, x in d.items():
         print(emp, x["meta"]["desde"], "→", x["meta"]["hasta"], "ventas hasta", x["meta"]["ventasHasta"], "compras hasta", x["meta"]["comprasHasta"])
-        print("  totales", x["totals"]); print("  incompletos", x["meta"]["incompletos"]); print("  a revisar", len(x["meta"]["revisar"]))
+        print("  totales", x["totals"]); print("  entre empresas (fuera)", x["meta"]["entreEmpresas"]); print("  incompletos", x["meta"]["incompletos"]); print("  a revisar", len(x["meta"]["revisar"]))
         for y in x["years"]: print("  ", y)
         print("  top productos", [(p["nombre"][:26], p["util"]) for p in x["topProductos"]])
         print("  top clientes", [(c["nombre"][:26], c["venta"]) for c in x["topClientes"]])
@@ -247,7 +270,8 @@ if __name__ == "__main__" and ESCRIBIR:
 
 if __name__ == "__main__":
     for emp in FUENTES:
-        vs, sep, av, cs, ac, meses = resumen(emp)
+        vs, sep, av, cs, ac, meses, entre = resumen(emp)
+        print(f"\n  entre empresas (fuera): {entre}")
         print(f"\n===== {emp}")
         for a, n in av: print("  ventas ", n, a)
         for a, n in ac: print("  compras", n, a)

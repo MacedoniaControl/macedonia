@@ -63,3 +63,13 @@ test("la nota de fuente dice sin IVA, hasta cuándo y qué mes está incompleto"
   assert.match(n, /Julio 2026 está incompleto \(sin ventas del 14-07 al 27-07-2026\)/);
   assert.match(n, /compras hasta el 24-08-2026/);
 });
+
+test("lo que se venden entre sí Sumigases y Sudematin no está en ningún ranking", () => {
+  const hermana = /SUDEMATIN|SUMINISTROS? DE MATERIALES INDUSTRIALES|SUMIGASES/i;
+  for (const h of Object.values(HISTORY)) {
+    for (const c of h.topClientes) assert.doesNotMatch(c.nombre, hermana);
+    for (const p of h.topProveedores) assert.doesNotMatch(p.nombre, hermana);
+    assert.ok(h.meta.entreEmpresas.ventas > 0 && h.meta.entreEmpresas.compras > 0);
+  }
+  assert.match(notaHistorico(HISTORY.sudematin), /No incluye lo que Sumigases y Sudematin se venden entre sí/);
+});
