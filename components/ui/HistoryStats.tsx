@@ -3,7 +3,7 @@
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { enBs, fmtUsd } from "@/lib/ux/format";
-import { getHistory, type HistMonth } from "@/lib/ux/history-data";
+import { getHistory, notaHistorico, type HistMonth } from "@/lib/ux/history-data";
 
 const MESES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 function labelMes(ym: string) {
@@ -79,7 +79,7 @@ export function HistoryTrend({ empresa = "sumigases", height = 260 }: Props & { 
         ))}
       </svg>
       <p className="mt-1 text-xs text-muted">
-        {labelMes(data[0].ym)} – {labelMes(data[n - 1].ym)} · {n} meses · fuente: exports de Valery
+        {labelMes(data[0].ym)} – {labelMes(data[n - 1].ym)} · {n} meses. {notaHistorico(h)}
       </p>
     </div>
   );
@@ -109,13 +109,13 @@ export function HistoryYearly({ empresa = "sumigases" }: Props) {
               <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(y.venta)}</td>
               <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(y.compra)}</td>
               <td className="py-2.5 pr-3 text-right font-medium text-ok">{fmtUsd(y.util)}</td>
-              <td className="py-2.5 pr-3 text-right text-muted">{y.margen}%</td>
-              <td className="py-2.5 text-right"><StatusBadge tone="ok">{y.roi}%</StatusBadge></td>
+              <td className="py-2.5 pr-3 text-right text-muted">{y.margen.toLocaleString("es-VE")}%</td>
+              <td className="py-2.5 text-right"><StatusBadge tone="ok">{y.roi.toLocaleString("es-VE")}%</StatusBadge></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-muted">* {ultimoAnio} es parcial (hasta {h.meta.hasta}).</p>
+      <p className="mt-2 text-xs text-muted">* {ultimoAnio} es parcial. {notaHistorico(h)}</p>
     </div>
   );
 }

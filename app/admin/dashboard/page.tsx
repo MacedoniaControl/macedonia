@@ -22,7 +22,7 @@ import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SeriesChart } from "@/components/ui/SeriesChart";
 import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
-import { getHistory } from "@/lib/ux/history-data";
+import { getHistory, notaHistorico } from "@/lib/ux/history-data";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
 import { enBs, fmtUsd } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
@@ -228,7 +228,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           </div>
 
           <SectionCard title="Rentabilidad del Período"
-            description={`Del histórico de Valery, que llega hasta ${hastaHist}.`}
+            description={notaHistorico(hist)}
             action={<StatusBadge tone="brand">{periodos.length} período(s)</StatusBadge>}>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <StatCard label="ROI del Período" value={`${t.roi.toLocaleString("es-VE")}%`} sub="utilidad / costo" accent />
@@ -267,7 +267,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
                 </ul>
               </div>
             </div>
-            <p className="mt-3 text-xs text-muted">Productos y clientes: acumulado de todo el histórico.</p>
+            <p className="mt-3 text-xs text-muted">Productos y clientes: acumulado de todo el histórico, sin IVA. Una nota de entrega que después se facturó cuenta una sola vez.</p>
           </SectionCard>
 
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

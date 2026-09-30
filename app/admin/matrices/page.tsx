@@ -71,7 +71,7 @@ export default function MatricesPage() {
                   <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(r.compras)}</td>
                   <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(r.costo)}</td>
                   <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(r.utilidad)}</td>
-                  <td className="py-2.5 text-right font-medium text-ok">{r.roi}%</td>
+                  <td className="py-2.5 text-right font-medium text-ok">{r.roi.toLocaleString("es-VE")}%</td>
                 </tr>
               ))}
             </tbody>

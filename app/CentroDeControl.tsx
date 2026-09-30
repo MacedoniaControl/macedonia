@@ -70,11 +70,11 @@ export function CentroDeControl() {
                     </div>
                     <div className="min-w-0">
                       <dt className="text-[11px] uppercase tracking-wide text-muted">Margen</dt>
-                      <dd className="text-base font-semibold tabular-nums text-text">{t.margen}%</dd>
+                      <dd className="text-base font-semibold tabular-nums text-text">{t.margen.toLocaleString("es-VE")}%</dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-[11px] uppercase tracking-wide text-muted">ROI</dt>
-                      <dd className="text-base font-semibold tabular-nums text-ok">{t.roi}%</dd>
+                      <dd className="text-base font-semibold tabular-nums text-ok">{t.roi.toLocaleString("es-VE")}%</dd>
                     </div>
                   </dl>
 
