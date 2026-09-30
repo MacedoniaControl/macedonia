@@ -19,7 +19,7 @@ Reglas (todas en dólares, SIN IVA):
     de débito (NDB) suman. Duplicados entre libros: (RIF, tipo, documento,
     fecha, total Bs).
   · Una factura idéntica a una nota de entrega del mismo día (cliente,
-    código, cantidad y monto) es la misma venta: la nota que se facturó.
+    código, cantidad y monto en dólares ±1 %) es la misma venta: la nota que se facturó.
     Valery exporta las dos; se cuenta una vez. (En Sudematin eran 5.033
     renglones, $365.021: el histórico anterior las sumaba dos veces.)
   · La nota que se factura DÍAS DESPUÉS también se cuenta una vez (se queda
@@ -58,9 +58,14 @@ RAIZ = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/Desktop/Sumig
 ESCRIBIR = "--escribir" in sys.argv
 SALIDA = os.path.join(os.path.dirname(__file__), "..", "lib", "ux", "history-data.ts")
 
+# Está en la carpeta de Sumigases pero es de SUDEMATIN: sus facturas (23014-23118)
+# y notas (19261-19657) siguen la serie de Sudematin. Antes se sumaba a Sumigases.
+VENTAS_AGOSTO_SUDEMATIN = f"{RAIZ}/Ventas Historico/Relacion de Ventas Diarias (Detallado por Renglon)29-07 AL 31-08-2026.xls"
+
 FUENTES = {
     "sumigases": {
-        "ventas": sorted(glob.glob(f"{RAIZ}/Ventas Historico/*.xls")) + [f"{RAIZ}/Actual/Relacion de Ventas Diarias (Detallado por Renglon).xls"],
+        "ventas": sorted(f for f in glob.glob(f"{RAIZ}/Ventas Historico/*.xls") if f != VENTAS_AGOSTO_SUDEMATIN)
+                  + [f"{RAIZ}/Actual/Relacion de Ventas Diarias (Detallado por Renglon).xls"],
         # Todos los libros de la carpeta: «SEPTIEMBRE A DICIEMBRE 2023.xls» es un
         # libro aunque no lo diga el nombre. La «Relación de Compras del Mes» que
         # está ahí es de Sudematin (otro formato): no entra.
@@ -68,7 +73,7 @@ FUENTES = {
                    + [f"{RAIZ}/Actual/Libro de Compras Art  75 Reg IVA (Reexpresado).xls"],
     },
     "sudematin": {
-        "ventas": sorted(glob.glob(f"{RAIZ}/Sudematin/Ventas/*.xls")),
+        "ventas": sorted(glob.glob(f"{RAIZ}/Sudematin/Ventas/*.xls")) + [VENTAS_AGOSTO_SUDEMATIN],
         "compras": sorted(glob.glob(f"{RAIZ}/Sudematin/Compras/*.xls")),
     },
 }
@@ -95,6 +100,10 @@ def normal(s):
     s = re.sub(r"[^A-Z0-9 ]", " ", s)
     s = re.sub(r"\b(C ?A|S ?A|S ?R ?L|SACA|CA)\b", " ", s)
     return re.sub(r"\s+", " ", s).strip()
+
+# Las facturas de cada empresa llevan su propia serie. Un archivo de ventas con
+# facturas de la otra serie está en la carpeta equivocada: se detiene todo.
+SERIE_FAC = {"sumigases": (1, 9999), "sudematin": (19000, 99999)}
 
 def ventas(emp):
     aceptadas, filas, separados, archivos = collections.Counter(), [], [], []
@@ -126,16 +135,23 @@ def ventas(emp):
             filas.append(fila)
             if absurdo: separados.append(fila)
         archivos.append((os.path.basename(f), n))
+        desde, hasta = SERIE_FAC[emp]
+        ajenas = [x["doc"] for x in filas[-n:] if x["tipo"] == "FAC" and not desde <= int(re.sub(r"\D", "", x["doc"]) or 0) <= hasta] if n else []
+        if ajenas:
+            sys.exit(f"{os.path.basename(f)}: trae facturas de la serie de la otra empresa ({ajenas[0]}…). ¿Está en la carpeta equivocada?")
     # La nota de entrega que después se facturó: se queda la nota, se descarta la factura gemela.
     # Primero las del mismo día (renglón por renglón), después las de días después (por factura).
     notas = collections.defaultdict(list)
     for i, f in enumerate(filas):
         f["_i"] = i
-        if f["tipo"] == "NET": notas[(f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"], round(f["neto_bs"]))].append(f)
+        if f["tipo"] == "NET": notas[(f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"])].append(f)
     consumidas, fuera = set(), set()
     for f in filas:
         if f["tipo"] != "FAC": continue
-        libres = [q for q in notas.get((f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"], round(f["neto_bs"])), []) if q["_i"] not in consumidas]
+        # En dólares, no en bolívares: la nota y su factura pueden llevar la tasa con
+        # distintos decimales (158,93 / 158,9289) y los bolívares no dan iguales.
+        libres = [q for q in notas.get((f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"]), [])
+                  if q["_i"] not in consumidas and abs(q["venta"] - f["venta"]) <= 0.01 * abs(q["venta"]) + 0.05]
         if libres: consumidas.add(libres[0]["_i"]); fuera.add(f["_i"])
     gemelas = len(fuera)
     despues = facturadas_despues(filas, consumidas, fuera)
