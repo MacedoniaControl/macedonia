@@ -19,7 +19,7 @@ import {
   HistoryTopClientes,
   HistoryTopProveedores,
 } from "@/components/ui/HistoryStats";
-import { getHistory } from "@/lib/ux/history-data";
+import { getHistory, notaHistorico } from "@/lib/ux/history-data";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
 
 const EMPRESAS = [
@@ -66,7 +66,8 @@ export default function RoiPage() {
 
       <SectionCard
         title={`ROI histórico real · ${label}`}
-        action={<StatusBadge tone="ok">ROI del período {t.roi}%</StatusBadge>}
+        description={notaHistorico(h)}
+        action={<StatusBadge tone="ok">ROI del período {t.roi.toLocaleString("es-VE")}%</StatusBadge>}
       >
         <HistoryKpis empresa={empresa} tasa={tasa} />
         <div className="mt-5 border-t border-border pt-4">
