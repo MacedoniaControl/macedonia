@@ -11,7 +11,10 @@ Reglas (todas en dólares, SIN IVA):
     Costo $. Utilidad = venta neta - costo (es la «Utilidad-Venta $» de Valery).
   · Las devoluciones (DEV) vienen en negativo y restan.
   · Un renglón que aparece en el anual y en un parcial se cuenta una vez:
-    (fecha, tipo, documento, código, cantidad, neto Bs).
+    (fecha, tipo, documento, código, cantidad, neto Bs). Se compara entre
+    ARCHIVOS: si una factura trae dos renglones iguales (el mismo producto dos
+    veces), los dos cuentan. (Antes se borraba el segundo: $14.200 en
+    Sumigases, $3.800 en Sudematin.)
   · Compra neta = total $ - IVA - IGTF. Notas de crédito (NCR) restan; notas
     de débito (NDB) suman. Duplicados entre libros: (RIF, tipo, documento,
     fecha, total Bs).
@@ -19,6 +22,15 @@ Reglas (todas en dólares, SIN IVA):
     código, cantidad y monto) es la misma venta: la nota que se facturó.
     Valery exporta las dos; se cuenta una vez. (En Sudematin eran 5.033
     renglones, $365.021: el histórico anterior las sumaba dos veces.)
+  · La nota que se factura DÍAS DESPUÉS también se cuenta una vez (se queda
+    la nota, se descarta la factura), si:
+      - la factura tiene 2 renglones o más y TODOS están en notas del mismo
+        cliente de 1 a 60 días antes (mismo código y cantidad, monto ±3 %);
+      - o tiene 1 renglón y hay una nota de 1 renglón igual (monto ±1 %) de
+        1 a 7 días antes;
+      - y ninguna de esas notas se anuló con una devolución antes de facturar.
+    Probado contra el control (buscar las notas DESPUÉS de la factura, que
+    solo coinciden por casualidad): 86–96 % de lo que descarta es doble.
   · Un renglón con utilidad fuera de rango (más de 20 veces su costo y más de
     $2.000, o sin costo) NO entra a los rankings de productos y clientes y se
     lista para revisar. Sí entra a los totales: el caso que lo originó (1
@@ -40,7 +52,7 @@ Reglas (todas en dólares, SIN IVA):
 Uso:  python3 scripts/historico-valery.py <carpeta Sumigases> [--escribir]
 Sin --escribir solo muestra el resumen y los renglones separados.
 """
-import sys, glob, json, re, os, collections, unicodedata, html, xlrd
+import sys, glob, json, re, os, collections, datetime, unicodedata, html, xlrd
 
 RAIZ = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/Desktop/Sumigases")
 ESCRIBIR = "--escribir" in sys.argv
@@ -85,20 +97,22 @@ def normal(s):
     return re.sub(r"\s+", " ", s).strip()
 
 def ventas(emp):
-    vistos, filas, separados, archivos = set(), [], [], []
+    aceptadas, filas, separados, archivos = collections.Counter(), [], [], []
     for f in FUENTES[emp]["ventas"]:
         s = xlrd.open_workbook(f).sheet_by_index(0)
         h = [str(x).strip() for x in s.row_values(0)]
         ix = {n: i for i, n in enumerate(h)}
-        n = 0
+        n, en_archivo = 0, collections.Counter()
         for r in range(1, s.nrows):
             v = s.row_values(r)
             d = fecha(v[ix["Fecha Emision"]])
             if not d: continue
             tipo = str(v[ix["Tipo Doc"]]).strip()
             clave = (d, tipo, str(v[ix["Documento"]]).strip(), str(v[ix["Codigo"]]).strip(), num(v[ix["Cantidad"]]), round(num(v[ix["Total Neto Bs"]]), 2))
-            if clave in vistos: continue
-            vistos.add(clave); n += 1
+            # Entra si este archivo la trae más veces de las que ya entraron desde otros.
+            en_archivo[clave] += 1
+            if en_archivo[clave] <= aceptadas[clave]: continue
+            aceptadas[clave] += 1; n += 1
             tasa = num(v[ix["Tasa del Dia"]])
             neto_bs = num(v[ix["Total Neto Bs"]])
             venta = neto_bs / tasa if tasa > 0 else num(v[ix["Total Operacion $"]]) / 1.16
@@ -113,17 +127,57 @@ def ventas(emp):
             if absurdo: separados.append(fila)
         archivos.append((os.path.basename(f), n))
     # La nota de entrega que después se facturó: se queda la nota, se descarta la factura gemela.
-    notas = collections.Counter((f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"], round(f["neto_bs"])) for f in filas if f["tipo"] == "NET")
-    unicas, gemelas = [], 0
+    # Primero las del mismo día (renglón por renglón), después las de días después (por factura).
+    notas = collections.defaultdict(list)
+    for i, f in enumerate(filas):
+        f["_i"] = i
+        if f["tipo"] == "NET": notas[(f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"], round(f["neto_bs"]))].append(f)
+    consumidas, fuera = set(), set()
     for f in filas:
-        k = (f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"], round(f["neto_bs"]))
-        if f["tipo"] == "FAC" and notas.get(k, 0) > 0:
-            notas[k] -= 1; gemelas += 1; continue
-        unicas.append(f)
+        if f["tipo"] != "FAC": continue
+        libres = [q for q in notas.get((f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"], round(f["neto_bs"])), []) if q["_i"] not in consumidas]
+        if libres: consumidas.add(libres[0]["_i"]); fuera.add(f["_i"])
+    gemelas = len(fuera)
+    despues = facturadas_despues(filas, consumidas, fuera)
+    unicas = [f for f in filas if f["_i"] not in fuera]
     entre = [f for f in unicas if f["hermana"]]
     unicas = [f for f in unicas if not f["hermana"]]
-    archivos += [("facturas gemelas de una nota (no se suman)", -gemelas), ("ventas a la otra empresa del grupo (no se suman)", -len(entre))]
+    archivos += [("facturas gemelas de una nota (no se suman)", -gemelas),
+                 (f"renglones de {despues[0]} facturas de notas de días antes (no se suman)", -despues[1]), ("ventas a la otra empresa del grupo (no se suman)", -len(entre))]
     return unicas, [f for f in separados if f in unicas], archivos, entre
+
+def facturadas_despues(filas, consumidas, fuera):
+    """Marca en `fuera` las facturas que facturan notas de días antes (reglas arriba).
+    Devuelve (facturas, renglones)."""
+    D = datetime.date.fromisoformat
+    k = lambda f: (normal(f["cliente"]), f["codigo"], abs(f["cantidad"]))
+    net, dev, facs = collections.defaultdict(list), collections.defaultdict(list), collections.defaultdict(list)
+    for f in filas:
+        if f["_i"] in fuera: continue
+        if f["tipo"] == "NET" and f["_i"] not in consumidas: net[k(f)].append(f)
+        elif f["tipo"] == "DEV": dev[k(f)].append(f)
+        elif f["tipo"] == "FAC": facs[f["doc"]].append(f)
+    renglones_nota = collections.Counter(f["doc"] for f in filas if f["tipo"] == "NET")
+    n_fac = n_ren = 0
+    for ls in sorted(facs.values(), key=lambda x: x[0]["fecha"]):
+        fd, uno = D(ls[0]["fecha"]), len(ls) == 1
+        dias, tol = (7, 0.01) if uno else (60, 0.03)
+        tomadas = []
+        for x in ls:
+            ya = {t["_i"] for t in tomadas}
+            c = [q for q in net[k(x)] if q["_i"] not in consumidas and q["_i"] not in ya
+                 and 1 <= (fd - D(q["fecha"])).days <= dias and abs(q["venta"] - x["venta"]) <= tol * abs(q["venta"]) + 0.5
+                 and (not uno or renglones_nota[q["doc"]] == 1)]
+            if not c: break
+            tomadas.append(c[0])
+        else:
+            if sum(x["venta"] for x in ls) <= 0: continue
+            # Si la nota se devolvió antes de facturar, la factura es la única venta.
+            if any(0 <= (D(d["fecha"]) - D(q["fecha"])).days and (D(d["fecha"]) - fd).days <= 3 for q in tomadas for d in dev[k(q)]):
+                continue
+            consumidas.update(q["_i"] for q in tomadas); fuera.update(x["_i"] for x in ls)
+            n_fac += 1; n_ren += len(ls)
+    return n_fac, n_ren
 
 def sin_tildes(x):
     return unicodedata.normalize("NFD", str(x)).encode("ascii", "ignore").decode().strip().lower()
@@ -262,8 +316,8 @@ HEAD = """// Datos históricos REALES por empresa (Valery), en dólares y SIN IV
 // Art. 75 Reg. IVA (Reexpresado)». Las reglas están en ese script. En corto:
 //   · venta = neto sin IVA; utilidad = venta - costo (la de Valery);
 //   · devoluciones y notas de crédito restan; duplicados entre archivos, una vez;
-//   · la factura gemela de una nota de entrega (la nota que se facturó) no se
-//     vuelve a sumar;
+//   · la factura de una nota de entrega (la nota que se facturó, el mismo día
+//     o días después) no se vuelve a sumar;
 //   · renglones con utilidad fuera de rango no entran a los rankings y quedan
 //     en meta.revisar; los meses con huecos, en meta.incompletos;
 //   · lo que Sumigases y Sudematin se venden entre sí no cuenta (meta.entreEmpresas).
