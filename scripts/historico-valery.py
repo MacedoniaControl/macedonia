@@ -31,6 +31,11 @@ Reglas (todas en dólares, SIN IVA):
     RIF, así que por la razón social (Sudematin & GM es «Suministros de
     Materiales Industriales y Gases Medicinales»). Lo excluido queda sumado
     en meta.entreEmpresas.
+    Excepción confirmada: lo que Sumigases registra en su libro a nombre de
+    Sudematin SÍ es compra. Son compras a terceros que llegan por medio de
+    Sudematin (gas de GUV, traslados, importaciones, Oxicar): casi ninguna
+    coincide con una nota de entrega de Sudematin. En los rankings se
+    muestran como «Por medio de Sudematin».
 
 Uso:  python3 scripts/historico-valery.py <carpeta Sumigases> [--escribir]
 Sin --escribir solo muestra el resumen y los renglones separados.
@@ -58,7 +63,8 @@ FUENTES = {
 
 # La otra empresa del grupo, vista desde cada una.
 HERMANA = {
-    "sumigases": {"rif": {"J316971414"}, "nombre": re.compile(r"^(SUDEMATIN|SUMINISTROS? DE MATERIALES INDUSTRIALES)")},
+    # Sin RIF: sus compras a nombre de Sudematin son de terceros (ver arriba).
+    "sumigases": {"rif": set(), "nombre": re.compile(r"^(SUDEMATIN|SUMINISTROS? DE MATERIALES INDUSTRIALES)")},
     "sudematin": {"rif": {"J502789510"}, "nombre": re.compile(r"^SUMIGASES ORIENTE")},
 }
 
@@ -227,7 +233,9 @@ def armar(emp):
     prov = collections.defaultdict(lambda: {"compra": 0, "nombres": []})
     for c in cs:
         p = prov[c["rif"] or normal(c["proveedor"])]; p["compra"] += c["neta"]; p["nombres"].append(c["proveedor"])
-    topProveedores = [{"nombre": nombre_mas_usado(p["nombres"]), "compra": r2(p["compra"])} for _, p in sorted(prov.items(), key=lambda x: -x[1]["compra"])[:6]]
+    # Las compras de terceros que Sumigases registra a nombre de Sudematin.
+    nombre_prov = lambda k, p: "Por medio de Sudematin (GUV, traslados, importaciones)" if k == "J316971414" else nombre_mas_usado(p["nombres"])
+    topProveedores = [{"nombre": nombre_prov(k, p), "compra": r2(p["compra"])} for k, p in sorted(prov.items(), key=lambda x: -x[1]["compra"])[:6]]
     ventas_hasta, compras_hasta = entre.pop("_ventas_hasta"), entre.pop("_compras_hasta")
     incompletos = [{"ym": ym, "motivo": m} for ym, m in sorted(huecos([f["fecha"] for f in vs], primero, ventas_hasta).items())]
     revisar = [{"fecha": f["fecha"], "tipo": f["tipo"], "documento": f["doc"], "cliente": re.sub(r"\s*\(.*$", "", html.unescape(f["cliente"])).strip(),

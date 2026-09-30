@@ -68,8 +68,12 @@ test("lo que se venden entre sí Sumigases y Sudematin no está en ningún ranki
   const hermana = /SUDEMATIN|SUMINISTROS? DE MATERIALES INDUSTRIALES|SUMIGASES/i;
   for (const h of Object.values(HISTORY)) {
     for (const c of h.topClientes) assert.doesNotMatch(c.nombre, hermana);
-    for (const p of h.topProveedores) assert.doesNotMatch(p.nombre, hermana);
-    assert.ok(h.meta.entreEmpresas.ventas > 0 && h.meta.entreEmpresas.compras > 0);
+    for (const p of h.topProveedores) if (!/^Por medio de Sudematin/.test(p.nombre)) assert.doesNotMatch(p.nombre, hermana);
+    assert.ok(h.meta.entreEmpresas.ventas > 0);
   }
+  // Lo que Sumigases registra a nombre de Sudematin son compras a terceros: sí cuentan.
+  assert.equal(HISTORY.sumigases.meta.entreEmpresas.compras, 0);
+  assert.ok(HISTORY.sumigases.topProveedores.some((p) => /^Por medio de Sudematin/.test(p.nombre)));
+  assert.ok(HISTORY.sudematin.meta.entreEmpresas.compras > 0);
   assert.match(notaHistorico(HISTORY.sudematin), /No incluye lo que Sumigases y Sudematin se venden entre sí/);
 });
