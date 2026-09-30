@@ -44,7 +44,11 @@ SALIDA = os.path.join(os.path.dirname(__file__), "..", "lib", "ux", "history-dat
 FUENTES = {
     "sumigases": {
         "ventas": sorted(glob.glob(f"{RAIZ}/Ventas Historico/*.xls")) + [f"{RAIZ}/Actual/Relacion de Ventas Diarias (Detallado por Renglon).xls"],
-        "compras": sorted(glob.glob(f"{RAIZ}/Compras Historico/*ibro de Compras*.xls")) + [f"{RAIZ}/Actual/Libro de Compras Art  75 Reg IVA (Reexpresado).xls"],
+        # Todos los libros de la carpeta: «SEPTIEMBRE A DICIEMBRE 2023.xls» es un
+        # libro aunque no lo diga el nombre. La «Relación de Compras del Mes» que
+        # está ahí es de Sudematin (otro formato): no entra.
+        "compras": sorted(f for f in glob.glob(f"{RAIZ}/Compras Historico/*.xls") if "Relación de Compras" not in unicodedata.normalize("NFC", f))
+                   + [f"{RAIZ}/Actual/Libro de Compras Art  75 Reg IVA (Reexpresado).xls"],
     },
     "sudematin": {
         "ventas": sorted(glob.glob(f"{RAIZ}/Sudematin/Ventas/*.xls")),
