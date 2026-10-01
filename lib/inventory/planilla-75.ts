@@ -1,6 +1,6 @@
-// La planilla impresa de 75 productos de Sumigases, en el orden del papel.
+// La planilla de 75 productos de cada empresa: los 75 con más movimiento.
 //
-// Es la hoja que se imprimio para el primer conteo: los 75 productos con mas
+// Sumigases: en el orden del papel. Es la hoja que se imprimio para el primer conteo: los 75 productos con mas
 // movimiento. El N° de cada renglon es su posicion aquí, para que quien pasa el
 // papel a la pantalla encuentre el mismo numero en los dos lados. El renglon
 // 54 era 010203 (un servicio, no se cuenta): se reemplazo por el siguiente con
@@ -23,3 +23,27 @@ export const PLANILLA_75: readonly string[] = [
   "EH7018532", "NITR6", "LPN80", "E6010532", "E601118H", "E701832L",
   "8004221", "6009932", "386912",
 ];
+
+// Sudematin: los 75 productos de más movimiento en sus ventas de Valery del
+// último año (sep-2025 a ago-2026, por cantidad de facturas y notas), sin
+// servicios. Mismo criterio que la de Sumigases.
+export const PLANILLA_75_SUDEMATIN: readonly string[] = [
+  "OXI6", "E6013332H", "VA404318", "8004004", "OXITE", "TH01TX",
+  "TEF03", "E308332", "6003901", "2007001", "00001601", "E6010532",
+  "E701018HF", "E601318H", "E701818", "2001705", "C033", "386953",
+  "C022", "ADA002", "3052093", "EA60", "ADA001", "TEI01",
+  "2702PD-501", "ABRA06", "00001801", "E4043332", "RAMP38", "A002",
+  "2002300", "NITR6", "252516", "MCON1036", "ADA003", "2002225",
+  "2002305", "BOM75", "2007002", "OXI6MED", "2007000", "OXI80",
+  "JUNT02", "LG80NOR", "E6010532HF", "KOB1450B", "AF15", "9041630",
+  "ENC3151", "LENOX24", "TEI02", "KOB1480", "JUNT01", "A001",
+  "ARG6", "PAGA19", "L2444", "9041632", "RAMP516", "2375227",
+  "ER53563/64", "386912", "CPPAB22", "TOM270TB", "E30818", "113003525",
+  "TEF02", "ABRA12", "CP34", "CG1304", "DF440", "E6013332",
+  "212010112", "GAL002", "TOM270B",
+];
+
+/** La planilla de cada empresa (vacía si una empresa no tiene). */
+export function planilla75(empresa: string): readonly string[] {
+  return empresa === "sudematin" ? PLANILLA_75_SUDEMATIN : empresa === "sumigases" ? PLANILLA_75 : [];
+}
