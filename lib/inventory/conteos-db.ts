@@ -14,7 +14,7 @@ import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
 import { getEmpresa } from "@/lib/ux/empresas";
 import { armarActa, valorizar, type Acta, type EventoActa } from "./acta.ts";
 import { actaExcel, actaPdf, valorizadaExcel, valorizadaPdf } from "./acta-archivos.ts";
-import { PLANILLA_75, ZONA_PLANILLA_75 } from "./planilla-75.ts";
+import { planilla75, ZONA_PLANILLA_75 } from "./planilla-75.ts";
 import { ZONA_GENERAL } from "./alcance.ts";
 import { todasLasFilas } from "../supabase/paginar.ts";
 
@@ -175,9 +175,10 @@ async function productosDelConteo(cliente: Cliente | ReturnType<typeof createAdm
         .eq("departamento", c.departamento!).eq("se_cuenta", true).order("nombre").order("codigo").range(d, h));
   }
   if (c.zona === ZONA_PLANILLA_75) {
-    const { data } = await sb.from("productos").select(campos).eq("empresa_id", empresa).in("codigo", [...PLANILLA_75]);
+    const lista = planilla75(empresa);
+    const { data } = await sb.from("productos").select(campos).eq("empresa_id", empresa).in("codigo", [...lista]);
     const P = new Map((data ?? []).map((p) => [p.codigo, p as ProdConteo]));
-    return PLANILLA_75.map((cod) => P.get(cod) ?? { codigo: cod, nombre: cod, unidad: "", departamento: null });
+    return lista.map((cod) => P.get(cod) ?? { codigo: cod, nombre: cod, unidad: "", departamento: null });
   }
   if (c.zona === ZONA_GENERAL) {
     const [prods, fuera] = await Promise.all([

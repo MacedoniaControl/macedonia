@@ -2,6 +2,7 @@
 
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SelectorRango } from "@/components/ui/SelectorRango";
 import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
@@ -29,7 +30,13 @@ const EMPRESAS = [
 
 export default function RoiPage() {
   const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
-  const [empresa, setEmpresa] = usePersistedState("roi:empresa", "sumigases");
+  // Dentro de una empresa (/admin/sudematin/roi) se muestra esa empresa; el
+  // selector queda solo en la vista general. Antes la página ignoraba la ruta:
+  // en Sudematin mostraba Sumigases.
+  const pathname = usePathname();
+  const deRuta = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/)?.[1] ?? null;
+  const [elegida, setEmpresa] = usePersistedState("roi:empresa", "sumigases");
+  const empresa = deRuta ?? elegida;
   const h = getHistory(empresa);
   // Los indicadores siguen el rango elegido; antes eran siempre el total
   // historico, dijera lo que dijera el selector.
@@ -48,7 +55,7 @@ export default function RoiPage() {
       <PageHeader
         title="Rentabilidad"
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Rentabilidad" }]}
-        filters={
+        filters={deRuta ? undefined :
           <>
             <label className="sr-only" htmlFor="roi-empresa">Empresa</label>
             <select id="roi-empresa" className="h-11 rounded-xl border border-border bg-surface px-3 text-sm text-text"
