@@ -44,6 +44,9 @@ Reglas (todas en dólares, SIN IVA):
     originó: 1 mascarilla de $0,20 facturada en 8.278.489,80 Bs (FAC 497 del
     26-08-2024), anulada con la devolución 162 del mismo día; salen las dos.
   · Lo que una empresa se «vende» a sí misma (consumo interno) no es venta.
+  · Una recepción (RCM) con factura (FCM) del mismo proveedor y el mismo
+    número es la misma compra: cuenta una vez, la factura. (Confirmado por el
+    usuario; en Sumigases eran 275 recepciones.)
   · La factura 70693 de Star Gas es de Sudematin; Sumigases la registró como
     recepción y no cuenta en sus compras. (Confirmado por el usuario.)
   · Un mes con un hueco de más de 7 días sin ventas se marca incompleto.
@@ -278,6 +281,14 @@ def compras(emp, tasas):
             else: neta = 0
             filas.append({"fecha": d, "tipo": tipo, "doc": doc, "proveedor": str(v[col("Razon Social")]).strip(), "rif": rif, "neta": neta})
         archivos.append((os.path.basename(f), n))
+    # La recepción (RCM) que tiene su factura (FCM) del mismo proveedor con el
+    # mismo número es la misma compra cargada dos veces: al llegar la mercancía
+    # y al llegar la factura. Se queda la factura, que es el documento fiscal.
+    numero = lambda d: re.sub(r"\D", "", d).lstrip("0")
+    facturas = {(c["rif"], numero(c["doc"])) for c in filas if c["tipo"] == "FCM" and len(numero(c["doc"])) >= 3}
+    recepciones = [c for c in filas if c["tipo"] == "RCM" and (c["rif"], numero(c["doc"])) in facturas]
+    filas = [c for c in filas if not (c["tipo"] == "RCM" and (c["rif"], numero(c["doc"])) in facturas)]
+    archivos.append(("recepciones (RCM) con su factura del mismo número (no se suman)", -len(recepciones)))
     entre = [c for c in filas if c["rif"] in HERMANA[emp]["rif"]]
     filas = [c for c in filas if c["rif"] not in HERMANA[emp]["rif"] and (c["rif"], c["doc"]) not in AJENAS[emp]]
     archivos.append(("compras a la otra empresa del grupo (no se suman)", -len(entre)))
