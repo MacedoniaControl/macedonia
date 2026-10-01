@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScanBar } from "@/components/inventory/ScanBar";
+import { ImportarVentasValery } from "@/components/inventory/ImportarVentasValery";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
 import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
 import { registrarMovimiento, listarMovimientos, revertirMovimiento, type MovimientoGuardado, type Direccion } from "@/lib/inventory/movimientos-db";
@@ -133,6 +134,11 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
           <div className="text-xs text-muted">{movs.length} movimiento(s) · ver todos</div>
         </button>
       </div>
+
+      {/* Ventas de Valery: el reporte tal como sale, con vista previa. */}
+      <ImportarVentasValery empresa={empresa} onImportada={() => setRecarga((n) => n + 1)} />
+
+      <div className="h-4" />
 
       {/* Alta de movimiento manual */}
       <SectionCard
