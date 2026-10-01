@@ -14,7 +14,7 @@ import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
 import { getEmpresa } from "@/lib/ux/empresas";
 import { armarActa, valorizar, type Acta, type EventoActa } from "./acta.ts";
 import { actaExcel, actaPdf, valorizadaExcel, valorizadaPdf } from "./acta-archivos.ts";
-import { planilla75, ZONA_PLANILLA_75 } from "./planilla-75.ts";
+import { esZona75, planilla75, ZONA_PLANILLA_75, zonaVisible } from "./planilla-75.ts";
 import { ZONA_GENERAL } from "./alcance.ts";
 import { todasLasFilas } from "../supabase/paginar.ts";
 
@@ -38,7 +38,7 @@ export type Conteo = {
   departamento: string | null;
   departamentoNombre: string | null;
   zona: string | null;
-  /** Que se cuenta: un departamento, la planilla impresa, todo (consolidado), o nada definido. */
+  /** Que se cuenta: un departamento, los 75 de mayor rotación, todo (consolidado), o nada definido. */
   origen: "departamento" | "planilla" | "general" | "libre";
   abiertoEn: string;
   renglones: number;
@@ -92,7 +92,7 @@ const ETIQUETA_EVENTO: Record<string, string> = {
 };
 
 function origenDe(departamento: string | null, zona: string | null): Conteo["origen"] {
-  return departamento ? "departamento" : zona === ZONA_PLANILLA_75 ? "planilla" : zona === ZONA_GENERAL ? "general" : "libre";
+  return departamento ? "departamento" : esZona75(zona) ? "planilla" : zona === ZONA_GENERAL ? "general" : "libre";
 }
 
 // ---------------------------------------------------------------- permisos y catalogos
@@ -127,12 +127,12 @@ export async function conteoAbierto(empresa: string): Promise<Conteo | null> {
   if (!data) return null;
   return {
     id: data.id, fecha: data.fecha, departamento: data.departamento, departamentoNombre: data.departamento_nombre,
-    zona: data.zona, abiertoEn: fechaHora(data.abierto_en), renglones: data.renglones,
+    zona: zonaVisible(data.zona), abiertoEn: fechaHora(data.abierto_en), renglones: data.renglones,
     origen: origenDe(data.departamento, data.zona),
   };
 }
 
-/** Abre un conteo de un departamento, de la planilla impresa de 75, o de todo (consolidado). */
+/** Abre un conteo de un departamento, de los 75 de mayor rotación, o de todo (consolidado). */
 export async function abrirConteo(
   empresa: string,
   que: { departamento: string } | { planilla: true } | { general: true },
@@ -174,7 +174,7 @@ async function productosDelConteo(cliente: Cliente | ReturnType<typeof createAdm
       sb.from("productos").select(campos, cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa)
         .eq("departamento", c.departamento!).eq("se_cuenta", true).order("nombre").order("codigo").range(d, h));
   }
-  if (c.zona === ZONA_PLANILLA_75) {
+  if (esZona75(c.zona)) {
     const lista = planilla75(empresa);
     const { data } = await sb.from("productos").select(campos).eq("empresa_id", empresa).in("codigo", [...lista]);
     const P = new Map((data ?? []).map((p) => [p.codigo, p as ProdConteo]));
@@ -271,7 +271,7 @@ export async function cambiarAlcance(
     ? await sb.from("departamentos").select("codigo, nombre").eq("empresa_id", empresa).in("codigo", codigos)
     : { data: [] as { codigo: string; nombre: string }[] };
   const D = new Map((deps ?? []).map((d) => [d.codigo, `${d.codigo} - ${d.nombre}`]));
-  const nombre = (x: { departamento: string | null; zona: string | null }) => (x.departamento ? D.get(x.departamento) ?? x.departamento : x.zona ?? "Sin departamento");
+  const nombre = (x: { departamento: string | null; zona: string | null }) => (x.departamento ? D.get(x.departamento) ?? x.departamento : zonaVisible(x.zona) ?? "Sin departamento");
   const usuario = await getUsuarioSesion();
   await createAdminClient().from("conteo_eventos").insert({
     conteo_id: conteoId, tipo: "alcance", usuario_id: usuario?.id ?? null,
@@ -403,7 +403,7 @@ async function actaDe(admin: ReturnType<typeof createAdminClient>, id: number) {
     admin.from("conteo_costos").select("codigo, costo_unitario").eq("conteo_id", id),
     c.departamento ? admin.from("departamentos").select("nombre").eq("empresa_id", c.empresa_id).eq("codigo", c.departamento).single() : Promise.resolve({ data: null }),
   ]);
-  const departamento = c.departamento ? `${c.departamento} - ${(dep.data as { nombre: string } | null)?.nombre ?? ""}` : c.zona ?? "Sin departamento";
+  const departamento = c.departamento ? `${c.departamento} - ${(dep.data as { nombre: string } | null)?.nombre ?? ""}` : zonaVisible(c.zona) ?? "Sin departamento";
   const contados = new Set((lin.data ?? []).map((l) => l.codigo));
 
   // Lo que quedo sin contar, para la hoja "Sin contar" del Excel.
@@ -491,7 +491,7 @@ function aResumen(r: Record<string, unknown>): ResumenConteo {
   return {
     id: r.id as number, numero: r.numero as string | null, fecha: r.fecha as string,
     departamento: r.departamento as string | null, departamentoNombre: r.departamento_nombre as string | null,
-    zona: r.zona as string | null, conto: r.conto as string | null, cerrado: r.cerrado as boolean,
+    zona: zonaVisible(r.zona as string | null), conto: r.conto as string | null, cerrado: r.cerrado as boolean,
     cerradoEn: r.cerrado_en ? fechaHora(r.cerrado_en as string) : null,
     ajuste: r.ajuste as ResumenConteo["ajuste"], ajusteNota: r.ajuste_nota as string | null,
     renglones: r.renglones as number, diferencias: r.diferencias as number, articulosNuevos: r.articulos_nuevos as number,
@@ -608,7 +608,7 @@ export async function master(empresa: string): Promise<FilaMaster[]> {
       valery,
       contado: c ? c.n : null,
       fechaConteo: c ? c.fecha : null,
-      zona: c ? c.zona : null,
+      zona: c ? zonaVisible(c.zona) : null,
       diferencia: c ? c.n - valery : null,
     };
   });

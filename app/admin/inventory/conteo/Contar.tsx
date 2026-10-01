@@ -13,7 +13,7 @@
 //   · El lector de codigos del panel viejo se conserva, para contar con el
 //     telefono en el galpon.
 //   · El Departamento de arriba es un selector: en un conteo de varios
-//     departamentos (el general, o la planilla de 75) muestra uno a la vez con
+//     departamentos (el general, o los 75 de mayor rotación) muestra uno a la vez con
 //     su avance, y desde ahi se amplia un conteo a todos los departamentos.
 
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -88,7 +88,7 @@ function NuevoConteo({ empresa, onAbierto }: { empresa: string; onAbierto: () =>
         <select className="sumi-campo" value={elegido} onChange={(e) => setElegido(e.target.value)}>
           <option value="">Elige un departamento…</option>
           <option value="__general">Todos los departamentos (consolidado)</option>
-          <option value="__planilla75">Planilla impresa de 75 productos</option>
+          <option value="__planilla75">Los 75 de Mayor Rotación (todos los departamentos)</option>
           <optgroup label="Departamentos de Valery">
             {contables.map((d) => <option key={d.codigo} value={d.codigo}>{d.codigo} - {d.nombre}</option>)}
           </optgroup>
