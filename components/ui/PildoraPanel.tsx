@@ -14,14 +14,18 @@ export function PildoraPanel({
   etiqueta,
   icono = "plus",
   ancho = "w-[26rem]",
+  onSoltarArchivo,
   children,
 }: {
   etiqueta: string;
   icono?: IconName;
   ancho?: string;
+  /** Si se da, se puede soltar un archivo sobre la píldora: abre el panel y lo entrega. */
+  onSoltarArchivo?: (f: File) => void;
   children: (cerrar: () => void) => React.ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
+  const [encima, setEncima] = useState(false);
   const caja = useRef<HTMLDivElement>(null);
 
   // Cerrar al hacer clic afuera o con Escape. Sin esto el panel queda tapando
@@ -46,13 +50,23 @@ export function PildoraPanel({
         type="button"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
+        {...(onSoltarArchivo ? {
+          onDragOver: (e: React.DragEvent) => { e.preventDefault(); setEncima(true); },
+          onDragLeave: () => setEncima(false),
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault(); setEncima(false);
+            const f = e.dataTransfer.files?.[0];
+            if (f) { setAbierto(true); onSoltarArchivo(f); }
+          },
+        } : {})}
         className={`flex h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition
-          ${abierto
+          ${encima ? "border-brand border-dashed bg-brand-soft text-brand ring-2 ring-brand/30"
+            : abierto
             ? "border-brand-strong bg-brand-soft text-brand"
             : "border-border-strong bg-surface text-text hover:bg-surface-2"}`}
       >
         <Icon name={icono} size={16} />
-        {etiqueta}
+        {encima ? "Suelta el archivo" : etiqueta}
       </button>
 
       {abierto && (
