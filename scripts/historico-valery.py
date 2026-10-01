@@ -10,6 +10,10 @@ Reglas (todas en dólares, SIN IVA):
   · Venta neta de un renglón = Total Neto Bs / Tasa del Día. Costo = Total
     Costo $. Utilidad = venta neta - costo (es la «Utilidad-Venta $» de Valery).
   · Las devoluciones (DEV) vienen en negativo y restan.
+  · Valery exporta el reporte de ventas en dos formatos: con fecha, tipo,
+    documento y cliente en CADA renglón, o agrupado por documento (solo el
+    primer renglón los lleva; los siguientes vienen vacíos y los heredan).
+    Antes los renglones de continuación se saltaban.
   · Un renglón que aparece en el anual y en un parcial se cuenta una vez:
     (fecha, tipo, documento, código, cantidad, neto Bs). Se compara entre
     ARCHIVOS: si una factura trae dos renglones iguales (el mismo producto dos
@@ -122,13 +126,21 @@ def ventas(emp):
         s = xlrd.open_workbook(f).sheet_by_index(0)
         h = [str(x).strip() for x in s.row_values(0)]
         ix = {n: i for i, n in enumerate(h)}
-        n, en_archivo = 0, collections.Counter()
+        n, en_archivo, previo = 0, collections.Counter(), None
         for r in range(1, s.nrows):
             v = s.row_values(r)
             d = fecha(v[ix["Fecha Emision"]])
-            if not d: continue
-            tipo = str(v[ix["Tipo Doc"]]).strip()
-            clave = (d, tipo, str(v[ix["Documento"]]).strip(), str(v[ix["Codigo"]]).strip(), num(v[ix["Cantidad"]]), round(num(v[ix["Total Neto Bs"]]), 2))
+            codigo = str(v[ix["Codigo"]]).strip()
+            if d:
+                tipo, doc, cli = str(v[ix["Tipo Doc"]]).strip(), str(v[ix["Documento"]]).strip(), str(v[ix["Cliente"]]).strip()
+                previo = (d, tipo, doc, cli)
+            elif codigo and previo:
+                # Formato agrupado: solo el primer renglón del documento lleva
+                # fecha, tipo, número y cliente; los siguientes los heredan.
+                d, tipo, doc, cli = previo
+            else:
+                continue   # fila de totales
+            clave = (d, tipo, doc, codigo, num(v[ix["Cantidad"]]), round(num(v[ix["Total Neto Bs"]]), 2))
             # Entra si este archivo la trae más veces de las que ya entraron desde otros.
             en_archivo[clave] += 1
             if en_archivo[clave] <= aceptadas[clave]: continue
@@ -138,7 +150,7 @@ def ventas(emp):
             venta = neto_bs / tasa if tasa > 0 else num(v[ix["Total Operacion $"]]) / 1.16
             costo = num(v[ix["Total Costo $"]])
             fila = {"fecha": d, "tipo": tipo, "doc": clave[2], "codigo": clave[3], "producto": str(v[ix["Producto"]]).strip(),
-                    "cliente": str(v[ix["Cliente"]]).strip(), "cantidad": clave[4], "venta": venta, "costo": costo, "util": venta - costo,
+                    "cliente": cli, "cantidad": clave[4], "venta": venta, "costo": costo, "util": venta - costo,
                     "neto_bs": neto_bs, "tasa": tasa}
             absurdo = abs(venta) >= 2000 and (abs(costo) <= 0.01 * abs(venta) or abs(venta) > 20 * abs(costo))
             fila["revisar"] = absurdo
