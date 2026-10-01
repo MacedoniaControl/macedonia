@@ -49,6 +49,13 @@ export async function guardarConfig(
     }
   }
 
+  // Comisiones de vendedores externos: un porcentaje entre 0 y 100, o vacío.
+  for (const [clave, valor] of Object.entries(cambios)) {
+    if (!clave.startsWith("comision_externo")) continue;
+    const t = String(valor).trim().replace(",", ".");
+    if (t !== "" && !(Number(t) >= 0 && Number(t) <= 100)) return { ok: false, error: "La comisión debe ser un porcentaje entre 0 y 100." };
+  }
+
   const sb = await createClient();
   const filas = Object.entries(cambios).map(([clave, valor]) => ({
     empresa_id: empresa,

@@ -30,6 +30,7 @@ import { fmtUsd } from "@/lib/ux/format";
 import { TIPOS_PRECIO } from "@/lib/ux/catalogos";
 import { neTotals, notaEntregaHtml, printDoc, NOMBRE_GAS, type NECil, type NEDoc } from "@/lib/ux/doc-templates";
 import { vendedoresDe } from "@/lib/auth/vendedores";
+import { vendedoresExternos } from "@/lib/documentos/documentos-db";
 import { leerConfig } from "@/lib/config/config-db";
 import { useTasaViva } from "@/lib/ux/bcv-rate";
 import type { Cliente } from "@/lib/directorio/directorio-db";
@@ -42,6 +43,8 @@ import { useSesion } from "@/components/auth/SesionProvider";
  */
 export type NEEmitir = NEDoc & {
   lineasImpresas: NEDoc["lineas"];
+  /** Nombre del vendedor de afuera del personal (vacío = del personal). Su comisión sale de aquí. */
+  vendedorExterno: string;
   cilindrosEntrega: { lineas: LineaEntrega[]; autorizadoPor: string | null; retiradoPor: string | null };
 };
 
@@ -106,6 +109,9 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
   const ivaPct = Number(cfg.datos?.iva_pct) || 16;
   const cargaVend = useCarga(empresaKey, () => vendedoresDe(empresaKey));
   const vendedores = cargaVend.datos ?? [];
+  const externosUsados = useCarga(`externos:${empresaKey}`, () => vendedoresExternos(empresaKey)).datos ?? [];
+  const [vendedorExterno, setVendedorExterno] = useState("");
+  const esExterno = f.vendedor === "__externo";
   // Una sede por empresa: el depósito no se elige, se sabe.
   const deposito = isEmpresaId(empresaKey) ? EMPRESAS[empresaKey].deposito : "";
 
@@ -116,7 +122,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
   const llevaIva = ivaManual ?? enBolivares;
 
   const doc = (correlativo: string, ls: Renglon[] = lineas): NEDoc => ({
-    ...f, cliente: cliente?.nombre ?? "", correlativo, fecha: hoyISO(), deposito, lineas: ls, cilindros: cil, llevaIva, ivaPct,
+    ...f, vendedor: esExterno ? vendedorExterno.trim() : f.vendedor, cliente: cliente?.nombre ?? "", correlativo, fecha: hoyISO(), deposito, lineas: ls, cilindros: cil, llevaIva, ivaPct,
   });
   const t = neTotals(doc(""), ivaPct);
 
@@ -128,6 +134,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
     const otros = sinCasilla.length ? `Cilindros: ${sinCasilla.map((g) => `${g} ${cuenta(g).llenos} lleno(s) / ${cuenta(g).vacios} vacío(s)`).join(", ")}.` : "";
     return {
       ...doc(correlativo), notas: [f.notas, otros, nota].filter(Boolean).join(" · "), lineasImpresas: impresas,
+      vendedorExterno: esExterno ? vendedorExterno.trim() : "",
       cilindrosEntrega: {
         lineas: conCilindros.map((g) => ({ gas: g, llenosEntregados: cuenta(g).llenos, vaciosRecibidos: cuenta(g).vacios })),
         autorizadoPor: dejaLlenos ? autoriza || null : null,
@@ -138,6 +145,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
   function validar(): string | null {
     if (!cliente) return "Elige el cliente de la cartera.";
     if (lineas.length === 0) return "Agrega al menos un producto.";
+    if (esExterno && !vendedorExterno.trim()) return "Falta el nombre del vendedor externo.";
     const sinPrecio = lineas.filter((l) => l.precio <= 0).length;
     if (sinPrecio) return `${sinPrecio} renglón(es) sin precio, marcados en rojo. Complétalos antes de emitir.`;
     if (enBolivares && !tasa) return "Todavía no hay tasa BCV: no emitas en bolívares hasta que cargue.";
@@ -155,7 +163,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
       // Se suelta el cliente: si queda elegido, la siguiente nota sale al mismo sin que nadie lo pida.
       if (r.error) setMsg(r.error);
       else {
-        setLineas([]); setF(formularioVacio()); setCliente(null); setCuentas({}); setAutoriza(""); setRetira(null); setIvaManual(null);
+        setLineas([]); setF(formularioVacio()); setVendedorExterno(""); setCliente(null); setCuentas({}); setAutoriza(""); setRetira(null); setIvaManual(null);
         setAvisoFinal(r.aviso ?? null);
         setRecargaCil((n) => n + 1);
       }
@@ -262,8 +270,16 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
               <select id="ne-vend" className={campo} value={f.vendedor} onChange={set("vendedor")}>
                 <option value="">Elige…</option>
                 {vendedores.map((v) => <option key={v.id} value={v.nombre}>{v.nombre} · {v.rol}</option>)}
+                <option value="__externo">Vendedor externo…</option>
               </select>
               {cargaVend.error && <span className="mt-1 block text-xs text-danger">{cargaVend.error}</span>}
+              {esExterno && (
+                <>
+                  <input className={`${campo} mt-2`} placeholder="Nombre del vendedor externo" value={vendedorExterno} list="ne-externos"
+                    aria-label="Nombre del vendedor externo" onChange={(e) => setVendedorExterno(e.target.value)} />
+                  <datalist id="ne-externos">{externosUsados.map((n) => <option key={n} value={n} />)}</datalist>
+                </>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

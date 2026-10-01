@@ -214,6 +214,7 @@ export default function DeliveryNotesPage() {
         const r = await guardarDocumento({
           tipo: "nota_entrega",
           cliente: ne.cliente,
+          vendedorExterno: ne.vendedorExterno,
           clienteRif: ne.rif,
           clienteDireccion: ne.direccion,
           lineas: ne.lineas.map((l) => ({

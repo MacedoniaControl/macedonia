@@ -23,6 +23,7 @@ import { CampoNumero } from "@/components/ui/CampoNumero";
 import { fmtUsd, enBs } from "@/lib/ux/format";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
 import { vendedoresDe } from "@/lib/auth/vendedores";
+import { vendedoresExternos } from "@/lib/documentos/documentos-db";
 import { gases as gasesDe } from "@/lib/cilindros/cilindros-db";
 import { leerConfig } from "@/lib/config/config-db";
 import { buscarClientes, type Cliente } from "@/lib/directorio/directorio-db";
@@ -48,6 +49,7 @@ export function NuevaCotizacion({ seq, onSave }: { seq: string; onSave: (d: GenD
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
 
   const cargaVend = useCarga(empresaKey, () => vendedoresDe(empresaKey));
+  const externosUsados = useCarga(`externos:${empresaKey}`, () => vendedoresExternos(empresaKey)).datos ?? [];
   const vendedores = cargaVend.datos ?? [];
   const cargaGases = useCarga(empresaKey, () => gasesDe(empresaKey));
   const gases = cargaGases.datos ?? [];
@@ -177,8 +179,11 @@ export function NuevaCotizacion({ seq, onSave }: { seq: string; onSave: (d: GenD
               </select>
               {cargaVend.error && <span className="mt-1 block text-xs text-danger">{cargaVend.error}</span>}
               {f.vendedor === "__externo" && (
-                <input className={`${campo} mt-2`} placeholder="Nombre del vendedor externo" value={f.vendedorExterno}
-                  onChange={(e) => setF({ ...f, vendedorExterno: e.target.value })} />
+                <>
+                  <input className={`${campo} mt-2`} placeholder="Nombre del vendedor externo" value={f.vendedorExterno} list="cot-externos"
+                    aria-label="Nombre del vendedor externo" onChange={(e) => setF({ ...f, vendedorExterno: e.target.value })} />
+                  <datalist id="cot-externos">{externosUsados.map((n) => <option key={n} value={n} />)}</datalist>
+                </>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">

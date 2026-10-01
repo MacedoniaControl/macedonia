@@ -10,6 +10,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { todasLasFilas } from "@/lib/supabase/paginar";
+import { nombresUsados, type DocExterno } from "./vendedores-externos";
+
 
 export type TipoDoc = "nota_entrega" | "cotizacion" | "devolucion";
 
@@ -197,4 +200,28 @@ export async function correlativoPrevisto(empresa: string, tipo: TipoDoc): Promi
   // Mismo arranque que la base (supabase/10-correlativos.sql): si aquí quedara
   // un 1, la pantalla anunciaría "0000000001" antes de guardar.
   return String(data?.siguiente ?? 45200).padStart(10, "0");
+}
+
+/**
+ * Cotizaciones y notas de entrega de vendedores externos en un período, para su
+ * panel. Sin líneas: el panel suma totales.
+ */
+export async function documentosExternos(empresa: string, desde: string, hasta: string): Promise<DocExterno[]> {
+  const sb = await createClient();
+  type Fila = { id: number; tipo: string; correlativo: string; fecha: string; cliente: string; vendedor_externo: string | null; total_usd: number };
+  const filas = await todasLasFilas<Fila>((a, b, contar) =>
+    sb.from("documentos")
+      .select("id, tipo, correlativo, fecha, cliente, vendedor_externo, total_usd", contar ? { count: "exact" } : undefined)
+      .eq("empresa_id", empresa).in("tipo", ["cotizacion", "nota_entrega"]).not("vendedor_externo", "is", null)
+      .gte("fecha", desde).lte("fecha", hasta).order("id").range(a, b));
+  return filas.map((d) => ({ id: d.id, tipo: d.tipo, correlativo: d.correlativo, fecha: d.fecha, cliente: d.cliente, vendedorExterno: d.vendedor_externo, total: Number(d.total_usd) || 0 }));
+}
+
+/** Los vendedores externos ya usados en la empresa, para sugerirlos al escribir. */
+export async function vendedoresExternos(empresa: string): Promise<string[]> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("documentos").select("vendedor_externo")
+    .eq("empresa_id", empresa).not("vendedor_externo", "is", null).order("id", { ascending: false }).limit(1000);
+  if (error) return [];
+  return nombresUsados((data ?? []).map((d) => d.vendedor_externo as string | null));
 }
