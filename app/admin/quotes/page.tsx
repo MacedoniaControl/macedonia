@@ -14,7 +14,7 @@ import { VentasExternas } from "./VentasExternas";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
 import { leerConfig } from "@/lib/config/config-db";
 import { NuevaCotizacion } from "./NuevaCotizacion";
-import { useRol, puedeVerRegistros } from "@/lib/ux/session";
+import { useRol, puedeVerRegistros, puedeVerFinanzas } from "@/lib/ux/session";
 
 type Estado = "Borrador" | "Aprobada" | "Rechazada" | "Nota de entrega";
 type Cotizacion = {
@@ -98,6 +98,8 @@ export default function QuotesPage() {
   // Los registros/logs son solo del OWNER.
   const { rol } = useRol();
   const verRegistros = puedeVerRegistros(rol);
+  // El panel de vendedores externos muestra comisiones: solo Owner y Administrador.
+  const verExternos = puedeVerFinanzas(rol);
 
   const filtered = cots.filter((c) => inPeriod(c.fechaISO, period));
   const cfg = useCarga(`cfg:${empresaKey}`, () => leerConfig(empresaKey));
@@ -154,7 +156,7 @@ export default function QuotesPage() {
           ["gen", "Nueva Cotización"] as const,
           // Ventas externas vive aqui, no en el menu principal: es una forma de
           // cotizar/vender, no un departamento aparte.
-          ["externas", "Ventas Externas"] as const,
+          ...(verExternos ? ([["externas", "Vendedores Externos"]] as const) : []),
           ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
         ]).map(([k, l]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
@@ -228,7 +230,7 @@ export default function QuotesPage() {
         return { error: null };
       }} />}
 
-      {tab === "externas" && <VentasExternas />}
+      {tab === "externas" && verExternos && <VentasExternas />}
 
     </>
   );
