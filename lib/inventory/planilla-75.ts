@@ -1,4 +1,5 @@
-// La planilla de 75 productos de cada empresa: los 75 con más movimiento.
+// Los 75 de mayor rotación de cada empresa: los 75 productos con más movimiento,
+// de todos los departamentos.
 //
 // Sumigases: en el orden del papel. Es la hoja que se imprimio para el primer conteo: los 75 productos con mas
 // movimiento. El N° de cada renglon es su posicion aquí, para que quien pasa el
@@ -6,7 +7,14 @@
 // 54 era 010203 (un servicio, no se cuenta): se reemplazo por el siguiente con
 // mas movimiento, 10N24, sin correr la numeracion.
 
-export const ZONA_PLANILLA_75 = "Planilla impresa de 75 productos";
+// Así se llama la opción y así queda el conteo (abarca todos los departamentos).
+export const ZONA_PLANILLA_75 = "Los 75 de Mayor Rotación";
+/** El nombre con que se guardaban antes estos conteos. */
+const ZONA_PLANILLA_75_ANTES = "Planilla impresa de 75 productos";
+/** ¿Es un conteo de los 75 de mayor rotación? (también los guardados con el nombre viejo) */
+export const esZona75 = (zona: string | null | undefined) => zona === ZONA_PLANILLA_75 || zona === ZONA_PLANILLA_75_ANTES;
+/** Cómo se muestra la zona de un conteo: los viejos salen con el nombre nuevo. */
+export const zonaVisible = (zona: string | null | undefined) => (esZona75(zona) ? ZONA_PLANILLA_75 : zona ?? null);
 
 export const PLANILLA_75: readonly string[] = [
   "2702PD-500", "0316001", "OXI6", "E701018HF", "8004005", "8004004",
