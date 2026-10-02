@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SelectorCliente } from "@/components/directorio/SelectorCliente";
 import { EditorRenglones, totalRenglon, type Renglon } from "@/components/documentos/EditorRenglones";
-import { fmtUsd, enBs } from "@/lib/ux/format";
+import { fmtUsdCentavos, enBs } from "@/lib/ux/format";
 import { devolucionHtml, printDoc, type DevDoc } from "@/lib/ux/doc-templates";
 import { leerConfig } from "@/lib/config/config-db";
 import { useTasaViva } from "@/lib/ux/bcv-rate";
@@ -86,7 +86,7 @@ export function NuevaDevolucion({ seq, onSave }: { seq: string; onSave: (d: DevD
         </div>
       </SectionCard>
 
-      <EditorRenglones empresa={empresaKey} numero={seq} lineas={lineas} setLineas={setLineas}
+      <EditorRenglones empresa={empresaKey} ivaPct={ivaPct} numero={seq} lineas={lineas} setLineas={setLineas}
         onCambio={() => setMsg("")} className="xl:[grid-area:prod] xl:self-start" />
 
       <div className="space-y-4 xl:[grid-area:cond]">
@@ -113,12 +113,12 @@ export function NuevaDevolucion({ seq, onSave }: { seq: string; onSave: (d: DevD
 
         <div className="rounded-2xl border border-border bg-surface p-4">
           <dl className="space-y-1.5 text-sm">
-            <div className="flex justify-between text-muted"><dt>Subtotal · {lineas.length} renglón(es)</dt><dd className="tabular-nums">{fmtUsd(sub)}</dd></div>
-            {llevaIva && <div className="flex justify-between text-muted"><dt>IVA {ivaPct}%</dt><dd className="tabular-nums">{fmtUsd(iva)}</dd></div>}
+            <div className="flex justify-between text-muted"><dt>Subtotal · {lineas.length} renglón(es)</dt><dd className="tabular-nums">{fmtUsdCentavos(sub)}</dd></div>
+            {llevaIva && <div className="flex justify-between text-muted"><dt>IVA {ivaPct}%</dt><dd className="tabular-nums">{fmtUsdCentavos(iva)}</dd></div>}
             <div className="flex items-baseline justify-between border-t border-border pt-2">
               <dt className="font-semibold text-text">Total a acreditar</dt>
               <dd className="text-right">
-                <span className="block text-xl font-semibold tabular-nums text-text">{fmtUsd(total)}</span>
+                <span className="block text-xl font-semibold tabular-nums text-text">{fmtUsdCentavos(total)}</span>
                 {tasa && total > 0 && <span className="block text-xs tabular-nums text-muted">≈ {enBs(total, tasa)}</span>}
               </dd>
             </div>
@@ -126,7 +126,7 @@ export function NuevaDevolucion({ seq, onSave }: { seq: string; onSave: (d: DevD
           {msg && <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
           <ConfirmDialog
             title="¿Emitir la devolución?"
-            message={`${cliente?.nombre ?? "Sin cliente"} · ${lineas.length} renglón(es) · ${fmtUsd(total)}${f.referencia ? ` · de la nota ${f.referencia}` : ""}. Se usa el número ${seq} y no se puede deshacer.`}
+            message={`${cliente?.nombre ?? "Sin cliente"} · ${lineas.length} renglón(es) · ${fmtUsdCentavos(total)}${f.referencia ? ` · de la nota ${f.referencia}` : ""}. Se usa el número ${seq} y no se puede deshacer.`}
             confirmLabel="Sí, emitir" cancelLabel="No"
             onConfirm={emitir}
             trigger={(abrir) => (

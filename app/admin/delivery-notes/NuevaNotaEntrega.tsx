@@ -26,7 +26,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CampoNumero } from "@/components/ui/CampoNumero";
 import { SelectorCliente } from "@/components/directorio/SelectorCliente";
 import { EditorRenglones, type Renglon } from "@/components/documentos/EditorRenglones";
-import { fmtUsd } from "@/lib/ux/format";
+import { fmtUsdCentavos } from "@/lib/ux/format";
 import { TIPOS_PRECIO } from "@/lib/ux/catalogos";
 import { neTotals, notaEntregaHtml, printDoc, NOMBRE_GAS, type NECil, type NEDoc } from "@/lib/ux/doc-templates";
 import { vendedoresDe } from "@/lib/auth/vendedores";
@@ -176,7 +176,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
     printDoc(notaEntregaHtml({ ...d, lineas: d.lineasImpresas, notas: [d.notas, "BORRADOR, sin número"].filter(Boolean).join(" · ") }, empresaKey));
   }
 
-  const totalVisible = enBolivares ? (tasa ? bs(t.total * tasa) : "sin tasa") : fmtUsd(t.total);
+  const totalVisible = enBolivares ? (tasa ? bs(t.total * tasa) : "sin tasa") : fmtUsdCentavos(t.total);
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:[grid-template-areas:'prod_cli'_'prod_cil'_'prod_cond']">
@@ -207,7 +207,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
       </SectionCard>
 
       {/* ---------------- Productos: el documento */}
-      <EditorRenglones empresa={empresaKey} numero={seq} lineas={lineas} setLineas={setLineas}
+      <EditorRenglones empresa={empresaKey} ivaPct={ivaPct} numero={seq} lineas={lineas} setLineas={setLineas}
         onCambio={() => setMsg("")} className="xl:[grid-area:prod] xl:self-start" />
 
       {/* ---------------- Cilindros: van aparte del total, son de la empresa y vuelven. */}
@@ -313,16 +313,16 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
         <div className="rounded-2xl border border-border bg-surface p-4">
           <dl className="space-y-1.5 text-sm">
             <div className="flex justify-between text-muted"><dt>Base · {lineas.length} renglón(es)</dt>
-              <dd className="tabular-nums">{enBolivares && tasa ? bs(t.base * tasa) : fmtUsd(t.base)}</dd></div>
+              <dd className="tabular-nums">{enBolivares && tasa ? bs(t.base * tasa) : fmtUsdCentavos(t.base)}</dd></div>
             {llevaIva && <div className="flex justify-between text-muted"><dt>IVA {ivaPct}%</dt>
-              <dd className="tabular-nums">{enBolivares && tasa ? bs(t.iva * tasa) : fmtUsd(t.iva)}</dd></div>}
+              <dd className="tabular-nums">{enBolivares && tasa ? bs(t.iva * tasa) : fmtUsdCentavos(t.iva)}</dd></div>}
             <div className="flex items-baseline justify-between border-t border-border pt-2">
               <dt className="font-semibold text-text">Total</dt>
               <dd className="text-right">
                 <span className="block text-xl font-semibold tabular-nums text-text">{totalVisible}</span>
                 {t.total > 0 && tasa && (
                   <span className="block text-xs tabular-nums text-muted">
-                    {enBolivares ? `${fmtUsd(t.total)} · tasa BCV ${tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` : `≈ ${bs(t.total * tasa)}`}
+                    {enBolivares ? `${fmtUsdCentavos(t.total)} · tasa BCV ${tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` : `≈ ${bs(t.total * tasa)}`}
                   </span>
                 )}
               </dd>

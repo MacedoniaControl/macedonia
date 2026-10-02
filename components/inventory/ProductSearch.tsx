@@ -13,6 +13,7 @@
 //     quien busca son cosas muy distintas.
 
 import { useEffect, useRef, useState } from "react";
+import { precioSinIva } from "@/lib/documentos/precio-documento";
 import { Icon } from "@/components/ui/Icon";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 
@@ -28,9 +29,12 @@ const ESPERA_MS = 220;
 export function ProductSearch({
   onPick,
   placeholder = "Buscar producto por código o nombre…",
+  ivaPct,
 }: {
   onPick: (p: ProductoCatalogo) => void;
   placeholder?: string;
+  /** En documentos: muestra el precio sin IVA, el mismo que entra al renglón. */
+  ivaPct?: number;
 }) {
   const empresa = useEmpresaActiva();
   const [q, setQ] = useState("");
@@ -153,7 +157,7 @@ export function ProductSearch({
                   <span className="font-mono text-[11px] text-muted">{p.codigo}</span>
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-muted">
-                  {p.precio > 0 ? `$${p.precio.toFixed(2)}` : "sin precio"}
+                  {p.precio > 0 ? (ivaPct === undefined ? `$${p.precio.toFixed(2)}` : `$${precioSinIva(p.precio, ivaPct).toFixed(2)} sin IVA`) : "sin precio"}
                 </span>
               </button>
             </li>
