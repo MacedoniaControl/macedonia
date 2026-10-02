@@ -10,8 +10,11 @@
 //     (con BI, IVA, IVA retenido) y notas (con Monto). El monto es «Saldo»:
 //     lo que falta pagar, ya sin la retención ni lo abonado.
 //
-// Se reconoce por la cabecera exacta. Junto con la plantilla de Macedonia
-// (plantilla-cuentas.ts), es lo único que admite la importación.
+// Se reconoce por la cabecera exacta, en cualquiera de las primeras filas.
+// También se acepta un pedazo del reporte copiado a un libro nuevo, sin la
+// cabecera: si trae la fila «Descripción Cliente …» (o «Proveedor Descrip. …»)
+// se leen las columnas en el orden del reporte. Junto con la plantilla de
+// Macedonia (plantilla-cuentas.ts), es lo único que admite la importación.
 
 import { aFechaPlantilla, type FilaPlantilla, type TipoPlantilla } from "./plantilla-cuentas.ts";
 import type { ClaseCuenta } from "./retencion.ts";
@@ -43,9 +46,36 @@ export function reporteValery(cabecera: Celda[]): TipoPlantilla | null {
   return null;
 }
 
+/** Cuántas filas de arriba se miran buscando la cabecera (Valery a veces pone títulos encima). */
+const FILAS_TITULO = 10;
+
+/**
+ * Cómo leer una hoja: de qué reporte es, sus columnas y desde qué fila van los
+ * datos. null = no es de Valery.
+ *
+ * Sin cabecera, la hoja es de Valery solo si tiene la fila de grupo del cliente
+ * o proveedor Y algún documento con fecha de emisión en su columna: un archivo
+ * cualquiera no se lee como si lo fuera.
+ */
+export function disposicionValery(h: HojaLeida): { tipo: TipoPlantilla; cab: string[]; desde: number } | null {
+  for (let i = 0; i < Math.min(FILAS_TITULO, h.filas.length); i++) {
+    const tipo = reporteValery(h.filas[i] ?? []);
+    if (tipo) return { tipo, cab: cabeceraDe(h.filas[i]), desde: i + 1 };
+  }
+  for (const tipo of ["cobrar", "pagar"] as const) {
+    if (!h.filas.some((f) => GRUPO[tipo].test(t(f[1])))) continue;
+    const ancho = Math.max(...h.filas.map((f) => cabeceraDe(f).length));
+    const cab = [...(tipo === "pagar" && ancho <= CABECERAS_VALERY.pagar[1].length ? CABECERAS_VALERY.pagar[1] : CABECERAS_VALERY[tipo][0])];
+    const emision = cab.indexOf("Fecha Emisión");
+    const conDocumento = h.filas.some((f) => t(f[1]) && !GRUPO[tipo].test(t(f[1])) && aFechaPlantilla(t(f[emision])));
+    if (conDocumento) return { tipo, cab, desde: 0 };
+  }
+  return null;
+}
+
 /** Por qué las hojas no son el reporte de Valery que va en esta pantalla. null = sí lo son. */
 export function errorDeValery(tipo: TipoPlantilla, hojas: HojaLeida[]): string | null {
-  const tipos = hojas.map((h) => reporteValery(h.filas[0] ?? []));
+  const tipos = hojas.map((h) => disposicionValery(h)?.tipo ?? null);
   if (tipos.includes(tipo)) return null;
   const otro: TipoPlantilla = tipo === "cobrar" ? "pagar" : "cobrar";
   if (tipos.includes(otro)) {
@@ -54,7 +84,7 @@ export function errorDeValery(tipo: TipoPlantilla, hojas: HojaLeida[]): string |
   return null;
 }
 
-export const esValery = (hojas: HojaLeida[]) => hojas.some((h) => reporteValery(h.filas[0] ?? []) !== null);
+export const esValery = (hojas: HojaLeida[]) => hojas.some((h) => disposicionValery(h) !== null);
 
 /** «NE» → nota de entrega; «NDE» (en por pagar, la nota de entrega del proveedor); lo demás, factura. */
 function claseDe(tipoDoc: string): ClaseCuenta {
@@ -86,18 +116,21 @@ export function leerValery(tipo: TipoPlantilla, hojas: HojaLeida[]): LecturaVale
   const filas: FilaValery[] = [];
   const problemas: LecturaValery["problemas"] = [];
   let enCero = 0, sinVencimiento = 0;
-  const varias = hojas.filter((h) => reporteValery(h.filas[0] ?? []) === tipo).length > 1;
+  const varias = hojas.filter((h) => disposicionValery(h)?.tipo === tipo).length > 1;
 
   for (const h of hojas) {
-    if (reporteValery(h.filas[0] ?? []) !== tipo) continue;
-    const cab = cabeceraDe(h.filas[0]);
+    const d = disposicionValery(h);
+    if (d?.tipo !== tipo) continue;
+    const { cab, desde } = d;
     const col = (n: string) => cab.indexOf(n);
     const pre = varias ? `${h.nombre.trim()}, ` : "";
     let quien = "";
-    h.filas.slice(1).forEach((v, k) => {
-      const linea = k + 2;
+    h.filas.slice(desde).forEach((v, k) => {
+      const linea = desde + k + 1;
       const c0 = t(v[0]), c1 = t(v[1]);
-      if (c0 === "-") { quien = c1.replace(GRUPO[tipo], "").trim(); return; }
+      // La fila del cliente: Valery le pone «-» en la primera columna, pero
+      // copiada a mano a veces llega sin él.
+      if (c0 === "-" || GRUPO[tipo].test(c1)) { quien = c1.replace(GRUPO[tipo], "").trim(); return; }
       if (!c1) return;   // subtotal o fila vacía
       const tipoDoc = c1.toUpperCase();
       const emitida = aFechaPlantilla(t(v[col("Fecha Emisión")]));
