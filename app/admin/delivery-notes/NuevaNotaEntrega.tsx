@@ -35,6 +35,7 @@ import { leerConfig } from "@/lib/config/config-db";
 import { useTasaViva } from "@/lib/ux/bcv-rate";
 import type { Cliente } from "@/lib/directorio/directorio-db";
 import { autorizantes, cilindrosParaNota, type LineaEntrega } from "@/lib/cilindros/cilindros-db";
+import { llenosDeRenglones } from "@/lib/cilindros/gas-de-producto";
 import { useSesion } from "@/components/auth/SesionProvider";
 
 /**
@@ -53,6 +54,8 @@ export type NEEmitir = NEDoc & {
 const GASES_NE = ["OXIGENO", "ACETILENO", "ARGON", "NITROGENO"];
 const casillaDe = (gas: string) => (gas.startsWith("ACETILENO") ? "ACETILENO" : GASES_NE.includes(gas) ? gas : null);
 type Cuenta = { llenos: number; vacios: number };
+/** Lo que el vendedor tocó a mano; lo que no tocó sale de los renglones (llenos) o es 0 (vacíos). */
+type Manual = Partial<Cuenta>;
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
@@ -80,7 +83,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
   const [f, setF] = useState(formularioVacio());
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
   const [lineas, setLineas] = useState<Renglon[]>([]);
-  const [cuentas, setCuentas] = useState<Record<string, Cuenta>>({});
+  const [cuentas, setCuentas] = useState<Record<string, Manual>>({});
   const [autoriza, setAutoriza] = useState("");
   const [retira, setRetira] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
@@ -93,8 +96,12 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
     return { ...p, autorizan: a };
   });
   const gasesCil = parque.datos?.gases ?? [];
-  const cuenta = (g: string): Cuenta => cuentas[g] ?? { llenos: 0, vacios: 0 };
-  const setCuenta = (g: string, k: keyof Cuenta, n: number) => setCuentas((p) => ({ ...p, [g]: { ...cuenta(g), [k]: n } }));
+  // Un gas agregado como producto («OXIGENO GASEOSO» × 2) pone solos sus
+  // llenos: antes el parque no se enteraba si nadie tocaba esta sección. Los
+  // vacíos que trae el cliente se cargan a mano.
+  const deRenglones = llenosDeRenglones(lineas, gasesCil);
+  const cuenta = (g: string): Cuenta => ({ llenos: cuentas[g]?.llenos ?? deRenglones[g] ?? 0, vacios: cuentas[g]?.vacios ?? 0 });
+  const setCuenta = (g: string, k: keyof Cuenta, n: number) => setCuentas((p) => ({ ...p, [g]: { ...p[g], [k]: n } }));
   const conCilindros = gasesCil.filter((g) => cuenta(g).llenos > 0 || cuenta(g).vacios > 0);
   const dejaLlenos = conCilindros.some((g) => cuenta(g).llenos > 0);
   const quienSeLosLleva = retira ?? sesion?.nombre ?? "";
@@ -228,6 +235,14 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium text-text">{NOMBRE_GAS[g] ?? g}</span>
                     <span className={`block text-[11px] tabular-nums ${c.llenos > hay ? "font-medium text-danger" : "text-muted"}`}>{hay} en planta</span>
+                    {(deRenglones[g] ?? 0) > 0 && (
+                      cuentas[g]?.llenos === undefined || cuentas[g]?.llenos === deRenglones[g]
+                        ? <span className="block text-[11px] text-brand">{deRenglones[g]} por los productos</span>
+                        : <button type="button" className="block text-[11px] text-brand underline"
+                            onClick={() => setCuentas((p) => ({ ...p, [g]: { ...p[g], llenos: undefined } }))}>
+                            Usar los de los productos ({deRenglones[g]})
+                          </button>
+                    )}
                   </span>
                   <Paso valor={c.llenos} etiqueta={`${g} llenos`} onChange={(n) => setCuenta(g, "llenos", n)} />
                   <Paso valor={c.vacios} etiqueta={`${g} vacíos`} onChange={(n) => setCuenta(g, "vacios", n)} />
