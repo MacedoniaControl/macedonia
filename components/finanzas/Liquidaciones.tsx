@@ -18,15 +18,19 @@ import { fechaVista } from "@/lib/ux/tabla-export";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("es-VE", { timeZone: "America/Caracas", day: "2-digit", month: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit" });
 
-export function Liquidaciones({ empresa, recarga, gerencia, onCambio }: { empresa: string; recarga: number; gerencia: boolean; onCambio: () => void }) {
-  const carga = useCarga(`liq:${empresa}:${recarga}`, () => listarLiquidaciones(empresa));
+export function Liquidaciones({ empresa, recarga, gerencia, onCambio, tipo = "cobrar" }: {
+  empresa: string; recarga: number; gerencia: boolean; onCambio: () => void; tipo?: "cobrar" | "pagar";
+}) {
+  const carga = useCarga(`liq:${tipo}:${empresa}:${recarga}`, () => listarLiquidaciones(empresa, tipo));
   const lista = carga.datos ?? [];
   const [abierta, setAbierta] = useState<number | null>(null);
   if (!carga.cargando && !carga.error && lista.length === 0) return null;
 
   return (
     <div className="mt-6">
-      <SectionCard title="Liquidaciones" description="Pagos que liquidaron varias notas de un cliente. Toca una para ver sus notas y el comprobante.">
+      <SectionCard title="Liquidaciones" description={tipo === "pagar"
+        ? "Pagos que liquidaron varias cuentas de un proveedor. Toca uno para ver sus cuentas y el comprobante."
+        : "Pagos que liquidaron varias notas de un cliente. Toca una para ver sus notas y el comprobante."}>
         {carga.error && <p className="text-sm text-danger">{carga.error}</p>}
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
           {lista.map((l) => (
@@ -95,7 +99,7 @@ function Detalle({ l, gerencia, onCambio }: { l: Liquidacion; gerencia: boolean;
               placeholder="Motivo para anular" aria-label="Motivo para anular la liquidación" />
             <ConfirmDialog
               title={`¿Anular ${l.numero}?`}
-              message={`Se borran sus ${l.documentos.length} abono(s) y las notas de ${l.contraparte} vuelven a quedar abiertas por ${fmtUsd(l.total)}. La liquidación queda en el registro como anulada.`}
+              message={`Se borran sus ${l.documentos.length} abono(s) y las cuentas de ${l.contraparte} vuelven a quedar abiertas por ${fmtUsd(l.total)}. La liquidación queda en el registro como anulada.`}
               confirmLabel="Sí, anular" cancelLabel="No" onConfirm={anular}
               trigger={(abrir) => <Button variant="secondary" disabled={anulando || !motivo.trim()} onClick={abrir}>{anulando ? "Anulando…" : "Anular"}</Button>}
             />

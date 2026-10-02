@@ -22,7 +22,10 @@ import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { Button } from "@/components/ui/Button";
-import { fmtUsd } from "@/lib/ux/format";
+import { fmtUsd, fmtUsdCentavos } from "@/lib/ux/format";
+import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
+import { Liquidaciones } from "@/components/finanzas/Liquidaciones";
+import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 import { MarcaRevision } from "@/components/finanzas/MarcaRevision";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
@@ -37,6 +40,9 @@ const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
   : d <= 7 ? { label: `Alerta (${d}d)`, tone: "warn" }
   : { label: "Al día", tone: "info" };
 const inputClass = "sumi-campo";
+/** El mismo proveedor escrito con espacios o mayúsculas distintas. */
+const mismoProveedor = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toUpperCase() === b.trim().replace(/\s+/g, " ").toUpperCase();
+const pildora = "rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2";
 
 // «Descargar» baja las cuentas tal como se ven, con su filtro de clase.
 export default function PayablesPage() {
@@ -56,6 +62,12 @@ function CuentasPorPagar() {
   // El exito NO puede vivir dentro del panel: al confirmar, el panel se cierra
   // y el mensaje se iba con el. Quien abonaba no veia ninguna respuesta.
   const [exito, setExito] = useState("");
+  const [exitoTitulo, setExitoTitulo] = useState("Abono Registrado");
+  // Liquidar (Owner y Administrador) y Anexar, como en Cuentas por Cobrar.
+  const { rol } = useRol();
+  const gerencia = puedeVerFinanzas(rol);
+  const [liquidar, setLiquidar] = useState<string | null>(null);
+  const [anexar, setAnexar] = useState<string | null>(null);
   // Que cuenta se esta mirando, y si esta en modo edicion. Son dos estados
   // distintos: se puede abrir el detalle sin editar.
   const [abierta, setAbierta] = useState<number | null>(null);
@@ -76,6 +88,7 @@ function CuentasPorPagar() {
     if (!r.ok) { setMsg(`ERR:${r.error}`); return false; }
 
     setRecarga((n) => n + 1);
+    setExitoTitulo("Abono Registrado");
     setExito(`Abono de ${fmtUsd(a)} aplicado a ${docSel}.`);
     setAbono("");
     setDocSel("");
@@ -217,13 +230,16 @@ function CuentasPorPagar() {
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
+            {gerencia && (
+              <Button variant="secondary" icon="check" onClick={() => { setExito(""); setLiquidar(""); }}>Liquidar cuentas</Button>
+            )}
             <BotonDescargar empresa={empresaKey} />
           </div>
         }
       />
       {exito && (
         <div className="mb-4">
-          <AlertCard tone="ok" titulo="Abono Registrado" mensaje={exito} />
+          <AlertCard tone="ok" titulo={exitoTitulo} mensaje={exito} />
         </div>
       )}
       <FiltroClase conteo={porClase} total={ctas.length}
@@ -319,9 +335,17 @@ function CuentasPorPagar() {
                       <td className="py-2.5">
                         {/* Liquidada gana sobre vencida: una cuenta cerrada ya
                             no le debe nada a nadie, aunque su fecha pasara. */}
-                        {c.estado === "liquidada"
-                          ? <StatusBadge tone="ok">Liquidada</StatusBadge>
-                          : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                        <span className="flex flex-wrap items-center gap-2">
+                          {c.estado === "liquidada"
+                            ? <StatusBadge tone="ok">Liquidada</StatusBadge>
+                            : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                          {gerencia && c.estado === "abierta" && c.saldoNeto > 0.005 && (
+                            <button type="button" className={pildora} title={`Liquidar cuentas de ${c.contraparte}`}
+                              onClick={(ev) => { ev.stopPropagation(); setExito(""); setLiquidar(c.contraparte); }}>Liquidar</button>
+                          )}
+                          <button type="button" className={pildora} title={`Anexar una cuenta a la deuda con ${c.contraparte}`}
+                            onClick={(ev) => { ev.stopPropagation(); setExito(""); setAnexar(c.contraparte); }}>Anexar</button>
+                        </span>
                       </td>
                     </tr>
                   );
@@ -332,6 +356,32 @@ function CuentasPorPagar() {
           </EstadoDatos>
         </SectionCard>
       </div>
+
+      <Liquidaciones tipo="pagar" empresa={empresaKey} recarga={recarga} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} />
+
+      {liquidar !== null && (
+        <Modal titulo="Liquidar Cuentas" onCerrar={() => setLiquidar(null)}>
+          <LiquidarNotas tipo="pagar" empresa={empresaKey} cuentas={ctas} clienteInicial={liquidar || undefined}
+            onHecho={(t) => { setExitoTitulo("Cuentas Liquidadas"); setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setLiquidar(null)} />
+        </Modal>
+      )}
+
+      {anexar !== null && (() => {
+        // Todas las cuentas del proveedor, no solo las del filtro de clase.
+        const suyas = ctas.filter((c) => mismoProveedor(c.contraparte, anexar));
+        const deuda = suyas.filter((c) => c.estado === "abierta").reduce((a, c) => a + c.saldoNeto, 0);
+        return (
+          <Modal titulo="Anexar a la Deuda" onCerrar={() => setAnexar(null)}>
+            <FormularioCuenta tipo="pagar" empresa={empresaKey}
+              anexo={{ contraparte: anexar, deuda, documentos: suyas.map((c) => c.documento) }}
+              onCreada={(c) => {
+                if (c) { setExitoTitulo("Cuenta Anexada"); setExito(`${c.documento} anexada a ${anexar} por ${fmtUsdCentavos(c.monto)}. La deuda queda en ${fmtUsdCentavos(deuda + c.monto)}.`); }
+                setRecarga((n) => n + 1);
+              }}
+              onCerrar={() => setAnexar(null)} />
+          </Modal>
+        );
+      })()}
 
       {abierta !== null && (
         <Modal titulo="Cuenta por Pagar" onCerrar={() => { setAbierta(null); setEditando(null); }}>

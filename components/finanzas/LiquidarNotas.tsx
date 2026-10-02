@@ -20,13 +20,21 @@ const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoy = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
 const METODOS = ["Transferencia", "Pago móvil", "Efectivo", "Zelle", "Punto de venta", "Depósito", "Otro"];
 
-export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCerrar }: {
+// Las palabras de cada cartera: en por pagar son cuentas de un proveedor.
+const PALABRAS = {
+  cobrar: { quien: "Cliente", doc: "nota", Doc: "Nota", total: "el total por cobrar" },
+  pagar: { quien: "Proveedor", doc: "cuenta", Doc: "Cuenta", total: "el total por pagar" },
+} as const;
+
+export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCerrar, tipo = "cobrar" }: {
+  tipo?: "cobrar" | "pagar";
   empresa: string;
   cuentas: CuentaLiquidable[];
   clienteInicial?: string;
   onHecho: (texto: string) => void;
   onCerrar: () => void;
 }) {
+  const w = PALABRAS[tipo];
   const clientes = clientesConDeuda(cuentas);
   const [cliente, setCliente] = useState(() => clientes.find((g) => g.cliente.toUpperCase() === clienteInicial?.trim().toUpperCase())?.cliente ?? "");
   const grupo = clientes.find((g) => g.cliente === cliente);
@@ -52,8 +60,8 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCer
   const alternar = (id: number) => setElegidas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   function validar(): string | null {
-    if (!grupo) return "Elige el cliente.";
-    if (!elegidas.size) return "Marca al menos una nota.";
+    if (!grupo) return `Elige el ${w.quien.toLowerCase()}.`;
+    if (!elegidas.size) return `Marca al menos una ${w.doc}.`;
     if (!fecha || fecha > hoy()) return "La fecha del pago no puede ser posterior a hoy.";
     return null;
   }
@@ -61,9 +69,9 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCer
   async function liquidar() {
     setGuardando(true); setError(null);
     try {
-      const r = await liquidarCuentas(empresa, [...elegidas], { fecha, metodo, referencia, nota, imagen });
+      const r = await liquidarCuentas(empresa, [...elegidas], { fecha, metodo, referencia, nota, imagen }, tipo);
       if (!r.ok) return setError(r.error);
-      onHecho(`${r.numero}: ${r.cuentas} nota(s) de ${cliente} liquidadas por ${fmtUsd(r.total)}.`);
+      onHecho(`${r.numero}: ${r.cuentas} ${w.doc}(s) de ${cliente} liquidadas por ${fmtUsd(r.total)}.`);
       onCerrar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo liquidar.");
@@ -73,16 +81,16 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCer
   }
 
   if (!clientes.length) {
-    return <p className="py-6 text-center text-sm text-muted">No hay notas pendientes para liquidar.</p>;
+    return <p className="py-6 text-center text-sm text-muted">No hay {w.doc}s pendientes para liquidar.</p>;
   }
 
   return (
     <div className="space-y-4">
       <label className="block">
-        <span className={lbl}>Cliente</span>
+        <span className={lbl}>{w.quien}</span>
         <select className={campo} value={cliente} onChange={(e) => elegirCliente(e.target.value)}>
-          <option value="">Elige el cliente…</option>
-          {clientes.map((g) => <option key={g.cliente} value={g.cliente}>{g.cliente} · {g.cuentas.length} nota(s) · {fmtUsd(g.total)}</option>)}
+          <option value="">Elige el {w.quien.toLowerCase()}…</option>
+          {clientes.map((g) => <option key={g.cliente} value={g.cliente}>{g.cliente} · {g.cuentas.length} {w.doc}(s) · {fmtUsd(g.total)}</option>)}
         </select>
       </label>
 
@@ -148,15 +156,15 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCer
 
       <div className="flex flex-wrap gap-2">
         <ConfirmDialog
-          title="¿Liquidar las notas?"
-          message={`${elegidas.size} nota(s) de ${cliente || "—"} por ${fmtUsd(total)}, pagadas el ${fechaVista(fecha)}. Cada una queda liquidada y el total por cobrar baja en ${fmtUsd(total)}.`}
+          title={`¿Liquidar las ${w.doc}s?`}
+          message={`${elegidas.size} ${w.doc}(s) de ${cliente || "—"} por ${fmtUsd(total)}, pagadas el ${fechaVista(fecha)}. Cada una queda liquidada y ${w.total} baja en ${fmtUsd(total)}.`}
           confirmLabel="Sí, liquidar"
           cancelLabel="No"
           onConfirm={liquidar}
           trigger={(abrir) => (
             <Button icon="check" className="flex-1" disabled={guardando}
               onClick={() => { const e = validar(); if (e) return setError(e); setError(null); abrir(); }}>
-              {guardando ? "Liquidando…" : `Liquidar ${elegidas.size} nota(s) · ${fmtUsd(total)}`}
+              {guardando ? "Liquidando…" : `Liquidar ${elegidas.size} ${w.doc}(s) · ${fmtUsd(total)}`}
             </Button>
           )}
         />

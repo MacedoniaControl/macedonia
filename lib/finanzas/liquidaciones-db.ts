@@ -1,6 +1,7 @@
 "use server";
 
-// Liquidar varias cuentas por cobrar de un cliente con un solo pago.
+// Liquidar varias cuentas de un cliente (por cobrar) o de un proveedor (por
+// pagar) con un solo pago (migraciones 33 y 34).
 //
 // El comprobante (foto o PDF) va al bucket privado de comprobantes, bajo la
 // carpeta de la empresa, ANTES de llamar a la base; si la base rechaza la
@@ -18,6 +19,7 @@ export async function liquidarCuentas(
   empresa: string,
   ids: number[],
   pago: { fecha: string; metodo?: string; referencia?: string; nota?: string; imagen?: File | null },
+  tipo: "cobrar" | "pagar" = "cobrar",
 ): Promise<ResultadoLiquidacion> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
@@ -34,7 +36,7 @@ export async function liquidarCuentas(
 
   const { data, error } = await sb.rpc("liquidar_cuentas", {
     p_empresa: empresa, p_ids: ids, p_fecha: pago.fecha, p_metodo: pago.metodo ?? null,
-    p_referencia: pago.referencia ?? null, p_nota: pago.nota ?? null, p_imagen_ruta: ruta,
+    p_referencia: pago.referencia ?? null, p_nota: pago.nota ?? null, p_imagen_ruta: ruta, p_tipo: tipo,
   });
   if (error) {
     if (ruta) await sb.storage.from(BUCKET).remove([ruta]);
@@ -54,11 +56,11 @@ export type Liquidacion = {
 };
 
 /** Las últimas liquidaciones de la empresa, con sus documentos. */
-export async function listarLiquidaciones(empresa: string, limite = 50): Promise<Liquidacion[]> {
+export async function listarLiquidaciones(empresa: string, tipo: "cobrar" | "pagar" = "cobrar", limite = 50): Promise<Liquidacion[]> {
   const sb = await createClient();
   const { data, error } = await sb.from("liquidaciones")
     .select("id, numero, contraparte, fecha, total, cuentas, metodo, referencia, nota, imagen_ruta, creado_nombre, creado_en, anulada_en, anulada_nombre, anulada_motivo")
-    .eq("empresa_id", empresa).eq("tipo", "cobrar").order("id", { ascending: false }).limit(limite);
+    .eq("empresa_id", empresa).eq("tipo", tipo).order("id", { ascending: false }).limit(limite);
   if (error) {
     // Sin la migración 33 la tabla no existe: la sección simplemente no se muestra.
     if (error.code === "42P01" || error.code === "PGRST205") return [];

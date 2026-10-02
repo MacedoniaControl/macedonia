@@ -8,12 +8,17 @@
 import type { ClaseCuenta } from "./retencion.ts";
 import { numeroDocumento } from "./valery-cuentas.ts";
 
-const PREFIJO: Partial<Record<ClaseCuenta, string>> = { nota_entrega: "NE", factura: "FAC", nota_debito: "ND" };
+// Los mismos prefijos que trae Valery en cada reporte: en por pagar la factura
+// del proveedor es «FCM» y su nota de entrega «NDE».
+const PREFIJO: Record<"cobrar" | "pagar", Partial<Record<ClaseCuenta, string>>> = {
+  cobrar: { nota_entrega: "NE", factura: "FAC", nota_debito: "ND" },
+  pagar: { nota_entrega: "NDE", factura: "FCM", nota_debito: "ND" },
+};
 
 /** «9150» → «NE-9150»; «ne 9150» → «NE-9150»; lo que ya trae otro prefijo se respeta. */
-export function documentoAnexo(clase: ClaseCuenta, texto: string): string {
+export function documentoAnexo(clase: ClaseCuenta, texto: string, tipo: "cobrar" | "pagar" = "cobrar"): string {
   const t = texto.trim().toUpperCase().replace(/\s+/g, " ");
-  const p = PREFIJO[clase];
+  const p = PREFIJO[tipo][clase];
   if (!t || !p) return t;
   if (/^\d[\d\-/.]*$/.test(t)) return `${p}-${t}`;
   const m = t.match(/^([A-Z]+)[\s\-#:.]*(\d.*)$/);
