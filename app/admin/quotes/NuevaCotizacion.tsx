@@ -20,7 +20,7 @@ import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { CampoNumero } from "@/components/ui/CampoNumero";
-import { fmtUsd, enBs } from "@/lib/ux/format";
+import { fmtUsdCentavos, enBs } from "@/lib/ux/format";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
 import { vendedoresDe } from "@/lib/auth/vendedores";
 import { vendedoresExternos } from "@/lib/documentos/documentos-db";
@@ -163,7 +163,7 @@ export function NuevaCotizacion({ seq, onSave }: { seq: string; onSave: (d: GenD
       </SectionCard>
 
       {/* ---------------- Productos: el documento */}
-      <EditorRenglones empresa={empresaKey} numero={String(seq).padStart(10, "0")} lineas={lineas} setLineas={setLineas}
+      <EditorRenglones empresa={empresaKey} ivaPct={ivaPct} numero={String(seq).padStart(10, "0")} lineas={lineas} setLineas={setLineas}
         gases={gases.map((g) => g.nombre)} onCambio={() => setMsg("")} className="xl:[grid-area:prod] xl:self-start" />
 
       {/* ---------------- Condiciones y total */}
@@ -207,12 +207,12 @@ export function NuevaCotizacion({ seq, onSave }: { seq: string; onSave: (d: GenD
 
         <div className="rounded-2xl border border-border bg-surface p-4">
           <dl className="space-y-1.5 text-sm">
-            <div className="flex justify-between text-muted"><dt>Subtotal · {lineas.length} renglón(es)</dt><dd className="tabular-nums">{fmtUsd(sub)}</dd></div>
-            <div className="flex justify-between text-muted"><dt>IVA {ivaPct}%</dt><dd className="tabular-nums">{fmtUsd(iva)}</dd></div>
+            <div className="flex justify-between text-muted"><dt>Subtotal · {lineas.length} renglón(es)</dt><dd className="tabular-nums">{fmtUsdCentavos(sub)}</dd></div>
+            <div className="flex justify-between text-muted"><dt>IVA {ivaPct}%</dt><dd className="tabular-nums">{fmtUsdCentavos(iva)}</dd></div>
             <div className="flex items-baseline justify-between border-t border-border pt-2">
               <dt className="font-semibold text-text">Total</dt>
               <dd className="text-right">
-                <span className="block text-xl font-semibold tabular-nums text-text">{fmtUsd(total)}</span>
+                <span className="block text-xl font-semibold tabular-nums text-text">{fmtUsdCentavos(total)}</span>
                 {tasa && total > 0 && <span className="block text-xs tabular-nums text-muted">≈ {enBs(total, tasa)}</span>}
               </dd>
             </div>

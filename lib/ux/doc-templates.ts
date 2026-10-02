@@ -104,7 +104,7 @@ function neCopy(d: NEDoc, empresa: EmpresaId) {
       <tbody>${filas}${"<tr class='sp'><td></td><td></td><td></td><td></td><td></td></tr>".repeat(Math.max(0, 6 - d.lineas.length))}</tbody></table>
     <table class="tot">
       <tr><td class="k">BASE IMPONIBLE</td><td class="r">${m(t.base)}</td></tr>
-      ${d.llevaIva ? `<tr><td class="k">IVA &nbsp; ${m(d.ivaPct ?? 16)} %</td><td class="r">${m(t.iva)}</td></tr>` : ""}
+      <tr><td class="k">IVA${d.llevaIva ? ` &nbsp; ${m(d.ivaPct ?? 16)} %` : ""}</td><td class="r">${m(t.iva)}</td></tr>
       <tr><td class="k">TOTAL OPERACIÓN</td><td class="r">${m(t.total)}</td></tr>
     </table>
     <table class="cilt"><thead><tr><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACÍOS</th><th class="l">PRODUCTO</th><th>CILINDROS<br>LLENOS</th><th>CILINDROS<br>VACÍOS</th></tr></thead>

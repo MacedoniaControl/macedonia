@@ -8,6 +8,11 @@ export function fmtUsd(n: number): string {
   return `${r < 0 ? "-" : ""}$${Math.abs(r).toLocaleString("es-VE")}`;
 }
 
+/** Con centavos, para documentos: en una nota de $21,23 el IVA es $2,93, no «$3». */
+export function fmtUsdCentavos(n: number): string {
+  return `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function fmtBs(n: number): string {
   return `${new Intl.NumberFormat("es-VE", { maximumFractionDigits: 0 }).format(n)} Bs`;
 }

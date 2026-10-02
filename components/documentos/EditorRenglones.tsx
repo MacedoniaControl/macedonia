@@ -17,12 +17,13 @@ import { Button } from "@/components/ui/Button";
 import { InputMonto } from "@/components/ui/InputMonto";
 import { CampoNumero } from "@/components/ui/CampoNumero";
 import { Icon } from "@/components/ui/Icon";
-import { fmtUsd } from "@/lib/ux/format";
+import { fmtUsdCentavos } from "@/lib/ux/format";
 import { UNIDADES } from "@/lib/ux/catalogos";
 import { ScanBar } from "@/components/inventory/ScanBar";
 import { ProductSearch } from "@/components/inventory/ProductSearch";
 import { escanear, mensajeDeEscaneo, type ProductoEscaneado } from "@/lib/inventory/escanear";
 import { beep } from "@/lib/inventory/scan-feedback";
+import { precioSinIva } from "@/lib/documentos/precio-documento";
 
 export type Renglon = { codigo: string; descripcion: string; cantidad: number; precio: number; descuento: number; unidad: string };
 
@@ -33,9 +34,11 @@ const COLUMNAS = "@xl:grid-cols-[minmax(0,1fr)_5.5rem_7rem_4.5rem_6.5rem_2.25rem
 const vacio = (): Renglon => ({ codigo: "", descripcion: "", cantidad: 1, precio: 0, descuento: 0, unidad: "UNIDAD" });
 
 export function EditorRenglones({
-  empresa, numero, lineas, setLineas, gases = [], className = "", onCambio,
+  empresa, ivaPct, numero, lineas, setLineas, gases = [], className = "", onCambio,
 }: {
   empresa: string;
+  /** El IVA de la empresa: el catálogo trae el precio con IVA y el renglón va sin él. */
+  ivaPct: number;
   /** El número previsto del documento, arriba a la derecha. */
   numero: string;
   lineas: Renglon[];
@@ -61,8 +64,10 @@ export function EditorRenglones({
         setAviso({ ok: true, text: `${p.nombre} · cantidad ${nueva}` });
         return prev.map((l, j) => (j === i ? { ...l, cantidad: nueva } : l));
       }
-      setAviso({ ok: true, text: p.precio > 0 ? `${p.nombre} agregado (${origen})` : `${p.nombre} agregado · falta el precio` });
-      return [...prev, { codigo: p.codigo, descripcion: p.nombre, cantidad: 1, precio: p.precio, descuento: 0, unidad: p.unidad ?? "UNIDAD" }];
+      // El renglón va SIN IVA; el IVA se suma abajo si se elige.
+      const precio = precioSinIva(p.precio, ivaPct);
+      setAviso({ ok: true, text: precio > 0 ? `${p.nombre} agregado (${origen}) · ${fmtUsdCentavos(precio)} sin IVA` : `${p.nombre} agregado · falta el precio` });
+      return [...prev, { codigo: p.codigo, descripcion: p.nombre, cantidad: 1, precio, descuento: 0, unidad: p.unidad ?? "UNIDAD" }];
     });
   }
   async function onScan(codigo: string) {
@@ -94,7 +99,7 @@ export function EditorRenglones({
       <div className="flex items-end gap-2">
         <div className="min-w-0 flex-1">
           <label className="mb-1 block text-xs font-medium text-muted">Buscar en el catálogo</label>
-          <ProductSearch onPick={(p) => agregar(p, "buscador")} />
+          <ProductSearch onPick={(p) => agregar(p, "buscador")} ivaPct={ivaPct} />
         </div>
         <button type="button" onClick={() => setEscaneando((v) => !v)} aria-pressed={escaneando} aria-label="Escanear código"
           className={`flex h-11 flex-none items-center gap-1.5 rounded-xl border px-3.5 text-sm font-medium transition ${escaneando
@@ -133,7 +138,7 @@ export function EditorRenglones({
         ) : (
           <>
             <div className={`hidden gap-3 border-b border-border py-2 text-[11px] font-medium uppercase tracking-wide text-muted @xl:grid ${COLUMNAS}`}>
-              <span>Producto</span><span className="text-right">Cantidad</span><span className="text-right">Precio</span>
+              <span>Producto</span><span className="text-right">Cantidad</span><span className="text-right">Precio sin IVA</span>
               <span className="text-right">Dcto %</span><span className="text-right">Total</span><span />
             </div>
             <ul className="divide-y divide-border">
@@ -154,7 +159,7 @@ export function EditorRenglones({
                         aria-label={`Cantidad de ${l.descripcion}`} className={`${campo} h-10 text-right`} />
                     </label>
                     <label className="block">
-                      <span className="mb-1 block text-[11px] text-muted @xl:sr-only">Precio</span>
+                      <span className="mb-1 block text-[11px] text-muted @xl:sr-only">Precio sin IVA</span>
                       <InputMonto valor={l.precio} onChange={(n) => upd(i, { precio: n })} aria-label={`Precio de ${l.descripcion}`}
                         className={`${campo} h-10 text-right ${l.precio <= 0 ? "!border-danger" : ""}`} />
                     </label>
@@ -165,7 +170,7 @@ export function EditorRenglones({
                     </label>
                   </div>
                   <p className="col-span-2 text-right text-sm font-semibold tabular-nums text-text @xl:col-span-1">
-                    <span className="mr-2 text-xs font-normal text-muted @xl:hidden">Total</span>{fmtUsd(totalRenglon(l))}
+                    <span className="mr-2 text-xs font-normal text-muted @xl:hidden">Total</span>{fmtUsdCentavos(totalRenglon(l))}
                   </p>
                 </li>
               ))}
@@ -189,7 +194,7 @@ export function EditorRenglones({
             <select className={campo} value={libre.unidad} aria-label="Unidad" onChange={(e) => setLibre({ ...libre, unidad: e.target.value })}>
               {UNIDADES.map((u) => <option key={u}>{u}</option>)}
             </select>
-            <InputMonto valor={libre.precio} onChange={(n) => setLibre({ ...libre, precio: n })} aria-label="Precio" className={`${campo} text-right`} />
+            <InputMonto valor={libre.precio} onChange={(n) => setLibre({ ...libre, precio: n })} aria-label="Precio sin IVA" className={`${campo} text-right`} />
           </div>
           <div className="flex gap-2">
             <Button icon="plus" onClick={agregarLibre}>Agregar</Button>
