@@ -3,13 +3,7 @@
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
-import { getHistory, notaHistorico, type HistMonth } from "@/lib/ux/history-data";
-
-const MESES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-function labelMes(ym: string) {
-  const [y, m] = ym.split("-");
-  return `${MESES[Number(m)]} ${y.slice(2)}`;
-}
+import { getHistory, type HistMonth } from "@/lib/ux/history-data";
 
 type Props = { empresa?: string };
 
@@ -79,9 +73,6 @@ export function HistoryTrend({ empresa = "sumigases", height = 260 }: Props & { 
           <polyline key={s.name} points={line(s.key)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         ))}
       </svg>
-      <p className="mt-1 text-xs text-muted">
-        {labelMes(data[0].ym)} – {labelMes(data[n - 1].ym)} · {n} meses. {notaHistorico(h)}
-      </p>
     </div>
   );
 }
@@ -116,7 +107,7 @@ export function HistoryYearly({ empresa = "sumigases" }: Props) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-muted">* {ultimoAnio} es parcial. {notaHistorico(h)}</p>
+      <p className="mt-2 text-xs text-muted">* {ultimoAnio} es parcial.</p>
     </div>
   );
 }
