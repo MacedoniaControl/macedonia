@@ -76,3 +76,36 @@ test("duplicadas: las que ya están en la cartera y las repetidas en el archivo,
   // Mismo número de otro proveedor: no es duplicada.
   assert.equal(separarDuplicadas(l.filas, [{ ...cartera[0], contraparte: "OXIORIENTE" }]).duplicadas.length, 0);
 });
+
+test("un pedazo del reporte copiado a un libro nuevo, sin cabecera ni «-», también se lee", () => {
+  // Así llega cuando se copian a mano unas filas del Estado de Cuenta (al
+  // pegarse, la celda combinada del cliente se repite en toda la fila).
+  const cliente = Array(10).fill("Descripción Cliente  FERRETERÍA EL CLAVO");
+  const h: HojaLeida = { nombre: "Hoja1", filas: [
+    ["", ...cliente],
+    ["", "NE", "9068", "46293", "46323", "", "", "", "20", "", "20"],
+    ["", "NE", "9138", "46297", "45963", "", "", "", "35,5", "", "55,5"],
+    ["", "", "", "", "", "", "", "", ",", "0", "55,5"],
+  ] };
+  assert.equal(esValery([h]), true);
+  assert.equal(errorDeValery("cobrar", [h]), null);
+  const l = leerValery("cobrar", [h]);
+  assert.deepEqual(l.problemas, []);
+  assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.emitida, f.vence, f.monto, f.linea]), [
+    ["FERRETERÍA EL CLAVO", "NE-9068", "2026-09-28", "2026-10-28", 20, 2],
+    // Vencimiento anterior a la emisión: vence el día que se emitió.
+    ["FERRETERÍA EL CLAVO", "NE-9138", "2026-10-02", "2026-10-02", 35.5, 3],
+  ]);
+});
+
+test("sin cabecera, un archivo cualquiera no se toma por reporte de Valery", () => {
+  assert.equal(esValery([{ nombre: "x", filas: [["", "Descripción Cliente : A"], ["", "hola", "", "no es fecha"]] }]), false);
+  assert.equal(esValery([{ nombre: "x", filas: [["Cliente", "Documento"], ["A", "NE-1"]] }]), false);
+});
+
+test("la cabecera también se encuentra con títulos encima", () => {
+  const cab = ["Tipo Doc.", "", "Documento", "Fecha Emisión", "Fecha Venc.", "Concepto", "Saldo Inicial", "Anticipo", "Débito", "Crédito", "Saldo"];
+  const h: HojaLeida = { nombre: "R", filas: [["Estado de Cuenta de Clientes"], [], cab, ["-", "Descripción Cliente : A"], ["", "NE", "1", "46293", "", "", "10", "", "", "", "10"]] };
+  const l = leerValery("cobrar", [h]);
+  assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.monto, f.linea]), [["A", "NE-1", 10, 5]]);
+});
