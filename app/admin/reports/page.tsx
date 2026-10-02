@@ -24,7 +24,7 @@ import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO, type Periodo } from "@/lib/ux/historico-rango";
-import { HISTORY, notaHistorico, type EmpresaHist } from "@/lib/ux/history-data";
+import { HISTORY, type EmpresaHist } from "@/lib/ux/history-data";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
 import type { TipoColumna } from "@/lib/ux/tabla-export";
@@ -235,7 +235,7 @@ function Reportes() {
       </SectionCard>
 
       <p className="mt-3 text-xs text-muted">
-        {notaHistorico(HISTORY[empresa as EmpresaHist] ?? HISTORY.sumigases)} Margen = utilidad / ventas · ROI = utilidad / costo de lo vendido.
+        Margen = utilidad / ventas · ROI = utilidad / costo de lo vendido.
       </p>
     </>
   );
