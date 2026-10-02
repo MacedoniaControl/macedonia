@@ -48,10 +48,13 @@ export function FormularioCuenta({
 }) {
   const quien = tipo === "cobrar" ? "Cliente" : "Proveedor";
   const [f, setF] = useState({ contraparte: anexo?.contraparte ?? "", documento: "", emitida: hoy(), vence: hoy(), nota: "" });
-  const [clase, setClase] = useState<ClaseCuenta>(anexo ? "nota_entrega" : "factura");
+  // Al anexar a un cliente lo común es una nota de entrega sin IVA; a un
+  // proveedor, su factura con IVA y retención (como «Nueva cuenta»).
+  const notaSinIva = !!anexo && tipo === "cobrar";
+  const [clase, setClase] = useState<ClaseCuenta>(notaSinIva ? "nota_entrega" : "factura");
   const [montoTxt, setMontoTxt] = useState("");
-  const [conIva, setConIva] = useState(!anexo);
-  const [retiene, setRetiene] = useState(!anexo);
+  const [conIva, setConIva] = useState(!notaSinIva);
+  const [retiene, setRetiene] = useState(!notaSinIva);
   const [imagen, setImagen] = useState<File | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export function FormularioCuenta({
 
   const monto = parseMonto(montoTxt);
   const d = monto !== null ? desglosar(monto, conIva, retiene) : null;
-  const documento = anexo ? documentoAnexo(clase, f.documento) : f.documento.trim();
+  const documento = anexo ? documentoAnexo(clase, f.documento, tipo) : f.documento.trim();
   const repetidos = anexo ? yaAnexados(documento, anexo.documentos) : [];
   const aCobrar = d ? d.total - (conIva && retiene ? d.retencion : 0) : 0;
 
@@ -98,7 +101,7 @@ export function FormularioCuenta({
         <div className="rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm">
           <span className="block text-xs text-muted">{quien}</span>
           <b className="text-text">{anexo.contraparte}</b>
-          <span className="block text-xs text-muted">Debe hoy {fmtUsdCentavos(anexo.deuda)}</span>
+          <span className="block text-xs text-muted">{tipo === "cobrar" ? "Debe hoy" : "Le debemos hoy"} {fmtUsdCentavos(anexo.deuda)}</span>
         </div>
       ) : (
         <>
@@ -205,7 +208,7 @@ export function FormularioCuenta({
 
       {anexo && aCobrar > 0 && (
         <p className="rounded-xl border border-brand/30 bg-brand/5 px-3 py-2 text-sm text-text">
-          Su deuda pasa de {fmtUsdCentavos(anexo.deuda)} a <b>{fmtUsdCentavos(anexo.deuda + aCobrar)}</b>.
+          {tipo === "cobrar" ? "Su deuda pasa" : "La deuda con el proveedor pasa"} de {fmtUsdCentavos(anexo.deuda)} a <b>{fmtUsdCentavos(anexo.deuda + aCobrar)}</b>.
         </p>
       )}
 
