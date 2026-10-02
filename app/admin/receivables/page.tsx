@@ -26,7 +26,9 @@ import { fmtUsd } from "@/lib/ux/format";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
-import { agruparPorCliente } from "@/lib/finanzas/cartera";
+import { agruparPorCliente, type ClienteCartera } from "@/lib/finanzas/cartera";
+import { ariaOrden, gravedad, ordenar, siguienteOrden, type ClaveOrden, type Orden } from "@/lib/finanzas/orden-cartera";
+import { SortableTh } from "@/components/ui/SortableTh";
 import { Icon } from "@/components/ui/Icon";
 import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
 import { Liquidaciones } from "@/components/finanzas/Liquidaciones";
@@ -170,7 +172,20 @@ function CuentasPorCobrar() {
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const clientes = agruparPorCliente(conSaldo);
   const tc = buscaCliente.trim().toLowerCase();
-  const clientesVisibles = tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes;
+  // Se ordena tocando la cabecera; sin tocar, primero quien más debe. Los
+  // documentos de cada cliente siguen el mismo orden al desplegarlo.
+  const [orden, setOrden] = useState<Orden>(null);
+  const valorCliente = (g: ClienteCartera<CuentaDb>, k: ClaveOrden) =>
+    k === "nombre" ? g.cliente : k === "documentos" ? g.documentos : k === "monto" ? g.monto : k === "saldo" ? g.saldo
+    : k === "vence" ? g.masVieja?.vence ?? null : g.masVieja ? gravedad(g.saldo, g.masVieja.dias) : null;
+  const valorCuenta = (c: CuentaDb, k: ClaveOrden) =>
+    k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "vence" ? c.vence
+    : k === "estado" ? gravedad(c.saldo, c.dias, c.estado === "liquidada") : null;
+  const clientesVisibles = ordenar(tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes, orden, valorCliente)
+    .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, orden, valorCuenta) }));
+  const thOrden = (label: string, clave: ClaveOrden, align: "left" | "right" = "left") => (
+    <SortableTh label={label} sortKey={clave} align={align} ariaSort={(k) => ariaOrden(orden, k)} onSort={() => setOrden((o) => siguienteOrden(o, clave))} />
+  );
   const alternar = (k: string) => setAbiertos((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const todosAbiertos = clientesVisibles.length > 0 && clientesVisibles.every((g) => abiertos.has(g.cliente));
   const nombreClase = (id: string) => CLASES.find((x) => x.id === id)?.label ?? id;
@@ -284,12 +299,12 @@ function CuentasPorCobrar() {
             <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
-                  <th className="py-2.5 pr-3 font-medium">Cliente</th>
-                  <th className="py-2.5 pr-3 font-medium">Documentos</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Monto</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Saldo</th>
-                  <th className="py-2.5 pr-3 font-medium">Vence</th>
-                  <th className="py-2.5 font-medium">Estado</th>
+                  {thOrden("Cliente", "nombre")}
+                  {thOrden("Documentos", "documentos")}
+                  {thOrden("Monto", "monto", "right")}
+                  {thOrden("Saldo", "saldo", "right")}
+                  {thOrden("Vence", "vence")}
+                  {thOrden("Estado", "estado")}
                 </tr>
               </thead>
               {clientesVisibles.map((g) => {

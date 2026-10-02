@@ -26,7 +26,9 @@ import { fmtUsd } from "@/lib/ux/format";
 import { MarcaRevision } from "@/components/finanzas/MarcaRevision";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
-import { textoCelda } from "@/lib/ux/tabla-export";
+import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
+import { ariaOrden, gravedad, ordenar, siguienteOrden, type ClaveOrden, type Orden } from "@/lib/finanzas/orden-cartera";
+import { SortableTh } from "@/components/ui/SortableTh";
 
 type Cta = { id: number; proveedor: string; doc: string; monto: number; abonado: number; venc: string };
 const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
@@ -81,9 +83,20 @@ function CuentasPorPagar() {
   }
 
     // saldo y dias los calcula la BASE, contra la fecha de hoy real.
-  const conSaldo = ctas
-    .filter((c) => filtroClase === "todas" || grupoDeClase(c.clase) === filtroClase)
-    .map((c) => ({ ...c, d: c.dias }));
+  // Se ordena tocando la cabecera (montos de mayor a menor, vencimiento del
+  // más viejo al más nuevo, estado del más grave al pagado). La descarga sale
+  // en el mismo orden.
+  const [orden, setOrden] = useState<Orden>(null);
+  const conSaldo = ordenar(
+    ctas.filter((c) => filtroClase === "todas" || grupoDeClase(c.clase) === filtroClase).map((c) => ({ ...c, d: c.dias })),
+    orden,
+    (c, k: ClaveOrden) =>
+      k === "nombre" ? c.contraparte : k === "documentos" ? c.documento : k === "monto" ? c.neto : k === "saldo" ? c.saldoNeto
+      : k === "vence" ? c.vence : gravedad(c.saldoNeto, c.d, c.estado === "liquidada"),
+  );
+  const thOrden = (label: string, clave: ClaveOrden, align: "left" | "right" = "left") => (
+    <SortableTh label={label} sortKey={clave} align={align} ariaSort={(k) => ariaOrden(orden, k)} onSort={() => setOrden((o) => siguienteOrden(o, clave))} />
+  );
 
   // Cuantas hay de cada clase, para no ofrecer un filtro que deja la tabla
   // vacia: un filtro con cero resultados parece que el sistema perdio datos.
@@ -263,15 +276,16 @@ function CuentasPorPagar() {
             }
           >
             <div className="sumi-scroll max-w-full overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-sm">
+            <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
-                  <th className="py-2.5 pr-3 font-medium">Proveedor</th>
-                  <th className="py-2.5 pr-3 font-medium">Documento</th>
+                  {thOrden("Proveedor", "nombre")}
+                  {thOrden("Documento", "documentos")}
                   <th className="py-2.5 pr-3 font-medium">Clase</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">A Pagar</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Saldo</th>
-                  <th className="py-2.5 font-medium">Estado</th>
+                  {thOrden("A Pagar", "monto", "right")}
+                  {thOrden("Saldo", "saldo", "right")}
+                  {thOrden("Vence", "vence")}
+                  {thOrden("Estado", "estado")}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -301,6 +315,7 @@ function CuentasPorPagar() {
                         ) : null}
                       </td>
                       <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(c.saldoNeto)}</td>
+                      <td className="whitespace-nowrap py-2.5 pr-3 text-xs text-muted">{fechaVista(c.vence)}</td>
                       <td className="py-2.5">
                         {/* Liquidada gana sobre vencida: una cuenta cerrada ya
                             no le debe nada a nadie, aunque su fecha pasara. */}

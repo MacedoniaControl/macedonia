@@ -316,7 +316,8 @@ describe("el panel muestra lo que hay que pagar, no el valor de cara", () => {
   test("la columna se llama «A Pagar», no «Monto»", () => {
     // Si el numero es el neto, llamarlo Monto hace creer que es el de la
     // factura, y no cuadraria con el papel.
-    assert.match(pant, />A Pagar</);
+    assert.match(pant, /thOrden\("A Pagar", "monto"/);
+    assert.doesNotMatch(pant, /thOrden\("Monto"/);
   });
 
   test("cuando hay retención, el total de la factura sigue a la vista", () => {
