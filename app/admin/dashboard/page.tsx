@@ -193,7 +193,6 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
               <p className="mt-1 text-xs text-muted">
                 Fecha valor BCV: {bcv.fecha.split("-").reverse().join("-")} · Actualizada: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
               </p>
-              <p className="mt-1 text-xs text-muted">Lo de hoy (ventas y cuentas) se pasa a bolívares a esta tasa; el histórico muestra lo facturado, a la tasa de cada día.</p>
             </>
           ) : (
             <>
