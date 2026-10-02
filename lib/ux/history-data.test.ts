@@ -92,3 +92,16 @@ test("renglones a revisar: el precio mal cargado no suma; el costo mal cargado s
   assert.match(notaHistorico(HISTORY.sumigases), /con el precio mal cargado no suman/);
   assert.ok(HISTORY.sudematin.meta.consumoPropio > 0);
 });
+
+test("el costo absurdo de Valery se recalcula con el costo habitual del producto", () => {
+  // 30 cepillos de alambre vendidos en $336,30 con costo de $8.169 en Valery.
+  const c = HISTORY.sumigases.meta.costosCorregidos.find((x) => /CEPILLO ALAMBRE/.test(x.producto));
+  assert.ok(c, "el cepillo está entre los corregidos");
+  assert.equal(c!.costoValery, 8169);
+  assert.ok(c!.costo < c!.venta, "con el costo habitual ya no da pérdida");
+  // Solo se corrige lo absurdo: un regalo a precio casi cero con costo normal es una pérdida real.
+  assert.ok(!HISTORY.sumigases.meta.costosCorregidos.some((x) => /ARGON CIL 6 M3/.test(x.producto)));
+  assert.match(notaHistorico(HISTORY.sumigases), /se recalcularon con el costo habitual del producto/);
+  // La utilidad sigue siendo venta menos costo en cada mes.
+  for (const e of ["sumigases", "sudematin"] as const) for (const m of HISTORY[e].months) assert.equal(m.util, m.venta - m.costo);
+});

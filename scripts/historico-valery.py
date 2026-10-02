@@ -195,6 +195,7 @@ def ventas(emp):
     motivo_revisar(unicas)
     separados = [f for f in unicas if f["revisar"]]
     unicas = [f for f in unicas if f.get("motivo") != "precio"]
+    corregir_costos(unicas)
     archivos += [("facturas gemelas de una nota (no se suman)", -gemelas),
                  (f"renglones de {despues[0]} facturas de notas de días antes (no se suman)", -despues[1]), ("ventas a la otra empresa del grupo (no se suman)", -len(entre)),
                  ("ventas a sí misma (no se suman)", -len(propias)),
@@ -211,6 +212,27 @@ def motivo_revisar(filas):
         habitual = sorted(pu[f["codigo"]])[len(pu[f["codigo"]]) // 2] if pu[f["codigo"]] else None
         unitario = abs(f["venta"]) / (abs(f["cantidad"]) or 1)
         f["motivo"] = "precio" if habitual is None or unitario > 8 * habitual else "costo"
+
+def corregir_costos(filas):
+    """El costo mal cargado en Valery (30 cepillos de $11 con costo $8.169) se
+    recalcula con el costo unitario habitual del producto (la mediana de sus
+    demás ventas). Es mal cargado si el costo pasa 3 veces la venta, la pérdida
+    pasa $200 y el costo unitario es más de 5 veces el habitual. Sin otras
+    ventas del producto con qué comparar, se deja como está. El renglón guarda
+    el costo de Valery en «costo_valery» (meta.costosCorregidos)."""
+    malo = lambda f: (f["tipo"] != "DEV" and f["venta"] > 0 and f["cantidad"] > 0
+                      and f["costo"] > 3 * f["venta"] and f["costo"] - f["venta"] > 200)
+    unit = collections.defaultdict(list)
+    for f in filas:
+        if f["tipo"] != "DEV" and f["cantidad"] > 0 and f["costo"] > 0 and not malo(f):
+            unit[f["codigo"]].append(f["costo"] / f["cantidad"])
+    for f in filas:
+        if not malo(f) or not unit[f["codigo"]]: continue
+        habitual = sorted(unit[f["codigo"]])[len(unit[f["codigo"]]) // 2]
+        if f["costo"] / f["cantidad"] <= 5 * habitual: continue
+        f["costo_valery"] = f["costo"]
+        f["costo"] = habitual * f["cantidad"]
+        f["util"] = f["venta"] - f["costo"]
 
 def facturadas_despues(filas, consumidas, fuera):
     """Marca en `fuera` las facturas que facturan notas de días antes (reglas arriba).
@@ -381,7 +403,11 @@ def armar(emp):
     revisar = [{"fecha": f["fecha"], "tipo": f["tipo"], "documento": f["doc"], "cliente": re.sub(r"\s*\(.*$", "", html.unescape(f["cliente"])).strip(),
                 "producto": f["producto"], "cantidad": f["cantidad"], "venta": round(f["venta"], 2), "costo": round(f["costo"], 2), "motivo": f["motivo"]}
                for f in sorted(sep, key=lambda x: -abs(x["venta"]))]
-    meta = {"desde": yms[0], "hasta": yms[-1], "ventasHasta": ventas_hasta, "comprasHasta": compras_hasta, "incompletos": incompletos, "revisar": revisar, "entreEmpresas": entre, "consumoPropio": propio}
+    corregidos = [{"fecha": f["fecha"], "tipo": f["tipo"], "documento": f["doc"], "producto": f["producto"], "cantidad": f["cantidad"],
+                   "venta": round(f["venta"], 2), "costoValery": round(f["costo_valery"], 2), "costo": round(f["costo"], 2)}
+                  for f in sorted(vs, key=lambda f: f["fecha"]) if "costo_valery" in f]
+    meta = {"desde": yms[0], "hasta": yms[-1], "ventasHasta": ventas_hasta, "comprasHasta": compras_hasta, "incompletos": incompletos, "revisar": revisar,
+            "costosCorregidos": corregidos, "entreEmpresas": entre, "consumoPropio": propio}
     return {"meta": meta, "totals": totals, "years": years, "months": months, "topProductos": topProductos, "topClientes": topClientes, "topProveedores": topProveedores}
 
 def escribir():
@@ -408,7 +434,8 @@ HEAD = """// Datos históricos REALES por empresa (Valery), en dólares y SIN IV
 //     en meta.revisar; los meses con huecos, en meta.incompletos;
 //   · lo que Sumigases y Sudematin se venden entre sí no cuenta (meta.entreEmpresas),
 //     ni lo que cada una se vende a sí misma (meta.consumoPropio);
-//   · un renglón con el precio mal cargado no suma a nada (meta.revisar, motivo «precio»).
+//   · un renglón con el precio mal cargado no suma a nada (meta.revisar, motivo «precio»);
+//   · un costo absurdo de Valery se recalcula con el costo habitual del producto (meta.costosCorregidos).
 // No editar a mano: volver a correr el script."""
 
 if __name__ == "__main__" and ESCRIBIR:
