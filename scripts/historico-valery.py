@@ -279,7 +279,7 @@ def compras(emp, tasas):
             if factor > 0: neta = neto_bs / factor
             elif total_bs: neta = total_usd * (neto_bs / total_bs)
             else: neta = 0
-            filas.append({"fecha": d, "tipo": tipo, "doc": doc, "proveedor": str(v[col("Razon Social")]).strip(), "rif": rif, "neta": neta})
+            filas.append({"fecha": d, "tipo": tipo, "doc": doc, "proveedor": str(v[col("Razon Social")]).strip(), "rif": rif, "neta": neta, "bs": neto_bs})
         archivos.append((os.path.basename(f), n))
     # La recepción (RCM) que tiene su factura (FCM) del mismo proveedor con el
     # mismo número es la misma compra cargada dos veces: al llegar la mercancía
@@ -300,11 +300,19 @@ def resumen(emp):
     for f in vs + sep + ev:
         if f["tasa"] > 0: tasas.setdefault(f["fecha"], f["tasa"])
     cs, ac, ec = compras(emp, tasas)
-    meses = collections.defaultdict(lambda: {"venta": 0.0, "costo": 0.0, "util": 0.0, "compra": 0.0})
+    meses = collections.defaultdict(lambda: {"venta": 0.0, "costo": 0.0, "util": 0.0, "compra": 0.0,
+                                             "ventaBs": 0.0, "costoBs": 0.0, "compraBs": 0.0})
+    # Los bolívares de verdad: cada renglón a la tasa de SU día, la que trae
+    # Valery. Pasar los dólares a la tasa de hoy daba cuatro veces lo facturado,
+    # porque casi todo se vendió a tasas viejas.
     for f in vs:
         m = meses[f["fecha"][:7]]; m["venta"] += f["venta"]; m["costo"] += f["costo"]; m["util"] += f["util"]
+        tasa = f["tasa"] if f["tasa"] > 0 else tasa_de(tasas, f["fecha"])
+        m["ventaBs"] += f["neto_bs"] if f["tasa"] > 0 else f["venta"] * tasa
+        m["costoBs"] += f["costo"] * tasa
     for c in cs:
         meses[c["fecha"][:7]]["compra"] += c["neta"]
+        meses[c["fecha"][:7]]["compraBs"] += c["bs"]
     entre = {"ventas": round(sum(f["venta"] for f in ev)), "compras": round(sum(c["neta"] for c in ec)),
              # Hasta dónde llega cada archivo, con o sin la otra empresa.
              "_ventas_hasta": max(f["fecha"] for f in vs + ev), "_compras_hasta": max(c["fecha"] for c in cs + ec),
@@ -334,7 +342,9 @@ def armar(emp):
     primero = min(f["fecha"] for f in vs)[:7]
     yms = [y for y in yms if y >= primero]
     r2 = lambda x: round(x)
-    months = [{"ym": y, "venta": r2(meses[y]["venta"]), "costo": r2(meses[y]["costo"]), "util": r2(meses[y]["venta"]) - r2(meses[y]["costo"]), "compra": r2(meses[y]["compra"])} for y in yms]
+    months = [{"ym": y, "venta": r2(meses[y]["venta"]), "costo": r2(meses[y]["costo"]), "util": r2(meses[y]["venta"]) - r2(meses[y]["costo"]), "compra": r2(meses[y]["compra"]),
+               "ventaBs": r2(meses[y]["ventaBs"]), "costoBs": r2(meses[y]["costoBs"]), "utilBs": r2(meses[y]["ventaBs"]) - r2(meses[y]["costoBs"]),
+               "compraBs": r2(meses[y]["compraBs"])} for y in yms]
     anios = collections.defaultdict(lambda: {"venta": 0, "costo": 0, "util": 0, "compra": 0})
     for m in months:
         a = anios[int(m["ym"][:4])]
@@ -342,6 +352,7 @@ def armar(emp):
     pct = lambda a, b: round(100 * a / b, 1) if b else 0
     years = [{"year": y, **a, "margen": pct(a["util"], a["venta"]), "roi": pct(a["util"], a["costo"])} for y, a in sorted(anios.items())]
     t = {k: sum(m[k] for m in months) for k in ("venta", "costo", "util", "compra")}
+    t.update({k: sum(m[k] for m in months) for k in ("ventaBs", "costoBs", "utilBs", "compraBs")})
     totals = {**t, "margen": pct(t["util"], t["venta"]), "roi": pct(t["util"], t["costo"])}
     buenas = [f for f in vs if not f["revisar"]]
     prod = collections.defaultdict(lambda: {"util": 0, "venta": 0, "qty": 0, "nombres": []})

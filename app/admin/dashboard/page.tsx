@@ -7,9 +7,11 @@
 //   · Abajo, el período elegido, del histórico real de Valery (las dos empresas).
 //     Antes «Rentabilidad» y los gráficos eran cifras fijas de 2024 de
 //     Sumigases, y Sudematin salía en cero por un factor 0.
-//   · Los bolívares van a la tasa BCV de hoy, debajo de cada monto. Con años
-//     enteros llegan a diez y más dígitos: se abrevian en millones o billones
-//     para que quepan (fmtBsCorto).
+//   · Los bolívares van debajo de cada monto. Lo de hoy (ventas, cartera), a la
+//     tasa BCV de hoy; el histórico, lo FACTURADO: cada venta a la tasa de su
+//     día. Pasar el histórico a la tasa de hoy daba cuatro veces lo facturado.
+//     Con años enteros llegan a diez y más dígitos: se abrevian en millones o
+//     billones para que quepan (fmtBsCorto).
 //   · Utilidad, ROI y márgenes son de Owner y Administrador, como Gastos.
 
 import { useMemo } from "react";
@@ -24,7 +26,7 @@ import { SeriesChart } from "@/components/ui/SeriesChart";
 import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
 import { getHistory, notaHistorico } from "@/lib/ux/history-data";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
-import { enBs, fmtUsd } from "@/lib/ux/format";
+import { enBs, fmtBsCorto, fmtUsd } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useBcvRate, useTasaViva } from "@/lib/ux/bcv-rate";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
@@ -97,7 +99,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   const o = op.datos;
   const n = (x: number) => x.toLocaleString("es-VE");
 
-  type Kpi = { key: string; label: string; value: string; bs?: string | null; sub?: string; tone: "brand" | "navy" | "ok" | "warn" | "danger" | "info" };
+  type Kpi = { key: string; label: string; value: string; bs?: string | null; bsExacto?: boolean; sub?: string; tone: "brand" | "navy" | "ok" | "warn" | "danger" | "info" };
   const kpis: Kpi[] = [
     ...(ve("delivery-notes") ? [{ key: "vh", label: "Ventas Hoy", value: o?.ventasHoy ? fmtUsd(o.ventasHoy.usd) : cargando,
       bs: o?.ventasHoy ? enBs(o.ventasHoy.usd, tasa) : null, sub: o?.ventasHoy ? `${n(o.ventasHoy.notas)} nota(s) de entrega` : undefined, tone: "brand" as const }] : []),
@@ -115,7 +117,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
     ] : []),
     ...(o?.compras !== null && ve("purchases") ? [{ key: "oc", label: "Compras por Recibir", value: o?.compras ? n(o.compras.ordenes) : cargando,
       bs: null, sub: o?.compras ? `orden(es) · ${fmtUsd(o.compras.usd)} pendientes` : undefined, tone: "navy" as const }] : []),
-    ...(finanzas ? [{ key: "bg", label: "Utilidad del Período", value: fmtUsd(t.util), bs: enBs(t.util, tasa),
+    ...(finanzas ? [{ key: "bg", label: "Utilidad del Período", value: fmtUsd(t.util), bs: fmtBsCorto(t.utilBs), bsExacto: true,
       sub: `histórico de Valery, hasta ${hastaHist}`, tone: "ok" as const }] : []),
   ];
 
@@ -160,19 +162,19 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           </div>
           <div className={`mt-3 grid gap-3 ${finanzas ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
             <div className="min-w-0">
-              <p className="text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.venta)}</p>
-              {tasa && <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">≈ {enBs(hist.totals.venta, tasa)}</p>}
+              <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:anywhere] xl:text-xl">{fmtUsd(hist.totals.venta)}</p>
+              <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">{fmtBsCorto(hist.totals.ventaBs)} facturados</p>
               <p className="text-xs text-muted">Ventas</p>
             </div>
             {finanzas && (
               <>
                 <div className="min-w-0">
-                  <p className="text-base font-semibold tabular-nums text-text sm:text-xl">{fmtUsd(hist.totals.util)}</p>
-                  {tasa && <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">≈ {enBs(hist.totals.util, tasa)}</p>}
+                  <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:anywhere] xl:text-xl">{fmtUsd(hist.totals.util)}</p>
+                  <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">{fmtBsCorto(hist.totals.utilBs)}</p>
                   <p className="text-xs text-muted">Utilidad</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-base font-semibold tabular-nums text-ok sm:text-xl">{hist.totals.roi.toLocaleString("es-VE")}%</p>
+                  <p className="text-base font-semibold tabular-nums text-ok [overflow-wrap:anywhere] xl:text-xl">{hist.totals.roi.toLocaleString("es-VE")}%</p>
                   <p className="text-xs text-muted">ROI (utilidad / costo)</p>
                 </div>
               </>
@@ -191,7 +193,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
               <p className="mt-1 text-xs text-muted">
                 Fecha valor BCV: {bcv.fecha.split("-").reverse().join("-")} · Actualizada: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
               </p>
-              <p className="mt-1 text-xs text-muted">Los bolívares de esta pantalla se calculan a esta tasa.</p>
+              <p className="mt-1 text-xs text-muted">Lo de hoy (ventas y cuentas) se pasa a bolívares a esta tasa; el histórico muestra lo facturado, a la tasa de cada día.</p>
             </>
           ) : (
             <>
@@ -205,7 +207,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       {op.error && <AlertCard tone="danger" titulo="No se pudieron leer los indicadores del día" mensaje={op.error} />}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {kpis.map((k) => (
-          <KpiCard key={k.key} label={k.label} value={k.value} bs={k.bs} sub={k.sub} tone={k.tone} />
+          <KpiCard key={k.key} label={k.label} value={k.value} bs={k.bs} bsAproximado={!k.bsExacto} sub={k.sub} tone={k.tone} />
         ))}
       </div>
 
@@ -216,7 +218,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
               title="Histórico de Ventas y Compras"
               action={<StatusBadge tone="brand">Real {hist.meta.desde.slice(0, 4)}–{hist.meta.hasta.slice(0, 4)}</StatusBadge>}
             >
-              <HistoryKpis empresa={empresa} tasa={tasa} />
+              <HistoryKpis empresa={empresa} />
               <div className="mt-5 border-t border-border pt-4">
                 <HistoryTrend empresa={empresa} />
               </div>
@@ -232,9 +234,9 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
             action={<StatusBadge tone="brand">{periodos.length} período(s)</StatusBadge>}>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <StatCard label="ROI del Período" value={`${t.roi.toLocaleString("es-VE")}%`} sub="utilidad / costo" accent />
-              <StatCard label="Utilidad" value={fmtUsd(t.util)} bs={enBs(t.util, tasa)} sub="ventas menos costo" />
+              <StatCard label="Utilidad" value={fmtUsd(t.util)} bsAproximado={false} bs={fmtBsCorto(t.utilBs)} sub="ventas menos costo" />
               <StatCard label="Margen Bruto" value={`${t.margen.toLocaleString("es-VE")}%`} sub="sobre ventas" />
-              <StatCard label="Ventas" value={fmtUsd(t.venta)} bs={enBs(t.venta, tasa)}
+              <StatCard label="Ventas" value={fmtUsd(t.venta)} bsAproximado={false} bs={fmtBsCorto(t.ventaBs)}
                 sub={`compras ${fmtUsd(t.compra)}${t.compra > 0 ? ` · ${(t.venta / t.compra).toLocaleString("es-VE", { maximumFractionDigits: 1 })}x` : ""}`} />
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -15,10 +15,15 @@ type KpiCardProps = {
   sub?: string;
   /** El mismo monto en bolívares, debajo. */
   bs?: string | null;
+  /**
+   * El «≈» de los bolívares: es aproximado lo que se pasa a la tasa de hoy. Lo
+   * facturado (el histórico, cada venta a la tasa de su día) es exacto: false.
+   */
+  bsAproximado?: boolean;
   tone?: KpiTone;
 };
 
-export function KpiCard({ label, value, sub, bs, tone = "brand" }: KpiCardProps) {
+export function KpiCard({ label, value, sub, bs, bsAproximado = true, tone = "brand" }: KpiCardProps) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-4 shadow-sm">
       <span className={`absolute inset-y-0 left-0 w-1 ${accent[tone]}`} aria-hidden="true" />
@@ -30,7 +35,7 @@ export function KpiCard({ label, value, sub, bs, tone = "brand" }: KpiCardProps)
       <p className="mt-2 text-lg font-semibold leading-tight tracking-tight tabular-nums text-text [overflow-wrap:anywhere] sm:text-2xl">
         {value}
       </p>
-      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:anywhere]">≈ {bs}</p>}
+      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:anywhere]">{bsAproximado ? "≈ " : ""}{bs}</p>}
       {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
     </div>
   );

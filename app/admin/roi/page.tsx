@@ -10,8 +10,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SeriesChart } from "@/components/ui/SeriesChart";
-import { enBs, fmtUsd } from "@/lib/ux/format";
-import { useTasaViva } from "@/lib/ux/bcv-rate";
+import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
 import {
   HistoryKpis,
   HistoryTrend,
@@ -43,7 +42,6 @@ export default function RoiPage() {
   const periodos = historicoEnRango(empresa, rango);
   const t = totalesDe(periodos);
   const label = EMPRESAS.find((e) => e.id === empresa)?.label ?? "Sumigases";
-  const tasa = useTasaViva();
   // ROI por producto del histórico real: utilidad / costo (venta - utilidad).
   const roiProductos = h.topProductos
     .map((p) => ({ ...p, roi: p.venta - p.util > 0 ? Math.round((p.util / (p.venta - p.util)) * 100) : null }))
@@ -76,7 +74,7 @@ export default function RoiPage() {
         description={notaHistorico(h)}
         action={<StatusBadge tone="ok">ROI del período {t.roi.toLocaleString("es-VE")}%</StatusBadge>}
       >
-        <HistoryKpis empresa={empresa} tasa={tasa} />
+        <HistoryKpis empresa={empresa} />
         <div className="mt-5 border-t border-border pt-4">
           <HistoryTrend empresa={empresa} />
         </div>
@@ -108,9 +106,9 @@ export default function RoiPage() {
       <SectionCard title="Indicadores del Período" action={<StatusBadge tone="brand">{periodos.length} período(s)</StatusBadge>}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="ROI del Período" value={`${t.roi.toLocaleString("es-VE")}%`} sub="utilidad / costo" accent />
-          <StatCard label="Utilidad" value={fmtUsd(t.util)} bs={enBs(t.util, tasa)} sub="ventas menos costo" />
+          <StatCard label="Utilidad" value={fmtUsd(t.util)} bsAproximado={false} bs={fmtBsCorto(t.utilBs)} sub="ventas menos costo" />
           <StatCard label="Margen Bruto" value={`${t.margen.toLocaleString("es-VE")}%`} sub="sobre ventas" />
-          <StatCard label="Ventas" value={fmtUsd(t.venta)} bs={enBs(t.venta, tasa)} sub={`compras ${fmtUsd(t.compra)}`} />
+          <StatCard label="Ventas" value={fmtUsd(t.venta)} bsAproximado={false} bs={fmtBsCorto(t.ventaBs)} sub={`compras ${fmtUsd(t.compra)}`} />
         </div>
       </SectionCard>
 
