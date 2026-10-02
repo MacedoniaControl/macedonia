@@ -26,6 +26,11 @@ export type Periodo = {
   costo: number;
   util: number;
   compra: number;
+  /** Lo facturado en bolívares, cada mes a las tasas de sus días (no a la de hoy). */
+  ventaBs: number;
+  costoBs: number;
+  utilBs: number;
+  compraBs: number;
   margen: number;
   roi: number;
 };
@@ -56,10 +61,12 @@ export function historicoEnRango(empresa: string, r: Rango): Periodo[] {
       const costo = ms.reduce((a, m) => a + m.costo, 0);
       const util = ms.reduce((a, m) => a + m.util, 0);
       const compra = ms.reduce((a, m) => a + m.compra, 0);
+      const bs = (k: "ventaBs" | "costoBs" | "utilBs" | "compraBs") => ms.reduce((a, m) => a + (m[k] ?? 0), 0);
       return {
         clave,
         etiqueta: etiquetaDe(clave, agr),
         venta, costo, util, compra,
+        ventaBs: bs("ventaBs"), costoBs: bs("costoBs"), utilBs: bs("utilBs"), compraBs: bs("compraBs"),
         margen: venta > 0 ? Math.round((util / venta) * 1000) / 10 : 0,
         roi: costo > 0 ? Math.round((util / costo) * 1000) / 10 : 0,
       };
@@ -71,8 +78,10 @@ export function totalesDe(ps: Periodo[]): Omit<Periodo, "clave" | "etiqueta"> {
   const costo = ps.reduce((a, p) => a + p.costo, 0);
   const util = ps.reduce((a, p) => a + p.util, 0);
   const compra = ps.reduce((a, p) => a + p.compra, 0);
+  const bs = (k: "ventaBs" | "costoBs" | "utilBs" | "compraBs") => ps.reduce((a, p) => a + p[k], 0);
   return {
     venta, costo, util, compra,
+    ventaBs: bs("ventaBs"), costoBs: bs("costoBs"), utilBs: bs("utilBs"), compraBs: bs("compraBs"),
     margen: venta > 0 ? Math.round((util / venta) * 1000) / 10 : 0,
     roi: costo > 0 ? Math.round((util / costo) * 1000) / 10 : 0,
   };

@@ -7,7 +7,8 @@
 // etiqueta «2024 · USD» fija aunque los datos fueran de 2025-2026, y el total
 // de Rentabilidad SUMABA porcentajes (y los escribía con $). Ahora:
 //   · arriba, el reporte y el período en una sola barra;
-//   · cuatro cifras del período, con su equivalente en bolívares;
+//   · cuatro cifras del período, con lo facturado en bolívares (cada venta a la
+//     tasa de su día, no a la de hoy);
 //   · el gráfico del reporte y la tabla a todo el ancho;
 //   · margen y ROI del total se calculan de los totales, no sumando meses;
 //   · «Descargar» es el mismo de toda la app (Excel y PDF).
@@ -25,8 +26,7 @@ import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO, type Periodo } from "@/lib/ux/historico-rango";
 import { HISTORY, notaHistorico, type EmpresaHist } from "@/lib/ux/history-data";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { useTasaViva } from "@/lib/ux/bcv-rate";
-import { enBs, fmtUsd } from "@/lib/ux/format";
+import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
 import type { TipoColumna } from "@/lib/ux/tabla-export";
 
 type Totales = ReturnType<typeof totalesDe>;
@@ -39,7 +39,7 @@ type Reporte = {
   /** Lo que se dibuja: una barra por serie en cada período. */
   series: { name: string; color: string; get: (p: Periodo) => number }[];
   pct?: boolean;
-  cifras: (t: Totales, ps: Periodo[], tasa: number | null) => Cifra[];
+  cifras: (t: Totales, ps: Periodo[]) => Cifra[];
 };
 
 const pct = (n: number) => `${n.toLocaleString("es-VE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
@@ -52,14 +52,14 @@ const REPORTES: Reporte[] = [
     id: "ventas", title: "Ventas",
     cols: [{ h: "Ventas", get: (p) => p.venta, tipo: "usd" }],
     series: [{ name: "Ventas", color: "var(--color-brand)", get: (p) => p.venta }],
-    cifras: (t, ps, tasa) => {
+    cifras: (t, ps) => {
       const m = mejor(ps, (p) => p.venta);
       const prom = ps.length ? t.venta / ps.length : 0;
       return [
-        { label: "Ventas", value: fmtUsd(t.venta), bs: enBs(t.venta, tasa), sub: `${ps.length} período(s)`, accent: true },
-        { label: "Promedio", value: fmtUsd(prom), bs: enBs(prom, tasa), sub: "por período" },
+        { label: "Ventas", value: fmtUsd(t.venta), bs: fmtBsCorto(t.ventaBs), sub: `${ps.length} período(s)`, accent: true },
+        { label: "Promedio", value: fmtUsd(prom), bs: fmtBsCorto(ps.length ? t.ventaBs / ps.length : 0), sub: "por período" },
         { label: "Mejor Período", value: m ? fmtUsd(m.venta) : "—", sub: m?.etiqueta },
-        { label: "Utilidad", value: fmtUsd(t.util), bs: enBs(t.util, tasa), sub: `margen ${pct(t.margen)}` },
+        { label: "Utilidad", value: fmtUsd(t.util), bs: fmtBsCorto(t.utilBs), sub: `margen ${pct(t.margen)}` },
       ];
     },
   },
@@ -76,10 +76,10 @@ const REPORTES: Reporte[] = [
       { name: "Costo", color: "var(--color-muted)", get: (p) => p.costo },
       { name: "Utilidad", color: "var(--color-ok)", get: (p) => p.util },
     ],
-    cifras: (t, _ps, tasa) => [
-      { label: "Utilidad", value: fmtUsd(t.util), bs: enBs(t.util, tasa), sub: "ventas menos costo", accent: true },
-      { label: "Ventas", value: fmtUsd(t.venta), bs: enBs(t.venta, tasa) },
-      { label: "Costo", value: fmtUsd(t.costo), bs: enBs(t.costo, tasa), sub: "de lo vendido" },
+    cifras: (t) => [
+      { label: "Utilidad", value: fmtUsd(t.util), bs: fmtBsCorto(t.utilBs), sub: "ventas menos costo", accent: true },
+      { label: "Ventas", value: fmtUsd(t.venta), bs: fmtBsCorto(t.ventaBs) },
+      { label: "Costo", value: fmtUsd(t.costo), bs: fmtBsCorto(t.costoBs), sub: "de lo vendido" },
       { label: "Margen", value: pct(t.margen), sub: "utilidad sobre ventas" },
     ],
   },
@@ -94,10 +94,10 @@ const REPORTES: Reporte[] = [
       { name: "Ventas", color: "var(--color-brand)", get: (p) => p.venta },
       { name: "Compras", color: "var(--color-warn)", get: (p) => p.compra },
     ],
-    cifras: (t, _ps, tasa) => [
-      { label: "Ventas", value: fmtUsd(t.venta), bs: enBs(t.venta, tasa), accent: true },
-      { label: "Compras", value: fmtUsd(t.compra), bs: enBs(t.compra, tasa) },
-      { label: "Diferencia", value: fmtUsd(t.venta - t.compra), bs: enBs(t.venta - t.compra, tasa), sub: "ventas menos compras" },
+    cifras: (t) => [
+      { label: "Ventas", value: fmtUsd(t.venta), bs: fmtBsCorto(t.ventaBs), accent: true },
+      { label: "Compras", value: fmtUsd(t.compra), bs: fmtBsCorto(t.compraBs) },
+      { label: "Diferencia", value: fmtUsd(t.venta - t.compra), bs: fmtBsCorto(t.ventaBs - t.compraBs), sub: "ventas menos compras" },
       { label: "Ventas / Compras", value: veces(t.venta, t.compra), sub: "por cada dólar comprado" },
     ],
   },
@@ -112,12 +112,12 @@ const REPORTES: Reporte[] = [
       { name: "Margen %", color: "var(--color-info)", get: (p) => p.margen },
       { name: "ROI %", color: "var(--color-ok)", get: (p) => p.roi },
     ],
-    cifras: (t, ps, tasa) => {
+    cifras: (t, ps) => {
       const m = mejor(ps, (p) => p.roi);
       return [
         { label: "ROI", value: pct(t.roi), sub: "utilidad sobre costo", accent: true },
         { label: "Margen", value: pct(t.margen), sub: "utilidad sobre ventas" },
-        { label: "Utilidad", value: fmtUsd(t.util), bs: enBs(t.util, tasa) },
+        { label: "Utilidad", value: fmtUsd(t.util), bs: fmtBsCorto(t.utilBs) },
         { label: "Mejor ROI", value: m ? pct(m.roi) : "—", sub: m?.etiqueta },
       ];
     },
@@ -132,7 +132,6 @@ export default function ReportsPage() {
 
 function Reportes() {
   const empresa = useEmpresaActiva();
-  const tasa = useTasaViva();
   const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
   const [selId, setSel] = useState(REPORTES[0].id);
   const sel = REPORTES.find((r) => r.id === selId) ?? REPORTES[0];
@@ -180,8 +179,8 @@ function Reportes() {
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {sel.cifras(t, periodos, tasa).map((c) => (
-          <StatCard key={c.label} label={c.label} value={c.value} bs={c.bs ?? undefined} sub={c.sub} accent={c.accent} />
+        {sel.cifras(t, periodos).map((c) => (
+          <StatCard key={c.label} label={c.label} value={c.value} bs={c.bs ?? undefined} bsAproximado={false} sub={c.sub} accent={c.accent} />
         ))}
       </div>
 

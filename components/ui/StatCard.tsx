@@ -4,10 +4,15 @@ type StatCardProps = {
   sub?: string;
   /** El mismo monto en bolívares, debajo. */
   bs?: string | null;
+  /**
+   * El «≈» de los bolívares: es aproximado lo que se pasa a la tasa de hoy. Lo
+   * facturado (el histórico, cada venta a la tasa de su día) es exacto: false.
+   */
+  bsAproximado?: boolean;
   accent?: boolean;
 };
 
-export function StatCard({ label, value, sub, bs, accent }: StatCardProps) {
+export function StatCard({ label, value, sub, bs, bsAproximado = true, accent }: StatCardProps) {
   return (
     <div
       className={`rounded-xl border p-4 ${
@@ -25,7 +30,7 @@ export function StatCard({ label, value, sub, bs, accent }: StatCardProps) {
       <p className="mt-1.5 text-base font-semibold leading-tight tabular-nums text-text [overflow-wrap:anywhere] sm:text-xl">
         {value}
       </p>
-      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:anywhere]">≈ {bs}</p>}
+      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:anywhere]">{bsAproximado ? "≈ " : ""}{bs}</p>}
       {sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
     </div>
   );

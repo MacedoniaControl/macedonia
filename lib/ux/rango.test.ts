@@ -145,12 +145,20 @@ describe("historicoEnRango", () => {
 
 describe("totalesDe", () => {
   test("el margen sale de la utilidad sobre la venta", () => {
-    const t = totalesDe([{ clave: "x", etiqueta: "x", venta: 200, costo: 100, util: 50, compra: 100, margen: 0, roi: 0 }]);
+    const t = totalesDe([{ clave: "x", etiqueta: "x", venta: 200, costo: 100, util: 50, compra: 100, ventaBs: 0, costoBs: 0, utilBs: 0, compraBs: 0, margen: 0, roi: 0 }]);
     assert.equal(t.margen, 25);
     assert.equal(t.roi, 50);
   });
+  test("los bolívares se suman tal cual (lo facturado), no se recalculan con una tasa", () => {
+    const t = totalesDe([
+      { clave: "a", etiqueta: "a", venta: 100, costo: 60, util: 40, compra: 0, ventaBs: 3_100, costoBs: 1_860, utilBs: 1_240, compraBs: 0, margen: 0, roi: 0 },
+      { clave: "b", etiqueta: "b", venta: 100, costo: 60, util: 40, compra: 0, ventaBs: 52_400, costoBs: 31_440, utilBs: 20_960, compraBs: 0, margen: 0, roi: 0 },
+    ]);
+    assert.equal(t.ventaBs, 55_500);
+    assert.equal(t.utilBs, 22_200);
+  });
   test("sin ventas no divide por cero", () => {
-    const t = totalesDe([{ clave: "x", etiqueta: "x", venta: 0, costo: 0, util: 0, compra: 0, margen: 0, roi: 0 }]);
+    const t = totalesDe([{ clave: "x", etiqueta: "x", venta: 0, costo: 0, util: 0, compra: 0, ventaBs: 0, costoBs: 0, utilBs: 0, compraBs: 0, margen: 0, roi: 0 }]);
     assert.equal(t.margen, 0);
     assert.equal(t.roi, 0);
   });
