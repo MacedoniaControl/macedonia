@@ -28,6 +28,9 @@ import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
 import { agruparPorCliente } from "@/lib/finanzas/cartera";
 import { Icon } from "@/components/ui/Icon";
+import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
+import { Liquidaciones } from "@/components/finanzas/Liquidaciones";
+import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
 
@@ -62,6 +65,10 @@ function CuentasPorCobrar() {
   const [editando, setEditando] = useState<CuentaDetalle | null>(null);
   const [filtroClase, setFiltroClase] = useState<string>("todas");
   const [msg, setMsg] = useState("");
+  // Liquidar varias notas de un cliente con un solo pago: solo Owner y Administrador.
+  const { rol } = useRol();
+  const gerencia = puedeVerFinanzas(rol);
+  const [liquidar, setLiquidar] = useState<string | null>(null);
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -217,10 +224,20 @@ function CuentasPorCobrar() {
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
+            {gerencia && (
+              <Button variant="secondary" icon="check" onClick={() => { setExito(""); setLiquidar(""); }}>Liquidar notas</Button>
+            )}
             <BotonDescargar empresa={empresaKey} />
           </div>
         }
       />
+
+      {exito && (
+        <p role="status" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok/10 px-3 py-2 text-sm text-ok">
+          {exito}
+          <button type="button" className="text-xs underline-offset-2 hover:underline" onClick={() => setExito("")}>Cerrar</button>
+        </p>
+      )}
 
       <FiltroClase conteo={porClase} total={cuentas.length}
         valor={filtroClase} onCambio={setFiltroClase} />
@@ -296,7 +313,15 @@ function CuentasPorCobrar() {
                         {g.vencido > 0 && g.vencido < g.saldo && <span className="block text-[11px] font-normal text-danger">vencido {fmtUsd(g.vencido)}</span>}
                       </td>
                       <td className="whitespace-nowrap py-3 pr-3 text-xs text-muted">{g.masVieja ? `desde ${fechaVista(g.masVieja.vence)}` : "—"}</td>
-                      <td className="py-3"><StatusBadge tone={eg.tone}>{eg.label}</StatusBadge></td>
+                      <td className="py-3">
+                        <span className="flex items-center gap-2">
+                          <StatusBadge tone={eg.tone}>{eg.label}</StatusBadge>
+                          {gerencia && g.cuentas.some((c) => c.estado === "abierta" && c.saldo > 0.005) && (
+                            <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
+                              onClick={(ev) => { ev.stopPropagation(); setExito(""); setLiquidar(g.cliente); }}>Liquidar</button>
+                          )}
+                        </span>
+                      </td>
                     </tr>
                     {abierto && g.cuentas.map((c) => {
                       const e = estadoDe(c.saldo, c.dias);
@@ -327,6 +352,15 @@ function CuentasPorCobrar() {
           </EstadoDatos>
         </SectionCard>
       </div>
+
+      <Liquidaciones empresa={empresaKey} recarga={recarga} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} />
+
+      {liquidar !== null && (
+        <Modal titulo="Liquidar Notas" onCerrar={() => setLiquidar(null)}>
+          <LiquidarNotas empresa={empresaKey} cuentas={cuentas} clienteInicial={liquidar || undefined}
+            onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setLiquidar(null)} />
+        </Modal>
+      )}
 
       {abierta !== null && (
         <Modal titulo="Cuenta por Cobrar" onCerrar={() => { setAbierta(null); setEditando(null); }}>
