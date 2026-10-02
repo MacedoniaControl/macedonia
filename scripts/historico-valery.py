@@ -168,12 +168,18 @@ def ventas(emp):
     # La nota de entrega que después se facturó: se queda la nota, se descarta la factura gemela.
     # Primero las del mismo día (renglón por renglón), después las de días después (por factura).
     notas = collections.defaultdict(list)
+    # Si la nota se devolvió ese mismo día, la factura es la única venta: es como
+    # Valery convierte una nota en factura (nota → devolución → factura). Antes se
+    # descartaba la factura Y la devolución restaba la nota: la venta desaparecía.
+    devueltas = collections.Counter()
     for i, f in enumerate(filas):
         f["_i"] = i
         if f["tipo"] == "NET": notas[(f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"])].append(f)
+        if f["tipo"] == "DEV": devueltas[(f["fecha"], normal(f["cliente"]), f["codigo"], abs(f["cantidad"]))] += 1
     consumidas, fuera = set(), set()
     for f in filas:
         if f["tipo"] != "FAC": continue
+        if devueltas[(f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"])]: continue
         # En dólares, no en bolívares: la nota y su factura pueden llevar la tasa con
         # distintos decimales (158,93 / 158,9289) y los bolívares no dan iguales.
         libres = [q for q in notas.get((f["fecha"], normal(f["cliente"]), f["codigo"], f["cantidad"]), [])
