@@ -22,7 +22,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { Button } from "@/components/ui/Button";
-import { fmtUsd } from "@/lib/ux/format";
+import { fmtUsd, fmtUsdCentavos } from "@/lib/ux/format";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
@@ -46,6 +46,8 @@ function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
 }
 
 const inputClass = "sumi-campo";
+/** El mismo cliente escrito con espacios o mayúsculas distintas (la misma regla que agrupa la cartera). */
+const mismoCliente = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toUpperCase() === b.trim().replace(/\s+/g, " ").toUpperCase();
 
 // «Descargar» baja la cartera tal como se ve, con su filtro de clase.
 export default function ReceivablesPage() {
@@ -71,6 +73,8 @@ function CuentasPorCobrar() {
   const { rol } = useRol();
   const gerencia = puedeVerFinanzas(rol);
   const [liquidar, setLiquidar] = useState<string | null>(null);
+  // Anexar: una nota nueva que amplía la deuda del cliente, desde su fila.
+  const [anexar, setAnexar] = useState<{ cliente: string; deuda: number } | null>(null);
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -335,6 +339,9 @@ function CuentasPorCobrar() {
                             <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
                               onClick={(ev) => { ev.stopPropagation(); setExito(""); setLiquidar(g.cliente); }}>Liquidar</button>
                           )}
+                          <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
+                            title={`Anexar una nota a la deuda de ${g.cliente}`}
+                            onClick={(ev) => { ev.stopPropagation(); setExito(""); setAnexar({ cliente: g.cliente, deuda: g.saldo }); }}>Anexar</button>
                         </span>
                       </td>
                     </tr>
@@ -374,6 +381,22 @@ function CuentasPorCobrar() {
         <Modal titulo="Liquidar Notas" onCerrar={() => setLiquidar(null)}>
           <LiquidarNotas empresa={empresaKey} cuentas={cuentas} clienteInicial={liquidar || undefined}
             onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setLiquidar(null)} />
+        </Modal>
+      )}
+
+      {anexar && (
+        <Modal titulo="Anexar a la Deuda" onCerrar={() => setAnexar(null)}>
+          <FormularioCuenta tipo="cobrar" empresa={empresaKey}
+            anexo={{
+              contraparte: anexar.cliente, deuda: anexar.deuda,
+              // Todos sus documentos, no solo los del filtro de clase: un número repetido es repetido igual.
+              documentos: cuentas.filter((c) => mismoCliente(c.contraparte, anexar.cliente)).map((c) => c.documento),
+            }}
+            onCreada={(c) => {
+              if (c) setExito(`${c.documento} anexada a ${anexar.cliente} por ${fmtUsdCentavos(c.monto)}. Su deuda queda en ${fmtUsdCentavos(anexar.deuda + c.monto)}.`);
+              setRecarga((n) => n + 1);
+            }}
+            onCerrar={() => setAnexar(null)} />
         </Modal>
       )}
 
