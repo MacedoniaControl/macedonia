@@ -23,7 +23,8 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { AlertCard } from "@/components/ui/AlertCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SeriesChart } from "@/components/ui/SeriesChart";
-import { HistoryKpis, HistoryTrend } from "@/components/ui/HistoryStats";
+import { HistoryKpis } from "@/components/ui/HistoryStats";
+import { HistoriaBI } from "@/components/ui/HistoriaBI";
 import { getHistory } from "@/lib/ux/history-data";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
 import { enBs, fmtBsCorto, fmtUsd } from "@/lib/ux/format";
@@ -219,7 +220,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
             >
               <HistoryKpis empresa={empresa} />
               <div className="mt-5 border-t border-border pt-4">
-                <HistoryTrend empresa={empresa} />
+                <HistoriaBI key={empresa} empresa={empresa} />
               </div>
             </SectionCard>
           </div>

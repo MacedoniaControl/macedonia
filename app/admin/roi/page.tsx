@@ -13,13 +13,13 @@ import { SeriesChart } from "@/components/ui/SeriesChart";
 import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
 import {
   HistoryKpis,
-  HistoryTrend,
   HistoryYearly,
   HistoryTopProductos,
   HistoryTopClientes,
   HistoryTopProveedores,
 } from "@/components/ui/HistoryStats";
 import { getHistory } from "@/lib/ux/history-data";
+import { HistoriaBI } from "@/components/ui/HistoriaBI";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
 
 const EMPRESAS = [
@@ -75,7 +75,7 @@ export default function RoiPage() {
       >
         <HistoryKpis empresa={empresa} />
         <div className="mt-5 border-t border-border pt-4">
-          <HistoryTrend empresa={empresa} />
+          <HistoriaBI key={empresa} empresa={empresa} />
         </div>
       </SectionCard>
 

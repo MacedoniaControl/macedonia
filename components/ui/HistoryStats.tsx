@@ -3,7 +3,7 @@
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
-import { getHistory, type HistMonth } from "@/lib/ux/history-data";
+import { getHistory } from "@/lib/ux/history-data";
 
 type Props = { empresa?: string };
 
@@ -20,59 +20,6 @@ export function HistoryKpis({ empresa = "sumigases" }: Props) {
       <StatCard label="Margen Bruto" value={`${h.totals.margen.toLocaleString("es-VE")}%`} sub="sobre ventas" />
       <StatCard label="Compras Históricas" value={fmtUsd(h.totals.compra)} bsAproximado={false} bs={fmtBsCorto(h.totals.compraBs)} sub="inversión total" />
       <StatCard label="Costo de Ventas" value={fmtUsd(h.totals.costo)} bsAproximado={false} bs={fmtBsCorto(h.totals.costoBs)} sub="costo de lo vendido" />
-    </div>
-  );
-}
-
-/** Tendencia mensual: ventas vs compras vs utilidad (línea, SVG responsive). */
-export function HistoryTrend({ empresa = "sumigases", height = 260 }: Props & { height?: number }) {
-  const h = getHistory(empresa);
-  const data: HistMonth[] = h.months;
-  if (data.length === 0) return <p className="text-sm text-muted">Sin datos para esta empresa.</p>;
-
-  const W = 760, H = height, padL = 8, padR = 8, padT = 12, padB = 24;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-  const max = Math.max(1, ...data.map((d) => Math.max(d.venta, d.compra, d.util)));
-  const n = data.length;
-  const x = (i: number) => padL + (n <= 1 ? 0 : (i / (n - 1)) * plotW);
-  const y = (v: number) => padT + plotH - (v / max) * plotH;
-  // El ultimo mes ya no se punteaba por incompleto: el historico se recalculo
-  // hasta 2026-08, un mes cerrado. Antes cortaba a mitad de julio y la linea se
-  // desplomaba al final; puntear un mes que SI esta completo mentiria al reves.
-  const tramo = (key: keyof HistMonth, desde: number, hasta: number) =>
-    data.slice(desde, hasta).map((d, k) => `${x(desde + k)},${y(d[key] as number)}`).join(" ");
-  const line = (key: keyof HistMonth) => tramo(key, 0, n);
-  const series = [
-    { name: "Ventas", color: "var(--color-brand)", key: "venta" as const },
-    { name: "Compras", color: "var(--color-warn)", key: "compra" as const },
-    { name: "Utilidad", color: "var(--color-ok)", key: "util" as const },
-  ];
-  const marcas = data.map((d, i) => ({ i, ym: d.ym })).filter((d) => d.ym.endsWith("-01") || d.i === 0);
-
-  return (
-    <div className="w-full">
-      <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1">
-        {series.map((s) => (
-          <span key={s.name} className="flex items-center gap-1.5 text-xs text-muted">
-            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} aria-hidden="true" />
-            {s.name}
-          </span>
-        ))}
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label="Tendencia mensual de ventas, compras y utilidad">
-        {[0.25, 0.5, 0.75, 1].map((t) => (
-          <line key={t} x1={padL} x2={W - padR} y1={padT + plotH * (1 - t)} y2={padT + plotH * (1 - t)} stroke="var(--color-border)" strokeWidth={1} />
-        ))}
-        {marcas.map((mk) => (
-          <g key={mk.ym}>
-            <line x1={x(mk.i)} x2={x(mk.i)} y1={padT} y2={padT + plotH} stroke="var(--color-border)" strokeWidth={1} strokeDasharray="3 3" />
-            <text x={x(mk.i) + 3} y={H - 8} fontSize={11} fill="var(--color-muted)">{mk.ym.slice(0, 4)}</text>
-          </g>
-        ))}
-        {series.map((s) => (
-          <polyline key={s.name} points={line(s.key)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        ))}
-      </svg>
     </div>
   );
 }
