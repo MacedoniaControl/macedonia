@@ -469,15 +469,19 @@ const enPoderDe = (ms: MovSaldo[], cliente: string) => {
 };
 
 /** Los gases de la empresa y los llenos en planta, para la tarjeta Cilindros de la nota. */
-export async function cilindrosParaNota(empresa: string): Promise<{ gases: string[]; llenos: Record<string, number> }> {
+export async function cilindrosParaNota(empresa: string): Promise<{ gases: string[]; llenos: Record<string, number>; conParque: string[] }> {
   const u = await getUsuarioSesion();
-  if (!u || !(sesionPuede(u, "delivery-notes") || sesionPuede(u, "cylinders")) || !puedeEntrarAEmpresa(u, empresa)) return { gases: [], llenos: {} };
+  if (!u || !(sesionPuede(u, "delivery-notes") || sesionPuede(u, "cylinders")) || !puedeEntrarAEmpresa(u, empresa)) return { gases: [], llenos: {}, conParque: [] };
   const [g, ms] = await Promise.all([
     createAdminClient().from("gases").select("nombre").eq("empresa_id", empresa).eq("activo", true).order("nombre"),
     movimientosVivos(empresa),
   ]);
   if (g.error) throw new Error(`No se pudieron leer los gases: ${g.error.message}`);
-  return { gases: (g.data ?? []).map((x) => x.nombre as string), llenos: llenosDe(ms) };
+  // Los gases con algún cilindro cargado (en cualquier estado). Un gas sin
+  // parque todavía no se mueve desde la nota: si no, la nota no se podría emitir.
+  const total: Record<string, number> = {};
+  for (const m of ms) total[m.gas] = (total[m.gas] ?? 0) + (m.estado_desde === null ? m.cantidad : 0) - (m.estado_hacia === null ? m.cantidad : 0);
+  return { gases: (g.data ?? []).map((x) => x.nombre as string), llenos: llenosDe(ms), conParque: Object.keys(total).filter((k) => total[k] > 0) };
 }
 
 /** Registra en el parque los cilindros de una nota de entrega recién emitida. */

@@ -99,7 +99,11 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
   // Un gas agregado como producto («OXIGENO GASEOSO» × 2) pone solos sus
   // llenos: antes el parque no se enteraba si nadie tocaba esta sección. Los
   // vacíos que trae el cliente se cargan a mano.
-  const deRenglones = llenosDeRenglones(lineas, gasesCil);
+  // Solo los gases que ya tienen cilindros en el parque: uno sin parque (Sudematin
+  // antes de cargar el suyo) dejaría la nota sin poder emitirse por «no hay llenos».
+  const conParque = parque.datos?.conParque ?? [];
+  const deRenglones = llenosDeRenglones(lineas, gasesCil.filter((g) => conParque.includes(g)));
+  const sinParque = Object.keys(llenosDeRenglones(lineas, gasesCil)).filter((g) => !conParque.includes(g));
   const cuenta = (g: string): Cuenta => ({ llenos: cuentas[g]?.llenos ?? deRenglones[g] ?? 0, vacios: cuentas[g]?.vacios ?? 0 });
   const setCuenta = (g: string, k: keyof Cuenta, n: number) => setCuentas((p) => ({ ...p, [g]: { ...p[g], [k]: n } }));
   const conCilindros = gasesCil.filter((g) => cuenta(g).llenos > 0 || cuenta(g).vacios > 0);
@@ -222,6 +226,12 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
         description="Los que se dejan llenos y los que se traen vacíos. Al emitir, se registran en el parque.">
         {parque.error && <p className="mb-2 text-sm text-danger">{parque.error}</p>}
         {!parque.cargando && gasesCil.length === 0 && !parque.error && <p className="text-sm text-muted">No hay gases cargados en esta empresa.</p>}
+        {sinParque.length > 0 && (
+          <p className="mb-2 rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-2 text-xs text-warn">
+            {sinParque.map((g) => NOMBRE_GAS[g] ?? g).join(", ")}: todavía no {sinParque.length === 1 ? "tiene" : "tienen"} cilindros en el parque, así que esta nota no {sinParque.length === 1 ? "lo" : "los"} mueve.
+            Cárgalos en Cilindros → Parque → «Agregar Cilindros».
+          </p>
+        )}
         {gasesCil.length > 0 && (
           <div className="grid grid-cols-[minmax(4.5rem,1fr)_auto_auto] items-center gap-x-3 gap-y-2">
             <span />
