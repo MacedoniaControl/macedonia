@@ -213,6 +213,39 @@ export async function ingresarCilindros(
   return { ok: true };
 }
 
+export type CondicionAlta = "nuevo" | "buen_estado" | "mal_estado";
+export type LineaAlta = { gas: string; cantidad: number; condicion: CondicionAlta; estado?: "lleno" | "vacio"; dano?: string };
+export type OrigenAlta = "compra" | "traspaso" | "donacion" | "otro";
+
+/**
+ * «+ Agregar Cilindros»: amplía el parque con cilindros nuevos, en buen estado
+ * o en mal estado (estos entran «fuera de servicio» con su daño). Lo hacen el
+ * Owner, un Administrador o Almacén; queda el alta AC-AAAA-NNNNNN con quién
+ * los recibió, de dónde vienen y su documento (agregar_cilindros, migración 35).
+ */
+export async function agregarCilindros(
+  empresa: string,
+  alta: { fecha: string; origen: OrigenAlta; procedencia?: string; documento?: string; recibidoPor: string; nota?: string; lineas: LineaAlta[] },
+): Promise<{ ok: true; numero: string; cilindros: number } | { ok: false; error: string }> {
+  const usuario = await getUsuarioSesion();
+  if (!usuario) return { ok: false, error: "Sin sesión." };
+  if (!alta.recibidoPor.trim()) return { ok: false, error: "Indica quién recibe los cilindros." };
+  if (!alta.lineas.length) return { ok: false, error: "Agrega al menos un gas con su cantidad." };
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("agregar_cilindros", {
+    p_empresa: empresa, p_fecha: alta.fecha, p_origen: alta.origen, p_procedencia: alta.procedencia ?? null,
+    p_documento: alta.documento ?? null, p_recibido_por: alta.recibidoPor, p_nota: alta.nota ?? null,
+    p_lineas: alta.lineas.map((l) => ({ gas: l.gas, cantidad: l.cantidad, condicion: l.condicion,
+      ...(l.condicion === "mal_estado" ? { dano: l.dano ?? "" } : { estado: l.estado }) })),
+  });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") return { ok: false, error: "Falta correr la migración 35 en Supabase." };
+    return { ok: false, error: error.message };
+  }
+  const r = (Array.isArray(data) ? data[0] : data) as { numero: string; cilindros: number };
+  return { ok: true, numero: r.numero, cilindros: Number(r.cilindros) };
+}
+
 /**
  * Fuera de servicio: marcar cilindros dañados (lleno o vacío → fuera de
  * servicio) o reinsertarlos reparados (fuera de servicio → lleno o vacío).

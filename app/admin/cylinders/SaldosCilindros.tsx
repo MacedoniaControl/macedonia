@@ -126,7 +126,7 @@ export function SaldosCilindros({
 
       {/* Los tres movimientos que se hacen aquí: entran cilindros, se dañan o
           se reparan, y se cuenta lo que hay en el galpón. */}
-      <AccionesParque empresa={empresa} gerencia={gerencia} recarga={recarga} onRegistrada={() => onCambio?.()}
+      <AccionesParque empresa={empresa} gerencia={gerencia} operador={puedeContar} recarga={recarga} onRegistrada={() => onCambio?.()}
         extra={puedeContar && !contando && !pendiente && listo && !error && (
           <Button icon="inventory" variant="secondary" onClick={empezar}>Contar rampa</Button>
         )} />
