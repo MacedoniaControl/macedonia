@@ -1,7 +1,12 @@
 "use client";
 
-// Los dos botones de Parque.
+// Los botones de Parque.
 //
+// · + Agregar Cilindros (Owner, Administrador y Almacén): SOLO para ampliar el
+//   parque con cilindros nuevos, usados en buen estado o en mal estado (estos
+//   entran «fuera de servicio»). Es un formulario: fecha, de dónde vienen,
+//   documento, quién los recibe y una línea por gas. Queda el alta AC-… y
+//   cada movimiento la lleva (agregarCilindros, migración 35).
 // · Agregar un Gas (Owner y Administrador): cilindros nuevos que entran al
 //   parque, de un gas que ya existe o de uno nuevo («+ Gas nuevo…»). Abajo, los
 //   gases que se quedaron sin cilindros se pueden quitar.
@@ -17,8 +22,8 @@ import { Button } from "@/components/ui/Button";
 import { CampoNumero } from "@/components/ui/CampoNumero";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
-  activarGas, cambiarEstado, desactivarGas, gases, ingresarCilindros, saldos,
-  type EstadoCilindro,
+  activarGas, agregarCilindros, cambiarEstado, desactivarGas, gases, ingresarCilindros, saldos,
+  type CondicionAlta, type EstadoCilindro, type LineaAlta, type OrigenAlta,
 } from "@/lib/cilindros/cilindros-db";
 
 const campo =
@@ -47,23 +52,26 @@ function Etiqueta({ htmlFor, children }: { htmlFor: string; children: React.Reac
 }
 
 export function AccionesParque({
-  empresa, gerencia, recarga, onRegistrada, extra,
-}: { empresa: string; gerencia: boolean; recarga: number; onRegistrada: () => void; extra?: React.ReactNode }) {
+  empresa, gerencia, operador, recarga, onRegistrada, extra,
+}: { empresa: string; gerencia: boolean; operador: boolean; recarga: number; onRegistrada: () => void; extra?: React.ReactNode }) {
   const g = useCarga(`gases:${empresa}:${recarga}`, () => gases(empresa));
   const s = useCarga(`estados:${empresa}:${recarga}`, () => saldos(empresa));
   const lista = (g.datos ?? []).map((x) => x.nombre);
   const hay = (gas: string, estado: EstadoCilindro) => (s.datos ?? []).find((x) => x.gas === gas && x.estado === estado)?.cantidad ?? 0;
   const fueraTotal = (s.datos ?? []).filter((x) => x.estado === "fuera_servicio").reduce((a, x) => a + x.cantidad, 0);
 
-  const [abierto, setAbierto] = useState<"gas" | "fuera" | null>(null);
+  const [abierto, setAbierto] = useState<"cilindros" | "gas" | "fuera" | null>(null);
   const [aviso, setAviso] = useState<Msg>(null);
   const hecho = (texto: string) => { setAbierto(null); setAviso({ ok: true, texto }); onRegistrada(); };
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
+        {operador && (
+          <Button icon="plus" onClick={() => { setAviso(null); setAbierto("cilindros"); }}>Agregar Cilindros</Button>
+        )}
         {gerencia && (
-          <Button icon="plus" onClick={() => { setAviso(null); setAbierto("gas"); }}>Agregar un Gas</Button>
+          <Button variant="secondary" icon="plus" onClick={() => { setAviso(null); setAbierto("gas"); }}>Agregar un Gas</Button>
         )}
         <Button variant="secondary" icon="alert" onClick={() => { setAviso(null); setAbierto("fuera"); }}>
           Fuera de Servicio{fueraTotal > 0 ? ` · ${fueraTotal}` : ""}
@@ -72,6 +80,11 @@ export function AccionesParque({
       </div>
       <Aviso msg={aviso ?? (g.error ? { ok: false, texto: g.error } : null)} />
 
+      {abierto === "cilindros" && (
+        <Modal titulo="Agregar Cilindros" onCerrar={() => setAbierto(null)}>
+          <AgregarCilindros empresa={empresa} lista={lista} onHecho={hecho} />
+        </Modal>
+      )}
       {abierto === "gas" && (
         <Modal titulo="Agregar un Gas" onCerrar={() => setAbierto(null)}>
           <AgregarGas empresa={empresa} lista={lista} hay={hay} cargado={!!s.datos} onHecho={hecho} onCambio={onRegistrada} />
@@ -82,6 +95,172 @@ export function AccionesParque({
           <FueraDeServicio empresa={empresa} lista={lista} hay={hay} onHecho={hecho} />
         </Modal>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Agregar Cilindros
+
+const hoyCaracas = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
+const ORIGENES: { id: OrigenAlta; label: string }[] = [
+  { id: "compra", label: "Compra a un proveedor" },
+  { id: "traspaso", label: "Traspaso (otra sede o empresa)" },
+  { id: "donacion", label: "Donación o regalo" },
+  { id: "otro", label: "Otro" },
+];
+const CONDICIONES: { id: CondicionAlta; label: string }[] = [
+  { id: "nuevo", label: "Nuevos" },
+  { id: "buen_estado", label: "Usados en buen estado" },
+  { id: "mal_estado", label: "En mal estado" },
+];
+type Linea = { gas: string; cantidad: number; condicion: CondicionAlta; estado: EnPlanta; dano: string };
+
+function AgregarCilindros({ empresa, lista, onHecho }: { empresa: string; lista: string[]; onHecho: (t: string) => void }) {
+  const nueva = (): Linea => ({ gas: lista[0] ?? "", cantidad: 0, condicion: "nuevo", estado: "vacio", dano: "" });
+  const [lineas, setLineas] = useState<Linea[]>(() => [nueva()]);
+  const [fecha, setFecha] = useState(hoyCaracas());
+  const [origen, setOrigen] = useState<OrigenAlta>("compra");
+  const [procedencia, setProcedencia] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [recibe, setRecibe] = useState("");
+  const [nota, setNota] = useState("");
+  const [msg, setMsg] = useState<Msg>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  const set = (i: number, cambio: Partial<Linea>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...cambio } : l)));
+  const total = lineas.reduce((a, l) => a + (l.cantidad > 0 ? l.cantidad : 0), 0);
+  const malos = lineas.filter((l) => l.condicion === "mal_estado").reduce((a, l) => a + (l.cantidad > 0 ? l.cantidad : 0), 0);
+
+  function validar(): string | null {
+    if (!fecha || fecha > hoyCaracas()) return "La fecha no puede ser posterior a hoy.";
+    if (!recibe.trim()) return "Escribe quién recibe los cilindros: es quien responde por ellos.";
+    for (const l of lineas) {
+      if (!l.gas) return "Elige el gas de cada línea.";
+      if (!(l.cantidad > 0)) return `${l.gas}: la cantidad debe ser mayor que cero.`;
+      if (l.condicion === "mal_estado" && !l.dano.trim()) return `${l.gas}: indica qué daño tienen los cilindros en mal estado.`;
+    }
+    return null;
+  }
+  async function guardar() {
+    if (guardando) return;
+    setGuardando(true); setMsg(null);
+    try {
+      const r = await agregarCilindros(empresa, {
+        fecha, origen, procedencia, documento, recibidoPor: recibe, nota,
+        lineas: lineas.map<LineaAlta>((l) => ({ gas: l.gas, cantidad: l.cantidad, condicion: l.condicion,
+          ...(l.condicion === "mal_estado" ? { dano: l.dano } : { estado: l.estado }) })),
+      });
+      if (!r.ok) return setMsg({ ok: false, texto: r.error });
+      onHecho(`${r.numero}: ${r.cilindros} cilindro(s) agregados al parque, recibidos por ${recibe.trim()}.`);
+    } finally { setGuardando(false); }
+  }
+
+  if (lista.length === 0) {
+    return <p className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-sm text-muted">Esta empresa no tiene gases en la lista. Primero agrega uno con «Agregar un Gas».</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">Solo para ampliar el parque: cilindros que se compran, se reciben o se recuperan. Todos suman al total; los que están en mal estado entran «fuera de servicio».</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Etiqueta htmlFor="ac-fecha">Fecha</Etiqueta>
+          <input id="ac-fecha" type="date" value={fecha} max={hoyCaracas()} onChange={(e) => setFecha(e.target.value)} className={campo} />
+        </div>
+        <div>
+          <Etiqueta htmlFor="ac-origen">De dónde vienen</Etiqueta>
+          <select id="ac-origen" value={origen} onChange={(e) => setOrigen(e.target.value as OrigenAlta)} className={campo}>
+            {ORIGENES.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <Etiqueta htmlFor="ac-proc">{origen === "compra" ? "Proveedor" : "Procedencia"}</Etiqueta>
+          <input id="ac-proc" value={procedencia} onChange={(e) => setProcedencia(e.target.value)} className={campo}
+            placeholder={origen === "compra" ? "Ej.: Star Gas" : "Opcional"} />
+        </div>
+        <div>
+          <Etiqueta htmlFor="ac-doc">Documento</Etiqueta>
+          <input id="ac-doc" value={documento} onChange={(e) => setDocumento(e.target.value)} className={campo} placeholder="Factura o nota · opcional" />
+        </div>
+      </div>
+
+      {/* Una línea por gas y condición */}
+      <div className="space-y-2">
+        {lineas.map((l, i) => (
+          <div key={i} className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted">Cilindros {lineas.length > 1 ? i + 1 : ""}</span>
+              {lineas.length > 1 && (
+                <button type="button" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))}
+                  className="min-h-9 rounded-lg px-2 text-xs text-muted hover:text-danger">Quitar</button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Etiqueta htmlFor={`ac-gas-${i}`}>Gas</Etiqueta>
+                <select id={`ac-gas-${i}`} value={l.gas} onChange={(e) => set(i, { gas: e.target.value })} className={campo}>
+                  {lista.map((x) => <option key={x} value={x}>{x}</option>)}
+                </select>
+              </div>
+              <div>
+                <Etiqueta htmlFor={`ac-cant-${i}`}>Cantidad</Etiqueta>
+                <CampoNumero id={`ac-cant-${i}`} valor={l.cantidad} onChange={(n) => set(i, { cantidad: n })} className={campo} />
+              </div>
+              <div>
+                <Etiqueta htmlFor={`ac-cond-${i}`}>Condición</Etiqueta>
+                <select id={`ac-cond-${i}`} value={l.condicion} onChange={(e) => set(i, { condicion: e.target.value as CondicionAlta })} className={campo}>
+                  {CONDICIONES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
+              {l.condicion === "mal_estado" ? (
+                <div>
+                  <Etiqueta htmlFor={`ac-dano-${i}`}>Qué daño tienen *</Etiqueta>
+                  <input id={`ac-dano-${i}`} value={l.dano} onChange={(e) => set(i, { dano: e.target.value })} className={campo}
+                    placeholder="Ej.: válvula dañada" />
+                </div>
+              ) : (
+                <div>
+                  <Etiqueta htmlFor={`ac-est-${i}`}>Entran</Etiqueta>
+                  <select id={`ac-est-${i}`} value={l.estado} onChange={(e) => set(i, { estado: e.target.value as EnPlanta })} className={campo}>
+                    <option value="vacio">Vacíos</option>
+                    <option value="lleno">Llenos</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        <Button variant="secondary" icon="plus" onClick={() => setLineas((ls) => [...ls, nueva()])}>Otro gas o condición</Button>
+      </div>
+
+      <div>
+        <Etiqueta htmlFor="ac-recibe">Quién recibe los cilindros *</Etiqueta>
+        <input id="ac-recibe" value={recibe} onChange={(e) => setRecibe(e.target.value)} className={campo}
+          placeholder="Nombre y apellido" autoComplete="name" />
+      </div>
+      <div>
+        <Etiqueta htmlFor="ac-nota">Nota</Etiqueta>
+        <input id="ac-nota" value={nota} onChange={(e) => setNota(e.target.value)} className={campo} placeholder="Opcional" />
+      </div>
+
+      {total > 0 && (
+        <p className="rounded-xl border border-brand/30 bg-brand/5 px-3 py-2 text-sm text-text">
+          Entran <b className="tabular-nums">{total}</b> cilindro(s) al parque{malos > 0 ? `, ${malos} fuera de servicio` : ""}.
+        </p>
+      )}
+      <Aviso msg={msg} />
+      <ConfirmDialog
+        title="¿Agregar los cilindros al parque?"
+        message={`${lineas.filter((l) => l.cantidad > 0).map((l) => `${l.cantidad} ${l.gas} ${CONDICIONES.find((c) => c.id === l.condicion)!.label.toLowerCase()}`).join(", ")}. Recibe ${recibe.trim() || "—"}. Suman al total del parque y queda el registro.`}
+        confirmLabel="Sí, agregar" cancelLabel="No" onConfirm={guardar}
+        trigger={(abrir) => (
+          <Button icon="plus" className="w-full" cargando={guardando} textoCargando="Guardando…"
+            onClick={() => { const e = validar(); if (e) return setMsg({ ok: false, texto: e }); setMsg(null); abrir(); }}>
+            Agregar al parque{total > 0 ? ` · ${total}` : ""}
+          </Button>
+        )}
+      />
     </div>
   );
 }
