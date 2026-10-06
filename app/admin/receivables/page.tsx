@@ -175,7 +175,7 @@ function CuentasPorCobrar() {
   const carteras = porCartera(deClase, empresaNombre);
   const elegida = (id: string, externa: boolean) =>
     externa ? cartera === "externos" && vendedorSel === id : cartera === "propia";
-  const enFoco = cartera === "todas" ? "Toda la cartera" : cartera === "propia" ? `Cartera propia de ${empresaNombre}`
+  const enFoco = cartera === "todas" ? "Consolidado: todas las carteras" : cartera === "propia" ? `Cartera propia de ${empresaNombre}`
     : vendedorSel ? `Cartera de ${vendedorSel}` : "Vendedores externos";
 
   // Cuantas hay de cada clase: no se ofrece un filtro que deja la tabla vacia,
@@ -220,7 +220,7 @@ function CuentasPorCobrar() {
     titulo: "Cuentas por Cobrar",
     detalle: [
       filtroClase === "todas" ? "Todas las clases" : `Clase: ${CLASES.find((x) => x.id === filtroClase)?.label ?? filtroClase}`,
-      cartera === "todas" ? "Cartera: todas" : cartera === "propia" ? `Cartera propia de ${empresaNombre}` : `Vendedores externos${vendedorSel ? `: ${vendedorSel}` : ""}`,
+      cartera === "todas" ? "Cartera: consolidado" : cartera === "propia" ? `Cartera propia de ${empresaNombre}` : `Vendedores externos${vendedorSel ? `: ${vendedorSel}` : ""}`,
       `Por cobrar ${textoCelda(totalSaldo, "usd")} · Vencido ${textoCelda(vencido, "usd")} · Por vencer ${textoCelda(porVencer, "usd")}`,
       `${clientesVisibles.length} cliente(s)${tc ? ` · búsqueda «${buscaCliente.trim()}»` : ""}`,
     ],
@@ -282,26 +282,25 @@ function CuentasPorCobrar() {
       <FiltroClase conteo={porClase} total={cuentas.length}
         valor={filtroClase} onCambio={setFiltroClase} />
 
-      {/* Las dos carteras. Con «Vendedores Externos», cada vendedor por separado. */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Cartera">
-        {([["todas", "Todas"], ["propia", empresaNombre], ["externos", "Vendedores Externos"]] as const).map(([id, label]) => {
-          const n = deClase.filter((c) => enCartera(c, id)).length;
-          return (
-            <button key={id} type="button" aria-pressed={cartera === id} onClick={() => { setCartera(id); setVendedorSel(""); }}
-              className={`min-h-9 rounded-full border px-3 text-xs font-medium transition-colors ${cartera === id ? "border-brand-strong bg-brand-soft text-brand" : "border-border bg-surface text-muted hover:bg-surface-2 hover:text-text"}`}>
-              {label} ({n})
-            </button>
-          );
-        })}
-        {cartera === "externos" && vendedores.length > 1 && (
-          <select aria-label="Vendedor externo" className="sumi-campo sumi-campo--auto ml-1 h-9 text-xs" value={vendedorSel} onChange={(e) => setVendedorSel(e.target.value)}>
-            <option value="">Todos los vendedores</option>
-            {vendedores.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-        )}
-      </div>
-
       <SectionCard title="Resumen de Cartera" description={enFoco}>
+        {/* Las dos carteras. Con «Vendedores Externos», cada vendedor por separado. */}
+        <div className="mb-4 flex flex-wrap items-center gap-1.5" role="group" aria-label="Cartera">
+          {([["todas", "Consolidado"], ["propia", empresaNombre], ["externos", "Vendedores Externos"]] as const).map(([id, label]) => {
+            const n = deClase.filter((c) => enCartera(c, id)).length;
+            return (
+              <button key={id} type="button" aria-pressed={cartera === id} onClick={() => { setCartera(id); setVendedorSel(""); }}
+                className={`min-h-9 rounded-full border px-3 text-xs font-medium transition-colors ${cartera === id ? "border-brand-strong bg-brand-soft text-brand" : "border-border bg-surface text-muted hover:bg-surface-2 hover:text-text"}`}>
+                {label} ({n})
+              </button>
+            );
+          })}
+          {cartera === "externos" && vendedores.length > 1 && (
+            <select aria-label="Vendedor externo" className="sumi-campo sumi-campo--auto ml-1 h-9 text-xs" value={vendedorSel} onChange={(e) => setVendedorSel(e.target.value)}>
+              <option value="">Todos los vendedores</option>
+              {vendedores.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Total por Cobrar" value={fmtUsd(totalSaldo)} accent />
           <StatCard label="Vencido" value={fmtUsd(vencido)} />
@@ -343,6 +342,37 @@ function CuentasPorCobrar() {
                   </button>
                 );
               })}
+              {/* La suma de todas las carteras: tocarlo vuelve al consolidado. */}
+              {(() => {
+                const activa = cartera === "todas";
+                const t = carteras.reduce((a, k) => ({
+                  total: a.total + k.resumen.total, vencido: a.vencido + k.resumen.vencido, porVencer: a.porVencer + k.resumen.porVencer,
+                  vencidas: a.vencidas + k.resumen.vencidas, clientes: a.clientes + k.clientes, cuentas: a.cuentas + k.cuentas,
+                }), { total: 0, vencido: 0, porVencer: 0, vencidas: 0, clientes: 0, cuentas: 0 });
+                return (
+                  <button type="button" aria-pressed={activa} onClick={() => { setCartera("todas"); setVendedorSel(""); }}
+                    className={`rounded-xl border p-4 text-left transition ${activa ? "border-brand-strong bg-brand-soft" : "border-border bg-surface-2 hover:border-border-strong"}`}>
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-text">Consolidado</span>
+                        <span className="block text-[11px] text-muted">{carteras.length} carteras · {t.clientes} cliente(s) · {t.cuentas} cuenta(s)</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted">100 %</span>
+                    </span>
+                    <span className="mt-2 block text-xl font-semibold tabular-nums text-text">{fmtUsd(t.total)}</span>
+                    <span className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-border" aria-hidden>
+                      {carteras.map((k) => (
+                        <span key={k.id} className={`block h-full ${k.externa ? "bg-info" : "bg-brand"} border-r border-surface last:border-r-0`} style={{ width: `${Math.max(0, k.parte)}%` }} />
+                      ))}
+                    </span>
+                    <span className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <span><span className="block text-muted">Vencido</span><b className="tabular-nums text-danger">{fmtUsd(t.vencido)}</b></span>
+                      <span><span className="block text-muted">Por vencer</span><b className="tabular-nums text-text">{fmtUsd(t.porVencer)}</b></span>
+                      <span><span className="block text-muted">Vencidas</span><b className="tabular-nums text-text">{t.vencidas}</b></span>
+                    </span>
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}
