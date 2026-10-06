@@ -5,8 +5,8 @@
 // Una sola capa para las dos: la única diferencia es hacia dónde va el dinero.
 // Duplicarla serían dos sitios donde arreglar el mismo error.
 
-import { createClient } from "@/lib/supabase/server";
-import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getUsuarioSesion, puedeEntrarAEmpresa, sesionPuede } from "@/lib/auth/sesion-servidor";
 import { retencionDe, claseDeDocumento, revisarDesglose } from "./retencion.ts";
 import type { ClaseCuenta, Revision } from "./retencion.ts";
 // Las constantes NO se reexportan desde aqui: este archivo es "use server" y
@@ -92,6 +92,10 @@ export type Cuenta = {
   neto: number;
   /** Neto menos lo abonado. Es lo que queda por pagarle. */
   saldoNeto: number;
+  /** Por cobrar: el vendedor externo de la cuenta (null = cartera propia). Migración 36. */
+  vendedorExterno: string | null;
+  /** true = marcado en la cuenta (manda sobre el cliente); false = lo sigue del cliente. */
+  vendedorFijo: boolean;
 };
 
 export type CuentaNueva = {
@@ -113,6 +117,12 @@ export type CuentaNueva = {
   aplicaRetencion?: boolean;
   /** Foto del documento. Va al bucket privado, igual que los comprobantes. */
   imagen?: File | null;
+  /**
+   * Por cobrar. Sin indicar (undefined): lo decide la base (la nota de Macedonia
+   * o el vendedor del cliente). null: cartera propia, marcada. Un nombre: ese
+   * vendedor externo, marcado. Lo marcado manda sobre el cliente.
+   */
+  vendedorExterno?: string | null;
 };
 
 /** Lo que la vista no expone: el desglose fiscal de cada cuenta. */
@@ -120,6 +130,7 @@ type DesgloseFila = {
   base: number | null; iva: number | null; retenido: number | null;
   /** null = la migracion 21 no corrio todavia y la columna no existe. */
   clase: ClaseCuenta | null; estado: EstadoCuenta | null;
+  vendedor: string | null; vendedorFijo: boolean;
 };
 
 /**
@@ -138,7 +149,9 @@ async function desgloseDe(
     sb.from("cuentas").select(columnas).eq("empresa_id", empresa).eq("tipo", tipo);
   // Con la 21 corrida, la clase y el estado se leen de la tabla: una cuenta
   // liquidada tiene que verse liquidada. Sin ella, se piden sin esas columnas.
-  let r = await consulta("id, base_imponible, iva, iva_retenido, clase, estado");
+  // Con la 36, también el vendedor externo de cada cuenta.
+  let r = await consulta("id, base_imponible, iva, iva_retenido, clase, estado, vendedor_externo, vendedor_fijo");
+  if (faltaColumna(r.error)) r = await consulta("id, base_imponible, iva, iva_retenido, clase, estado");
   if (faltaColumna(r.error)) r = await consulta("id, base_imponible, iva, iva_retenido");
   // Sin las columnas el desglose es desconocido: el neto queda igual al total
   // y ninguna cuenta se marca, que es como se comportaba antes de existir.
@@ -152,6 +165,8 @@ async function desgloseDe(
         base: num(c.base_imponible), iva: num(c.iva), retenido: num(c.iva_retenido),
         clase: (c.clase as ClaseCuenta | undefined) ?? null,
         estado: (c.estado as EstadoCuenta | undefined) ?? null,
+        vendedor: (c.vendedor_externo as string | null | undefined) ?? null,
+        vendedorFijo: c.vendedor_fijo === true,
       },
     ]),
   );
@@ -193,6 +208,8 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
       revision: revisarDesglose(Number(c.monto), d?.base ?? null, d?.iva ?? null),
       neto: redondear(Number(c.monto) - (retenido ?? 0)),
       saldoNeto: redondear(Number(c.monto) - (retenido ?? 0) - Number(c.abonado)),
+      vendedorExterno: d?.vendedor ?? null,
+      vendedorFijo: d?.vendedorFijo ?? false,
     };
   });
 }
@@ -230,7 +247,12 @@ export async function crearCuenta(
     nota: c.nota?.trim() || null,
     usuario_id: usuario.id,
   };
-  const nuevas = { clase: c.clase ?? "factura", aplica_retencion: c.aplicaRetencion ?? true };
+  const nuevas = {
+    clase: c.clase ?? "factura", aplica_retencion: c.aplicaRetencion ?? true,
+    // Solo si se indicó: sin indicar, la base lo toma de la nota o del cliente.
+    ...(c.tipo === "cobrar" && c.vendedorExterno !== undefined
+      ? { vendedor_externo: c.vendedorExterno?.trim() || null, vendedor_fijo: true } : {}),
+  };
 
   // Se pide el id de vuelta: la imagen se guarda en una ruta que lo incluye,
   // asi que no se puede subir antes de que la cuenta exista.
@@ -621,4 +643,51 @@ export async function urlComprobante(ruta: string): Promise<string | null> {
   const sb = await createClient();
   const { data } = await sb.storage.from(BUCKET_COMPROBANTES).createSignedUrl(ruta, 60 * 5);
   return data?.signedUrl ?? null;
+}
+
+// ---------------------------------------------------------------- vendedores externos (migración 36)
+
+export type AsignacionCliente = { cliente: string; clave: string; vendedor: string };
+
+/** Los clientes con vendedor externo asignado. Sin la migración 36, ninguno. */
+export async function asignacionesClientes(empresa: string): Promise<AsignacionCliente[]> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("cliente_vendedor").select("cliente, cliente_clave, vendedor_externo").eq("empresa_id", empresa);
+  if (error) return [];
+  return (data ?? []).map((a) => ({ cliente: a.cliente as string, clave: a.cliente_clave as string, vendedor: a.vendedor_externo as string }));
+}
+
+const sinMigracion36 = (e: { code?: string } | null) => e?.code === "PGRST202" || e?.code === "42883";
+
+/** Asigna (o quita, con null) el vendedor de un cliente. Devuelve cuántas cuentas abiertas se movieron. */
+export async function asignarVendedorCliente(empresa: string, cliente: string, vendedor: string | null, moverAbiertas: boolean):
+  Promise<{ ok: true; movidas: number } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("asignar_vendedor_cliente", {
+    p_empresa: empresa, p_cliente: cliente, p_vendedor: vendedor?.trim() || null, p_mover_abiertas: moverAbiertas,
+  });
+  if (error) return { ok: false, error: sinMigracion36(error) ? "Falta correr la migración 36 en Supabase." : error.message };
+  return { ok: true, movidas: Number(data) || 0 };
+}
+
+/** Marca el vendedor de una cuenta (null = cartera propia), o la devuelve a seguir al cliente. */
+export async function asignarVendedorCuenta(id: number, vendedor: string | null, seguirAlCliente: boolean):
+  Promise<{ ok: true; vendedor: string | null } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("asignar_vendedor_cuenta", { p_id: id, p_vendedor: vendedor?.trim() || null, p_heredar: seguirAlCliente });
+  if (error) return { ok: false, error: sinMigracion36(error) ? "Falta correr la migración 36 en Supabase." : error.message };
+  return { ok: true, vendedor: (data as string | null) ?? null };
+}
+
+/**
+ * El vendedor externo de un cliente, para proponerlo en la nota de entrega.
+ * Lo lee el servidor: el vendedor del mostrador no ve la cartera.
+ */
+export async function vendedorDelCliente(empresa: string, cliente: string): Promise<string | null> {
+  const u = await getUsuarioSesion();
+  if (!u || !cliente.trim() || !puedeEntrarAEmpresa(u, empresa) || !(sesionPuede(u, "delivery-notes") || sesionPuede(u, "receivables"))) return null;
+  const clave = cliente.trim().replace(/\s+/g, " ").toUpperCase();
+  const { data } = await createAdminClient().from("cliente_vendedor").select("vendedor_externo")
+    .eq("empresa_id", empresa).eq("cliente_clave", clave).maybeSingle();
+  return (data?.vendedor_externo as string | undefined) ?? null;
 }

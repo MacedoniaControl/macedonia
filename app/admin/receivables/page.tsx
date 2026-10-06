@@ -9,7 +9,9 @@ import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
 import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { listarCuentas, abonar, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
+import { listarCuentas, abonar, asignacionesClientes, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
+import { claveCliente, enCartera, resumenCartera, vendedoresEnCartera, type FiltroCartera } from "@/lib/finanzas/cartera-vendedores";
+import { VendedorCliente, VendedorCuenta } from "@/components/finanzas/VendedorCartera";
 import { FiltroClase } from "@/components/finanzas/FiltroClase";
 import { CLASES, grupoDeClase } from "@/lib/finanzas/retencion";
 import { DetalleCuenta } from "@/components/finanzas/DetalleCuenta";
@@ -75,6 +77,15 @@ function CuentasPorCobrar() {
   const [liquidar, setLiquidar] = useState<string | null>(null);
   // Anexar: una nota nueva que amplía la deuda del cliente, desde su fila.
   const [anexar, setAnexar] = useState<{ cliente: string; deuda: number } | null>(null);
+  // Las dos carteras: la propia y la de vendedores externos (migración 36).
+  const [cartera, setCartera] = useState<FiltroCartera>("todas");
+  const [vendedorSel, setVendedorSel] = useState("");
+  const asig = useCarga(`asig:${empresaKey}:${recarga}`, () => asignacionesClientes(empresaKey));
+  const vendedorDe = new Map((asig.datos ?? []).map((a) => [a.clave, a.vendedor]));
+  const vendedores = vendedoresEnCartera(cuentas, asig.datos ?? []);
+  const [vendCliente, setVendCliente] = useState<string | null>(null);
+  const [vendCuenta, setVendCuenta] = useState<CuentaDb | null>(null);
+  const empresaNombre = empresaKey === "sudematin" ? "Sudematin" : "Sumigases";
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -158,7 +169,11 @@ function CuentasPorCobrar() {
     // saldo y dias los calcula la BASE. La version anterior usaba una fecha de
   // "hoy" escrita a mano (23/06/2026) que quedo congelada: una cuenta vencida
   // hace dos meses se mostraba al dia.
-  const conSaldo = cuentas.filter((c) => filtroClase === "todas" || grupoDeClase(c.clase) === filtroClase);
+  const deClase = cuentas.filter((c) => filtroClase === "todas" || grupoDeClase(c.clase) === filtroClase);
+  const conSaldo = deClase.filter((c) => enCartera(c, cartera, vendedorSel));
+  // Lo de vendedores externos dentro del total: va debajo de cada tarjeta.
+  const ext = resumenCartera(deClase.filter((c) => enCartera(c, "externos")));
+  const desglose = cartera === "todas" && ext.total !== 0;
 
   // Cuantas hay de cada clase: no se ofrece un filtro que deja la tabla vacia,
   // porque parece que el sistema perdio datos.
@@ -202,26 +217,29 @@ function CuentasPorCobrar() {
     titulo: "Cuentas por Cobrar",
     detalle: [
       filtroClase === "todas" ? "Todas las clases" : `Clase: ${CLASES.find((x) => x.id === filtroClase)?.label ?? filtroClase}`,
+      cartera === "todas" ? "Cartera: todas" : cartera === "propia" ? `Cartera propia de ${empresaNombre}` : `Vendedores externos${vendedorSel ? `: ${vendedorSel}` : ""}`,
       `Por cobrar ${textoCelda(totalSaldo, "usd")} · Vencido ${textoCelda(vencido, "usd")} · Por vencer ${textoCelda(porVencer, "usd")}`,
       `${clientesVisibles.length} cliente(s)${tc ? ` · búsqueda «${buscaCliente.trim()}»` : ""}`,
     ],
     columnas: [
       { titulo: "Cliente" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Clase" }, { titulo: "Monto", tipo: "usd" },
       { titulo: "Abonado", tipo: "usd" }, { titulo: "Saldo", tipo: "usd" }, { titulo: "Vence", tipo: "fecha" }, { titulo: "Estado" },
+      { titulo: "Vendedor" },
     ],
     // Por cliente: sus documentos y, al final de cada uno, lo que debe en total.
     filas: clientesVisibles.flatMap((g) => [
       ...g.cuentas.map((c) => [
         c.contraparte, c.documento, CLASES.find((x) => x.id === c.clase)?.label ?? null, c.monto, c.abonado, c.saldo, c.vence,
         c.estado === "liquidada" ? "Liquidada" : estadoDe(c.saldo, c.dias).label,
+        c.vendedorExterno ?? `Propia (${empresaNombre})`,
       ]),
       [`Total ${g.cliente}`, `${g.documentos} documento(s)`, null, g.monto, g.abonado, g.saldo, null,
-       g.masVieja && g.masVieja.dias < 0 ? `Vencido ${textoCelda(g.vencido, "usd")}` : null],
+       g.masVieja && g.masVieja.dias < 0 ? `Vencido ${textoCelda(g.vencido, "usd")}` : null, vendedorDe.get(claveCliente(g.cliente)) ?? null],
     ]),
     totales: [
       `Total · ${clientesVisibles.length} cliente(s)`, `${clientesVisibles.reduce((a, g) => a + g.documentos, 0)} documento(s)`, "",
       clientesVisibles.reduce((a, g) => a + g.monto, 0), clientesVisibles.reduce((a, g) => a + g.abonado, 0),
-      clientesVisibles.reduce((a, g) => a + g.saldo, 0), "", "",
+      clientesVisibles.reduce((a, g) => a + g.saldo, 0), "", "", "",
     ],
     nota: "Montos en USD. El saldo es el monto menos lo abonado.",
   }));
@@ -235,11 +253,11 @@ function CuentasPorCobrar() {
           <div className="flex flex-wrap items-center gap-2">
             <PildoraPanel etiqueta="Nueva cuenta" icono="plus">
               {(cerrar) => (
-                <FormularioCuenta tipo="cobrar" empresa={empresaKey}
+                <FormularioCuenta tipo="cobrar" empresa={empresaKey} vendedores={vendedores}
                   onCreada={() => setRecarga((n) => n + 1)} onCerrar={cerrar} />
               )}
             </PildoraPanel>
-            <ImportarCartera tipo="cobrar" empresa={empresaKey} onImportada={() => setRecarga((n) => n + 1)} />
+            <ImportarCartera tipo="cobrar" empresa={empresaKey} vendedores={vendedores} onImportada={() => setRecarga((n) => n + 1)} />
             <PildoraPanel etiqueta="Registrar abono" icono="cash">
               {(cerrar) => panelAbono(cerrar)}
             </PildoraPanel>
@@ -261,12 +279,31 @@ function CuentasPorCobrar() {
       <FiltroClase conteo={porClase} total={cuentas.length}
         valor={filtroClase} onCambio={setFiltroClase} />
 
+      {/* Las dos carteras. Con «Vendedores Externos», cada vendedor por separado. */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Cartera">
+        {([["todas", "Todas"], ["propia", empresaNombre], ["externos", "Vendedores Externos"]] as const).map(([id, label]) => {
+          const n = deClase.filter((c) => enCartera(c, id)).length;
+          return (
+            <button key={id} type="button" aria-pressed={cartera === id} onClick={() => { setCartera(id); setVendedorSel(""); }}
+              className={`min-h-9 rounded-full border px-3 text-xs font-medium transition-colors ${cartera === id ? "border-brand-strong bg-brand-soft text-brand" : "border-border bg-surface text-muted hover:bg-surface-2 hover:text-text"}`}>
+              {label} ({n})
+            </button>
+          );
+        })}
+        {cartera === "externos" && vendedores.length > 1 && (
+          <select aria-label="Vendedor externo" className="sumi-campo sumi-campo--auto ml-1 h-9 text-xs" value={vendedorSel} onChange={(e) => setVendedorSel(e.target.value)}>
+            <option value="">Todos los vendedores</option>
+            {vendedores.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        )}
+      </div>
+
       <SectionCard title="Resumen de Cartera">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Total por Cobrar" value={fmtUsd(totalSaldo)} accent />
-          <StatCard label="Vencido" value={fmtUsd(vencido)} />
-          <StatCard label="Por Vencer (≤8d)" value={fmtUsd(porVencer)} />
-          <StatCard label="Cuentas Vencidas" value={String(nVencidas)} />
+          <StatCard label="Total por Cobrar" value={fmtUsd(totalSaldo)} accent sub={desglose ? `Vendedores externos: ${fmtUsd(ext.total)}` : undefined} />
+          <StatCard label="Vencido" value={fmtUsd(vencido)} sub={desglose ? `Vendedores externos: ${fmtUsd(ext.vencido)}` : undefined} />
+          <StatCard label="Por Vencer (≤8d)" value={fmtUsd(porVencer)} sub={desglose ? `Vendedores externos: ${fmtUsd(ext.porVencer)}` : undefined} />
+          <StatCard label="Cuentas Vencidas" value={String(nVencidas)} sub={desglose ? `Vendedores externos: ${ext.vencidas}` : undefined} />
         </div>
       </SectionCard>
 
@@ -323,6 +360,18 @@ function CuentasPorCobrar() {
                         <span className="flex items-center gap-2">
                           <span className={`text-muted transition ${abierto ? "rotate-90" : ""}`} aria-hidden><Icon name="chevronRight" size={14} /></span>
                           <b className="font-semibold text-text">{g.cliente}</b>
+                          {(() => {
+                            const v = vendedorDe.get(claveCliente(g.cliente));
+                            const cls = "rounded-full px-2 py-0.5 text-[11px] font-medium";
+                            if (!v && !gerencia) return null;
+                            return gerencia ? (
+                              <button type="button" title="Cambiar el vendedor del cliente"
+                                className={`${cls} ${v ? "bg-info/10 text-info hover:bg-info/20" : "border border-dashed border-border-strong text-muted hover:text-text"}`}
+                                onClick={(ev) => { ev.stopPropagation(); setExito(""); setVendCliente(g.cliente); }}>
+                                {v ?? "+ Vendedor"}
+                              </button>
+                            ) : <span className={`${cls} bg-info/10 text-info`}>{v}</span>;
+                          })()}
                         </span>
                       </td>
                       <td className="py-3 pr-3 text-xs text-muted">{g.documentos} · {resumenClases(g.porClase)}</td>
@@ -351,7 +400,21 @@ function CuentasPorCobrar() {
                         <tr key={c.id} onClick={() => setAbierta(c.id)} tabIndex={0}
                           onKeyDown={(ev) => { if (ev.key === "Enter") setAbierta(c.id); }}
                           className="cursor-pointer bg-surface-2/60 text-xs hover:bg-surface-2">
-                          <td className="py-2 pl-8 pr-3 font-mono text-muted">{c.documento}</td>
+                          <td className="py-2 pl-8 pr-3 font-mono text-muted">
+                            {c.documento}
+                            {(() => {
+                              // Se marca cuando la cuenta no va con su cliente (otro vendedor o propia a mano).
+                              const delCli = vendedorDe.get(claveCliente(c.contraparte)) ?? null;
+                              if ((c.vendedorExterno ?? null) === delCli && !gerencia) return null;
+                              const distinta = (c.vendedorExterno ?? null) !== delCli;
+                              const txt = c.vendedorExterno ?? "propia";
+                              const cls = `ml-2 rounded px-1.5 py-0.5 font-sans text-[10px] ${distinta ? "bg-warn/15 text-warn" : "text-muted"}`;
+                              return gerencia
+                                ? <button type="button" className={`${cls} hover:underline`} title={distinta ? "Esta nota no va con el vendedor de su cliente" : "Cambiar el vendedor de esta nota"}
+                                    onClick={(ev) => { ev.stopPropagation(); setExito(""); setVendCuenta(c); }}>{distinta ? "≠ " : ""}{txt}</button>
+                                : <span className={cls}>≠ {txt}</span>;
+                            })()}
+                          </td>
                           <td className="py-2 pr-3 text-muted">{nombreClase(c.clase)}</td>
                           <td className="py-2 pr-3 text-right tabular-nums text-muted">{fmtUsd(c.monto)}</td>
                           <td className="py-2 pr-3 text-right tabular-nums text-text">{fmtUsd(c.saldo)}</td>
@@ -384,11 +447,27 @@ function CuentasPorCobrar() {
         </Modal>
       )}
 
+      {vendCliente && (
+        <Modal titulo="Vendedor del Cliente" onCerrar={() => setVendCliente(null)}>
+          <VendedorCliente empresa={empresaKey} cliente={vendCliente} vendedores={vendedores}
+            actual={vendedorDe.get(claveCliente(vendCliente)) ?? null}
+            abiertasQueSiguen={cuentas.filter((c) => claveCliente(c.contraparte) === claveCliente(vendCliente) && c.estado === "abierta" && !c.vendedorFijo).length}
+            onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setVendCliente(null)} />
+        </Modal>
+      )}
+      {vendCuenta && (
+        <Modal titulo="Vendedor de la Cuenta" onCerrar={() => setVendCuenta(null)}>
+          <VendedorCuenta cuentaId={vendCuenta.id} documento={vendCuenta.documento} actual={vendCuenta.vendedorExterno} fija={vendCuenta.vendedorFijo}
+            delCliente={vendedorDe.get(claveCliente(vendCuenta.contraparte)) ?? null} vendedores={vendedores}
+            onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setVendCuenta(null)} />
+        </Modal>
+      )}
+
       {anexar && (
         <Modal titulo="Anexar a la Deuda" onCerrar={() => setAnexar(null)}>
-          <FormularioCuenta tipo="cobrar" empresa={empresaKey}
+          <FormularioCuenta tipo="cobrar" empresa={empresaKey} vendedores={vendedores}
             anexo={{
-              contraparte: anexar.cliente, deuda: anexar.deuda,
+              contraparte: anexar.cliente, deuda: anexar.deuda, vendedor: vendedorDe.get(claveCliente(anexar.cliente)) ?? null,
               // Todos sus documentos, no solo los del filtro de clase: un número repetido es repetido igual.
               documentos: cuentas.filter((c) => mismoCliente(c.contraparte, anexar.cliente)).map((c) => c.documento),
             }}

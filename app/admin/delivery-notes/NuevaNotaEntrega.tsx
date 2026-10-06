@@ -36,6 +36,7 @@ import { useTasaViva } from "@/lib/ux/bcv-rate";
 import type { Cliente } from "@/lib/directorio/directorio-db";
 import { autorizantes, cilindrosParaNota, type LineaEntrega } from "@/lib/cilindros/cilindros-db";
 import { llenosDeRenglones } from "@/lib/cilindros/gas-de-producto";
+import { vendedorDelCliente } from "@/lib/finanzas/cuentas-db";
 import { useSesion } from "@/components/auth/SesionProvider";
 
 /**
@@ -123,6 +124,8 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
   const externosUsados = useCarga(`externos:${empresaKey}`, () => vendedoresExternos(empresaKey)).datos ?? [];
   const [vendedorExterno, setVendedorExterno] = useState("");
   const esExterno = f.vendedor === "__externo";
+  // El cliente asignado a un vendedor externo lo propone en la nota (se puede cambiar).
+  const [delCliente, setDelCliente] = useState<string | null>(null);
   // Una sede por empresa: el depósito no se elige, se sabe.
   const deposito = isEmpresaId(empresaKey) ? EMPRESAS[empresaKey].deposito : "";
 
@@ -174,7 +177,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
       // Se suelta el cliente: si queda elegido, la siguiente nota sale al mismo sin que nadie lo pida.
       if (r.error) setMsg(r.error);
       else {
-        setLineas([]); setF(formularioVacio()); setVendedorExterno(""); setCliente(null); setCuentas({}); setAutoriza(""); setRetira(null); setIvaManual(null);
+        setLineas([]); setF(formularioVacio()); setVendedorExterno(""); setCliente(null); setDelCliente(null); setCuentas({}); setAutoriza(""); setRetira(null); setIvaManual(null);
         setAvisoFinal(r.aviso ?? null);
         setRecargaCil((n) => n + 1);
       }
@@ -204,6 +207,13 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
                 setMsg("");
                 setCliente(c);
                 setF((v) => ({ ...v, rif: c?.rif ?? "", direccion: c?.direccion ?? "", tlf: c?.telefonos ?? "" }));
+                setDelCliente(null);
+                if (c?.nombre) void vendedorDelCliente(empresaKey, c.nombre).then((ven) => {
+                  setDelCliente(ven);
+                  // Solo si no se eligió ya un vendedor: no pisa lo que se marcó a mano.
+                  if (ven) setF((v) => (v.vendedor === "" ? { ...v, vendedor: "__externo" } : v));
+                  if (ven) setVendedorExterno((x) => x || ven);
+                });
               }} />
           </div>
           {/* Quedan editables: la ficha puede estar incompleta y el vendedor
@@ -298,6 +308,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
                 <option value="__externo">Vendedor externo…</option>
               </select>
               {cargaVend.error && <span className="mt-1 block text-xs text-danger">{cargaVend.error}</span>}
+              {delCliente && <span className="mt-1 block text-xs text-muted">Cliente de {delCliente} (vendedor externo): la nota va a su cartera.</span>}
               {esExterno && (
                 <>
                   <input className={`${campo} mt-2`} placeholder="Nombre del vendedor externo" value={vendedorExterno} list="ne-externos"
