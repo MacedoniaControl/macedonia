@@ -11,7 +11,12 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { asignarVendedorCliente, asignarVendedorCuenta } from "@/lib/finanzas/cuentas-db";
+import { asignarVendedorCliente, asignarVendedorClienteNotas, asignarVendedorCuenta } from "@/lib/finanzas/cuentas-db";
+import { fmtUsdCentavos } from "@/lib/ux/format";
+import { fechaVista } from "@/lib/ux/tabla-export";
+
+/** Una nota abierta del cliente, para elegir si pasa a la nueva cartera. */
+export type NotaAbierta = { id: number; documento: string; emitida: string; saldo: number; vendedorExterno: string | null; vendedorFijo: boolean };
 
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -45,14 +50,19 @@ export function SelectorVendedor({ id, vendedores, valor, onCambio, propiaLabel 
 }
 export const VALOR_PROPIA = PROPIA;
 
-export function VendedorCliente({ empresa, cliente, actual, vendedores, abiertasQueSiguen, onHecho, onCerrar }: {
+export function VendedorCliente({ empresa, cliente, actual, vendedores, notas, onHecho, onCerrar }: {
   empresa: string; cliente: string; actual: string | null; vendedores: string[];
-  /** Cuántas notas abiertas del cliente siguen al cliente (no marcadas a mano). */
-  abiertasQueSiguen: number;
+  /** Sus notas abiertas. */
+  notas: NotaAbierta[];
   onHecho: (texto: string) => void; onCerrar: () => void;
 }) {
   const [valor, setValor] = useState(actual ?? PROPIA);
-  const [mover, setMover] = useState(true);
+  // «siguen»: pasan las que siguen al cliente · «quedan»: ninguna · «elegir»: las marcadas en la lista.
+  const [modo, setModo] = useState<"siguen" | "quedan" | "elegir">("siguen");
+  const siguen = notas.filter((n) => !n.vendedorFijo);
+  const [elegidas, setElegidas] = useState<Set<number>>(() => new Set(siguen.map((n) => n.id)));
+  const alternar = (id: number) => setElegidas((s) => { const x = new Set(s); if (x.has(id)) x.delete(id); else x.add(id); return x; });
+  const totalElegido = notas.filter((n) => elegidas.has(n.id)).reduce((a, n) => a + n.saldo, 0);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const nuevo = valor === PROPIA ? null : valor.trim();
@@ -61,9 +71,11 @@ export function VendedorCliente({ empresa, cliente, actual, vendedores, abiertas
     if (valor !== PROPIA && !valor.trim()) return setError("Escribe el nombre del vendedor externo.");
     setGuardando(true); setError(null);
     try {
-      const r = await asignarVendedorCliente(empresa, cliente, nuevo, mover);
+      const r = modo === "elegir"
+        ? await asignarVendedorClienteNotas(empresa, cliente, nuevo, [...elegidas])
+        : await asignarVendedorCliente(empresa, cliente, nuevo, modo === "siguen");
       if (!r.ok) return setError(r.error);
-      onHecho(`${cliente}: ${nuevo ? `cliente de ${nuevo}` : "cartera propia"}.${mover && r.movidas ? ` ${r.movidas} nota(s) abiertas pasaron con él.` : ""}`);
+      onHecho(`${cliente}: ${nuevo ? `cliente de ${nuevo}` : "cartera propia"}.${r.movidas ? ` ${r.movidas} nota(s) abiertas pasaron a ${nuevo ?? "la cartera propia"}.` : ""}`);
       onCerrar();
     } finally { setGuardando(false); }
   }
@@ -77,12 +89,43 @@ export function VendedorCliente({ empresa, cliente, actual, vendedores, abiertas
         <span className={lbl}>Vendedor del cliente</span>
         <SelectorVendedor id="vc-sel" vendedores={vendedores} valor={valor} onCambio={setValor} />
       </label>
-      {abiertasQueSiguen > 0 && (
+      {notas.length > 0 && (
         <fieldset className="space-y-1.5 rounded-xl border border-border p-3 text-sm">
-          <legend className="px-1 text-xs font-medium text-muted">Sus {abiertasQueSiguen} nota(s) abiertas</legend>
-          <label className="flex items-center gap-2"><input type="radio" checked={mover} onChange={() => setMover(true)} /> También pasan a la nueva cartera</label>
-          <label className="flex items-center gap-2"><input type="radio" checked={!mover} onChange={() => setMover(false)} /> Se quedan donde están; solo cambian las nuevas</label>
-          <p className="text-xs text-muted">Las notas marcadas a mano con otro vendedor o como propias no se tocan.</p>
+          <legend className="px-1 text-xs font-medium text-muted">Sus {notas.length} nota(s) abiertas</legend>
+          <label className="flex items-center gap-2"><input type="radio" name="vc-modo" checked={modo === "siguen"} onChange={() => setModo("siguen")} />
+            Pasan a la nueva cartera{siguen.length < notas.length ? ` las ${siguen.length} que siguen al cliente` : ""}</label>
+          <label className="flex items-center gap-2"><input type="radio" name="vc-modo" checked={modo === "quedan"} onChange={() => setModo("quedan")} />
+            Se quedan donde están; solo cambian las nuevas</label>
+          <label className="flex items-center gap-2"><input type="radio" name="vc-modo" checked={modo === "elegir"} onChange={() => setModo("elegir")} />
+            Elegir cuáles pasan</label>
+          {modo === "elegir" ? (
+            <div className="mt-2 rounded-lg border border-border">
+              <div className="flex items-center justify-between gap-2 border-b border-border px-2.5 py-1.5 text-xs">
+                <span className="text-muted">{elegidas.size} de {notas.length} · <b className="tabular-nums text-text">{fmtUsdCentavos(totalElegido)}</b></span>
+                <span className="flex gap-2">
+                  <button type="button" className="text-brand hover:underline" onClick={() => setElegidas(new Set(notas.map((n) => n.id)))}>Todas</button>
+                  <button type="button" className="text-muted hover:underline" onClick={() => setElegidas(new Set())}>Ninguna</button>
+                </span>
+              </div>
+              <ul className="max-h-56 divide-y divide-border overflow-y-auto">
+                {notas.map((n) => (
+                  <li key={n.id}>
+                    <label className="flex cursor-pointer items-center gap-2.5 px-2.5 py-1.5 text-xs hover:bg-surface-2">
+                      <input type="checkbox" className="h-4 w-4 accent-[var(--color-brand)]" checked={elegidas.has(n.id)} onChange={() => alternar(n.id)} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-mono text-text">{n.documento}</span>
+                        <span className="block text-muted">{fechaVista(n.emitida)} · hoy en {n.vendedorExterno ?? "cartera propia"}{n.vendedorFijo ? " (marcada)" : ""}</span>
+                      </span>
+                      <span className="tabular-nums text-text">{fmtUsdCentavos(n.saldo)}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <p className="border-t border-border px-2.5 py-1.5 text-[11px] text-muted">Las que no marques se quedan donde están.</p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted">Las notas marcadas a mano con otro vendedor o como propias no se tocan.</p>
+          )}
         </fieldset>
       )}
       {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}

@@ -670,6 +670,23 @@ export async function asignarVendedorCliente(empresa: string, cliente: string, v
   return { ok: true, movidas: Number(data) || 0 };
 }
 
+/**
+ * Asigna el vendedor de un cliente y pasa a esa cartera SOLO las notas abiertas
+ * elegidas; las demás se quedan donde estaban (migración 37). Devuelve cuántas pasaron.
+ */
+export async function asignarVendedorClienteNotas(empresa: string, cliente: string, vendedor: string | null, ids: number[]):
+  Promise<{ ok: true; movidas: number } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("asignar_vendedor_cliente_notas", {
+    p_empresa: empresa, p_cliente: cliente, p_vendedor: vendedor?.trim() || null, p_ids: ids,
+  });
+  if (error) {
+    if (sinMigracion36(error)) return { ok: false, error: "Falta correr la migración 37 en Supabase." };
+    return { ok: false, error: error.message };
+  }
+  return { ok: true, movidas: Number(data) || 0 };
+}
+
 /** Marca el vendedor de una cuenta (null = cartera propia), o la devuelve a seguir al cliente. */
 export async function asignarVendedorCuenta(id: number, vendedor: string | null, seguirAlCliente: boolean):
   Promise<{ ok: true; vendedor: string | null } | { ok: false; error: string }> {

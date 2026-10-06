@@ -492,7 +492,8 @@ function CuentasPorCobrar() {
         <Modal titulo="Vendedor del Cliente" onCerrar={() => setVendCliente(null)}>
           <VendedorCliente empresa={empresaKey} cliente={vendCliente} vendedores={vendedores}
             actual={vendedorDe.get(claveCliente(vendCliente)) ?? null}
-            abiertasQueSiguen={cuentas.filter((c) => claveCliente(c.contraparte) === claveCliente(vendCliente) && c.estado === "abierta" && !c.vendedorFijo).length}
+            notas={cuentas.filter((c) => claveCliente(c.contraparte) === claveCliente(vendCliente) && c.estado === "abierta")
+              .sort((x, y) => x.emitida.localeCompare(y.emitida) || x.documento.localeCompare(y.documento))}
             onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setVendCliente(null)} />
         </Modal>
       )}
