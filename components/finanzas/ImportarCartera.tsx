@@ -25,6 +25,7 @@ import { leerXlsx, hojasDe, pareceXlsx } from "@/lib/ux/xlsx";
 import { hojasXls, leerXls, pareceXls } from "@/lib/ux/xls";
 import { fmtUsd } from "@/lib/ux/format";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
+import { SelectorVendedor, VALOR_PROPIA } from "@/components/finanzas/VendedorCartera";
 
 type Fila = FilaPlantilla & { clase?: ClaseCuenta; linea?: number };
 type Lectura = {
@@ -54,10 +55,13 @@ export function ImportarCartera({
   tipo,
   empresa,
   onImportada,
+  vendedores = [],
 }: {
   tipo: TipoCuenta;
   empresa: string;
   onImportada: () => void;
+  /** Por cobrar: los vendedores externos conocidos, para decir de quién es la cartera que se sube. */
+  vendedores?: string[];
 }) {
   const [lectura, setLectura] = useState<Lectura | null>(null);
   const [nombre, setNombre] = useState("");
@@ -66,6 +70,8 @@ export function ImportarCartera({
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
   const [encima, setEncima] = useState(false);
+  // "" = cada cuenta sigue a su cliente; propia o un vendedor externo = todas a esa cartera.
+  const [cartera, setCartera] = useState("");
   const t = tipo as "cobrar" | "pagar";
   const reporte = t === "cobrar" ? "Estado de Cuenta de Clientes" : "Relación de Cuentas por Pagar a Proveedores";
 
@@ -124,6 +130,8 @@ export function ImportarCartera({
       for (const f of lectura.nuevas) {
         const r = await crearCuenta({
           tipo, contraparte: f.contraparte, documento: f.documento, monto: f.monto, emitida: f.emitida, vence: f.vence, nota: f.nota,
+          // De quién es la cartera: sin elegir, cada cuenta sigue a su cliente (o a su nota de Macedonia).
+          ...(tipo === "cobrar" && cartera !== "" ? { vendedorExterno: cartera === VALOR_PROPIA ? null : cartera.trim() } : {}),
           // Del reporte de Valery el saldo ya viene sin la retención: no se vuelve a calcular.
           ...(lectura.origen === "valery" ? { clase: f.clase, aplicaRetencion: false } : {}),
         }, empresa);
@@ -242,6 +250,15 @@ export function ImportarCartera({
               )}
             </div>
           )}
+
+          {tipo === "cobrar" && lectura?.nuevas.length ? (
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted">¿De quién es esta cartera?</span>
+              <SelectorVendedor id="imp-cartera" vendedores={vendedores} valor={cartera} onCambio={setCartera}
+                propiaLabel={`Cartera propia de ${nombreEmpresa}`} extra={[{ id: "", label: "Según cada cliente" }]} />
+              <span className="mt-1 block text-[11px] text-muted">Con un vendedor externo, sus clientes sin vendedor quedan asignados a él.</span>
+            </label>
+          ) : null}
 
           {resultado && <p className="rounded-xl bg-ok/10 px-3 py-2 text-sm text-ok">{resultado}</p>}
 

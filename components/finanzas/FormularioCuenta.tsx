@@ -19,6 +19,7 @@ import { crearCuenta, type TipoCuenta } from "@/lib/finanzas/cuentas-db";
 import { CLASES, desglosar, PCT_IVA, PCT_RETENCION, type ClaseCuenta } from "@/lib/finanzas/retencion";
 import { documentoAnexo, yaAnexados } from "@/lib/finanzas/anexar";
 import { fmtUsdCentavos } from "@/lib/ux/format";
+import { SelectorVendedor, VALOR_PROPIA } from "@/components/finanzas/VendedorCartera";
 
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -34,6 +35,7 @@ export function FormularioCuenta({
   onCreada,
   onCerrar,
   anexo,
+  vendedores = [],
 }: {
   tipo: TipoCuenta;
   empresa: string;
@@ -44,7 +46,9 @@ export function FormularioCuenta({
    * está puesto, por defecto es una nota de entrega (sin IVA), el número se
    * guarda con su prefijo y no se deja repetir uno que el cliente ya tiene.
    */
-  anexo?: { contraparte: string; documentos: string[]; deuda: number };
+  anexo?: { contraparte: string; documentos: string[]; deuda: number; vendedor?: string | null };
+  /** Por cobrar: los vendedores externos conocidos, para elegir de quién es la cuenta. */
+  vendedores?: string[];
 }) {
   const quien = tipo === "cobrar" ? "Cliente" : "Proveedor";
   const [f, setF] = useState({ contraparte: anexo?.contraparte ?? "", documento: "", emitida: hoy(), vence: hoy(), nota: "" });
@@ -56,6 +60,8 @@ export function FormularioCuenta({
   const [conIva, setConIva] = useState(!notaSinIva);
   const [retiene, setRetiene] = useState(!notaSinIva);
   const [imagen, setImagen] = useState<File | null>(null);
+  // "" = lo decide la base (la nota de Macedonia o el vendedor del cliente).
+  const [vendedor, setVendedor] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -86,6 +92,7 @@ export function FormularioCuenta({
         ivaRetenido: conIva && retiene ? d!.retencion : null,
         aplicaRetencion: conIva && retiene,
         imagen,
+        ...(tipo === "cobrar" && vendedor !== "" ? { vendedorExterno: vendedor === VALOR_PROPIA ? null : vendedor.trim() } : {}),
       }, empresa);
       if (!r.ok) return setMsg(r.error ?? "No se pudo guardar.");
       // Se creó, pero puede haber quedado algo fuera: decirlo antes de cerrar.
@@ -205,6 +212,14 @@ export function FormularioCuenta({
         <span className={lbl}>Nota</span>
         <input value={f.nota} onChange={(e) => setF({ ...f, nota: e.target.value })} className={campo} />
       </label>
+
+      {tipo === "cobrar" && (
+        <label className="block">
+          <span className={lbl}>Cartera</span>
+          <SelectorVendedor id="fc-vend" vendedores={vendedores} valor={vendedor} onCambio={setVendedor}
+            extra={[{ id: "", label: anexo ? `Según el cliente (${anexo.vendedor ?? "cartera propia"})` : "Según el cliente" }]} />
+        </label>
+      )}
 
       {anexo && aCobrar > 0 && (
         <p className="rounded-xl border border-brand/30 bg-brand/5 px-3 py-2 text-sm text-text">
