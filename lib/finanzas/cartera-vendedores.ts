@@ -26,6 +26,38 @@ export function resumenCartera(cs: ConSaldo[]) {
   };
 }
 
+export type ResumenDeCartera = {
+  /** "propia" o el nombre del vendedor externo. */
+  id: string;
+  nombre: string;
+  externa: boolean;
+  resumen: ReturnType<typeof resumenCartera>;
+  cuentas: number;
+  clientes: number;
+  /** Parte del total por cobrar, en %. */
+  parte: number;
+};
+
+/**
+ * Cada cartera por separado, para el Resumen: primero la propia, después cada
+ * vendedor externo de mayor a menor deuda. Las partes suman 100 %.
+ */
+export function porCartera<C extends ConSaldo & { contraparte: string }>(cs: C[], nombrePropia: string): ResumenDeCartera[] {
+  const grupos = new Map<string, C[]>();
+  for (const c of cs) {
+    const k = c.vendedorExterno?.trim() || "";
+    grupos.set(k, [...(grupos.get(k) ?? []), c]);
+  }
+  const total = cs.reduce((a, c) => a + c.saldo, 0);
+  const filas = [...grupos.entries()].map(([k, g]) => ({
+    id: k || "propia", nombre: k || nombrePropia, externa: !!k,
+    resumen: resumenCartera(g), cuentas: g.length,
+    clientes: new Set(g.map((c) => claveCliente(c.contraparte))).size,
+    parte: total ? Math.round((g.reduce((a, c) => a + c.saldo, 0) / total) * 1000) / 10 : 0,
+  }));
+  return filas.sort((a, b) => Number(a.externa) - Number(b.externa) || b.resumen.total - a.resumen.total);
+}
+
 /** Los vendedores externos que aparecen: en las cuentas y en los clientes asignados. */
 export function vendedoresEnCartera(cs: ConVendedor[], asignados: { vendedor: string }[] = []): string[] {
   const m = new Map<string, string>();

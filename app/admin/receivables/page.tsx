@@ -10,7 +10,7 @@ import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
 import { ImportarCartera } from "@/components/finanzas/ImportarCartera";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, asignacionesClientes, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
-import { claveCliente, enCartera, resumenCartera, vendedoresEnCartera, type FiltroCartera } from "@/lib/finanzas/cartera-vendedores";
+import { claveCliente, enCartera, porCartera, vendedoresEnCartera, type FiltroCartera } from "@/lib/finanzas/cartera-vendedores";
 import { VendedorCliente, VendedorCuenta } from "@/components/finanzas/VendedorCartera";
 import { FiltroClase } from "@/components/finanzas/FiltroClase";
 import { CLASES, grupoDeClase } from "@/lib/finanzas/retencion";
@@ -171,9 +171,12 @@ function CuentasPorCobrar() {
   // hace dos meses se mostraba al dia.
   const deClase = cuentas.filter((c) => filtroClase === "todas" || grupoDeClase(c.clase) === filtroClase);
   const conSaldo = deClase.filter((c) => enCartera(c, cartera, vendedorSel));
-  // Lo de vendedores externos dentro del total: va debajo de cada tarjeta.
-  const ext = resumenCartera(deClase.filter((c) => enCartera(c, "externos")));
-  const desglose = cartera === "todas" && ext.total !== 0;
+  // Cada cartera por separado, en su propio recuadro del Resumen: la propia y cada vendedor externo.
+  const carteras = porCartera(deClase, empresaNombre);
+  const elegida = (id: string, externa: boolean) =>
+    externa ? cartera === "externos" && vendedorSel === id : cartera === "propia";
+  const enFoco = cartera === "todas" ? "Toda la cartera" : cartera === "propia" ? `Cartera propia de ${empresaNombre}`
+    : vendedorSel ? `Cartera de ${vendedorSel}` : "Vendedores externos";
 
   // Cuantas hay de cada clase: no se ofrece un filtro que deja la tabla vacia,
   // porque parece que el sistema perdio datos.
@@ -298,13 +301,51 @@ function CuentasPorCobrar() {
         )}
       </div>
 
-      <SectionCard title="Resumen de Cartera">
+      <SectionCard title="Resumen de Cartera" description={enFoco}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Total por Cobrar" value={fmtUsd(totalSaldo)} accent sub={desglose ? `Vendedores externos: ${fmtUsd(ext.total)}` : undefined} />
-          <StatCard label="Vencido" value={fmtUsd(vencido)} sub={desglose ? `Vendedores externos: ${fmtUsd(ext.vencido)}` : undefined} />
-          <StatCard label="Por Vencer (≤8d)" value={fmtUsd(porVencer)} sub={desglose ? `Vendedores externos: ${fmtUsd(ext.porVencer)}` : undefined} />
-          <StatCard label="Cuentas Vencidas" value={String(nVencidas)} sub={desglose ? `Vendedores externos: ${ext.vencidas}` : undefined} />
+          <StatCard label="Total por Cobrar" value={fmtUsd(totalSaldo)} accent />
+          <StatCard label="Vencido" value={fmtUsd(vencido)} />
+          <StatCard label="Por Vencer (≤8d)" value={fmtUsd(porVencer)} />
+          <StatCard label="Cuentas Vencidas" value={String(nVencidas)} />
         </div>
+
+        {/* Cada cartera en su recuadro, con sus números completos. Tocar uno filtra la cartera. */}
+        {carteras.length > 1 && (
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Por cartera</p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {carteras.map((k) => {
+                const activa = elegida(k.id, k.externa);
+                return (
+                  <button key={k.id} type="button" aria-pressed={activa}
+                    onClick={() => {
+                      if (activa) { setCartera("todas"); setVendedorSel(""); }
+                      else if (k.externa) { setCartera("externos"); setVendedorSel(k.id); }
+                      else { setCartera("propia"); setVendedorSel(""); }
+                    }}
+                    className={`rounded-xl border p-4 text-left transition ${activa ? "border-brand-strong bg-brand-soft" : "border-border bg-surface-2 hover:border-border-strong"}`}>
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-text">{k.nombre}</span>
+                        <span className="block text-[11px] text-muted">{k.externa ? "Vendedor externo" : "Cartera propia"} · {k.clientes} cliente(s) · {k.cuentas} cuenta(s)</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted">{k.parte.toLocaleString("es-VE")} %</span>
+                    </span>
+                    <span className="mt-2 block text-xl font-semibold tabular-nums text-text">{fmtUsd(k.resumen.total)}</span>
+                    <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-border" aria-hidden>
+                      <span className={`block h-full rounded-full ${k.externa ? "bg-info" : "bg-brand"}`} style={{ width: `${Math.min(100, Math.max(0, k.parte))}%` }} />
+                    </span>
+                    <span className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <span><span className="block text-muted">Vencido</span><b className="tabular-nums text-danger">{fmtUsd(k.resumen.vencido)}</b></span>
+                      <span><span className="block text-muted">Por vencer</span><b className="tabular-nums text-text">{fmtUsd(k.resumen.porVencer)}</b></span>
+                      <span><span className="block text-muted">Vencidas</span><b className="tabular-nums text-text">{k.resumen.vencidas}</b></span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </SectionCard>
 
       {nVencidas > 0 && (
