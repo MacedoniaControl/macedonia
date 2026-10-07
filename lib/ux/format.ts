@@ -3,30 +3,28 @@
 // las descargas en "$1.052,55": la misma pantalla con dos formatos. El "$" va a
 // mano porque el formato de moneda de es-VE escribe "USD 2.447.086".
 
+// Es una herramienta administrativa: ningún monto se redondea al mostrarlo.
+// Dólares y bolívares van siempre con 3 decimales como mínimo (hasta 4, lo que
+// guarda la base).
+const DECIMALES = { minimumFractionDigits: 3, maximumFractionDigits: 4 } as const;
+const exacto = (n: number) => Math.abs(n).toLocaleString("es-VE", DECIMALES);
+
 export function fmtUsd(n: number): string {
-  const r = Math.round(n);
-  return `${r < 0 ? "-" : ""}$${Math.abs(r).toLocaleString("es-VE")}`;
+  return `${n < 0 ? "-" : ""}$${exacto(n)}`;
 }
 
-/** Con centavos, para documentos: en una nota de $21,23 el IVA es $2,93, no «$3». */
+/** Igual que fmtUsd (antes cortaba a 2 decimales). */
 export function fmtUsdCentavos(n: number): string {
-  return `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return fmtUsd(n);
 }
 
 export function fmtBs(n: number): string {
-  return `${new Intl.NumberFormat("es-VE", { maximumFractionDigits: 0 }).format(n)} Bs`;
+  return `${n < 0 ? "-" : ""}${exacto(n)} Bs`;
 }
 
-/**
- * Bolívares que caben en una tarjeta. Con la tasa en cientos, un año de ventas
- * pasa los diez dígitos y puede llegar a dieciséis: hasta 999.999.999 se
- * escribe entero; de ahí en más, en millones o en billones (10¹² en español).
- */
+/** Bolívares completos, sin abreviar ni redondear (antes «millones de Bs»). */
 export function fmtBsCorto(n: number): string {
-  const a = Math.abs(n), signo = n < 0 ? "-" : "";
-  if (a < 1e9) return `${signo}${Math.round(a).toLocaleString("es-VE")} Bs`;
-  if (a < 1e12) return `${signo}${(a / 1e6).toLocaleString("es-VE", { maximumFractionDigits: 1 })} millones de Bs`;
-  return `${signo}${(a / 1e12).toLocaleString("es-VE", { maximumFractionDigits: 2 })} billones de Bs`;
+  return fmtBs(n);
 }
 
 /** Un monto en dólares, en bolívares a la tasa del día. Sin tasa, null. */
