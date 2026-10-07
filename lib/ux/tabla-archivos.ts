@@ -112,7 +112,7 @@ type PdfMake = {
 };
 let motor: PdfMake | null = null;
 
-async function motorPdf(): Promise<PdfMake> {
+export async function motorPdf(): Promise<PdfMake> {
   if (motor) return motor;
   const pm = await import("pdfmake/build/pdfmake");
   const fuentes = await import("pdfmake/build/vfs_fonts");
