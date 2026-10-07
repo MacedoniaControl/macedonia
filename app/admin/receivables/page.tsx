@@ -84,7 +84,7 @@ function CuentasPorCobrar() {
   const gerencia = puedeVerFinanzas(rol);
   const [liquidar, setLiquidar] = useState<string | null>(null);
   // Al liquidar UNA nota desde su detalle: esa nota y lo que ya se escribió del pago.
-  const [liquidarDesde, setLiquidarDesde] = useState<{ ids: number[]; pago: { fecha: string; metodo: string; referencia: string } } | null>(null);
+  const [liquidarDesde, setLiquidarDesde] = useState<{ ids: number[]; pago: { fecha: string; metodo: string; referencia: string; monto?: number } } | null>(null);
   // Anexar: una nota nueva que amplía la deuda del cliente, desde su fila.
   const [anexar, setAnexar] = useState<{ cliente: string; deuda: number } | null>(null);
   // Las dos carteras: la propia y la de vendedores externos (migración 36).
@@ -113,7 +113,7 @@ function CuentasPorCobrar() {
   const liquidacionesDe = (cli: string) => (liq.datos ?? []).filter((l) => claveCliente(l.contraparte) === claveCliente(cli));
   // Las notas pagadas con una liquidación vigente se ven DENTRO de ella, no
   // repetidas como «Pagada» en la lista del cliente.
-  const enLiquidacion = new Set((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.map((d) => d.cuentaId)));
+  const enLiquidacion = new Set((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.filter((d) => d.saldada).map((d) => d.cuentaId)));
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -125,9 +125,9 @@ function CuentasPorCobrar() {
 
     // El pago que completa una nota de entrega es una liquidación (migración 40):
     // se abre «Liquidar Notas» con esa nota marcada.
-    if (c.clase === "nota_entrega" && a >= c.saldoNeto - CASI_CERO && a <= c.saldoNeto + CASI_CERO) {
+    if (c.clase === "nota_entrega" && a >= c.saldoNeto - CASI_CERO) {
       setAbono(""); setDocSel(""); setExito("");
-      setLiquidarDesde({ ids: [c.id], pago: { fecha: new Date().toISOString().slice(0, 10), metodo: "", referencia: "" } });
+      setLiquidarDesde({ ids: [c.id], pago: { fecha: new Date().toISOString().slice(0, 10), metodo: "", referencia: "", monto: a } });
       setLiquidar(c.contraparte);
       return true;
     }

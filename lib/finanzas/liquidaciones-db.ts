@@ -20,6 +20,8 @@ export async function liquidarCuentas(
   ids: number[],
   pago: { fecha: string; metodo?: string; referencia?: string; nota?: string; imagen?: File | null },
   tipo: "cobrar" | "pagar" = "cobrar",
+  /** Lo que sobra del pago, abonado a otra nota en la misma liquidación (migración 41). */
+  restante?: { cuentaId: number; monto: number } | null,
 ): Promise<ResultadoLiquidacion> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
@@ -37,6 +39,7 @@ export async function liquidarCuentas(
   const { data, error } = await sb.rpc("liquidar_cuentas", {
     p_empresa: empresa, p_ids: ids, p_fecha: pago.fecha, p_metodo: pago.metodo ?? null,
     p_referencia: pago.referencia ?? null, p_nota: pago.nota ?? null, p_imagen_ruta: ruta, p_tipo: tipo,
+    p_abono_cuenta: restante?.cuentaId ?? null, p_abono_monto: restante?.monto ?? null,
   });
   if (error) {
     if (ruta) await sb.storage.from(BUCKET).remove([ruta]);
@@ -47,7 +50,11 @@ export async function liquidarCuentas(
 }
 
 /** Una nota (o factura) que entró en una liquidación, con lo que se le abonó. */
-export type DocumentoLiquidado = { cuentaId: number; documento: string; emitida: string | null; vence: string | null; monto: number };
+export type DocumentoLiquidado = {
+  cuentaId: number; documento: string; emitida: string | null; vence: string | null; monto: number;
+  /** false = la liquidación solo le abonó el restante del pago: la nota sigue abierta. */
+  saldada: boolean;
+};
 
 export type Liquidacion = {
   id: number; numero: string; contraparte: string; fecha: string; total: number; cuentas: number;
@@ -73,12 +80,14 @@ export async function listarLiquidaciones(empresa: string, tipo: "cobrar" | "pag
   const ids = filas.map((l) => l.id);
   const docs = new Map<number, DocumentoLiquidado[]>();
   if (ids.length) {
-    const { data: ab } = await sb.from("abonos").select("liquidacion_id, cuenta_id, monto, cuentas(documento, emitida, vence)").in("liquidacion_id", ids);
-    type Fila = { liquidacion_id: number; cuenta_id: number; monto: number; cuentas: { documento: string; emitida: string | null; vence: string | null } | null };
+    const { data: ab } = await sb.from("abonos").select("liquidacion_id, cuenta_id, monto, cuentas(documento, emitida, vence, estado, liquidada_nota)").in("liquidacion_id", ids);
+    type Fila = { liquidacion_id: number; cuenta_id: number; monto: number; cuentas: { documento: string; emitida: string | null; vence: string | null; estado: string; liquidada_nota: string | null } | null };
+    const numero = new Map(filas.map((l) => [l.id, l.numero]));
     for (const a of (ab ?? []) as unknown as Fila[]) {
       docs.set(a.liquidacion_id, [...(docs.get(a.liquidacion_id) ?? []), {
         cuentaId: Number(a.cuenta_id), documento: a.cuentas?.documento ?? "—",
         emitida: a.cuentas?.emitida ?? null, vence: a.cuentas?.vence ?? null, monto: Number(a.monto),
+        saldada: a.cuentas?.estado === "liquidada" && (a.cuentas.liquidada_nota ?? "").startsWith(`Liquidación ${numero.get(a.liquidacion_id)}`),
       }]);
     }
   }

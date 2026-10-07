@@ -34,10 +34,11 @@ export function DetalleCuenta({
   onCambio: () => void;
   onEditar: (d: CuentaDetalle) => void;
   /**
-   * Liquidar la nota (migración 40). Una nota de entrega por cobrar se da por
-   * pagada SOLO liquidándola: el pago que la completa abre la liquidación.
+   * Liquidar la nota (migraciones 40 y 41). Una nota de entrega (por cobrar o
+   * por pagar) se da por pagada SOLO liquidándola: el pago que la completa
+   * abre la liquidación, y lo que sobre se reparte entre las otras.
    */
-  onLiquidar?: (d: CuentaDetalle, pago: { fecha: string; metodo: string; referencia: string }) => void;
+  onLiquidar?: (d: CuentaDetalle, pago: { fecha: string; metodo: string; referencia: string; monto?: number }) => void;
 }) {
   const [recarga, setRecarga] = useState(0);
   const carga = useCarga(`${cuentaId}:${recarga}`, () => detalleCuenta(cuentaId));
@@ -53,7 +54,7 @@ export function DetalleCuenta({
   const [notaCierre, setNotaCierre] = useState("");
 
   function refrescar() { setRecarga((n) => n + 1); onCambio(); }
-  const soloLiquidando = !!d && d.tipo === "cobrar" && d.clase === "nota_entrega" && !!onLiquidar;
+  const soloLiquidando = !!d && d.clase === "nota_entrega" && !!onLiquidar;
   const completa = soloLiquidando && (() => { const n = parseMonto(abono); return n !== null && d !== null && n >= d.saldo - CASI_CERO; })();
 
   async function registrar() {
@@ -62,9 +63,9 @@ export function DetalleCuenta({
     if (n === null) return setMsg("No se entiende ese monto. Ejemplo: 1.500,50");
     if (n <= 0) return setMsg("El abono tiene que ser mayor que cero.");
     // El pago que completa una nota de entrega por cobrar es una liquidación.
+    // Si es más que su saldo, el resto se reparte entre las otras notas (migración 41).
     if (d && soloLiquidando && n >= d.saldo - CASI_CERO) {
-      if (n > d.saldo + CASI_CERO) return setMsg(`El abono supera el saldo pendiente (${fmtUsd(d.saldo)}).`);
-      return onLiquidar?.(d, { fecha, metodo, referencia });
+      return onLiquidar?.(d, { fecha, metodo, referencia, monto: n });
     }
     setGuardando(true);
     try {
@@ -223,7 +224,9 @@ export function DetalleCuenta({
                   <p role="alert" className="mt-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{msg}</p>
                 )}
                 {completa && (
-                  <p className="mt-2 text-xs text-muted">Ese monto paga toda la nota: se registra como una liquidación.</p>
+                  <p className="mt-2 text-xs text-muted">
+                    Ese monto paga toda la nota: se registra como una liquidación{(parseMonto(abono) ?? 0) > d.saldo + CASI_CERO ? " y lo que sobra se reparte entre sus otras notas" : ""}.
+                  </p>
                 )}
                 <Button icon={completa ? "check" : "cash"} className="mt-2 w-full" disabled={guardando} onClick={registrar}>
                   {guardando ? "Registrando…" : completa ? "Liquidar la nota" : "Registrar abono"}

@@ -6,12 +6,20 @@
 // pago una vez —fecha, método, referencia, nota y el comprobante— y cada nota
 // queda liquidada por su saldo completo. La base lo hace todo junto o nada
 // (migración 33) y deja el registro con su número LQ-AAAA-NNNNNN.
+//
+// Con «Monto del pago» el sistema reparte (migración 41): salda las notas que
+// alcanza, de la más vieja a la más nueva, y abona lo que sobra a la de mayor
+// saldo, en la misma liquidación. La persona puede cambiar las notas y a cuál
+// va el restante.
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { liquidarCuentas } from "@/lib/finanzas/liquidaciones-db";
 import { clientesConDeuda, pendiente, totalElegido, type CuentaLiquidable } from "@/lib/finanzas/liquidar";
+import { evaluarReparto, repartoInicial, type NotaPago } from "@/lib/finanzas/repartir-pago";
+import { CampoMonto } from "@/components/ui/CampoMonto";
+import { parseMonto } from "@/lib/ux/monto";
 import { fmtUsd } from "@/lib/ux/format";
 import { fechaVista } from "@/lib/ux/tabla-export";
 
@@ -34,7 +42,7 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, 
   /** Qué notas vienen marcadas (por defecto, todas las del cliente). */
   idsIniciales?: number[];
   /** Lo que ya se escribió del pago (al venir de «Registrar abono»). */
-  pagoInicial?: { fecha?: string; metodo?: string; referencia?: string };
+  pagoInicial?: { fecha?: string; metodo?: string; referencia?: string; monto?: number };
   onHecho: (texto: string) => void;
   onCerrar: () => void;
 }) {
@@ -42,8 +50,13 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, 
   const clientes = clientesConDeuda(cuentas);
   const [cliente, setCliente] = useState(() => clientes.find((g) => g.cliente.toUpperCase() === clienteInicial?.trim().toUpperCase())?.cliente ?? "");
   const grupo = clientes.find((g) => g.cliente === cliente);
-  const [elegidas, setElegidas] = useState<Set<number>>(() => new Set(
+  const aPago = (cs: CuentaLiquidable[]): NotaPago[] => cs.map((c) => ({ id: c.id, documento: c.documento, vence: c.vence, pendiente: pendiente(c) }));
+  // Un pago que llega con monto (desde «Registrar abono») ya viene repartido.
+  const inicial = pagoInicial?.monto ? repartoInicial(aPago(grupo?.cuentas ?? []), pagoInicial.monto, idsIniciales ?? []) : null;
+  const [elegidas, setElegidas] = useState<Set<number>>(() => new Set(inicial ? inicial.saldadas :
     (grupo?.cuentas ?? []).filter((c) => !idsIniciales?.length || idsIniciales.includes(c.id)).map((c) => c.id)));
+  const [montoPago, setMontoPago] = useState(pagoInicial?.monto ? String(pagoInicial.monto).replace(".", ",") : "");
+  const [destino, setDestino] = useState<number | null>(inicial?.destino ?? null);
   const [fecha, setFecha] = useState(pagoInicial?.fecha || hoy());
   const [metodo, setMetodo] = useState(pagoInicial?.metodo?.trim() || "Transferencia");
   const [referencia, setReferencia] = useState(pagoInicial?.referencia ?? "");
@@ -54,11 +67,22 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, 
   const [guardando, setGuardando] = useState(false);
 
   const notas = grupo?.cuentas ?? [];
-  const total = totalElegido(notas, elegidas);
+  const pago = montoPago.trim() ? parseMonto(montoPago) : null;
+  const reparto = pago !== null && pago > 0 ? evaluarReparto(aPago(notas), pago, elegidas, destino, fmtUsd) : null;
+  const total = reparto ? (reparto.error ? totalElegido(notas, elegidas) : pago!) : totalElegido(notas, elegidas);
+  const notaDestino = reparto?.destino != null ? notas.find((c) => c.id === reparto.destino) : undefined;
+  function cambiarMonto(t: string) {
+    setMontoPago(t); setError(null);
+    const n = t.trim() ? parseMonto(t) : null;
+    if (n !== null && n > 0) {
+      const p = repartoInicial(aPago(notas), n, idsIniciales ?? []);
+      setElegidas(new Set(p.saldadas)); setDestino(p.destino);
+    }
+  }
   const todas = notas.length > 0 && notas.every((c) => elegidas.has(c.id));
 
   function elegirCliente(c: string) {
-    setCliente(c); setError(null);
+    setCliente(c); setError(null); setMontoPago(""); setDestino(null);
     // Al elegir el cliente se marcan todas: lo común es que pague todo lo pendiente.
     setElegidas(new Set(clientes.find((g) => g.cliente === c)?.cuentas.map((x) => x.id) ?? []));
   }
@@ -68,15 +92,19 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, 
     if (!grupo) return `Elige el ${w.quien.toLowerCase()}.`;
     if (!elegidas.size) return `Marca al menos una ${w.doc}.`;
     if (!fecha || fecha > hoy()) return "La fecha del pago no puede ser posterior a hoy.";
+    if (montoPago.trim() && (pago === null || pago <= 0)) return "No se entiende el monto del pago. Ejemplo: 1.500,50";
+    if (reparto?.error) return reparto.error;
     return null;
   }
 
   async function liquidar() {
     setGuardando(true); setError(null);
     try {
-      const r = await liquidarCuentas(empresa, [...elegidas], { fecha, metodo, referencia, nota, imagen }, tipo);
+      const restante = reparto && reparto.restante > 0 && reparto.destino !== null ? { cuentaId: reparto.destino, monto: reparto.restante } : null;
+      const r = await liquidarCuentas(empresa, [...elegidas], { fecha, metodo, referencia, nota, imagen }, tipo, restante);
       if (!r.ok) return setError(r.error);
-      onHecho(`${r.numero}: ${r.cuentas} ${w.doc}(s) de ${cliente} liquidadas por ${fmtUsd(r.total)}.`);
+      onHecho(`${r.numero}: ${r.cuentas} ${w.doc}(s) de ${cliente} liquidadas por ${fmtUsd(r.total)}`
+        + (restante ? ` y ${fmtUsd(restante.monto)} abonados a ${notaDestino?.documento ?? "otra"}.` : "."));
       onCerrar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo liquidar.");
@@ -100,6 +128,30 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, 
       </label>
 
       {grupo && (
+        <div className="space-y-2">
+          <CampoMonto etiqueta={`Monto del pago (opcional) · se debe ${fmtUsd(grupo.total)}`} valor={montoPago} onChange={cambiarMonto} />
+          {reparto && !reparto.error && (
+            <div className="rounded-xl border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-text">
+              <p>Se saldan <b>{elegidas.size} {w.doc}(s)</b> por <b className="tabular-nums">{fmtUsd(reparto.suma)}</b>.</p>
+              {reparto.restante > 0 && (
+                <label className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span>Restante <b className="tabular-nums">{fmtUsd(reparto.restante)}</b> se abona a</span>
+                  <select className="sumi-campo sumi-campo--auto py-1 text-xs" value={reparto.destino ?? ""} onChange={(e) => setDestino(Number(e.target.value))}>
+                    {reparto.destinos.map((id) => {
+                      const c = notas.find((x) => x.id === id)!;
+                      return <option key={id} value={id}>{c.documento} · saldo {fmtUsd(pendiente(c))}</option>;
+                    })}
+                  </select>
+                </label>
+              )}
+              <p className="mt-1.5 text-muted">Después del pago {cliente} queda debiendo <b className="tabular-nums text-text">{fmtUsd(reparto.quedaDebiendo)}</b>.</p>
+            </div>
+          )}
+          {reparto?.error && <p className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">{reparto.error}</p>}
+        </div>
+      )}
+
+      {grupo && (
         <div className="rounded-xl border border-border">
           <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
             <label className="flex items-center gap-2 text-sm font-medium text-text">
@@ -118,6 +170,9 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, 
                     <span className="block font-mono text-xs text-text">{c.documento}</span>
                     <span className="block text-xs text-muted">emitida {fechaVista(c.emitida)} · vence {fechaVista(c.vence)}</span>
                   </span>
+                  {reparto?.destino === c.id && reparto.restante > 0 && (
+                    <span className="rounded-full bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">abono {fmtUsd(reparto.restante)}</span>
+                  )}
                   <span className="font-semibold tabular-nums text-text">{fmtUsd(pendiente(c))}</span>
                 </label>
               </li>
@@ -162,14 +217,18 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, 
       <div className="flex flex-wrap gap-2">
         <ConfirmDialog
           title={`¿Liquidar las ${w.doc}s?`}
-          message={`${elegidas.size} ${w.doc}(s) de ${cliente || "—"} por ${fmtUsd(total)}, pagadas el ${fechaVista(fecha)}. Cada una queda liquidada y ${w.total} baja en ${fmtUsd(total)}.`}
+          message={`${elegidas.size} ${w.doc}(s) de ${cliente || "—"} por ${fmtUsd(reparto ? reparto.suma : total)}, pagadas el ${fechaVista(fecha)}. Cada una queda liquidada`
+            + (reparto && reparto.restante > 0 && notaDestino ? ` y ${fmtUsd(reparto.restante)} se abonan a ${notaDestino.documento}` : "")
+            + `. ${w.total[0].toUpperCase()}${w.total.slice(1)} baja en ${fmtUsd(total)}.`}
           confirmLabel="Sí, liquidar"
           cancelLabel="No"
           onConfirm={liquidar}
           trigger={(abrir) => (
             <Button icon="check" className="flex-1" disabled={guardando}
               onClick={() => { const e = validar(); if (e) return setError(e); setError(null); abrir(); }}>
-              {guardando ? "Liquidando…" : `Liquidar ${elegidas.size} ${w.doc}(s) · ${fmtUsd(total)}`}
+              {guardando ? "Liquidando…" : reparto && reparto.restante > 0
+                ? `Liquidar ${elegidas.size} ${w.doc}(s) + abono · ${fmtUsd(total)}`
+                : `Liquidar ${elegidas.size} ${w.doc}(s) · ${fmtUsd(total)}`}
             </Button>
           )}
         />
