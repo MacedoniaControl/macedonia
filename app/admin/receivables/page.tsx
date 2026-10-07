@@ -49,7 +49,7 @@ function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
   if (saldo <= 0) return { label: "Pagado", tone: "ok" };
   if (dias < 0) return { label: `Vencido (${-dias}d)`, tone: "danger" };
   if (dias <= 8) return { label: `Por vencer (${dias}d)`, tone: "warn" };
-  return { label: "Al día", tone: "info" };
+  return { label: "Pendiente", tone: "info" };
 }
 
 const inputClass = "sumi-campo";
@@ -98,6 +98,8 @@ function CuentasPorCobrar() {
   const [eliminar, setEliminar] = useState<string | null>(null);
   // Cada cliente desplegado muestra sus pendientes; con el interruptor, también las pagadas.
   const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());
+  // El orden de los documentos dentro de cada cliente (manda sobre el de la cabecera).
+  const [ordenDe, setOrdenDe] = useState<Map<string, Orden>>(new Map());
   const verPagadas = (cli: string, v: boolean) => setConPagadas((s) => { const n = new Set(s); if (v) n.add(cli); else n.delete(cli); return n; });
   // Las liquidaciones, por cliente: el historial de pagos de cada uno.
   const liq = useCarga(`liq:cobrar:${empresaKey}:${recarga}`, () => listarLiquidaciones(empresaKey, "cobrar"));
@@ -220,7 +222,9 @@ function CuentasPorCobrar() {
     k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "vence" ? c.vence
     : k === "estado" ? gravedad(c.saldo, c.dias, c.estado === "liquidada") : null;
   const clientesVisibles = ordenar(tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes, orden, valorCliente)
-    .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, orden, valorCuenta) }));
+    .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, ordenDe.get(g.cliente) ?? orden, valorCuenta) }));
+  const ordenarDentro = (cliente: string, clave: ClaveOrden) =>
+    setOrdenDe((m) => new Map(m).set(cliente, siguienteOrden(m.get(cliente) ?? null, clave)));
   const thOrden = (label: string, clave: ClaveOrden, align: "left" | "right" = "left") => (
     <SortableTh label={label} sortKey={clave} align={align} ariaSort={(k) => ariaOrden(orden, k)} onSort={() => setOrden((o) => siguienteOrden(o, clave))} />
   );
@@ -433,7 +437,6 @@ function CuentasPorCobrar() {
                 <tr className="border-b border-border">
                   {thOrden("Cliente", "nombre")}
                   {thOrden("Documentos", "documentos")}
-                  {thOrden("Monto", "monto", "right")}
                   {thOrden("Saldo", "saldo", "right")}
                   {thOrden("Vence", "vence")}
                   {thOrden("Estado", "estado")}
@@ -466,7 +469,6 @@ function CuentasPorCobrar() {
                         </span>
                       </td>
                       <td className="py-3 pr-3 text-xs text-muted">{g.documentos} · {resumenClases(g.porClase)}</td>
-                      <td className="py-3 pr-3 text-right tabular-nums text-muted">{fmtUsd(g.monto)}</td>
                       <td className="py-3 pr-3 text-right font-semibold tabular-nums text-text">
                         {fmtUsd(g.saldo)}
                         {g.vencido > 0 && g.vencido < g.saldo && <span className="block text-[11px] font-normal text-danger">vencido {fmtUsd(g.vencido)}</span>}
@@ -474,7 +476,18 @@ function CuentasPorCobrar() {
                       <td className="whitespace-nowrap py-3 pr-3 text-xs text-muted">{g.masVieja ? `desde ${fechaVista(g.masVieja.vence)}` : "—"}</td>
                       <td className="py-3">
                         <span className="flex items-center gap-2">
-                          <StatusBadge tone={eg.tone}>{eg.label}</StatusBadge>
+                          {(() => {
+                            const nv = g.cuentas.filter((c) => c.estado === "abierta" && c.saldo > CASI_CERO && c.dias < 0).length;
+                            return (
+                              <StatusBadge tone={eg.tone}>
+                                {eg.label}
+                                {nv > 0 && (
+                                  <span className="ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-danger px-1.5 text-[10px] font-bold leading-4 text-white"
+                                    title={`${nv} documento(s) vencido(s)`} aria-label={`${nv} documento(s) vencido(s)`}>{nv}</span>
+                                )}
+                              </StatusBadge>
+                            );
+                          })()}
                           {gerencia && g.cuentas.some((c) => c.estado === "abierta" && c.saldo > CASI_CERO) && (
                             <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
                               onClick={(ev) => { ev.stopPropagation(); setExito(""); setLiquidar(g.cliente); }}>Liquidar</button>
@@ -493,12 +506,28 @@ function CuentasPorCobrar() {
                       const pagada = (c: CuentaDb) => c.estado === "liquidada" || c.saldo <= CASI_CERO;
                       const nPagadas = g.cuentas.filter(pagada).length;
                       const todo = conPagadas.has(g.cliente);
+                      const nLq = liquidacionesDe(g.cliente).length;
+                      const od = ordenDe.get(g.cliente) ?? orden;
+                      const flecha = (k: ClaveOrden) => (od?.clave === k ? (od.dir === "desc" ? " ↓" : " ↑") : "");
+                      const botonOrden = (k: ClaveOrden, label: string) => (
+                        <button type="button" aria-pressed={od?.clave === k}
+                          title={`Ordenar los documentos de ${g.cliente} por ${label.toLowerCase()}`}
+                          className={`rounded-full border px-2 py-0.5 ${od?.clave === k ? "border-brand/40 bg-brand/10 text-brand" : "border-border text-muted hover:text-text"}`}
+                          onClick={() => ordenarDentro(g.cliente, k)}>{label}{flecha(k)}</button>
+                      );
                       return (
                         <tr className="bg-surface-2/60">
-                          <td colSpan={6} className="px-3 py-2 pl-8">
-                            <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                              <Switch checked={todo} onChange={(v) => verPagadas(g.cliente, v)} label={`Ver también las pagadas de ${g.cliente}`} />
-                              {todo ? `Historial completo · ${g.cuentas.length} nota(s), ${nPagadas} pagada(s)` : `Solo pendientes por cobrar · ${g.cuentas.length - nPagadas} nota(s)${nPagadas ? ` · ${nPagadas} pagada(s) ocultas` : ""}`}
+                          <td colSpan={5} className="px-3 py-2 pl-8">
+                            <span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
+                              <span className="flex flex-wrap items-center gap-2">
+                                <Switch checked={todo} onChange={(v) => verPagadas(g.cliente, v)} label={`Ver también las pagadas y las liquidaciones de ${g.cliente}`} />
+                                {todo
+                                  ? `Historial completo · ${g.cuentas.length} nota(s), ${nPagadas} pagada(s)${nLq ? ` · ${nLq} liquidación(es)` : ""}`
+                                  : `Solo pendientes, por vencer y vencidas · ${g.cuentas.length - nPagadas} nota(s)${nPagadas || nLq ? ` · ocultas: ${[nPagadas ? `${nPagadas} pagada(s)` : "", nLq ? `${nLq} liquidación(es)` : ""].filter(Boolean).join(" y ")}` : ""}`}
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                Ordenar: {botonOrden("estado", "Estado")}{botonOrden("vence", "Vence")}{botonOrden("saldo", "Saldo")}
+                              </span>
                             </span>
                           </td>
                         </tr>
@@ -526,8 +555,10 @@ function CuentasPorCobrar() {
                             })()}
                           </td>
                           <td className="py-2 pr-3 text-muted">{nombreClase(c.clase)}</td>
-                          <td className="py-2 pr-3 text-right tabular-nums text-muted">{fmtUsd(c.monto)}</td>
-                          <td className="py-2 pr-3 text-right tabular-nums text-text">{fmtUsd(c.saldo)}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums text-text">
+                            {fmtUsd(c.saldo)}
+                            {Math.abs(c.monto - c.saldo) > CASI_CERO && <span className="block text-[10px] text-muted">de {fmtUsd(c.monto)}</span>}
+                          </td>
                           <td className="whitespace-nowrap py-2 pr-3 text-muted">{fechaVista(c.vence)}</td>
                           <td className="py-2">
                             {/* Liquidada gana sobre vencida: una cuenta cerrada ya
@@ -539,9 +570,9 @@ function CuentasPorCobrar() {
                         </tr>
                       );
                     })}
-                    {abierto && liquidacionesDe(g.cliente).length > 0 && (
+                    {abierto && conPagadas.has(g.cliente) && liquidacionesDe(g.cliente).length > 0 && (
                       <tr className="bg-surface-2/60">
-                        <td colSpan={6} className="px-3 pb-3 pl-8 pt-1">
+                        <td colSpan={5} className="px-3 pb-3 pl-8 pt-1">
                           <LiquidacionesDelCliente lista={liquidacionesDe(g.cliente)} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} />
                         </td>
                       </tr>

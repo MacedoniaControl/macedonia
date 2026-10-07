@@ -43,6 +43,7 @@ import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 import { useSesion } from "@/components/auth/SesionProvider";
 import { puedeVer } from "@/lib/auth/permisos";
 import { puedeVerFinanzas, useRol } from "@/lib/ux/session";
+import { Cifra } from "@/components/ui/Cifra";
 
 const selectClass = "sumi-campo sumi-campo--auto min-w-[9rem]";
 
@@ -163,19 +164,19 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           </div>
           <div className={`mt-3 grid gap-3 ${finanzas ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
             <div className="min-w-0">
-              <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:anywhere] xl:text-xl">{fmtUsd(hist.totals.venta)}</p>
-              <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">{fmtBsCorto(hist.totals.ventaBs)} facturados</p>
+              <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:normal] xl:text-xl"><Cifra texto={fmtUsd(hist.totals.venta)} /></p>
+              <p className="text-[11px] tabular-nums text-muted [overflow-wrap:normal]"><Cifra texto={fmtBsCorto(hist.totals.ventaBs)} /> facturados</p>
               <p className="text-xs text-muted">Ventas</p>
             </div>
             {finanzas && (
               <>
                 <div className="min-w-0">
-                  <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:anywhere] xl:text-xl">{fmtUsd(hist.totals.util)}</p>
-                  <p className="text-[11px] tabular-nums text-muted [overflow-wrap:anywhere]">{fmtBsCorto(hist.totals.utilBs)}</p>
+                  <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:normal] xl:text-xl"><Cifra texto={fmtUsd(hist.totals.util)} /></p>
+                  <p className="text-[11px] tabular-nums text-muted [overflow-wrap:normal]"><Cifra texto={fmtBsCorto(hist.totals.utilBs)} /></p>
                   <p className="text-xs text-muted">Utilidad</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-base font-semibold tabular-nums text-ok [overflow-wrap:anywhere] xl:text-xl">{hist.totals.roi.toLocaleString("es-VE")}%</p>
+                  <p className="text-base font-semibold tabular-nums text-ok [overflow-wrap:normal] xl:text-xl">{hist.totals.roi.toLocaleString("es-VE")}%</p>
                   <p className="text-xs text-muted">ROI (utilidad / costo)</p>
                 </div>
               </>
