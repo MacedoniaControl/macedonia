@@ -142,3 +142,11 @@ test("por cobrar: la nota de entrega sin vencimiento en Valery vence a los 30 d�
   const h: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "1", "2026-10-07", "", "", "10", "", "", "", "10"]] };
   assert.equal(leerValery("cobrar", [h]).filas[0].vence, "2026-11-06");
 });
+
+test("por cobrar: la nota de entrega que en Valery vence el día que se emitió va a los 30 días", () => {
+  const h: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "1", "2026-10-07", "2026-10-07", "", "10", "", "", "", "10"]] };
+  assert.equal(leerValery("cobrar", [h]).filas[0].vence, "2026-11-06");
+  // Con una fecha posterior, manda la de Valery.
+  const h2: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "2", "2026-10-07", "2026-10-20", "", "10", "", "", "", "10"]] };
+  assert.equal(leerValery("cobrar", [h2]).filas[0].vence, "2026-10-20");
+});
