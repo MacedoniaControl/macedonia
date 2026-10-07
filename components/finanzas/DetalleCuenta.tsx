@@ -27,12 +27,17 @@ const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoy = () => new Date().toISOString().slice(0, 10);
 
 export function DetalleCuenta({
-  cuentaId, empresa, onCambio, onEditar,
+  cuentaId, empresa, onCambio, onEditar, onLiquidar,
 }: {
   cuentaId: number;
   empresa: string;
   onCambio: () => void;
   onEditar: (d: CuentaDetalle) => void;
+  /**
+   * Liquidar la nota (migración 40). Una nota de entrega por cobrar se da por
+   * pagada SOLO liquidándola: el pago que la completa abre la liquidación.
+   */
+  onLiquidar?: (d: CuentaDetalle, pago: { fecha: string; metodo: string; referencia: string }) => void;
 }) {
   const [recarga, setRecarga] = useState(0);
   const carga = useCarga(`${cuentaId}:${recarga}`, () => detalleCuenta(cuentaId));
@@ -48,12 +53,19 @@ export function DetalleCuenta({
   const [notaCierre, setNotaCierre] = useState("");
 
   function refrescar() { setRecarga((n) => n + 1); onCambio(); }
+  const soloLiquidando = !!d && d.tipo === "cobrar" && d.clase === "nota_entrega" && !!onLiquidar;
+  const completa = soloLiquidando && (() => { const n = parseMonto(abono); return n !== null && d !== null && n >= d.saldo - CASI_CERO; })();
 
   async function registrar() {
     setMsg(null);
     const n = parseMonto(abono);
     if (n === null) return setMsg("No se entiende ese monto. Ejemplo: 1.500,50");
     if (n <= 0) return setMsg("El abono tiene que ser mayor que cero.");
+    // El pago que completa una nota de entrega por cobrar es una liquidación.
+    if (d && soloLiquidando && n >= d.saldo - CASI_CERO) {
+      if (n > d.saldo + CASI_CERO) return setMsg(`El abono supera el saldo pendiente (${fmtUsd(d.saldo)}).`);
+      return onLiquidar?.(d, { fecha, metodo, referencia });
+    }
     setGuardando(true);
     try {
       const r = await abonarConComprobante(cuentaId, empresa, n, { fecha, metodo, referencia, imagen });
@@ -210,8 +222,11 @@ export function DetalleCuenta({
                 {msg && (
                   <p role="alert" className="mt-2 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{msg}</p>
                 )}
-                <Button icon="cash" className="mt-2 w-full" disabled={guardando} onClick={registrar}>
-                  {guardando ? "Registrando…" : "Registrar abono"}
+                {completa && (
+                  <p className="mt-2 text-xs text-muted">Ese monto paga toda la nota: se registra como una liquidación.</p>
+                )}
+                <Button icon={completa ? "check" : "cash"} className="mt-2 w-full" disabled={guardando} onClick={registrar}>
+                  {guardando ? "Registrando…" : completa ? "Liquidar la nota" : "Registrar abono"}
                 </Button>
               </div>
 
@@ -219,7 +234,9 @@ export function DetalleCuenta({
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" icon="settings" onClick={() => onEditar(d)}>Editar cuenta</Button>
 
-                {d.saldo <= CASI_CERO ? (
+                {soloLiquidando ? (
+                  <Button icon="check" onClick={() => onLiquidar?.(d, { fecha, metodo, referencia })}>Liquidar</Button>
+                ) : d.saldo <= CASI_CERO ? (
                   <ConfirmDialog
                     title="¿Liquidar la cuenta?"
                     message={`${d.documento} queda cerrada como pago total. Se puede reabrir después.`}

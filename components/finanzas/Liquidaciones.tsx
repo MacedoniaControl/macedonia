@@ -56,7 +56,11 @@ export function Liquidaciones({ empresa, recarga, gerencia, onCambio, tipo = "co
  * Las liquidaciones de UN cliente, dentro de su cuenta desplegada: es su
  * historial de pagos, no un registro general de la cartera.
  */
-export function LiquidacionesDelCliente({ lista, gerencia, onCambio }: { lista: Liquidacion[]; gerencia: boolean; onCambio: () => void }) {
+export function LiquidacionesDelCliente({ lista, gerencia, onCambio, onAbrirCuenta }: {
+  lista: Liquidacion[]; gerencia: boolean; onCambio: () => void;
+  /** Abrir una de sus notas (el detalle de la cuenta). */
+  onAbrirCuenta?: (id: number) => void;
+}) {
   const [abierta, setAbierta] = useState<number | null>(null);
   if (lista.length === 0) return null;
   return (
@@ -68,11 +72,17 @@ export function LiquidacionesDelCliente({ lista, gerencia, onCambio }: { lista: 
             <button type="button" onClick={() => setAbierta(abierta === l.id ? null : l.id)} aria-expanded={abierta === l.id}
               className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left text-xs hover:bg-surface-2">
               <span className="font-mono text-muted">{l.numero}</span>
-              <span className="text-muted">{fechaVista(l.fecha)} · {l.cuentas} nota(s){l.metodo ? ` · ${l.metodo}` : ""}</span>
+              <span className="text-muted">{fechaVista(l.fecha)}{l.metodo ? ` · ${l.metodo}` : ""}</span>
+              {/* Las notas que pagó viven dentro de la liquidación: no se repiten como «Pagada» en la lista. */}
+              <span className="min-w-0 truncate font-mono text-text/80" title={l.documentos.map((d) => d.documento).join(", ")}>
+                {l.documentos.length
+                  ? `${l.documentos.slice(0, 3).map((d) => d.documento).join(", ")}${l.documentos.length > 3 ? ` y ${l.documentos.length - 3} más` : ""}`
+                  : `${l.cuentas} nota(s)`}
+              </span>
               <span className={`ml-auto font-semibold tabular-nums ${l.anuladaEn ? "text-muted line-through" : "text-text"}`}>{fmtUsd(l.total)}</span>
               {l.anuladaEn ? <StatusBadge tone="danger">Anulada</StatusBadge> : <StatusBadge tone="ok">Pagada</StatusBadge>}
             </button>
-            {abierta === l.id && <Detalle l={l} gerencia={gerencia} onCambio={onCambio} />}
+            {abierta === l.id && <Detalle l={l} gerencia={gerencia} onCambio={onCambio} onAbrirCuenta={onAbrirCuenta} />}
           </li>
         ))}
       </ul>
@@ -80,7 +90,7 @@ export function LiquidacionesDelCliente({ lista, gerencia, onCambio }: { lista: 
   );
 }
 
-function Detalle({ l, gerencia, onCambio }: { l: Liquidacion; gerencia: boolean; onCambio: () => void }) {
+function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; gerencia: boolean; onCambio: () => void; onAbrirCuenta?: (id: number) => void }) {
   const [motivo, setMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,10 +118,25 @@ function Detalle({ l, gerencia, onCambio }: { l: Liquidacion; gerencia: boolean;
         {l.nota ? ` · «${l.nota}»` : ""} · registró {l.creadoNombre} el {hora(l.creadoEn)}
       </p>
       {l.documentos.length > 0 ? (
-        <ul className="space-y-0.5 text-xs">
-          {l.documentos.map((d) => (
-            <li key={d.documento} className="flex justify-between gap-3"><span className="font-mono text-muted">{d.documento}</span><span className="tabular-nums text-text">{fmtUsd(d.monto)}</span></li>
-          ))}
+        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface text-xs">
+          {l.documentos.map((d) => {
+            const fila = (
+              <>
+                <span className="font-mono text-text">{d.documento}</span>
+                <span className="text-muted">{d.emitida ? `emitida ${fechaVista(d.emitida)}` : ""}{d.vence ? ` · vencía ${fechaVista(d.vence)}` : ""}</span>
+                <span className="ml-auto font-medium tabular-nums text-text">{fmtUsd(d.monto)}</span>
+                {!l.anuladaEn && <StatusBadge tone="ok">Pagada</StatusBadge>}
+              </>
+            );
+            return (
+              <li key={`${d.cuentaId}-${d.documento}`}>
+                {onAbrirCuenta
+                  ? <button type="button" onClick={() => onAbrirCuenta(d.cuentaId)} title={`Ver ${d.documento}`}
+                      className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5 text-left hover:bg-surface-2">{fila}</button>
+                  : <span className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5">{fila}</span>}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {l.anuladaEn && (

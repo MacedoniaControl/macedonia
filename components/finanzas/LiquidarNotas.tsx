@@ -26,11 +26,15 @@ const PALABRAS = {
   pagar: { quien: "Proveedor", doc: "cuenta", Doc: "Cuenta", total: "el total por pagar" },
 } as const;
 
-export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCerrar, tipo = "cobrar" }: {
+export function LiquidarNotas({ empresa, cuentas, clienteInicial, idsIniciales, pagoInicial, onHecho, onCerrar, tipo = "cobrar" }: {
   tipo?: "cobrar" | "pagar";
   empresa: string;
   cuentas: CuentaLiquidable[];
   clienteInicial?: string;
+  /** Qué notas vienen marcadas (por defecto, todas las del cliente). */
+  idsIniciales?: number[];
+  /** Lo que ya se escribió del pago (al venir de «Registrar abono»). */
+  pagoInicial?: { fecha?: string; metodo?: string; referencia?: string };
   onHecho: (texto: string) => void;
   onCerrar: () => void;
 }) {
@@ -38,10 +42,11 @@ export function LiquidarNotas({ empresa, cuentas, clienteInicial, onHecho, onCer
   const clientes = clientesConDeuda(cuentas);
   const [cliente, setCliente] = useState(() => clientes.find((g) => g.cliente.toUpperCase() === clienteInicial?.trim().toUpperCase())?.cliente ?? "");
   const grupo = clientes.find((g) => g.cliente === cliente);
-  const [elegidas, setElegidas] = useState<Set<number>>(() => new Set(grupo?.cuentas.map((c) => c.id) ?? []));
-  const [fecha, setFecha] = useState(hoy());
-  const [metodo, setMetodo] = useState("Transferencia");
-  const [referencia, setReferencia] = useState("");
+  const [elegidas, setElegidas] = useState<Set<number>>(() => new Set(
+    (grupo?.cuentas ?? []).filter((c) => !idsIniciales?.length || idsIniciales.includes(c.id)).map((c) => c.id)));
+  const [fecha, setFecha] = useState(pagoInicial?.fecha || hoy());
+  const [metodo, setMetodo] = useState(pagoInicial?.metodo?.trim() || "Transferencia");
+  const [referencia, setReferencia] = useState(pagoInicial?.referencia ?? "");
   const [nota, setNota] = useState("");
   const [imagen, setImagen] = useState<File | null>(null);
   const [encima, setEncima] = useState(false);
