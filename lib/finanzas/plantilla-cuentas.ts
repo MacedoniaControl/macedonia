@@ -62,7 +62,10 @@ export function aFechaPlantilla(v: string): string | null {
   if (m) {
     const [, d, mes, a] = m;
     const iso = `${a}-${mes.padStart(2, "0")}-${d.padStart(2, "0")}`;
-    return Number.isNaN(new Date(`${iso}T00:00:00Z`).getTime()) || Number(mes) > 12 || Number(d) > 31 ? null : iso;
+    // El día tiene que existir en ese mes: «31/9» no existe. JavaScript la
+    // corre sola al 1 de octubre y la base la rechaza al guardar.
+    const f = new Date(`${iso}T00:00:00Z`);
+    return Number.isNaN(f.getTime()) || f.getUTCDate() !== Number(d) || f.getUTCMonth() + 1 !== Number(mes) ? null : iso;
   }
   // Excel guarda las fechas como días desde el 30-12-1899.
   if (/^\d{5}(\.\d+)?$/.test(t)) {
@@ -71,6 +74,22 @@ export function aFechaPlantilla(v: string): string | null {
     return new Date(Date.UTC(1899, 11, 30) + n * 86400000).toISOString().slice(0, 10);
   }
   return null;
+}
+
+/**
+ * Una fecha con un día de más para su mes («31/9/2026», «30/2/2026») pasa al
+ * último día de ese mes. Para el vencimiento: el que lo escribió quiso decir
+ * «fin de mes». Devuelve la fecha y si se corrigió. Lo demás, como aFechaPlantilla.
+ */
+export function fechaFinDeMes(v: string): { fecha: string | null; corregida: boolean } {
+  const exacta = aFechaPlantilla(v);
+  if (exacta) return { fecha: exacta, corregida: false };
+  const m = v.trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (!m) return { fecha: null, corregida: false };
+  const [d, mes, a] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mes < 1 || mes > 12 || d < 29 || d > 31) return { fecha: null, corregida: false };
+  const ultimo = new Date(Date.UTC(a, mes, 0)).getUTCDate();
+  return { fecha: `${a}-${String(mes).padStart(2, "0")}-${String(ultimo).padStart(2, "0")}`, corregida: true };
 }
 
 /** Cómo se reconoce una cuenta ya cargada: contraparte + documento, sin mayúsculas ni espacios de más. */

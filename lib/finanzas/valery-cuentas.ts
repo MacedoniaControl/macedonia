@@ -16,7 +16,7 @@
 // se leen las columnas en el orden del reporte. Junto con la plantilla de
 // Macedonia (plantilla-cuentas.ts), es lo único que admite la importación.
 
-import { aFechaPlantilla, type FilaPlantilla, type TipoPlantilla } from "./plantilla-cuentas.ts";
+import { aFechaPlantilla, fechaFinDeMes, type FilaPlantilla, type TipoPlantilla } from "./plantilla-cuentas.ts";
 import type { ClaseCuenta } from "./retencion.ts";
 
 export type Celda = string | number | boolean | null;
@@ -132,12 +132,15 @@ export function leerValery(tipo: TipoPlantilla, hojas: HojaLeida[]): LecturaVale
       // copiada a mano a veces llega sin él.
       if (c0 === "-" || GRUPO[tipo].test(c1)) { quien = c1.replace(GRUPO[tipo], "").trim(); return; }
       if (!c1) return;   // subtotal o fila vacía
+      if (/^tipo( de)? doc/i.test(c1)) return;   // los títulos escritos a mano («Tipo de documento»)
       const tipoDoc = c1.toUpperCase();
       const emitida = aFechaPlantilla(t(v[col("Fecha Emisión")]));
       // Valery tiene saldos viejos sin número (saldos iniciales): se identifican por la fecha.
       const sinNumero = !t(v[col("Documento")]);
       const numero = sinNumero && emitida ? `S/N ${emitida.split("-").reverse().join("-")}` : t(v[col("Documento")]).replace(/\.0+$/, "");
-      const venceValery = aFechaPlantilla(t(v[col("Fecha Venc.")]));
+      // Un vencimiento con un día de más («31/9») pasa a fin de ese mes, anotado.
+      const vf = fechaFinDeMes(t(v[col("Fecha Venc.")]));
+      const venceValery = vf.fecha;
       if (!quien) return void problemas.push({ linea, motivo: `${pre}el documento ${tipoDoc} ${numero} no tiene ${tipo === "cobrar" ? "cliente" : "proveedor"} arriba.` });
       if (!emitida) return void problemas.push({ linea, motivo: `${pre}${tipoDoc} ${numero}: fecha de emisión inválida «${t(v[col("Fecha Emisión")])}».` });
 
@@ -161,7 +164,8 @@ export function leerValery(tipo: TipoPlantilla, hojas: HojaLeida[]): LecturaVale
       if (!venceValery) sinVencimiento++;
       filas.push({
         contraparte: quien, documento: `${tipoDoc}-${numero}`, emitida, vence, monto,
-        nota: [nota, sinNumero ? "sin número en Valery" : "", !venceValery ? "sin vencimiento en Valery" : ""].filter(Boolean).join(" · "),
+        nota: [nota, sinNumero ? "sin número en Valery" : "", !venceValery ? "sin vencimiento en Valery" : "",
+          vf.corregida ? `vencimiento «${t(v[col("Fecha Venc.")])}» no existe: fin de mes` : ""].filter(Boolean).join(" · "),
         clase: claseDe(tipoDoc), hoja: h.nombre.trim(), linea, sinVencimiento: !venceValery, sinNumero,
       });
     });
