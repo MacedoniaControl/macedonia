@@ -12,6 +12,8 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, asignacionesClientes, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
 import { claveCliente, enCartera, porCartera, vendedoresEnCartera, type FiltroCartera } from "@/lib/finanzas/cartera-vendedores";
 import { VendedorCliente, VendedorCuenta } from "@/components/finanzas/VendedorCartera";
+import { BotonEliminar, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
+import { leerConfig } from "@/lib/config/config-db";
 import { FiltroClase } from "@/components/finanzas/FiltroClase";
 import { CLASES, grupoDeClase } from "@/lib/finanzas/retencion";
 import { DetalleCuenta } from "@/components/finanzas/DetalleCuenta";
@@ -86,6 +88,11 @@ function CuentasPorCobrar() {
   const [vendCliente, setVendCliente] = useState<string | null>(null);
   const [vendCuenta, setVendCuenta] = useState<CuentaDb | null>(null);
   const empresaNombre = empresaKey === "sudematin" ? "Sudematin" : "Sumigases";
+  // «Eliminar»: Owner y Administrador, mientras el Owner lo tenga habilitado (migración 38).
+  const cfg = useCarga(`cfg:${empresaKey}:${recarga}`, () => leerConfig(empresaKey));
+  const habilitadoEliminar = eliminarHabilitado(cfg.datos);
+  const puedeEliminar = gerencia && habilitadoEliminar && !!cfg.datos;
+  const [eliminar, setEliminar] = useState<string | null>(null);
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -266,6 +273,10 @@ function CuentasPorCobrar() {
             </PildoraPanel>
             {gerencia && (
               <Button variant="secondary" icon="check" onClick={() => { setExito(""); setLiquidar(""); }}>Liquidar notas</Button>
+            )}
+            {rol === "owner" && cfg.datos && (
+              <InterruptorEliminar empresa={empresaKey} habilitado={habilitadoEliminar}
+                onCambio={(t) => { setExito(t); setRecarga((n) => n + 1); }} />
             )}
             <BotonDescargar empresa={empresaKey} />
           </div>
@@ -462,6 +473,10 @@ function CuentasPorCobrar() {
                           <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
                             title={`Anexar una nota a la deuda de ${g.cliente}`}
                             onClick={(ev) => { ev.stopPropagation(); setExito(""); setAnexar({ cliente: g.cliente, deuda: g.saldo }); }}>Anexar</button>
+                          {puedeEliminar && (
+                            <BotonEliminar titulo={`Eliminar cuentas de ${g.cliente}`}
+                              onClick={(ev) => { ev.stopPropagation(); setExito(""); setEliminar(g.cliente); }} />
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -515,6 +530,15 @@ function CuentasPorCobrar() {
         <Modal titulo="Liquidar Notas" onCerrar={() => setLiquidar(null)}>
           <LiquidarNotas empresa={empresaKey} cuentas={cuentas} clienteInicial={liquidar || undefined}
             onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setLiquidar(null)} />
+        </Modal>
+      )}
+
+      {eliminar && (
+        <Modal titulo="Eliminar Cuentas" onCerrar={() => setEliminar(null)}>
+          <EliminarCuentasDe empresa={empresaKey} contraparte={eliminar}
+            cuentas={cuentas.filter((c) => claveCliente(c.contraparte) === claveCliente(eliminar))
+              .sort((x, y) => x.emitida.localeCompare(y.emitida) || x.documento.localeCompare(y.documento))}
+            onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminar(null)} />
         </Modal>
       )}
 

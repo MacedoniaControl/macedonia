@@ -708,3 +708,27 @@ export async function vendedorDelCliente(empresa: string, cliente: string): Prom
     .eq("empresa_id", empresa).eq("cliente_clave", clave).maybeSingle();
   return (data?.vendedor_externo as string | undefined) ?? null;
 }
+
+// ---------------------------------------------------------------- eliminar (migración 38)
+
+/**
+ * Elimina cuentas y sus abonos, sin dejar registro. Lo hacen el Owner o un
+ * Administrador, si el Owner lo tiene habilitado; la base lo comprueba todo y
+ * no deja borrar lo que está en una liquidación vigente. Después se borran sus
+ * fotos del bucket.
+ */
+export async function eliminarCuentas(empresa: string, ids: number[]):
+  Promise<{ ok: true; cuentas: number } | { ok: false; error: string }> {
+  if (!ids.length) return { ok: false, error: "Elige al menos una cuenta." };
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("eliminar_cuentas", { p_empresa: empresa, p_ids: ids });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") return { ok: false, error: "Falta correr la migración 38 en Supabase." };
+    return { ok: false, error: error.message };
+  }
+  const r = (Array.isArray(data) ? data[0] : data) as { cuentas: number; rutas: string[] | null };
+  const rutas = (r?.rutas ?? []).filter(Boolean);
+  // Las fotos no tienen dueño ya: se borran con la llave del servidor (la base ya validó todo).
+  if (rutas.length) await createAdminClient().storage.from("comprobantes").remove(rutas);
+  return { ok: true, cuentas: Number(r?.cuentas) || 0 };
+}
