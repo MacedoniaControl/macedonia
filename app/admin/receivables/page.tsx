@@ -36,6 +36,9 @@ import { SortableTh } from "@/components/ui/SortableTh";
 import { Icon } from "@/components/ui/Icon";
 import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
 import { LiquidacionesDelCliente } from "@/components/finanzas/Liquidaciones";
+import { descargarEstadoCuenta } from "@/lib/finanzas/estado-cuenta-pdf";
+import { clientePorNombre } from "@/lib/directorio/directorio-db";
+import type { EmpresaId } from "@/lib/ux/empresas";
 import { listarLiquidaciones } from "@/lib/finanzas/liquidaciones-db";
 import { Switch } from "@/components/ui/Switch";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
@@ -113,6 +116,33 @@ function CuentasPorCobrar() {
   const liquidacionesDe = (cli: string) => (liq.datos ?? []).filter((l) => claveCliente(l.contraparte) === claveCliente(cli));
   // Las notas pagadas con una liquidación vigente se ven DENTRO de ella, no
   // repetidas como «Pagada» en la lista del cliente.
+  // En qué liquidación se pagó cada nota (para el estado de cuenta en PDF).
+  const lqDeCuenta = new Map((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.filter((d) => d.saldada).map((d) => [d.cuentaId, l.numero] as const)));
+  const [descargando, setDescargando] = useState<string | null>(null);
+  async function pdfCliente(g: ClienteCartera<CuentaDb>, conPag: boolean) {
+    setDescargando(g.cliente);
+    try {
+      const filas = g.cuentas
+        .filter((c) => conPag || !(c.estado === "liquidada" || c.saldo <= CASI_CERO))
+        .map((c) => {
+          const pagada = c.estado === "liquidada" || c.saldo <= CASI_CERO;
+          const lq = lqDeCuenta.get(c.id);
+          return {
+            documento: c.documento, clase: nombreClase(c.clase), emitida: c.emitida, vence: c.vence,
+            monto: c.monto, saldo: pagada ? 0 : c.saldo, estado: pagada ? (lq ? `Pagada · ${lq}` : "Pagada") : estadoDe(c.saldo, c.dias).label,
+          };
+        });
+      const ficha = await clientePorNombre(g.cliente).catch(() => null);
+      await descargarEstadoCuenta({
+        empresa: empresaKey as EmpresaId,
+        emitido: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date()),
+        cliente: { nombre: g.cliente, rif: ficha?.rif, telefonos: ficha?.telefonos, direccion: ficha?.direccion },
+        filas, conPagadas: conPag,
+      });
+    } catch (e) {
+      setMsg(`ERR:No se pudo generar el PDF: ${e instanceof Error ? e.message : "error"}`);
+    } finally { setDescargando(null); }
+  }
   const enLiquidacion = new Set((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.filter((d) => d.saldada).map((d) => d.cuentaId)));
 
   async function registrarAbono(): Promise<boolean> {
@@ -232,11 +262,15 @@ function CuentasPorCobrar() {
   const tc = buscaCliente.trim().toLowerCase();
   // Se ordena tocando la cabecera; sin tocar, primero quien más debe.
   const [orden, setOrden] = useState<Orden>(null);
+  // La emisión del cliente: la de su nota abierta más vieja (la deuda viene desde ahí).
+  const emisionCliente = (g: ClienteCartera<CuentaDb>) =>
+    g.cuentas.filter((c) => c.estado === "abierta" && c.saldo > CASI_CERO).map((c) => c.emitida).sort()[0] ?? null;
   const valorCliente = (g: ClienteCartera<CuentaDb>, k: ClaveOrden) =>
     k === "nombre" ? g.cliente : k === "documentos" ? g.documentos : k === "monto" ? g.monto : k === "saldo" ? g.saldo
+    : k === "emision" ? emisionCliente(g)
     : k === "vence" ? g.masVieja?.vence ?? null : g.masVieja ? gravedad(g.saldo, g.masVieja.dias) : null;
   const valorCuenta = (c: CuentaDb, k: ClaveOrden) =>
-    k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "vence" ? c.vence
+    k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "emision" ? c.emitida : k === "vence" ? c.vence
     : k === "estado" ? gravedad(c.saldo, c.dias, c.estado === "liquidada") : null;
   const clientesVisibles = ordenar(tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes, orden, valorCliente)
     .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, ordenDe.get(g.cliente) ?? ORDEN_DOCUMENTOS, valorCuenta) }));
@@ -453,6 +487,7 @@ function CuentasPorCobrar() {
                   {thOrden("Cliente", "nombre")}
                   {thOrden("Documentos", "documentos")}
                   {thOrden("Saldo", "saldo", "right")}
+                  {thOrden("Emisión", "emision")}
                   {thOrden("Vence", "vence")}
                   {thOrden("Estado", "estado")}
                 </tr>
@@ -488,6 +523,7 @@ function CuentasPorCobrar() {
                         {fmtUsd(g.saldo)}
                         {g.vencido > 0 && g.vencido < g.saldo && <span className="block text-[11px] font-normal text-danger">vencido {fmtUsd(g.vencido)}</span>}
                       </td>
+                      <td className="whitespace-nowrap py-3 pr-3 text-xs text-muted">{(() => { const e = emisionCliente(g); return e ? `desde ${fechaVista(e)}` : "—"; })()}</td>
                       <td className="whitespace-nowrap py-3 pr-3 text-xs text-muted">{g.masVieja ? `desde ${fechaVista(g.masVieja.vence)}` : "—"}</td>
                       <td className="py-3">
                         <span className="flex items-center gap-2">
@@ -524,13 +560,14 @@ function CuentasPorCobrar() {
                       const OPCIONES: { id: string; label: string; orden: NonNullable<Orden> }[] = [
                         { id: "estado-asc", label: "Estado ↑", orden: { clave: "estado", dir: "asc" } },
                         { id: "estado-desc", label: "Estado ↓", orden: { clave: "estado", dir: "desc" } },
+                        { id: "emision", label: "Emisión", orden: { clave: "emision", dir: "desc" } },
                         { id: "vence", label: "Vence", orden: { clave: "vence", dir: "asc" } },
                         { id: "saldo", label: "Saldo", orden: { clave: "saldo", dir: "desc" } },
                       ];
                       const actual = OPCIONES.find((o) => o.orden.clave === od?.clave && o.orden.dir === od?.dir)?.id ?? "";
                       return (
                         <tr className="bg-surface-2/60">
-                          <td colSpan={5} className="px-3 py-2 pl-8">
+                          <td colSpan={6} className="px-3 py-2 pl-8">
                             <span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
                               <span className="flex flex-wrap items-center gap-2">
                                 <Switch checked={todo} onChange={(v) => verPagadas(g.cliente, v)} label={`Ver también las pagadas y las liquidaciones de ${g.cliente}`} />
@@ -545,6 +582,12 @@ function CuentasPorCobrar() {
                                   {OPCIONES.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                                 </select>
                               </label>
+                              <button type="button" disabled={descargando === g.cliente}
+                                title={todo ? `Estado de cuenta de ${g.cliente}, con las pagadas` : `Estado de cuenta de ${g.cliente}: lo pendiente`}
+                                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 font-medium text-text hover:bg-surface disabled:opacity-60"
+                                onClick={() => pdfCliente(g, todo)}>
+                                <Icon name="report" size={13} /> {descargando === g.cliente ? "Generando…" : "Descargar PDF"}
+                              </button>
                             </span>
                           </td>
                         </tr>
@@ -579,6 +622,7 @@ function CuentasPorCobrar() {
                             {fmtUsd(c.saldo)}
                             {Math.abs(c.monto - c.saldo) > CASI_CERO && <span className="block text-[10px] text-muted">de {fmtUsd(c.monto)}</span>}
                           </td>
+                          <td className="whitespace-nowrap py-2 pr-3 text-muted">{fechaVista(c.emitida)}</td>
                           <td className="whitespace-nowrap py-2 pr-3 text-muted">{fechaVista(c.vence)}</td>
                           <td className="py-2">
                             {/* Liquidada gana sobre vencida: una cuenta cerrada ya
@@ -592,7 +636,7 @@ function CuentasPorCobrar() {
                     })}
                     {abierto && conPagadas.has(g.cliente) && liquidacionesDe(g.cliente).length > 0 && (
                       <tr className="bg-surface-2/60">
-                        <td colSpan={5} className="px-3 pb-3 pl-8 pt-1">
+                        <td colSpan={6} className="px-3 pb-3 pl-8 pt-1">
                           <LiquidacionesDelCliente lista={liquidacionesDe(g.cliente)} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} onAbrirCuenta={setAbierta} />
                         </td>
                       </tr>

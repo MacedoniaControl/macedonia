@@ -1,7 +1,7 @@
 // Orden de las tablas de cartera (cobrar y pagar) al tocar una cabecera.
 //
 // El primer toque pone lo que más importa arriba: montos y saldos de mayor a
-// menor, el vencimiento del más viejo al más nuevo y el estado del más grave
+// menor, la emisión de la más reciente a la más vieja, el vencimiento del más viejo al más nuevo y el estado del más grave
 // (más días vencido) al que ya está pagado. El segundo toque lo invierte.
 // Lo que no tiene valor (un cliente sin deuda abierta no tiene «vence») va
 // siempre al final, en cualquier dirección.
@@ -10,11 +10,11 @@
 
 import { CASI_CERO } from "../ux/decimales.ts";
 
-export type ClaveOrden = "nombre" | "documentos" | "monto" | "saldo" | "vence" | "estado";
+export type ClaveOrden = "nombre" | "documentos" | "monto" | "saldo" | "emision" | "vence" | "estado";
 export type Orden = { clave: ClaveOrden; dir: "asc" | "desc" } | null;
 
 const PRIMERA: Record<ClaveOrden, "asc" | "desc"> = {
-  nombre: "asc", documentos: "desc", monto: "desc", saldo: "desc", vence: "asc", estado: "desc",
+  nombre: "asc", documentos: "desc", monto: "desc", saldo: "desc", emision: "desc", vence: "asc", estado: "desc",
 };
 
 /** El orden al tocar la cabecera `clave`: la misma la invierte, otra empieza por lo importante. */

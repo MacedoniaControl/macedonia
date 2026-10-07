@@ -68,6 +68,21 @@ export async function buscarClientes(consulta: string, limite = 10): Promise<Cli
   return (data ?? []).map(aCliente);
 }
 
+/**
+ * La ficha de un cliente por su nombre en la cartera (para el estado de cuenta).
+ * Primero el nombre exacto (sin mayúsculas ni espacios de más); si no, el que
+ * empieza igual. Sin ficha, null: el documento sale con el nombre solo.
+ */
+export async function clientePorNombre(nombre: string): Promise<Cliente | null> {
+  const n = nombre.trim().replace(/\s+/g, " ").replace(/[%_]/g, "");
+  if (!n) return null;
+  const sb = await createClient();
+  const exacto = await sb.from("clientes").select("*").ilike("nombre", n).limit(1);
+  if (exacto.data?.length) return aCliente(exacto.data[0]);
+  const parecido = await sb.from("clientes").select("*").ilike("nombre", `${n}%`).limit(1);
+  return parecido.data?.length ? aCliente(parecido.data[0]) : null;
+}
+
 export async function clientePorRif(rif: string): Promise<Cliente | null> {
   const sb = await createClient();
   const { data } = await sb.from("clientes").select("*").eq("rif", normalizarRif(rif)).maybeSingle();
