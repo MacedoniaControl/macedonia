@@ -72,6 +72,8 @@ function CuentasPorPagar() {
   const { rol } = useRol();
   const gerencia = puedeVerFinanzas(rol);
   const [liquidar, setLiquidar] = useState<string | null>(null);
+  // Al liquidar UNA nota desde su detalle o desde «Registrar abono»: esa nota y el pago.
+  const [liquidarDesde, setLiquidarDesde] = useState<{ ids: number[]; pago: { fecha: string; metodo: string; referencia: string; monto?: number } } | null>(null);
   const [anexar, setAnexar] = useState<string | null>(null);
   // «Eliminar»: Owner y Administrador, mientras el Owner lo tenga habilitado (migración 38).
   const cfg = useCarga(`cfg:${empresaKey}:${recarga}`, () => leerConfig(empresaKey));
@@ -91,6 +93,14 @@ function CuentasPorPagar() {
     if (!c) { setMsg("ERR:Selecciona un documento."); return false; }
     if (a === null) { setMsg("ERR:No se entiende ese monto. Ejemplo: 1.500,50"); return false; }
     if (a <= 0) { setMsg("ERR:Ingresa un abono mayor a 0."); return false; }
+
+    // El pago que completa una nota de entrega es una liquidación (migraciones 40 y 41).
+    if (c.clase === "nota_entrega" && a >= c.saldoNeto - CASI_CERO) {
+      setAbono(""); setDocSel(""); setExito("");
+      setLiquidarDesde({ ids: [c.id], pago: { fecha: new Date().toISOString().slice(0, 10), metodo: "", referencia: "", monto: a } });
+      setLiquidar(c.contraparte);
+      return true;
+    }
 
     // La base vuelve a comprobar que el abono no supere el saldo: dos personas
     // abonando a la vez podrian pasarse si solo se validara aqui.
@@ -405,9 +415,11 @@ function CuentasPorPagar() {
       <Liquidaciones tipo="pagar" empresa={empresaKey} recarga={recarga} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} />
 
       {liquidar !== null && (
-        <Modal titulo="Liquidar Cuentas" onCerrar={() => setLiquidar(null)}>
+        <Modal titulo="Liquidar Cuentas" onCerrar={() => { setLiquidar(null); setLiquidarDesde(null); }}>
           <LiquidarNotas tipo="pagar" empresa={empresaKey} cuentas={ctas} clienteInicial={liquidar || undefined}
-            onHecho={(t) => { setExitoTitulo("Cuentas Liquidadas"); setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setLiquidar(null)} />
+            idsIniciales={liquidarDesde?.ids} pagoInicial={liquidarDesde?.pago}
+            onHecho={(t) => { setExitoTitulo("Cuentas Liquidadas"); setExito(t); setRecarga((n) => n + 1); }}
+            onCerrar={() => { setLiquidar(null); setLiquidarDesde(null); }} />
         </Modal>
       )}
 
@@ -450,6 +462,7 @@ function CuentasPorPagar() {
               empresa={empresaKey}
               onCambio={() => setRecarga((n) => n + 1)}
               onEditar={(d) => setEditando(d)}
+              onLiquidar={(d, pago) => { setAbierta(null); setExito(""); setLiquidarDesde({ ids: [d.id], pago }); setLiquidar(d.contraparte); }}
             />
           )}
         </Modal>

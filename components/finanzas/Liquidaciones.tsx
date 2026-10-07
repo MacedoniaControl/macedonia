@@ -125,7 +125,7 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; ger
                 <span className="font-mono text-text">{d.documento}</span>
                 <span className="text-muted">{d.emitida ? `emitida ${fechaVista(d.emitida)}` : ""}{d.vence ? ` · vencía ${fechaVista(d.vence)}` : ""}</span>
                 <span className="ml-auto font-medium tabular-nums text-text">{fmtUsd(d.monto)}</span>
-                {!l.anuladaEn && <StatusBadge tone="ok">Pagada</StatusBadge>}
+                {!l.anuladaEn && (d.saldada ? <StatusBadge tone="ok">Pagada</StatusBadge> : <StatusBadge tone="info">Abono</StatusBadge>)}
               </>
             );
             return (
