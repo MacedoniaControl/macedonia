@@ -20,6 +20,8 @@ import { CLASES, desglosar, PCT_IVA, PCT_RETENCION, type ClaseCuenta } from "@/l
 import { documentoAnexo, yaAnexados } from "@/lib/finanzas/anexar";
 import { fmtUsdCentavos } from "@/lib/ux/format";
 import { SelectorVendedor, VALOR_PROPIA } from "@/components/finanzas/VendedorCartera";
+import { DIAS_NOTA_ENTREGA, venceNotaEntrega } from "@/lib/finanzas/vencimiento";
+import { fechaVista } from "@/lib/ux/tabla-export";
 
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -70,6 +72,9 @@ export function FormularioCuenta({
   const d = monto !== null ? desglosar(monto, conIva, retiene) : null;
   const documento = anexo ? documentoAnexo(clase, f.documento, tipo) : f.documento.trim();
   const repetidos = anexo ? yaAnexados(documento, anexo.documentos) : [];
+  // La nota de entrega por cobrar vence a los 30 días: solo se pide la emisión.
+  const venceSolo = tipo === "cobrar" && clase === "nota_entrega";
+  const vence = venceSolo ? venceNotaEntrega(f.emitida || hoy()) : f.vence;
   const aCobrar = d ? d.total - (conIva && retiene ? d.retencion : 0) : 0;
 
   async function guardar() {
@@ -79,14 +84,14 @@ export function FormularioCuenta({
     if (!f.documento.trim()) return setMsg("Falta el número de documento.");
     if (repetidos.length) return setMsg(`${f.contraparte.trim()} ya tiene ${repetidos.join(", ")}: no se anexa dos veces.`);
     if (!f.emitida || f.emitida > hoy()) return setMsg("La fecha de emisión no puede ser posterior a hoy.");
-    if (f.vence < f.emitida) return setMsg("El vencimiento no puede ser antes de la emisión.");
+    if (vence < f.emitida) return setMsg("El vencimiento no puede ser antes de la emisión.");
     if (monto === null) return setMsg("Falta el monto, o no se entiende. Ejemplo: 1.500,50");
     if (monto <= 0) return setMsg("El monto tiene que ser mayor que cero.");
 
     setGuardando(true);
     try {
       const r = await crearCuenta({
-        tipo, ...f, documento, clase, monto,
+        tipo, ...f, vence, documento, clase, monto,
         baseImponible: conIva ? d!.base : null,
         iva: conIva ? d!.iva : null,
         ivaRetenido: conIva && retiene ? d!.retencion : null,
@@ -149,10 +154,19 @@ export function FormularioCuenta({
           <input type="date" value={f.emitida} max={hoy()}
             onChange={(e) => setF({ ...f, emitida: e.target.value, vence: f.vence < e.target.value ? e.target.value : f.vence })} className={campo} />
         </label>
-        <label className="block">
-          <span className={lbl}>Vence</span>
-          <input type="date" value={f.vence} min={f.emitida} onChange={(e) => setF({ ...f, vence: e.target.value })} className={campo} />
-        </label>
+        {venceSolo ? (
+          <div>
+            <span className={lbl}>Vence</span>
+            <p className={`${campo} flex items-center bg-surface-2 text-muted`} aria-live="polite">
+              {fechaVista(vence)} · {DIAS_NOTA_ENTREGA} días
+            </p>
+          </div>
+        ) : (
+          <label className="block">
+            <span className={lbl}>Vence</span>
+            <input type="date" value={f.vence} min={f.emitida} onChange={(e) => setF({ ...f, vence: e.target.value })} className={campo} />
+          </label>
+        )}
       </div>
 
       <CampoMonto etiqueta="Monto total *" valor={montoTxt} onChange={setMontoTxt} />
