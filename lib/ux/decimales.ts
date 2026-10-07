@@ -1,8 +1,9 @@
 // Cuántos decimales lleva un monto (dólares o bolívares).
 //
 // Es una herramienta administrativa: no se redondea a centavos. La base guarda
-// 4 decimales y en pantalla se ven 3 como mínimo. Lo único que se recorta es
-// el ruido de la coma flotante (0,1 + 0,2 = 0,30000000000000004).
+// 4 decimales; en pantalla se ven 2 y, si la cifra los tiene, hasta 4. Lo
+// único que se recorta es el ruido de la coma flotante
+// (0,1 + 0,2 = 0,30000000000000004).
 
 export const DECIMALES_MONTO = 4;
 

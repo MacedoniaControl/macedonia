@@ -4,9 +4,9 @@
 // mano porque el formato de moneda de es-VE escribe "USD 2.447.086".
 
 // Es una herramienta administrativa: ningún monto se redondea al mostrarlo.
-// Dólares y bolívares van siempre con 3 decimales como mínimo (hasta 4, lo que
-// guarda la base).
-const DECIMALES = { minimumFractionDigits: 3, maximumFractionDigits: 4 } as const;
+// Dólares y bolívares van con 2 decimales ($600,00) y, si la cifra tiene más
+// (una suma, un IVA), se ven hasta 4, lo que guarda la base ($72,3612).
+const DECIMALES = { minimumFractionDigits: 2, maximumFractionDigits: 4 } as const;
 const exacto = (n: number) => Math.abs(n).toLocaleString("es-VE", DECIMALES);
 
 export function fmtUsd(n: number): string {
@@ -40,7 +40,7 @@ export function fmtPct(n: number): string {
   return `${n.toFixed(1)}%`;
 }
 
-/** La tasa BCV, con sus 4 decimales (3 como mínimo). Sin «Bs». */
+/** La tasa BCV, con sus decimales (2 como mínimo, hasta 4). Sin «Bs». */
 export function fmtTasa(n: number): string {
   return n.toLocaleString("es-VE", DECIMALES);
 }

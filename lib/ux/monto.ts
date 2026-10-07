@@ -86,5 +86,5 @@ export function parseMonto(entrada: string): number | null {
 }
 /** Como se muestra de vuelta, para que quien escribio pueda comprobarlo. */
 export function fmtMonto(n: number): string {
-  return n.toLocaleString("es-VE", { minimumFractionDigits: 3, maximumFractionDigits: 4 });
+  return n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
