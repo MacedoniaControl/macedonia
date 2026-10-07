@@ -21,5 +21,5 @@ test("clientes con deuda, con sus notas de la más vieja a la más nueva", () =>
 
 test("total de lo elegido", () => {
   const cs = [c(1, "A", 10.105), c(2, "A", 20), c(3, "A", 5)];
-  assert.equal(totalElegido(cs, new Set([1, 2])), 30.11);
+  assert.equal(totalElegido(cs, new Set([1, 2])), 30.105);
 });

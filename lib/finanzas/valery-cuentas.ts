@@ -19,6 +19,7 @@
 import { aFechaPlantilla, fechaFinDeMes, type FilaPlantilla, type TipoPlantilla } from "./plantilla-cuentas.ts";
 import type { ClaseCuenta } from "./retencion.ts";
 import { venceNotaEntrega } from "./vencimiento.ts";
+import { aMonto } from "../ux/decimales.ts";
 
 export type Celda = string | number | boolean | null;
 export type HojaLeida = { nombre: string; filas: Celda[][] };
@@ -97,8 +98,8 @@ function claseDe(tipoDoc: string): ClaseCuenta {
 }
 
 const num = (v: Celda | undefined) => (typeof v === "number" ? v : Number(t(v).replace(",", ".")) || 0);
-const dosDec = (n: number) => Math.round(n * 100) / 100;
-const fmt = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dosDec = aMonto;
+const fmt = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 3, maximumFractionDigits: 4 });
 
 export type FilaValery = FilaPlantilla & { clase: ClaseCuenta; hoja: string; linea: number; sinVencimiento: boolean; sinNumero: boolean };
 export type LecturaValery = {

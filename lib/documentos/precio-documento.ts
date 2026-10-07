@@ -7,8 +7,9 @@
 // $4,00 entraba a $4,64, el IVA quedaba escondido en la base imponible y, si
 // además se marcaba «Incluir IVA», se cobraba dos veces.
 
+import { aMonto } from "../ux/decimales.ts";
 /** Precio de catálogo (con IVA) → precio del renglón (sin IVA), a 2 decimales como Valery. */
 export function precioSinIva(precioConIva: number, ivaPct: number): number {
   if (!(precioConIva > 0)) return 0;
-  return Math.round((precioConIva / (1 + ivaPct / 100)) * 100) / 100;
+  return aMonto(precioConIva / (1 + ivaPct / 100));
 }

@@ -55,7 +55,7 @@ export type DevDoc = {
   llevaIva?: boolean; ivaPct?: number;
 };
 
-const m = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const m = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 3, maximumFractionDigits: 4 });
 
 const lineaTotal = (l: NELinea) => l.cantidad * l.precio * (1 - (l.descuento || 0) / 100);
 
@@ -124,7 +124,7 @@ export function devolucionHtml(d: DevDoc, empresa: EmpresaId) {
   const iva = d.llevaIva === false ? 0 : sub * ((d.ivaPct ?? 16) / 100);
   const total = sub + iva;
   const filas = d.lineas.map((l) =>
-    `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">0,00</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");
+    `<tr><td>${l.codigo}</td><td class="l">${l.descripcion}</td><td class="r">${m(l.cantidad)}</td><td class="r">0,000</td><td class="r">${m(l.precio)}</td><td class="r">${l.descuento.toFixed(2)} %</td><td class="r">${m(l.cantidad * l.precio * (1 - l.descuento / 100))}</td></tr>`).join("");
   const body = `<div class="copy dev">
     <div class="devhead">${E.logo}<div class="empresa"><b>${E.rif}</b><br>${E.dir}</div></div>
     <div class="devbox">
@@ -151,10 +151,10 @@ export function devolucionHtml(d: DevDoc, empresa: EmpresaId) {
         <tr><td class="k">Descuento 1</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
         <tr><td class="k">Descuento 2</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
         <tr><td class="k">Flete</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr></table>
-      <table class="r"><tr><td class="k">Total Exento</td><td class="r">0,00</td></tr>
+      <table class="r"><tr><td class="k">Total Exento</td><td class="r">0,000</td></tr>
         <tr><td class="k">Total Base Imponible</td><td class="r">${m(sub)}</td></tr>
         <tr><td class="k">Total Impuesto &nbsp;16,00 %</td><td class="r">${m(iva)}</td></tr>
-        <tr><td class="k">Total IGTF &nbsp;0,00 %</td><td class="r">0,00</td></tr>
+        <tr><td class="k">Total IGTF &nbsp;0,00 %</td><td class="r">0,000</td></tr>
         <tr><td class="k">Total Operación</td><td class="r"><b>${m(total)}</b></td></tr></table>
     </div>
     <p class="nota">Nota: ${d.nota || ""}</p>
@@ -192,10 +192,10 @@ export function presupuestoHtml(d: PresupuestoDoc, empresa: EmpresaId) {
         <tr><td class="k">Descuento 1</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
         <tr><td class="k">Descuento 2</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr>
         <tr><td class="k">Flete</td><td class="r">0,00 %&nbsp;&nbsp;0,00</td></tr></table>
-      <table class="r"><tr><td class="k">Total Exento</td><td class="r">0,00</td></tr>
+      <table class="r"><tr><td class="k">Total Exento</td><td class="r">0,000</td></tr>
         <tr><td class="k">Total Base Imponible</td><td class="r">${m(sub)}</td></tr>
         <tr><td class="k">Total Impuesto &nbsp;16,00 %</td><td class="r">${m(iva)}</td></tr>
-        <tr><td class="k">Total IGTF &nbsp;0,00 %</td><td class="r">0,00</td></tr>
+        <tr><td class="k">Total IGTF &nbsp;0,00 %</td><td class="r">0,000</td></tr>
         <tr><td class="k">Total Operación</td><td class="r"><b>${m(total)}</b></td></tr></table>
     </div>
     <p class="nota">Nota: ${d.nota || ""}</p>

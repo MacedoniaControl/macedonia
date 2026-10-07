@@ -4,6 +4,8 @@
 // sola, y el Excel, el PDF y la pantalla del historial dicen exactamente lo
 // mismo porque salen del mismo objeto.
 
+import { aMonto } from "../ux/decimales.ts";
+
 export type LineaEntrada = {
   renglon: number | null;
   codigo: string;
@@ -53,7 +55,7 @@ export type ActaValorizada = Acta & {
 };
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
-const r2 = (n: number) => Math.round(n * 100) / 100;
+const r2 = aMonto;
 
 /** Un SKU de Macedonia: el articulo no existia en Valery cuando se conto. */
 export const esSkuMacedonia = (codigo: string) => /^MC-\d{6}$/.test(codigo);
@@ -137,6 +139,6 @@ export function fmtDif(n: number | null): string {
 /** −$241,47 · +$13,52 */
 export function fmtUsdSigno(n: number | null): string {
   if (n === null) return "—";
-  const s = Math.abs(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const s = Math.abs(n).toLocaleString("es-VE", { minimumFractionDigits: 3, maximumFractionDigits: 4 });
   return (n < 0 ? "−" : n > 0 ? "+" : "") + "$" + s;
 }

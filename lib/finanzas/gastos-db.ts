@@ -12,6 +12,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { aMonto } from "../ux/decimales.ts";
 
 export type Moneda = "USD" | "BS";
 
@@ -73,7 +74,7 @@ export async function registrarGasto(
       monto: g.monto,
       moneda: g.moneda,
       tasa: g.moneda === "BS" ? g.tasa : null,
-      monto_usd: Math.round(montoUsd * 100) / 100,
+      monto_usd: aMonto(montoUsd),
       beneficiario: g.beneficiario?.trim() || null,
       tipo_transaccion: g.tipoTransaccion?.trim() || null,
       documento: g.documento?.trim() || null,

@@ -17,7 +17,7 @@ import { CampoMonto } from "@/components/ui/CampoMonto";
 import { parseMonto } from "@/lib/ux/monto";
 import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { fmtUsd } from "@/lib/ux/format";
+import { fmtUsd, fmtTasa, fmtBs } from "@/lib/ux/format";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { TablePager } from "@/components/ui/TablePager";
 import { SortableTh } from "@/components/ui/SortableTh";
@@ -90,7 +90,7 @@ function Gastos() {
       ],
       filas: filas.map((g) => [
         fechaVista(g.fecha), g.partida, g.categoria, g.beneficiario || null, g.tipoTransaccion || null,
-        g.moneda === "BS" ? `${g.monto.toLocaleString("es-VE")} Bs · TC ${g.tasa}` : null, g.montoUsd, g.nota || null,
+        g.moneda === "BS" ? `${fmtBs(g.monto)} · TC ${g.tasa == null ? "—" : fmtTasa(g.tasa)}` : null, g.montoUsd, g.nota || null,
       ]),
       totales: ["", `Total · ${filas.length} gasto(s)`, "", "", "", "", totalMes, ""],
     };
@@ -174,7 +174,7 @@ function Gastos() {
                       <td className="py-2.5 pr-3 text-muted">{g.beneficiario || "—"}</td>
                       <td className="py-2.5 pr-3 text-xs text-muted">
                         {g.tipoTransaccion || "—"}
-                        {g.moneda === "BS" && <span className="block">{g.monto.toLocaleString("es-VE")} Bs · TC {g.tasa}</span>}
+                        {g.moneda === "BS" && <span className="block">{fmtBs(g.monto)} · TC {g.tasa == null ? "—" : fmtTasa(g.tasa)}</span>}
                       </td>
                       <td className="py-2.5 pr-3 text-right font-medium tabular-nums text-text">{fmtUsd(g.montoUsd)}</td>
                       <td className="py-2.5 text-right">
@@ -200,7 +200,7 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
     partida: PARTIDAS[0].nombre,
     monto: "",
     moneda: "USD" as "USD" | "BS",
-    tasa: tasaBcv ? String(tasaBcv) : "",
+    tasa: tasaBcv ? fmtTasa(tasaBcv) : "",
     beneficiario: "",
     tipoTransaccion: TIPOS_TRANSACCION[0],
     documento: "",
@@ -302,7 +302,7 @@ function FormGasto({ empresa, tasaBcv, onDone }: { empresa: string; tasaBcv?: nu
       {monto > 0 && (
         <p className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
           Se registrará como <strong className="text-text">{fmtUsd(enUsd)}</strong>
-          {f.moneda === "BS" && tasa > 0 && ` (${monto.toLocaleString("es-VE")} Bs ÷ ${tasa})`}
+          {f.moneda === "BS" && tasa > 0 && ` (${fmtBs(monto)} ÷ ${fmtTasa(tasa)})`}
           {" · "}{categoriaDe(f.partida)}
         </p>
       )}

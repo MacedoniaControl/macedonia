@@ -114,11 +114,11 @@ export function CatalogoProductos({ embebido = false }: { embebido?: boolean }) 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="pre">Precio (USD)</label>
-                <input id="pre" type="text" inputMode="decimal" placeholder="0,00" value={precio} onChange={(e) => setPrecio(e.target.value)} className={`${inputClass} tabular-nums`} />
+                <input id="pre" type="text" inputMode="decimal" placeholder="0,000" value={precio} onChange={(e) => setPrecio(e.target.value)} className={`${inputClass} tabular-nums`} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="cos">Costo (USD)</label>
-                <input id="cos" type="text" inputMode="decimal" placeholder="0,00" value={costo} onChange={(e) => setCosto(e.target.value)} className={`${inputClass} tabular-nums`} />
+                <input id="cos" type="text" inputMode="decimal" placeholder="0,000" value={costo} onChange={(e) => setCosto(e.target.value)} className={`${inputClass} tabular-nums`} />
               </div>
             </div>
             {msg && <p className={`rounded-xl px-3 py-2 text-sm ${msg.startsWith("ERR:") ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}>{msg.replace("ERR:", "")}</p>}

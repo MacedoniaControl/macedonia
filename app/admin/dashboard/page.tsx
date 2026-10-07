@@ -27,7 +27,7 @@ import { HistoryKpis } from "@/components/ui/HistoryStats";
 import { HistoriaBI } from "@/components/ui/HistoriaBI";
 import { getHistory } from "@/lib/ux/history-data";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
-import { enBs, fmtBsCorto, fmtUsd } from "@/lib/ux/format";
+import { enBs, fmtBsCorto, fmtUsd, fmtTasa } from "@/lib/ux/format";
 import { usePersistedState } from "@/lib/ux/use-persisted-state";
 import { useBcvRate, useTasaViva } from "@/lib/ux/bcv-rate";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
@@ -190,7 +190,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           </div>
           {bcv ? (
             <>
-              <p className="mt-2 text-xl font-semibold tabular-nums text-text sm:text-2xl">{bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs</p>
+              <p className="mt-2 text-xl font-semibold tabular-nums text-text sm:text-2xl">{fmtTasa(bcv.tasa)} Bs</p>
               <p className="mt-1 text-xs text-muted">
                 Fecha valor BCV: {bcv.fecha.split("-").reverse().join("-")} · Actualizada: {new Date(bcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}
               </p>

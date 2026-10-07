@@ -90,7 +90,7 @@ describe("el acta valorizada", () => {
 
   test("da los mismos totales que el acta valorizada de ejemplo", () => {
     const v = valorizar(ejemplo(), costos);
-    assert.deepEqual(v.valor, { faltantes: -241.47, sobrantes: 13.52, neto: -227.95, sinCosto: 1 });
+    assert.deepEqual(v.valor, { faltantes: -241.4684, sobrantes: 13.5198, neto: -227.9486, sinCosto: 1 });
   });
 
   test("solo lista lo que tiene diferencia, y los nuevos", () => {
@@ -112,7 +112,7 @@ describe("formato del acta", () => {
     assert.equal(fmtDif(2), "+2");
     assert.equal(fmtDif(0), "0");
     assert.equal(fmtDif(null), "nuevo");
-    assert.equal(fmtUsdSigno(-241.47), "−$241,47");
-    assert.equal(fmtUsdSigno(13.52), "+$13,52");
+    assert.equal(fmtUsdSigno(-241.4684), "−$241,4684");
+    assert.equal(fmtUsdSigno(13.52), "+$13,520");
   });
 });

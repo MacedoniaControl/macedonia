@@ -29,8 +29,8 @@ describe("textoCelda", () => {
     assert.equal(textoCelda(0, "dif"), "0");
   });
   test("dolares y porcentajes", () => {
-    assert.equal(textoCelda(1500, "usd"), "$1.500,00");
-    assert.equal(textoCelda(-2.5, "usd"), "−$2,50");
+    assert.equal(textoCelda(1500, "usd"), "$1.500,000");
+    assert.equal(textoCelda(-2.5, "usd"), "−$2,500");
     assert.equal(textoCelda(23.456, "pct"), "23,5 %");
   });
   test("una fecha de la base se lee al derecho", () => {

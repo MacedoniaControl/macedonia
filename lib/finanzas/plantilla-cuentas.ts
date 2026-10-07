@@ -13,6 +13,7 @@
 // veces el mismo archivo duplicaba la deuda.
 
 import { aNumero } from "./importar-cuentas.ts";
+import { aMonto } from "../ux/decimales.ts";
 
 export type TipoPlantilla = "cobrar" | "pagar";
 
@@ -119,7 +120,7 @@ export function leerPlantilla(filasHoja: string[][], existentes: Set<string>): L
     if (!vence) return void problemas.push({ linea, motivo: `Fecha de vencimiento inválida: «${celda(3)}».` });
     if (vence < emitida) return void problemas.push({ linea, motivo: "Vence antes de emitirse." });
     if (monto === null || !(monto > 0)) return void problemas.push({ linea, motivo: `Monto inválido: «${celda(4)}».` });
-    const fila: FilaPlantilla = { contraparte, documento, emitida, vence, monto: Math.round(monto * 100) / 100, nota: celda(5) };
+    const fila: FilaPlantilla = { contraparte, documento, emitida, vence, monto: aMonto(monto), nota: celda(5) };
     const clave = claveCuenta(contraparte, documento);
     if (vistas.has(clave)) return void problemas.push({ linea, motivo: `${documento} de ${contraparte} está dos veces en el archivo.` });
     vistas.add(clave);

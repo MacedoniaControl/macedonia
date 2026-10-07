@@ -12,6 +12,7 @@ import { useCarga } from "@/lib/ux/use-carga";
 import { Icon } from "@/components/ui/Icon";
 import { buscarClientes, saldoCliente, type Cliente } from "@/lib/directorio/directorio-db";
 import { FormularioCliente } from "./FormularioCliente";
+import { fmtUsd } from "@/lib/ux/format";
 
 const ESPERA_MS = 220;
 
@@ -67,7 +68,7 @@ export function SelectorCliente({
     () => (seleccionado ? saldoCliente(seleccionado.id, empresa) : Promise.resolve(null)),
   );
   const aviso = saldo.datos?.excedido
-    ? `Este cliente debe $${saldo.datos.debe.toFixed(2)} y su límite es $${saldo.datos.limite.toFixed(2)}.`
+    ? `Este cliente debe ${fmtUsd(saldo.datos.debe)} y su límite es ${fmtUsd(saldo.datos.limite)}.`
     : null;
 
   function elegir(c: Cliente) {

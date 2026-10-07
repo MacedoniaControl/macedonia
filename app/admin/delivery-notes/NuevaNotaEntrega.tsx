@@ -26,7 +26,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CampoNumero } from "@/components/ui/CampoNumero";
 import { SelectorCliente } from "@/components/directorio/SelectorCliente";
 import { EditorRenglones, type Renglon } from "@/components/documentos/EditorRenglones";
-import { fmtUsdCentavos } from "@/lib/ux/format";
+import { fmtUsdCentavos, fmtBs, fmtTasa } from "@/lib/ux/format";
 import { TIPOS_PRECIO } from "@/lib/ux/catalogos";
 import { neTotals, notaEntregaHtml, printDoc, NOMBRE_GAS, type NECil, type NEDoc } from "@/lib/ux/doc-templates";
 import { vendedoresDe } from "@/lib/auth/vendedores";
@@ -38,6 +38,7 @@ import { autorizantes, cilindrosParaNota, type LineaEntrega } from "@/lib/cilind
 import { llenosDeRenglones } from "@/lib/cilindros/gas-de-producto";
 import { vendedorDelCliente } from "@/lib/finanzas/cuentas-db";
 import { useSesion } from "@/components/auth/SesionProvider";
+import { aMonto } from "@/lib/ux/decimales";
 
 /**
  * Lo que se emite: se guarda `lineas` (en dólares), se imprime `lineasImpresas`
@@ -60,7 +61,7 @@ type Manual = Partial<Cuenta>;
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
 const hoyISO = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
-const bs = (n: number) => `${n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs`;
+const bs = fmtBs;
 const formularioVacio = () => ({ rif: "", tlf: "", direccion: "", ordenCompra: "", notas: "", vendedor: "", tipoPrecio: TIPOS_PRECIO[0] as string, divisa: "Dólar" });
 
 /** Un número con − y +: en el teléfono, teclear cantidades chicas es un estorbo. */
@@ -143,8 +144,8 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
   // En bolívares el papel sale convertido a la tasa BCV; se guarda en dólares.
   function paraEmitir(correlativo: string): NEEmitir {
     const factor = enBolivares && tasa ? tasa : 1;
-    const impresas = lineas.map((l) => ({ ...l, precio: Math.round(l.precio * factor * 100) / 100 }));
-    const nota = enBolivares && tasa ? `Montos en bolívares, tasa BCV ${tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })}.` : "";
+    const impresas = lineas.map((l) => ({ ...l, precio: aMonto(l.precio * factor) }));
+    const nota = enBolivares && tasa ? `Montos en bolívares, tasa BCV ${fmtTasa(tasa)}.` : "";
     const otros = sinCasilla.length ? `Cilindros: ${sinCasilla.map((g) => `${g} ${cuenta(g).llenos} lleno(s) / ${cuenta(g).vacios} vacío(s)`).join(", ")}.` : "";
     return {
       ...doc(correlativo), notas: [f.notas, otros, nota].filter(Boolean).join(" · "), lineasImpresas: impresas,
@@ -358,7 +359,7 @@ export function NuevaNotaEntrega({ seq, onSave }: { seq: string; onSave: (d: NEE
                 <span className="block text-xl font-semibold tabular-nums text-text">{totalVisible}</span>
                 {t.total > 0 && tasa && (
                   <span className="block text-xs tabular-nums text-muted">
-                    {enBolivares ? `${fmtUsdCentavos(t.total)} · tasa BCV ${tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` : `≈ ${bs(t.total * tasa)}`}
+                    {enBolivares ? `${fmtUsdCentavos(t.total)} · tasa BCV ${fmtTasa(tasa)}` : `≈ ${bs(t.total * tasa)}`}
                   </span>
                 )}
               </dd>

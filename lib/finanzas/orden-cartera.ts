@@ -8,6 +8,8 @@
 //
 // Pura, para que la pantalla y la descarga salgan en el mismo orden.
 
+import { CASI_CERO } from "../ux/decimales.ts";
+
 export type ClaveOrden = "nombre" | "documentos" | "monto" | "saldo" | "vence" | "estado";
 export type Orden = { clave: ClaveOrden; dir: "asc" | "desc" } | null;
 
@@ -33,7 +35,7 @@ export function ariaOrden(actual: Orden, clave: string): "ascending" | "descendi
  * (una por vencer en 3 días va antes que una al día en 30).
  */
 export function gravedad(saldo: number, dias: number | null, liquidada = false): number | null {
-  if (liquidada || saldo <= 0.005 || dias === null) return null;
+  if (liquidada || saldo <= CASI_CERO || dias === null) return null;
   return -dias;
 }
 

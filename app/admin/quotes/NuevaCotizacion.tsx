@@ -20,7 +20,7 @@ import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { CampoNumero } from "@/components/ui/CampoNumero";
-import { fmtUsdCentavos, enBs } from "@/lib/ux/format";
+import { fmtUsdCentavos, enBs, fmtTasa } from "@/lib/ux/format";
 import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates";
 import { vendedoresDe } from "@/lib/auth/vendedores";
 import { vendedoresExternos } from "@/lib/documentos/documentos-db";
@@ -29,6 +29,7 @@ import { leerConfig } from "@/lib/config/config-db";
 import { buscarClientes, type Cliente } from "@/lib/directorio/directorio-db";
 import { useTasaViva } from "@/lib/ux/bcv-rate";
 import { EditorRenglones, totalRenglon, type Renglon } from "@/components/documentos/EditorRenglones";
+import { aMonto } from "@/lib/ux/decimales";
 
 export type GenDoc = {
   correlativo: string; fechaEmision: string; fechaVenc: string; razonSocial: string; rif: string; direccion: string;
@@ -94,8 +95,8 @@ export function NuevaCotizacion({ seq, onSave }: { seq: string; onSave: (d: GenD
       correlativo, fechaEmision: dmy(emision), fechaVenc: dmy(venc),
       razonSocial: f.razonSocial.trim(), rif: f.rif, direccion: f.direccion, telefonos: f.telefonos,
       lineas,
-      lineasImpresas: lineas.map((l) => ({ ...l, precio: Math.round(l.precio * factor * 100) / 100 })),
-      moneda: enBolivares && tasa ? `Bolívares (tasa BCV ${tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })})` : "Dólares",
+      lineasImpresas: lineas.map((l) => ({ ...l, precio: aMonto(l.precio * factor) })),
+      moneda: enBolivares && tasa ? `Bolívares (tasa BCV ${fmtTasa(tasa)})` : "Dólares",
       nota: f.nota, total,
       vendedorExterno: f.vendedor === "__externo" ? f.vendedorExterno : "",
     };
@@ -218,7 +219,7 @@ export function NuevaCotizacion({ seq, onSave }: { seq: string; onSave: (d: GenD
             </div>
           </dl>
           {enBolivares && tasa && total > 0 && (
-            <p className="mt-2 text-xs text-muted">El documento sale en bolívares a la tasa BCV {tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })}.</p>
+            <p className="mt-2 text-xs text-muted">El documento sale en bolívares a la tasa BCV {fmtTasa(tasa)}.</p>
           )}
           {msg && <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{msg}</p>}
           <Button icon="quote" className="mt-3 w-full" onClick={generar} disabled={guardando} cargando={guardando} textoCargando="Guardando…">

@@ -6,9 +6,9 @@ test("un artículo de $4,00 que el catálogo guarda en $4,64 entra al renglón e
   assert.equal(precioSinIva(4.64, 16), 4);
 });
 
-test("redondea a centavos, como Valery", () => {
-  assert.equal(precioSinIva(4.3723, 16), 3.77);
-  assert.equal(precioSinIva(1.0886, 16), 0.94);
+test("no redondea a centavos: guarda 4 decimales", () => {
+  assert.equal(precioSinIva(4.3723, 16), 3.7692);
+  assert.equal(precioSinIva(1.0886, 16), 0.9384);
 });
 
 test("sigue el IVA de la empresa", () => {

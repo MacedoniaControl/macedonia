@@ -11,6 +11,7 @@ import { findNavItem } from "@/lib/ux/nav";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { alertasDe, marcarRevisada, type Alerta } from "@/lib/ux/alertas-db";
 import { fetchBcvRate, useBcvRate } from "@/lib/ux/bcv-rate";
+import { fmtTasa } from "@/lib/ux/format";
 
 export function Header({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
@@ -70,7 +71,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <>
             {/* En el teléfono se muestra la CIFRA, no la palabra: es el dato que
                 se necesita, y ahorra el espacio que hacía falta para lo demás. */}
-            <span className="tabular-nums sm:hidden">{bcv ? bcv.tasa.toFixed(2) : "Tasa"}</span>
+            <span className="tabular-nums sm:hidden">{bcv ? fmtTasa(bcv.tasa) : "Tasa"}</span>
             <span className="hidden sm:inline">Tasa BCV</span>
           </>
         )}
@@ -84,13 +85,13 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         {bcv ? (
           <>
             <p className="text-sm font-semibold tabular-nums text-text">
-              {bcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs
+              {fmtTasa(bcv.tasa)} Bs
             </p>
             {/* La fecha valor es el día para el que vale; la hora, la última vez
                 que el BCV la confirmó. Con más de hora y media sin confirmarse,
                 se avisa: la base la pide cada 30 minutos. */}
             <p className={`text-[10px] ${viejaBcv ? "font-medium text-warn" : "text-muted"}`}
-              title={bcv.proxima ? `Ya publicada la del ${ddmm(bcv.proxima.fechaValor)}: ${bcv.proxima.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs` : undefined}>
+              title={bcv.proxima ? `Ya publicada la del ${ddmm(bcv.proxima.fechaValor)}: ${fmtTasa(bcv.proxima.tasa)} Bs` : undefined}>
               {viejaBcv ? "Sin actualizar desde " : `Vale el ${ddmm(bcv.fecha)} · `}
               {new Date(bcv.fetchedAt).toLocaleString("es-VE", viejaBcv ? { dateStyle: "short", timeStyle: "short" } : { timeStyle: "short" })}
             </p>
