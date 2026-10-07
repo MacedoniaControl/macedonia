@@ -52,6 +52,34 @@ export function Liquidaciones({ empresa, recarga, gerencia, onCambio, tipo = "co
   );
 }
 
+/**
+ * Las liquidaciones de UN cliente, dentro de su cuenta desplegada: es su
+ * historial de pagos, no un registro general de la cartera.
+ */
+export function LiquidacionesDelCliente({ lista, gerencia, onCambio }: { lista: Liquidacion[]; gerencia: boolean; onCambio: () => void }) {
+  const [abierta, setAbierta] = useState<number | null>(null);
+  if (lista.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Liquidaciones de este cliente ({lista.length})</p>
+      <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+        {lista.map((l) => (
+          <li key={l.id}>
+            <button type="button" onClick={() => setAbierta(abierta === l.id ? null : l.id)} aria-expanded={abierta === l.id}
+              className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left text-xs hover:bg-surface-2">
+              <span className="font-mono text-muted">{l.numero}</span>
+              <span className="text-muted">{fechaVista(l.fecha)} · {l.cuentas} nota(s){l.metodo ? ` · ${l.metodo}` : ""}</span>
+              <span className={`ml-auto font-semibold tabular-nums ${l.anuladaEn ? "text-muted line-through" : "text-text"}`}>{fmtUsd(l.total)}</span>
+              {l.anuladaEn ? <StatusBadge tone="danger">Anulada</StatusBadge> : <StatusBadge tone="ok">Pagada</StatusBadge>}
+            </button>
+            {abierta === l.id && <Detalle l={l} gerencia={gerencia} onCambio={onCambio} />}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Detalle({ l, gerencia, onCambio }: { l: Liquidacion; gerencia: boolean; onCambio: () => void }) {
   const [motivo, setMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);

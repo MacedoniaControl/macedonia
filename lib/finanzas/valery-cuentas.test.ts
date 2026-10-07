@@ -27,9 +27,9 @@ test("el reporte de la otra cartera se rechaza y dice dónde va", () => {
 test("por cobrar: el cliente sale de su fila de grupo, el monto del saldo inicial (no del acumulado)", () => {
   const l = leerValery("cobrar", hojas("valery-por-cobrar.xls"));
   assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.emitida, f.vence, f.monto]), [
-    ["CLIENTE DE PRUEBA UNO, C.A.", "NE-0000017809", "2026-03-02", "2026-03-02", 153.97],
-    ["CLIENTE DE PRUEBA UNO, C.A.", "NE-0000018142", "2026-04-10", "2026-04-10", 21.78],
-    ["CLIENTE ÑANDÚ, C.A", "NE-S/N 31-12-2024", "2024-12-31", "2024-12-31", 4004.14],
+    ["CLIENTE DE PRUEBA UNO, C.A.", "NE-0000017809", "2026-03-02", "2026-04-01", 153.97],
+    ["CLIENTE DE PRUEBA UNO, C.A.", "NE-0000018142", "2026-04-10", "2026-05-10", 21.78],
+    ["CLIENTE ÑANDÚ, C.A", "NE-S/N 31-12-2024", "2024-12-31", "2025-01-30", 4004.14],
   ]);
   assert.equal(l.enCero, 1);                       // la nota en 0 ya se cobró
   assert.equal(l.sinVencimiento, 3);               // Valery no trae vencimiento: vence el día de emisión
@@ -93,8 +93,8 @@ test("un pedazo del reporte copiado a un libro nuevo, sin cabecera ni «-», tam
   assert.deepEqual(l.problemas, []);
   assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.emitida, f.vence, f.monto, f.linea]), [
     ["FERRETERÍA EL CLAVO", "NE-9068", "2026-09-28", "2026-10-28", 20, 2],
-    // Vencimiento anterior a la emisión: vence el día que se emitió.
-    ["FERRETERÍA EL CLAVO", "NE-9138", "2026-10-02", "2026-10-02", 35.5, 3],
+    // Vencimiento anterior a la emisión: como nota de entrega, a los 30 días.
+    ["FERRETERÍA EL CLAVO", "NE-9138", "2026-10-02", "2026-11-01", 35.5, 3],
   ]);
 });
 
@@ -126,4 +126,19 @@ test("una fecha que no existe no pasa; el vencimiento «31/9» queda a fin de se
   const f = leerValery("cobrar", [h]).filas[0];
   assert.equal(f.vence, "2026-09-30");
   assert.match(f.nota ?? "", /no existe: fin de mes/);
+});
+
+test("la misma nota escrita «NE-8432·ISMESOL» o «NE-8432» es duplicada", () => {
+  assert.equal(numeroDocumento("NE-8432·ISMESOL"), numeroDocumento("NE-8432"));
+  const s = separarDuplicadas(
+    [{ contraparte: "ISMESOL", documento: "NE-8432", emitida: "2026-07-28", vence: "2026-08-28", monto: 100, nota: "" }],
+    [{ id: 1, contraparte: "ISMESOL", documento: "NE-8432·ISMESOL", monto: 100, saldo: 100 } as never],
+  );
+  assert.equal(s.nuevas.length, 0);
+  assert.equal(s.duplicadas.length, 1);
+});
+
+test("por cobrar: la nota de entrega sin vencimiento en Valery vence a los 30 días", () => {
+  const h: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "1", "2026-10-07", "", "", "10", "", "", "", "10"]] };
+  assert.equal(leerValery("cobrar", [h]).filas[0].vence, "2026-11-06");
 });

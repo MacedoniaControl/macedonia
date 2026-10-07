@@ -35,7 +35,9 @@ import { ariaOrden, gravedad, ordenar, siguienteOrden, type ClaveOrden, type Ord
 import { SortableTh } from "@/components/ui/SortableTh";
 import { Icon } from "@/components/ui/Icon";
 import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
-import { Liquidaciones } from "@/components/finanzas/Liquidaciones";
+import { LiquidacionesDelCliente } from "@/components/finanzas/Liquidaciones";
+import { listarLiquidaciones } from "@/lib/finanzas/liquidaciones-db";
+import { Switch } from "@/components/ui/Switch";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
@@ -93,6 +95,12 @@ function CuentasPorCobrar() {
   const habilitadoEliminar = eliminarHabilitado(cfg.datos);
   const puedeEliminar = gerencia && habilitadoEliminar && !!cfg.datos;
   const [eliminar, setEliminar] = useState<string | null>(null);
+  // Cada cliente desplegado muestra sus pendientes; con el interruptor, también las pagadas.
+  const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());
+  const verPagadas = (cli: string, v: boolean) => setConPagadas((s) => { const n = new Set(s); if (v) n.add(cli); else n.delete(cli); return n; });
+  // Las liquidaciones, por cliente: el historial de pagos de cada uno.
+  const liq = useCarga(`liq:cobrar:${empresaKey}:${recarga}`, () => listarLiquidaciones(empresaKey, "cobrar"));
+  const liquidacionesDe = (cli: string) => (liq.datos ?? []).filter((l) => claveCliente(l.contraparte) === claveCliente(cli));
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -480,7 +488,22 @@ function CuentasPorCobrar() {
                         </span>
                       </td>
                     </tr>
-                    {abierto && g.cuentas.map((c) => {
+                    {abierto && (() => {
+                      const pagada = (c: CuentaDb) => c.estado === "liquidada" || c.saldo <= 0.005;
+                      const nPagadas = g.cuentas.filter(pagada).length;
+                      const todo = conPagadas.has(g.cliente);
+                      return (
+                        <tr className="bg-surface-2/60">
+                          <td colSpan={6} className="px-3 py-2 pl-8">
+                            <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                              <Switch checked={todo} onChange={(v) => verPagadas(g.cliente, v)} label={`Ver también las pagadas de ${g.cliente}`} />
+                              {todo ? `Historial completo · ${g.cuentas.length} nota(s), ${nPagadas} pagada(s)` : `Solo pendientes por cobrar · ${g.cuentas.length - nPagadas} nota(s)${nPagadas ? ` · ${nPagadas} pagada(s) ocultas` : ""}`}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })()}
+                    {abierto && g.cuentas.filter((c) => conPagadas.has(g.cliente) || !(c.estado === "liquidada" || c.saldo <= 0.005)).map((c) => {
                       const e = estadoDe(c.saldo, c.dias);
                       return (
                         <tr key={c.id} onClick={() => setAbierta(c.id)} tabIndex={0}
@@ -508,13 +531,20 @@ function CuentasPorCobrar() {
                           <td className="py-2">
                             {/* Liquidada gana sobre vencida: una cuenta cerrada ya
                                 no le debe nada a nadie, aunque su fecha pasara. */}
-                            {c.estado === "liquidada"
-                              ? <StatusBadge tone="ok">Liquidada</StatusBadge>
+                            {c.estado === "liquidada" || c.saldo <= 0.005
+                              ? <StatusBadge tone="ok">Pagada</StatusBadge>
                               : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
                           </td>
                         </tr>
                       );
                     })}
+                    {abierto && liquidacionesDe(g.cliente).length > 0 && (
+                      <tr className="bg-surface-2/60">
+                        <td colSpan={6} className="px-3 pb-3 pl-8 pt-1">
+                          <LiquidacionesDelCliente lista={liquidacionesDe(g.cliente)} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} />
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 );
               })}
@@ -524,7 +554,6 @@ function CuentasPorCobrar() {
         </SectionCard>
       </div>
 
-      <Liquidaciones empresa={empresaKey} recarga={recarga} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} />
 
       {liquidar !== null && (
         <Modal titulo="Liquidar Notas" onCerrar={() => setLiquidar(null)}>

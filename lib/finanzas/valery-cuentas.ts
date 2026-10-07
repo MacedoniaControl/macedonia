@@ -18,6 +18,7 @@
 
 import { aFechaPlantilla, fechaFinDeMes, type FilaPlantilla, type TipoPlantilla } from "./plantilla-cuentas.ts";
 import type { ClaseCuenta } from "./retencion.ts";
+import { venceNotaEntrega } from "./vencimiento.ts";
 
 export type Celda = string | number | boolean | null;
 export type HojaLeida = { nombre: string; filas: Celda[][] };
@@ -159,8 +160,10 @@ export function leerValery(tipo: TipoPlantilla, hojas: HojaLeida[]): LecturaVale
       monto = dosDec(monto);
       if (monto < 0) return void problemas.push({ linea, motivo: `${pre}${tipoDoc} ${numero} de ${quien}: saldo negativo (${fmt(monto)}).` });
       if (monto === 0) { enCero++; return; }
-      // Valery no trae vencimiento en por cobrar: vence el día que se emitió.
-      const vence = venceValery && venceValery >= emitida ? venceValery : emitida;
+      // Valery no trae vencimiento en por cobrar. La nota de entrega vence a los
+      // 30 días (regla de la empresa); lo demás, el día que se emitió.
+      const sinVence = tipo === "cobrar" && claseDe(tipoDoc) === "nota_entrega" ? venceNotaEntrega(emitida) : emitida;
+      const vence = venceValery && venceValery >= emitida ? venceValery : sinVence;
       if (!venceValery) sinVencimiento++;
       filas.push({
         contraparte: quien, documento: `${tipoDoc}-${numero}`, emitida, vence, monto,
@@ -176,7 +179,8 @@ export function leerValery(tipo: TipoPlantilla, hojas: HojaLeida[]): LecturaVale
 // ---------------------------------------------------------------- duplicados
 /** El número de un documento sin el tipo, sin ceros a la izquierda ni signos: «NE-0000017809» → «17809». */
 export function numeroDocumento(d: string): string {
-  return d.toUpperCase().replace(/^(NE|NET|NDE|NDC|NDB|ND|NC|NCR|FAC|FCM|FACT|FACTURA|NOTA)[\s\-#:.]*/, "")
+  // «NE-8432·ISMESOL» (el estado de cuenta viejo le pegaba el cliente) es la NE-8432.
+  return d.split("·")[0].toUpperCase().replace(/^(NE|NET|NDE|NDC|NDB|ND|NC|NCR|FAC|FCM|FACT|FACTURA|NOTA)[\s\-#:.]*/, "")
     .replace(/\.0+$/, "").replace(/[^A-Z0-9]/g, "").replace(/^0+(?=.)/, "");
 }
 
