@@ -22,7 +22,7 @@ const esNumero = (c: Columna) => c.tipo === "num" || c.tipo === "dif" || c.tipo 
 const FORMATO: Partial<Record<NonNullable<Columna["tipo"]>, string>> = {
   num: "#,##0.###;[Red]-#,##0.###;0",
   dif: "+#,##0.###;[Red]-#,##0.###;0",
-  usd: '"$"#,##0.000#;[Red]-"$"#,##0.000#',
+  usd: '"$"#,##0.00##;[Red]-"$"#,##0.00##',
   pct: '0.0" %";[Red]-0.0" %"',
 };
 

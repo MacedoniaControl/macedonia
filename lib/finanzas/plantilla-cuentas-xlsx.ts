@@ -33,7 +33,7 @@ export async function libroPlantilla(tipo: TipoPlantilla, empresa: string): Prom
   for (let r = 2; r <= 1000; r++) {
     ws.getCell(r, 3).numFmt = "dd/mm/yyyy";
     ws.getCell(r, 4).numFmt = "dd/mm/yyyy";
-    ws.getCell(r, 5).numFmt = "#,##0.000#";
+    ws.getCell(r, 5).numFmt = "#,##0.00##";
   }
 
   const quien = tipo === "cobrar" ? "Cliente" : "Proveedor";

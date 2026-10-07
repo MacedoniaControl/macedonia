@@ -58,7 +58,7 @@ export function textoCelda(v: Celda, tipo: TipoColumna = "texto"): string {
   if (typeof v === "string") return tipo === "fecha" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v.split("-").reverse().join("-") : v;
   switch (tipo) {
     case "dif": return v === 0 ? "0" : `${v > 0 ? "+" : "−"}${num(v)}`;
-    case "usd": return `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("es-VE", { minimumFractionDigits: 3, maximumFractionDigits: 4 })}`;
+    case "usd": return `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
     case "pct": return `${v < 0 ? "−" : ""}${num(v, 1)} %`;
     default: return `${v < 0 ? "−" : ""}${num(v)}`;
   }

@@ -50,7 +50,7 @@ export function InputMonto({
       autoComplete="off"
       aria-label={ariaLabel}
       aria-invalid={invalido || undefined}
-      placeholder="0,000"
+      placeholder="0,00"
       value={texto}
       onFocus={() => { enfocado.current = true; }}
       onChange={(e) => {

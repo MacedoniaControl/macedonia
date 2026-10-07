@@ -139,6 +139,6 @@ export function fmtDif(n: number | null): string {
 /** −$241,47 · +$13,52 */
 export function fmtUsdSigno(n: number | null): string {
   if (n === null) return "—";
-  const s = Math.abs(n).toLocaleString("es-VE", { minimumFractionDigits: 3, maximumFractionDigits: 4 });
+  const s = Math.abs(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   return (n < 0 ? "−" : n > 0 ? "+" : "") + "$" + s;
 }

@@ -46,7 +46,7 @@ test("por pagar: las dos variantes de columnas; el monto es el saldo, ya sin ret
     ["CODINTER", "FCM-16200", "2026-08-17", 1929.84],
     ["STARGAS", "FCM-80165", "2026-08-17", 378.57],   // la cabecera sin los dos puntos también se lee
   ]);
-  assert.match(l.filas[2].nota, /total 3\.881,360 · IVA retenido 401,520 · abonado 1\.550,000/);
+  assert.match(l.filas[2].nota, /total 3\.881,36 · IVA retenido 401,52 · abonado 1\.550,00/);
   assert.equal(l.filas[0].clase, "nota_entrega");
   assert.equal(l.filas[1].clase, "factura");
 });

@@ -223,8 +223,6 @@ function CuentasPorCobrar() {
     : k === "estado" ? gravedad(c.saldo, c.dias, c.estado === "liquidada") : null;
   const clientesVisibles = ordenar(tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes, orden, valorCliente)
     .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, ordenDe.get(g.cliente) ?? orden, valorCuenta) }));
-  const ordenarDentro = (cliente: string, clave: ClaveOrden) =>
-    setOrdenDe((m) => new Map(m).set(cliente, siguienteOrden(m.get(cliente) ?? null, clave)));
   const thOrden = (label: string, clave: ClaveOrden, align: "left" | "right" = "left") => (
     <SortableTh label={label} sortKey={clave} align={align} ariaSort={(k) => ariaOrden(orden, k)} onSort={() => setOrden((o) => siguienteOrden(o, clave))} />
   );
@@ -503,31 +501,33 @@ function CuentasPorCobrar() {
                       </td>
                     </tr>
                     {abierto && (() => {
-                      const pagada = (c: CuentaDb) => c.estado === "liquidada" || c.saldo <= CASI_CERO;
-                      const nPagadas = g.cuentas.filter(pagada).length;
                       const todo = conPagadas.has(g.cliente);
-                      const nLq = liquidacionesDe(g.cliente).length;
                       const od = ordenDe.get(g.cliente) ?? orden;
-                      const flecha = (k: ClaveOrden) => (od?.clave === k ? (od.dir === "desc" ? " ↓" : " ↑") : "");
-                      const botonOrden = (k: ClaveOrden, label: string) => (
-                        <button type="button" aria-pressed={od?.clave === k}
-                          title={`Ordenar los documentos de ${g.cliente} por ${label.toLowerCase()}`}
-                          className={`rounded-full border px-2 py-0.5 ${od?.clave === k ? "border-brand/40 bg-brand/10 text-brand" : "border-border text-muted hover:text-text"}`}
-                          onClick={() => ordenarDentro(g.cliente, k)}>{label}{flecha(k)}</button>
-                      );
+                      // Una sola píldora: Estado ↑ / Estado ↓ / Vence / Saldo.
+                      const OPCIONES: { id: string; label: string; orden: NonNullable<Orden> }[] = [
+                        { id: "estado-asc", label: "Estado ↑", orden: { clave: "estado", dir: "asc" } },
+                        { id: "estado-desc", label: "Estado ↓", orden: { clave: "estado", dir: "desc" } },
+                        { id: "vence", label: "Vence", orden: { clave: "vence", dir: "asc" } },
+                        { id: "saldo", label: "Saldo", orden: { clave: "saldo", dir: "desc" } },
+                      ];
+                      const actual = OPCIONES.find((o) => o.orden.clave === od?.clave && o.orden.dir === od?.dir)?.id ?? "";
                       return (
                         <tr className="bg-surface-2/60">
                           <td colSpan={5} className="px-3 py-2 pl-8">
                             <span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
                               <span className="flex flex-wrap items-center gap-2">
                                 <Switch checked={todo} onChange={(v) => verPagadas(g.cliente, v)} label={`Ver también las pagadas y las liquidaciones de ${g.cliente}`} />
-                                {todo
-                                  ? `Historial completo · ${g.cuentas.length} nota(s), ${nPagadas} pagada(s)${nLq ? ` · ${nLq} liquidación(es)` : ""}`
-                                  : `Solo pendientes, por vencer y vencidas · ${g.cuentas.length - nPagadas} nota(s)${nPagadas || nLq ? ` · ocultas: ${[nPagadas ? `${nPagadas} pagada(s)` : "", nLq ? `${nLq} liquidación(es)` : ""].filter(Boolean).join(" y ")}` : ""}`}
+                                Pagadas
                               </span>
-                              <span className="flex items-center gap-1.5">
-                                Ordenar: {botonOrden("estado", "Estado")}{botonOrden("vence", "Vence")}{botonOrden("saldo", "Saldo")}
-                              </span>
+                              <label className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 ${actual ? "border-brand/40 bg-brand/10 text-brand" : "border-border text-muted"}`}>
+                                <span>Ordenar</span>
+                                <select value={actual} aria-label={`Ordenar los documentos de ${g.cliente}`}
+                                  className="cursor-pointer bg-transparent font-medium text-text outline-none"
+                                  onChange={(ev) => { const o = OPCIONES.find((x) => x.id === ev.target.value); if (o) setOrdenDe((m) => new Map(m).set(g.cliente, o.orden)); }}>
+                                  {!actual && <option value="" disabled>—</option>}
+                                  {OPCIONES.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                                </select>
+                              </label>
                             </span>
                           </td>
                         </tr>

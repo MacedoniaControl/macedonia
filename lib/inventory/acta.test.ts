@@ -113,6 +113,6 @@ describe("formato del acta", () => {
     assert.equal(fmtDif(0), "0");
     assert.equal(fmtDif(null), "nuevo");
     assert.equal(fmtUsdSigno(-241.4684), "−$241,4684");
-    assert.equal(fmtUsdSigno(13.52), "+$13,520");
+    assert.equal(fmtUsdSigno(13.52), "+$13,52");
   });
 });
