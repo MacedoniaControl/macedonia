@@ -52,6 +52,9 @@ function estadoDe(saldo: number, dias: number): { label: string; tone: Tone } {
   return { label: "Pendiente", tone: "info" };
 }
 
+/** El orden de los documentos de un cliente si no se elige otro: Estado ↓. */
+const ORDEN_DOCUMENTOS: Orden = { clave: "estado", dir: "desc" };
+
 const inputClass = "sumi-campo";
 /** El mismo cliente escrito con espacios o mayúsculas distintas (la misma regla que agrupa la cartera). */
 const mismoCliente = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toUpperCase() === b.trim().replace(/\s+/g, " ").toUpperCase();
@@ -98,7 +101,9 @@ function CuentasPorCobrar() {
   const [eliminar, setEliminar] = useState<string | null>(null);
   // Cada cliente desplegado muestra sus pendientes; con el interruptor, también las pagadas.
   const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());
-  // El orden de los documentos dentro de cada cliente (manda sobre el de la cabecera).
+  // El orden de los documentos dentro de cada cliente. Por defecto, Estado ↓:
+  // vencidas arriba (la más vieja primero), luego por vencer y pendientes por
+  // fecha, y las pagadas al final. La cabecera ordena los clientes.
   const [ordenDe, setOrdenDe] = useState<Map<string, Orden>>(new Map());
   const verPagadas = (cli: string, v: boolean) => setConPagadas((s) => { const n = new Set(s); if (v) n.add(cli); else n.delete(cli); return n; });
   // Las liquidaciones, por cliente: el historial de pagos de cada uno.
@@ -212,8 +217,7 @@ function CuentasPorCobrar() {
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const clientes = agruparPorCliente(conSaldo);
   const tc = buscaCliente.trim().toLowerCase();
-  // Se ordena tocando la cabecera; sin tocar, primero quien más debe. Los
-  // documentos de cada cliente siguen el mismo orden al desplegarlo.
+  // Se ordena tocando la cabecera; sin tocar, primero quien más debe.
   const [orden, setOrden] = useState<Orden>(null);
   const valorCliente = (g: ClienteCartera<CuentaDb>, k: ClaveOrden) =>
     k === "nombre" ? g.cliente : k === "documentos" ? g.documentos : k === "monto" ? g.monto : k === "saldo" ? g.saldo
@@ -222,7 +226,7 @@ function CuentasPorCobrar() {
     k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "vence" ? c.vence
     : k === "estado" ? gravedad(c.saldo, c.dias, c.estado === "liquidada") : null;
   const clientesVisibles = ordenar(tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes, orden, valorCliente)
-    .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, ordenDe.get(g.cliente) ?? orden, valorCuenta) }));
+    .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, ordenDe.get(g.cliente) ?? ORDEN_DOCUMENTOS, valorCuenta) }));
   const thOrden = (label: string, clave: ClaveOrden, align: "left" | "right" = "left") => (
     <SortableTh label={label} sortKey={clave} align={align} ariaSort={(k) => ariaOrden(orden, k)} onSort={() => setOrden((o) => siguienteOrden(o, clave))} />
   );
@@ -502,7 +506,7 @@ function CuentasPorCobrar() {
                     </tr>
                     {abierto && (() => {
                       const todo = conPagadas.has(g.cliente);
-                      const od = ordenDe.get(g.cliente) ?? orden;
+                      const od = ordenDe.get(g.cliente) ?? ORDEN_DOCUMENTOS;
                       // Una sola píldora: Estado ↑ / Estado ↓ / Vence / Saldo.
                       const OPCIONES: { id: string; label: string; orden: NonNullable<Orden> }[] = [
                         { id: "estado-asc", label: "Estado ↑", orden: { clave: "estado", dir: "asc" } },
