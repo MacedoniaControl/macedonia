@@ -20,12 +20,15 @@ export function FiltroClase({
   total,
   valor,
   onCambio,
+  etiquetaTodas = "Todas",
 }: {
   /** Cuántas cuentas hay de cada clase. */
   conteo: Record<string, number>;
   total: number;
   valor: string;
   onCambio: (clase: string) => void;
+  /** Cómo se llama la pestaña de todas: en Pagar, «Consolidado». */
+  etiquetaTodas?: string;
 }) {
   // Solo se ofrece la pestaña del GRUPO: las notas de debito se cuentan bajo
   // «Nota de entrega», asi que no tienen pestaña propia.
@@ -36,7 +39,7 @@ export function FiltroClase({
   return (
     <div className="sumi-tabs -mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1"
       role="group" aria-label="Filtrar por clase de documento">
-      {[{ id: "todas", label: `Todas (${total})` },
+      {[{ id: "todas", label: `${etiquetaTodas} (${total})` },
         ...visibles.map((c) => ({ id: c.id as string, label: `${c.label} (${conteo[c.id] ?? 0})` })),
       ].map((op) => (
         <button

@@ -28,6 +28,8 @@ import { Liquidaciones } from "@/components/finanzas/Liquidaciones";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 import { BotonEliminar, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
 import { leerConfig } from "@/lib/config/config-db";
+import { porClase, resumenDe } from "@/lib/finanzas/resumen-clases";
+import { TarjetaSegmento } from "@/components/finanzas/TarjetaSegmento";
 import { MarcaRevision } from "@/components/finanzas/MarcaRevision";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
@@ -122,7 +124,7 @@ function CuentasPorPagar() {
   // vacia: un filtro con cero resultados parece que el sistema perdio datos.
   // Se cuenta por GRUPO, no por clase: la pestaña «Nota de entrega» tiene que
   // decir cuantas cuentas va a mostrar, y muestra tambien las de debito.
-  const porClase = ctas.reduce<Record<string, number>>(
+  const conteoClase = ctas.reduce<Record<string, number>>(
     (a, c) => { const g = grupoDeClase(c.clase); return { ...a, [g]: (a[g] ?? 0) + 1 }; }, {});
 
   // Funcion que devuelve JSX, no componente: un componente definido adentro de
@@ -219,6 +221,12 @@ function CuentasPorPagar() {
   const vencido = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).reduce((a, c) => a + c.saldoNeto, 0);
   const alerta = conSaldo.filter((c) => c.saldoNeto > 0 && c.d >= 0 && c.d <= 7).reduce((a, c) => a + c.saldoNeto, 0);
   const nVenc = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).length;
+  // Segmentado por clase (Facturas, Notas de Entrega…) y el consolidado, sobre TODAS las cuentas.
+  const segmentos = porClase(ctas);
+  const todo = resumenDe(ctas);
+  const COLOR: Record<string, string> = { factura: "bg-brand", nota_entrega: "bg-info", ajuste: "bg-warn" };
+  const colorDe = (id: string) => COLOR[id] ?? "bg-muted";
+  const nombreFiltro = filtroClase === "todas" ? "Consolidado: todas las clases" : segmentos.find((x) => x.id === filtroClase)?.nombre ?? CLASES.find((x) => x.id === filtroClase)?.label ?? filtroClase;
 
   return (
     <>
@@ -253,16 +261,36 @@ function CuentasPorPagar() {
           <AlertCard tone="ok" titulo={exitoTitulo} mensaje={exito} />
         </div>
       )}
-      <FiltroClase conteo={porClase} total={ctas.length}
-        valor={filtroClase} onCambio={setFiltroClase} />
-
-      <SectionCard title="Resumen">
+      <SectionCard title="Resumen" description={nombreFiltro}>
+        <FiltroClase conteo={conteoClase} total={ctas.length} etiquetaTodas="Consolidado"
+          valor={filtroClase} onCambio={setFiltroClase} />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Total a Pagar" value={fmtUsd(total)} accent />
           <StatCard label="Vencido" value={fmtUsd(vencido)} />
           <StatCard label="Alerta (≤7d)" value={fmtUsd(alerta)} />
           <StatCard label="Cuentas Vencidas" value={String(nVenc)} />
         </div>
+
+        {/* Cada clase en su recuadro y el consolidado. Tocar uno filtra esa clase. */}
+        {segmentos.length > 1 && (
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Por clase</p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {segmentos.map((g) => (
+                <TarjetaSegmento key={g.id} nombre={g.nombre} activa={filtroClase === g.id}
+                  sub={`${g.proveedores} proveedor(es) · ${g.cuentas} cuenta(s)`}
+                  total={fmtUsd(g.total)} parte={g.parte} barras={[{ parte: g.parte, color: colorDe(g.id) }]}
+                  datos={[{ label: "Vencido", valor: fmtUsd(g.vencido), peligro: true }, { label: "Alerta (≤7d)", valor: fmtUsd(g.alerta) }, { label: "Vencidas", valor: String(g.vencidas) }]}
+                  onClick={() => setFiltroClase(filtroClase === g.id ? "todas" : g.id)} />
+              ))}
+              <TarjetaSegmento nombre="Consolidado" activa={filtroClase === "todas"}
+                sub={`${segmentos.length} clases · ${todo.proveedores} proveedor(es) · ${todo.cuentas} cuenta(s)`}
+                total={fmtUsd(todo.total)} parte={100} barras={segmentos.map((g) => ({ parte: g.parte, color: colorDe(g.id) }))}
+                datos={[{ label: "Vencido", valor: fmtUsd(todo.vencido), peligro: true }, { label: "Alerta (≤7d)", valor: fmtUsd(todo.alerta) }, { label: "Vencidas", valor: String(todo.vencidas) }]}
+                onClick={() => setFiltroClase("todas")} />
+            </div>
+          </div>
+        )}
       </SectionCard>
       {nVenc > 0 && (
         <div className="mt-4">
