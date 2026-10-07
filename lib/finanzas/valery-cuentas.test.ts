@@ -109,3 +109,21 @@ test("la cabecera también se encuentra con títulos encima", () => {
   const l = leerValery("cobrar", [h]);
   assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.monto, f.linea]), [["A", "NE-1", 10, 5]]);
 });
+
+test("una fecha que no existe no pasa; el vencimiento «31/9» queda a fin de septiembre", async () => {
+  const { aFechaPlantilla, fechaFinDeMes } = await import("./plantilla-cuentas.ts");
+  assert.equal(aFechaPlantilla("31/9/2026"), null, "septiembre tiene 30 días");
+  assert.equal(aFechaPlantilla("30/2/2026"), null);
+  assert.equal(aFechaPlantilla("31/8/2026"), "2026-08-31");
+  assert.deepEqual(fechaFinDeMes("31/9/2026"), { fecha: "2026-09-30", corregida: true });
+  assert.deepEqual(fechaFinDeMes("30/2/2028"), { fecha: "2028-02-29", corregida: true });
+  assert.deepEqual(fechaFinDeMes("12/10/2026"), { fecha: "2026-10-12", corregida: false });
+  assert.equal(fechaFinDeMes("45/9/2026").fecha, null);
+  const h: HojaLeida = { nombre: "Hoja1", filas: [
+    ["", "Descripción Cliente ISMESOL"],
+    ["", "NE", "8791", "31/8/2026", "31/9/2026", "", "", "", "1300", "", "1300"],
+  ] };
+  const f = leerValery("cobrar", [h]).filas[0];
+  assert.equal(f.vence, "2026-09-30");
+  assert.match(f.nota ?? "", /no existe: fin de mes/);
+});
