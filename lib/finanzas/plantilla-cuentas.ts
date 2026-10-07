@@ -14,6 +14,8 @@
 
 import { aNumero } from "./importar-cuentas.ts";
 import { aMonto } from "../ux/decimales.ts";
+import { claseDeDocumento } from "./retencion.ts";
+import { venceNotaEntrega } from "./vencimiento.ts";
 
 export type TipoPlantilla = "cobrar" | "pagar";
 
@@ -99,9 +101,10 @@ export const claveCuenta = (contraparte: string, documento: string) =>
 
 /**
  * Lee las filas de la hoja de la plantilla (la primera fila son los títulos).
- * `existentes` son las claves de lo que ya está en la cartera.
+ * `existentes` son las claves de lo que ya está en la cartera. En por cobrar,
+ * una nota de entrega que vence el mismo día que se emitió vence a los 30 días.
  */
-export function leerPlantilla(filasHoja: string[][], existentes: Set<string>): LecturaPlantilla {
+export function leerPlantilla(filasHoja: string[][], existentes: Set<string>, tipo?: "cobrar" | "pagar"): LecturaPlantilla {
   const filas: FilaPlantilla[] = [];
   const problemas: LecturaPlantilla["problemas"] = [];
   const repetidas: FilaPlantilla[] = [];
@@ -120,7 +123,8 @@ export function leerPlantilla(filasHoja: string[][], existentes: Set<string>): L
     if (!vence) return void problemas.push({ linea, motivo: `Fecha de vencimiento inválida: «${celda(3)}».` });
     if (vence < emitida) return void problemas.push({ linea, motivo: "Vence antes de emitirse." });
     if (monto === null || !(monto > 0)) return void problemas.push({ linea, motivo: `Monto inválido: «${celda(4)}».` });
-    const fila: FilaPlantilla = { contraparte, documento, emitida, vence, monto: aMonto(monto), nota: celda(5) };
+    const venceNe = tipo === "cobrar" && claseDeDocumento(documento) === "nota_entrega" && vence <= emitida ? venceNotaEntrega(emitida) : vence;
+    const fila: FilaPlantilla = { contraparte, documento, emitida, vence: venceNe, monto: aMonto(monto), nota: celda(5) };
     const clave = claveCuenta(contraparte, documento);
     if (vistas.has(clave)) return void problemas.push({ linea, motivo: `${documento} de ${contraparte} está dos veces en el archivo.` });
     vistas.add(clave);

@@ -103,7 +103,7 @@ export function ImportarCartera({
             ? e
             : `Este archivo no es el reporte «${reporte}» de Valery ni la plantilla de Macedonia. Sube el reporte tal como sale de Valery (.xls o .xlsx).`);
         }
-        const l = leerPlantilla(filasHoja, new Set());
+        const l = leerPlantilla(filasHoja, new Set(), t);
         filas = l.filas;
         base = { origen: "plantilla", problemas: l.problemas, enCero: 0, sinVencimiento: 0, sinNumero: 0 };
       }
