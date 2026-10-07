@@ -26,6 +26,8 @@ import { fmtUsd, fmtUsdCentavos } from "@/lib/ux/format";
 import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
 import { Liquidaciones } from "@/components/finanzas/Liquidaciones";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
+import { BotonEliminar, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
+import { leerConfig } from "@/lib/config/config-db";
 import { MarcaRevision } from "@/components/finanzas/MarcaRevision";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
@@ -68,6 +70,11 @@ function CuentasPorPagar() {
   const gerencia = puedeVerFinanzas(rol);
   const [liquidar, setLiquidar] = useState<string | null>(null);
   const [anexar, setAnexar] = useState<string | null>(null);
+  // «Eliminar»: Owner y Administrador, mientras el Owner lo tenga habilitado (migración 38).
+  const cfg = useCarga(`cfg:${empresaKey}:${recarga}`, () => leerConfig(empresaKey));
+  const habilitadoEliminar = eliminarHabilitado(cfg.datos);
+  const puedeEliminar = gerencia && habilitadoEliminar && !!cfg.datos;
+  const [eliminar, setEliminar] = useState<CuentaDb | null>(null);
   // Que cuenta se esta mirando, y si esta en modo edicion. Son dos estados
   // distintos: se puede abrir el detalle sin editar.
   const [abierta, setAbierta] = useState<number | null>(null);
@@ -233,6 +240,10 @@ function CuentasPorPagar() {
             {gerencia && (
               <Button variant="secondary" icon="check" onClick={() => { setExito(""); setLiquidar(""); }}>Liquidar cuentas</Button>
             )}
+            {rol === "owner" && cfg.datos && (
+              <InterruptorEliminar empresa={empresaKey} habilitado={habilitadoEliminar}
+                onCambio={(t) => { setExitoTitulo("Ajuste Guardado"); setExito(t); setRecarga((n) => n + 1); }} />
+            )}
             <BotonDescargar empresa={empresaKey} />
           </div>
         }
@@ -345,6 +356,10 @@ function CuentasPorPagar() {
                           )}
                           <button type="button" className={pildora} title={`Anexar una cuenta a la deuda con ${c.contraparte}`}
                             onClick={(ev) => { ev.stopPropagation(); setExito(""); setAnexar(c.contraparte); }}>Anexar</button>
+                          {puedeEliminar && (
+                            <BotonEliminar titulo={`Eliminar ${c.documento}`}
+                              onClick={(ev) => { ev.stopPropagation(); setExito(""); setEliminar(c); }} />
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -363,6 +378,14 @@ function CuentasPorPagar() {
         <Modal titulo="Liquidar Cuentas" onCerrar={() => setLiquidar(null)}>
           <LiquidarNotas tipo="pagar" empresa={empresaKey} cuentas={ctas} clienteInicial={liquidar || undefined}
             onHecho={(t) => { setExitoTitulo("Cuentas Liquidadas"); setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setLiquidar(null)} />
+        </Modal>
+      )}
+
+      {eliminar && (
+        <Modal titulo="Eliminar Cuenta" onCerrar={() => setEliminar(null)}>
+          <EliminarCuentasDe empresa={empresaKey} contraparte={eliminar.contraparte}
+            cuentas={[{ ...eliminar, saldo: eliminar.saldoNeto }]}
+            onHecho={(t) => { setExitoTitulo("Cuenta Eliminada"); setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminar(null)} />
         </Modal>
       )}
 
