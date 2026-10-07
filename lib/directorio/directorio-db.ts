@@ -83,6 +83,17 @@ export async function clientePorNombre(nombre: string): Promise<Cliente | null> 
   return parecido.data?.length ? aCliente(parecido.data[0]) : null;
 }
 
+/** Lo mismo para un proveedor (estado de cuenta por pagar). */
+export async function proveedorPorNombre(nombre: string): Promise<Proveedor | null> {
+  const n = nombre.trim().replace(/\s+/g, " ").replace(/[%_]/g, "");
+  if (!n) return null;
+  const sb = await createClient();
+  const exacto = await sb.from("proveedores").select("*").ilike("nombre", n).limit(1);
+  if (exacto.data?.length) return aProveedor(exacto.data[0]);
+  const parecido = await sb.from("proveedores").select("*").ilike("nombre", `${n}%`).limit(1);
+  return parecido.data?.length ? aProveedor(parecido.data[0]) : null;
+}
+
 export async function clientePorRif(rif: string): Promise<Cliente | null> {
   const sb = await createClient();
   const { data } = await sb.from("clientes").select("*").eq("rif", normalizarRif(rif)).maybeSingle();

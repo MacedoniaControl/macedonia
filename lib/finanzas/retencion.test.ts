@@ -314,16 +314,16 @@ describe("el panel muestra lo que hay que pagar, no el valor de cara", () => {
     assert.doesNotMatch(pant, /reduce\(\(a, c\) => a \+ c\.saldo,/);
   });
 
-  test("la columna se llama «A Pagar», no «Monto»", () => {
-    // Si el numero es el neto, llamarlo Monto hace creer que es el de la
-    // factura, y no cuadraria con el papel.
-    assert.match(pant, /thOrden\("A Pagar", "monto"/);
+  test("la cartera por proveedor muestra el saldo NETO, sin columna «Monto»", () => {
+    // Se agrupa por proveedor (como por cobrar) y solo queda el saldo: el
+    // neto, lo que de verdad se le paga.
+    assert.match(pant, /monto: c\.neto, saldo: c\.saldoNeto/);
     assert.doesNotMatch(pant, /thOrden\("Monto"/);
   });
 
   test("cuando hay retención, el total de la factura sigue a la vista", () => {
     // Sin el, no se puede conciliar la pantalla con el documento.
-    assert.match(pant, /factura \{fmtUsd\(c\.monto\)\}/);
+    assert.match(pant, /factura \{fmtUsd\(c\.montoFactura\)\}/);
   });
 
   test("abonar, liquidar y el detalle validan contra el MISMO saldo", () => {

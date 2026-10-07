@@ -1,6 +1,7 @@
 "use client";
 
-// El estado de cuenta de un cliente, en PDF (Cuentas por Cobrar).
+// El estado de cuenta de un cliente (Cuentas por Cobrar) o de un proveedor
+// (Cuentas por Pagar), en PDF.
 //
 // Pedido del usuario (07-10-2026): el botón «Descargar PDF» dentro de cada
 // cliente. Con «Pagadas» encendido incluye las pagadas; apagado, solo lo que
@@ -21,6 +22,8 @@ export type FilaEstadoCuenta = {
 
 export type EstadoCuenta = {
   empresa: EmpresaId;
+  /** Por defecto, por cobrar (un cliente). */
+  tipo?: "cobrar" | "pagar";
   emitido: string; // AAAA-MM-DD
   cliente: { nombre: string; rif?: string | null; telefonos?: string | null; direccion?: string | null };
   filas: FilaEstadoCuenta[];
@@ -32,6 +35,8 @@ const limpio = (d: string) => d.split("·")[0].trim();
 export async function estadoCuentaPdf(e: EstadoCuenta): Promise<Blob> {
   const pm = await motorPdf();
   const emp = EMPRESAS[e.empresa];
+  const titulo = e.tipo === "pagar" ? "Cuenta por Pagar" : "Cuenta por Cobrar";
+  const quien = e.tipo === "pagar" ? "PROVEEDOR" : "CLIENTE";
   const logo = logoDe(e.empresa);
   const totalMonto = e.filas.reduce((a, f) => a + f.monto, 0);
   const totalSaldo = e.filas.reduce((a, f) => a + f.saldo, 0);
@@ -57,14 +62,14 @@ export async function estadoCuentaPdf(e: EstadoCuenta): Promise<Blob> {
   const def = {
     pageSize: "A4",
     pageMargins: [36, 36, 36, 40],
-    info: { title: `Cuenta por Cobrar · ${e.cliente.nombre}`, subject: emp.nombre },
+    info: { title: `${titulo} · ${e.cliente.nombre}`, subject: emp.nombre },
     defaultStyle: { font: "Roboto", fontSize: 8.5, color: C.tinta },
     content: [
       {
         columns: [
           { image: logo.src, width: logo.ancho, height: logo.alto },
           { stack: [
-            { text: "Cuenta por Cobrar", bold: true, fontSize: 14, color: C.navy, alignment: "right" },
+            { text: titulo, bold: true, fontSize: 14, color: C.navy, alignment: "right" },
             { text: `RIF ${emp.rif}`, bold: true, fontSize: 9, color: C.marron, alignment: "right", margin: [0, 2, 0, 0] },
             { text: `Emitida el ${fechaVista(e.emitido)}`, fontSize: 8.5, color: C.gris, alignment: "right", margin: [0, 2, 0, 0] },
           ] },
@@ -75,7 +80,7 @@ export async function estadoCuentaPdf(e: EstadoCuenta): Promise<Blob> {
         table: {
           widths: [62, "*", 40, 110],
           body: [
-            [k("CLIENTE"), v(e.cliente.nombre), k("TLF"), v(e.cliente.telefonos)],
+            [k(quien), v(e.cliente.nombre), k("TLF"), v(e.cliente.telefonos)],
             [k("RIF"), v(e.cliente.rif), { text: "" }, { text: "" }],
             [k("DIRECCIÓN"), { ...v(e.cliente.direccion), colSpan: 3 }, "", ""],
           ],
@@ -114,9 +119,9 @@ export async function estadoCuentaPdf(e: EstadoCuenta): Promise<Blob> {
   return pm.createPdf(def).getBlob();
 }
 
-/** Arma y baja el PDF: «Cuenta por Cobrar - CLIENTE - AAAA-MM-DD.pdf». */
+/** Arma y baja el PDF: «Cuenta por Cobrar - CLIENTE - AAAA-MM-DD.pdf» (o «Cuenta por Pagar - PROVEEDOR …»). */
 export async function descargarEstadoCuenta(e: EstadoCuenta) {
   const blob = await estadoCuentaPdf(e);
-  const nombre = e.cliente.nombre.replace(/[\\/:*?"<>|]+/g, " ").trim();
-  descargarBlob(blob, `Cuenta por Cobrar - ${nombre} - ${e.emitido}.pdf`);
+  const nombre = e.cliente.nombre.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  descargarBlob(blob, `${e.tipo === "pagar" ? "Cuenta por Pagar" : "Cuenta por Cobrar"} - ${nombre} - ${e.emitido}.pdf`);
 }
