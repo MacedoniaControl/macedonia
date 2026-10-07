@@ -109,7 +109,8 @@ function CuentasPorPagar() {
   // Se ordena tocando la cabecera (montos de mayor a menor, vencimiento del
   // más viejo al más nuevo, estado del más grave al pagado). La descarga sale
   // en el mismo orden.
-  const [orden, setOrden] = useState<Orden>(null);
+  // Por defecto, por estado: vencidas arriba, luego por vencer, pendientes y pagadas.
+  const [orden, setOrden] = useState<Orden>({ clave: "estado", dir: "desc" });
   const conSaldo = ordenar(
     ctas.filter((c) => filtroClase === "todas" || grupoDeClase(c.clase) === filtroClase).map((c) => ({ ...c, d: c.dias })),
     orden,
