@@ -12,9 +12,9 @@
 --      Se buscan solas: también las que existan solo en producción. Los
 --      porcentajes (numeric(5,2)) no se tocan.
 --   2. Las vistas que leen esas columnas (o que redondean con ::numeric(14,2))
---      se guardan, se quitan y se vuelven a
---      crear tal cual (permisos, dueño, security_invoker y comentario
---      incluidos), cambiando sus ::numeric(14,2) por ::numeric(18,4).
+--      se guardan, se quitan y se vuelven a crear tal cual (permisos, dueño,
+--      security_invoker y comentario incluidos), cambiando sus
+--      ::numeric(14,2) por ::numeric(18,4).
 --   3. liquidar_cuentas redondeaba el saldo a 2 decimales: ahora a 4.
 --
 -- Los montos que ya estaban guardados no cambian (12,35 sigue siendo 12,35);
@@ -91,8 +91,9 @@ begin
     if v.comentario is not null then
       execute format('comment on view %I.%I is %L', v.esquema, v.nombre, v.comentario);
     end if;
-    -- Los permisos que tenía, uno por uno.
-    execute format('revoke all on %I.%I from public', v.esquema, v.nombre);
+    -- Los permisos que tenía, uno por uno (y ninguno de los que Supabase da
+    -- por defecto a una vista nueva).
+    execute format('revoke all on %I.%I from public, anon, authenticated, service_role', v.esquema, v.nombre);
     for a in select (aclexplode(v.acl)).* loop
       execute format('grant %s on %I.%I to %s', a.privilege_type, v.esquema, v.nombre,
         case when a.grantee = 0 then 'public' else quote_ident(pg_get_userbyid(a.grantee)) end);
