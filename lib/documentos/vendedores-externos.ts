@@ -9,6 +9,8 @@
 //     manda si existe. Sin porcentaje no hay comisión: no se inventa.
 //   · El mismo vendedor escrito distinto («Juan Pérez» / «JUAN PEREZ») es uno.
 
+import { aMonto } from "../ux/decimales.ts";
+
 export type DocExterno = {
   id: number; tipo: "cotizacion" | "nota_entrega" | string; correlativo: string; fecha: string;
   cliente: string; vendedorExterno: string | null; total: number;
@@ -54,7 +56,7 @@ export type FilaVendedor = {
   docs: DocExterno[];
 };
 
-const dos = (n: number) => Math.round(n * 100) / 100;
+const dos = aMonto;
 
 /** Una fila por vendedor, de mayor a menor vendido. */
 export function resumenVendedores(docs: DocExterno[], comisiones: Comisiones): FilaVendedor[] {

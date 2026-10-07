@@ -9,6 +9,8 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion, puedeEntrarAEmpresa, sesionPuede } from "@/lib/auth/sesion-servidor";
 import { retencionDe, claseDeDocumento, revisarDesglose } from "./retencion.ts";
 import type { ClaseCuenta, Revision } from "./retencion.ts";
+import { aMonto, CASI_CERO } from "../ux/decimales.ts";
+import { fmtUsd } from "../ux/format.ts";
 // Las constantes NO se reexportan desde aqui: este archivo es "use server" y
 // solo admite exportar funciones asincronas. Quien las necesite importa
 // directamente de ./retencion.
@@ -26,7 +28,7 @@ export type EstadoCuenta = "abierta" | "liquidada";
  * se corra, cada operacion tiene que decir QUE no pudo hacer, en vez de fallar
  * con un mensaje de Postgres que no le sirve a nadie.
  */
-const redondear = (n: number) => Math.round(n * 100) / 100;
+const redondear = aMonto;
 
 /**
  * Lo que queda por pagarle a la contraparte: el total, menos lo retenido,
@@ -316,8 +318,8 @@ export async function abonar(
   const sb = await createClient();
   const saldo = await saldoNetoDe(sb, cuentaId);
   if (saldo === null) return { ok: false, error: "No se encontró la cuenta." };
-  if (monto > saldo + 0.009) {
-    return { ok: false, error: `El abono supera el saldo pendiente ($${saldo.toFixed(2)}).` };
+  if (monto > saldo + CASI_CERO) {
+    return { ok: false, error: `El abono supera el saldo pendiente (${fmtUsd(saldo)}).` };
   }
 
   const { error } = await sb.from("abonos").insert({
@@ -483,7 +485,7 @@ export async function editarCuenta(
     .from("cuentas_saldo").select("abonado").eq("id", id).maybeSingle();
   const abonado = saldo ? Number(saldo.abonado) : 0;
   if (c.monto < abonado) {
-    return { ok: false, error: `Ya se abonaron $${abonado.toFixed(2)}: el monto no puede ser menor.` };
+    return { ok: false, error: `Ya se abonaron ${fmtUsd(abonado)}: el monto no puede ser menor.` };
   }
 
   const base = {
@@ -533,8 +535,8 @@ export async function liquidarCuenta(
   const sb = await createClient();
   const saldo = (await saldoNetoDe(sb, id)) ?? 0;
 
-  if (como === "total" && saldo > 0.009) {
-    return { ok: false, error: `Todavía quedan $${saldo.toFixed(2)}. Ciérrala como abono parcial o registra el resto.` };
+  if (como === "total" && saldo > CASI_CERO) {
+    return { ok: false, error: `Todavía quedan ${fmtUsd(saldo)}. Ciérrala como abono parcial o registra el resto.` };
   }
   if (como === "abono" && !nota?.trim()) {
     // Cerrar debiendo pide explicacion: dentro de seis meses nadie se acuerda.
@@ -593,8 +595,8 @@ export async function abonarConComprobante(
   const sb = await createClient();
   const saldo = await saldoNetoDe(sb, cuentaId);
   if (saldo === null) return { ok: false, error: "No se encontró la cuenta." };
-  if (monto > saldo + 0.009) {
-    return { ok: false, error: `El abono supera el saldo pendiente ($${saldo.toFixed(2)}).` };
+  if (monto > saldo + CASI_CERO) {
+    return { ok: false, error: `El abono supera el saldo pendiente (${fmtUsd(saldo)}).` };
   }
 
   if (opciones.imagen) {

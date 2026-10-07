@@ -23,6 +23,7 @@ import { SortableTh } from "@/components/ui/SortableTh";
 import { MOTIVOS_ENTRADA, MOTIVOS_SALIDA } from "@/lib/ux/catalogos";
 import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
+import { fmtUsd } from "@/lib/ux/format";
 
 const fieldClass = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -314,7 +315,7 @@ function FormMovimiento({ direccion, empresa, onDone }: { direccion: Direccion; 
                   falso confunde más que no mostrar nada. */}
               <p className="font-mono text-xs text-muted">
                 {prod.codigo}{prod.unidad ? ` · ${prod.unidad}` : ""}
-                {prod.precio > 0 ? ` · $${prod.precio.toFixed(2)}` : ""}
+                {prod.precio > 0 ? ` · ${fmtUsd(prod.precio)}` : ""}
               </p>
             </>
           ) : (

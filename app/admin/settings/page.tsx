@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { leerConfig, guardarConfig, type Configuracion } from "@/lib/config/config-db";
 import { fetchBcvRate, useBcvRate } from "@/lib/ux/bcv-rate";
+import { fmtTasa } from "@/lib/ux/format";
 
 const inputClass = "sumi-campo";
 
@@ -136,7 +137,7 @@ export default function SettingsPage() {
         <SectionCard title="Moneda y Tasa" description="USD/Bs, tasa BCV e IVA." >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Tasa BCV (Bs/USD)" hint={tasaBcv ? `Vale el ${tasaBcv.fecha.split("-").reverse().join("-")} · actualizada ${new Date(tasaBcv.fetchedAt).toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" })}` : undefined}>
-              <input className={inputClass} value={tasaBcv ? tasaBcv.tasa.toLocaleString("es-VE", { minimumFractionDigits: 2 }) : "…"} readOnly />
+              <input className={inputClass} value={tasaBcv ? fmtTasa(tasaBcv.tasa) : "…"} readOnly />
             </Field>
             <Field label="IVA (%)"><input className={inputClass} value={form.iva} onChange={set("iva")} /></Field>
             <Field label="Tasa especial sin aprobación (±%)" hint="Fuera de ese rango la aprueba el Owner o un Administrador."><input className={inputClass} value={form.rangoTasa} onChange={set("rangoTasa")} /></Field>

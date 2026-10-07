@@ -10,18 +10,19 @@
 
 import { C, argb, logoDe } from "./estilo-documentos";
 import { orientacion, textoCelda, type Columna, type MetaExport, type TablaExport } from "./tabla-export";
+import { aMonto } from "./decimales.ts";
 
 // Sumar decimales en coma flotante deja colas (40837,766000000002): se
 // redondea a lo que la pantalla muestra.
 const redondear = (v: TablaExport["filas"][number][number], c: Columna) =>
-  typeof v === "number" ? Math.round(v * (c.tipo === "usd" ? 100 : 1000)) / (c.tipo === "usd" ? 100 : 1000) : v;
+  typeof v === "number" ? (c.tipo === "usd" ? aMonto(v) : Math.round(v * 1000) / 1000) : v;
 
 const esNumero = (c: Columna) => c.tipo === "num" || c.tipo === "dif" || c.tipo === "usd" || c.tipo === "pct";
 
 const FORMATO: Partial<Record<NonNullable<Columna["tipo"]>, string>> = {
   num: "#,##0.###;[Red]-#,##0.###;0",
   dif: "+#,##0.###;[Red]-#,##0.###;0",
-  usd: '"$"#,##0.00;[Red]-"$"#,##0.00',
+  usd: '"$"#,##0.000#;[Red]-"$"#,##0.000#',
   pct: '0.0" %";[Red]-0.0" %"',
 };
 

@@ -18,6 +18,8 @@
 // lib/inventory/ventas-valery-db.ts, y la base lo vuelve a comprobar
 // (supabase/32-importar-ventas-valery.sql).
 
+import { aMonto } from "../ux/decimales.ts";
+
 export type Celda = string | number | boolean | null;
 export type TipoDoc = "FAC" | "NET" | "DEV";
 export type FormatoVentas = "completo" | "agrupado";
@@ -305,7 +307,7 @@ export function planVentas(renglones: RenglonVenta[], corte: string, previas: No
     movimientos.push({
       renglon: r.clave, fecha: r.fecha, direccion: r.tipo === "DEV" ? "entrada" : "salida", tipo: r.tipo,
       documento: `${r.tipo} ${r.documento}`, cliente: r.cliente, codigo: r.codigo, nombre: r.producto || r.codigo,
-      cantidad: r.cantidad, montoUsd: Math.round(Math.abs(r.ventaUsd) * 100) / 100,
+      cantidad: r.cantidad, montoUsd: aMonto(Math.abs(r.ventaUsd)),
       facturadaCon: r.tipo === "NET" ? fac.notas.get(r.clave) ?? null : null,
     });
   }

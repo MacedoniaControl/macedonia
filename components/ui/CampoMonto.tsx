@@ -51,7 +51,7 @@ export function CampoMonto({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={invalido || undefined}
         aria-describedby={`${id}-eco`}
-        placeholder="0,00"
+        placeholder="0,000"
         className="sumi-campo tabular-nums"
         required={requerido}
       />

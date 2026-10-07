@@ -12,6 +12,7 @@ import { CampoMonto } from "@/components/ui/CampoMonto";
 import { parseMonto, fmtMonto } from "@/lib/ux/monto";
 import { CLASES, retencionDe, type ClaseCuenta } from "@/lib/finanzas/retencion";
 import { editarCuenta, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
+import { aMonto, CASI_CERO } from "@/lib/ux/decimales";
 
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -47,7 +48,7 @@ export function EditarCuenta({
   // ya cargadas conserven su total y que el IVA se agregue a mano.
   const monto = parseMonto(montoManual);
   // Si el desglose no suma el total, se avisa — no se corrige solo.
-  const descuadre = monto !== null && suma !== null ? Math.round((suma - monto) * 100) / 100 : 0;
+  const descuadre = monto !== null && suma !== null ? aMonto(suma - monto) : 0;
 
   async function guardar() {
     setMsg(null);
@@ -120,7 +121,7 @@ export function EditarCuenta({
             <p className="flex justify-between text-muted">
               <span>Base imponible + IVA</span><span className="tabular-nums">{fmtMonto(suma)}</span>
             </p>
-            {Math.abs(descuadre) > 0.009 && (
+            {Math.abs(descuadre) > CASI_CERO && (
               <p role="alert" className="mt-1 rounded-lg border border-warn/35 bg-warn/10 px-2 py-1.5 text-warn">
                 No suma el monto total ({fmtMonto(monto ?? 0)}):{" "}
                 {descuadre > 0 ? "sobran" : "faltan"} {fmtMonto(Math.abs(descuadre))}. El

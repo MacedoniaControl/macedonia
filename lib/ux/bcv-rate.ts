@@ -29,7 +29,9 @@ const oyentes = new Set<(v: BcvRate | null) => void>();
 
 // El BCV publica ocho decimales; aquí se usan dos, como en Valery y en el
 // papel: así la tasa que se ve es la misma con la que se convierte.
-const dos = (n: number) => Math.round(n * 100) / 100;
+// La tasa va completa (4 decimales, como la publica el BCV redondeada): con 2
+// decimales cada conversión a bolívares arrastraba el error.
+const dos = (n: number) => Math.round(n * 1e4) / 1e4;
 const aRate = (t: TasaBcv | null): BcvRate | null =>
   t ? { tasa: dos(t.tasa), fecha: t.fechaValor, fetchedAt: t.actualizada, error: t.error,
         proxima: t.proxima ? { ...t.proxima, tasa: dos(t.proxima.tasa) } : null } : null;

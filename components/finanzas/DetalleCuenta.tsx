@@ -16,6 +16,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { fmtUsd } from "@/lib/ux/format";
 import { parseMonto } from "@/lib/ux/monto";
 import { CLASES } from "@/lib/finanzas/retencion";
+import { CASI_CERO } from "@/lib/ux/decimales";
 import {
   detalleCuenta, abonarConComprobante, liquidarCuenta, urlComprobante,
   type CuentaDetalle,
@@ -218,7 +219,7 @@ export function DetalleCuenta({
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" icon="settings" onClick={() => onEditar(d)}>Editar cuenta</Button>
 
-                {d.saldo <= 0.009 ? (
+                {d.saldo <= CASI_CERO ? (
                   <ConfirmDialog
                     title="¿Liquidar la cuenta?"
                     message={`${d.documento} queda cerrada como pago total. Se puede reabrir después.`}

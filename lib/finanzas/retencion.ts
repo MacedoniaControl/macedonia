@@ -4,6 +4,8 @@
 // se puede probar. cuentas-db importa el cliente de Supabase, y Node no puede
 // cargar eso para una prueba.
 
+import { aMonto } from "../ux/decimales.ts";
+
 export type ClaseCuenta = "factura" | "nota_entrega" | "nota_debito" | "nota_credito" | "ajuste";
 
 export const CLASES: { id: ClaseCuenta; label: string }[] = [
@@ -28,8 +30,8 @@ export const PCT_RETENCION = 0.75;
 
 export function retencionDe(iva: number | null, aplica: boolean): number {
   if (!aplica || !iva || iva <= 0) return 0;
-  // A centimos: un tercer decimal no existe en dinero.
-  return Math.round(iva * PCT_RETENCION * 100) / 100;
+  // A los 4 decimales que guarda la base: no se redondea a céntimos.
+  return aMonto(iva * PCT_RETENCION);
 }
 
 /**
@@ -89,7 +91,6 @@ export type Desglose = { base: number; iva: number; total: number; retencion: nu
  * si se sumara el IVA encima, el monto dejaria de ser el que dice el papel.
  */
 export function desglosar(total: number, conIva: boolean, retiene: boolean): Desglose {
-  const cent = (n: number) => Math.round(n * 100) / 100;
   if (!conIva || total <= 0) {
     return { base: cent(total), iva: 0, total: cent(total), retencion: 0 };
   }
@@ -110,7 +111,7 @@ export function desglosar(total: number, conIva: boolean, retiene: boolean): Des
  */
 const HOLGURA = 0.02;
 
-const cent = (n: number) => Math.round(n * 100) / 100;
+const cent = aMonto;
 
 /**
  * La parte de la factura que no lleva IVA.

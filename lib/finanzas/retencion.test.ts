@@ -2,6 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { retencionDe, PCT_RETENCION, CLASES, claseDeDocumento, grupoDeClase, desglosar, revisarDesglose, parteExenta } from "./retencion.ts";
+import { aMonto } from "../ux/decimales.ts";
 
 // El IVA retenido es el 75% del IVA de la cuenta: el comprador lo retiene y se
 // lo entera al SENIAT, asi que al proveedor le paga el total MENOS eso.
@@ -9,7 +10,7 @@ describe("retención de IVA", () => {
   test("es el 75% del IVA", () => {
     assert.equal(PCT_RETENCION, 0.75);
     assert.equal(retencionDe(100, true), 75);
-    assert.equal(retencionDe(57.46, true), 43.1);   // 43.095 redondeado
+    assert.equal(retencionDe(57.46, true), 43.095); // sin redondear a céntimos
   });
 
   test("sin IVA no hay nada que retener", () => {
@@ -25,9 +26,9 @@ describe("retención de IVA", () => {
     assert.equal(retencionDe(100, false), 0);
   });
 
-  test("redondea a centimos: un tercer decimal no existe en dinero", () => {
-    assert.equal(retencionDe(33.33, true), 25);      // 24.9975
-    assert.equal(retencionDe(10.01, true), 7.51);    // 7.5075
+  test("no redondea a céntimos: guarda los 4 decimales", () => {
+    assert.equal(retencionDe(33.33, true), 24.9975);
+    assert.equal(retencionDe(10.01, true), 7.5075);
   });
 });
 
@@ -58,7 +59,7 @@ describe("cerrar una cuenta", () => {
   });
 
   test("no se puede cerrar como pago total si queda saldo", () => {
-    assert.match(src, /como === "total" && saldo > 0\.009/);
+    assert.match(src, /como === "total" && saldo > CASI_CERO/);
   });
 
   test("si el abono falla, el comprobante no se queda huérfano", () => {
@@ -273,12 +274,12 @@ describe("desglosar un monto", () => {
     assert.equal(d.total, 116);
   });
 
-  test("base + IVA siempre da el total exacto, al centimo", () => {
+  test("base + IVA siempre da el total exacto", () => {
     // Calcular el IVA como base * 0,16 y redondear cada uno por separado
     // daba un centimo de diferencia en montos como estos.
     for (const t of [0.99, 1, 33.33, 195, 840.3, 1652, 15657.8, 224575]) {
       const d = desglosar(t, true, false);
-      assert.equal(d.base + d.iva, d.total, `${t} no cuadra`);
+      assert.equal(aMonto(d.base + d.iva), d.total, `${t} no cuadra`);
     }
   });
 
@@ -352,9 +353,12 @@ describe("el desglose reproduce la relación de cuentas por pagar", () => {
   for (const f of filas) {
     test(`${f.prov} ${f.doc}: de $${f.total} salen BI $${f.bi} e IVA $${f.iva}`, () => {
       const d = desglosar(f.total, true, true);
-      assert.equal(d.base, f.bi);
-      assert.equal(d.iva, f.iva);
-      assert.equal(d.retencion, f.ret);
+      // La hoja imprime 2 decimales; el sistema guarda 4. La BI y el IVA no se
+      // apartan más de medio céntimo; la retención (75% del IVA ya redondeado
+      // en la hoja) hasta un céntimo.
+      assert.ok(Math.abs(d.base - f.bi) < 0.005, `BI ${d.base}`);
+      assert.ok(Math.abs(d.iva - f.iva) < 0.005, `IVA ${d.iva}`);
+      assert.ok(Math.abs(d.retencion - f.ret) < 0.01, `retención ${d.retencion}`);
       // La hoja cuadra columna a columna: BI + IVA tiene que dar el total.
       assert.equal(Math.round((d.base + d.iva) * 100) / 100, f.total);
     });
@@ -375,7 +379,7 @@ describe("el desglose reproduce la relación de cuentas por pagar", () => {
     // automatico sirve para la mayoria, pero estas hay que cargarlas a mano.
     const d = desglosar(758.65, true, true);
     assert.notEqual(d.base, 656.11); // lo que dice la relacion
-    assert.equal(d.base, 654.01); // lo que da suponer todo gravado
+    assert.equal(d.base, 654.0086); // lo que da suponer todo gravado
     // La diferencia es chica, pero cae directo sobre el IVA y la retencion.
     assert.notEqual(d.retencion, 76.91);
   });

@@ -27,8 +27,9 @@ import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO, type Periodo } from "@/lib/ux/historico-rango";
 import { HISTORY, type EmpresaHist } from "@/lib/ux/history-data";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
-import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
+import { fmtBsCorto, fmtUsd, fmtBs } from "@/lib/ux/format";
 import type { TipoColumna } from "@/lib/ux/tabla-export";
+import { aMonto } from "@/lib/ux/decimales";
 
 type Totales = ReturnType<typeof totalesDe>;
 // `get` recibe la moneda: los montos en dólares o en los bolívares FACTURADOS
@@ -129,7 +130,7 @@ const REPORTES: Reporte[] = [
   },
 ];
 
-const monto = (v: number, m: MonedaBI) => (m === "bs" ? `${Math.round(v).toLocaleString("es-VE")} Bs` : fmtUsd(v));
+const monto = (v: number, m: MonedaBI) => (m === "bs" ? fmtBs(v) : fmtUsd(v));
 const fmt = (c: Col, v: number, m: MonedaBI) => (c.tipo === "pct" ? pct(v) : monto(v, m));
 
 const MES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -172,8 +173,8 @@ function Reportes() {
       titulo: enBs && c.tipo === "usd" ? `${c.h} (Bs)` : c.h,
       tipo: (enBs && c.tipo === "usd" ? "num" : c.tipo) as TipoColumna,
     }))],
-    filas: periodos.map((p) => [p.etiqueta, ...sel.cols.map((c) => Math.round(c.get(p, moneda) * 100) / 100)]),
-    totales: ["Total", ...sel.cols.map((c) => Math.round(c.get(t, moneda) * 100) / 100)],
+    filas: periodos.map((p) => [p.etiqueta, ...sel.cols.map((c) => aMonto(c.get(p, moneda)))]),
+    totales: ["Total", ...sel.cols.map((c) => aMonto(c.get(t, moneda)))],
     nota: "Margen = utilidad / ventas. ROI = utilidad / costo de lo vendido. Los porcentajes del total salen de los totales, no de sumar meses.",
   }));
 

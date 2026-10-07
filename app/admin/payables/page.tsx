@@ -36,6 +36,7 @@ import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
 import { ariaOrden, gravedad, ordenar, siguienteOrden, type ClaveOrden, type Orden } from "@/lib/finanzas/orden-cartera";
 import { SortableTh } from "@/components/ui/SortableTh";
+import { CASI_CERO } from "@/lib/ux/decimales";
 
 type Cta = { id: number; proveedor: string; doc: string; monto: number; abonado: number; venc: string };
 const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
@@ -378,7 +379,7 @@ function CuentasPorPagar() {
                           {c.estado === "liquidada"
                             ? <StatusBadge tone="ok">Liquidada</StatusBadge>
                             : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
-                          {gerencia && c.estado === "abierta" && c.saldoNeto > 0.005 && (
+                          {gerencia && c.estado === "abierta" && c.saldoNeto > CASI_CERO && (
                             <button type="button" className={pildora} title={`Liquidar cuentas de ${c.contraparte}`}
                               onClick={(ev) => { ev.stopPropagation(); setExito(""); setLiquidar(c.contraparte); }}>Liquidar</button>
                           )}

@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react";
 import { getHistory } from "@/lib/ux/history-data";
 import { GraficoBI, Grupo } from "@/components/ui/GraficoBI";
+import { fmtBs, fmtUsd } from "@/lib/ux/format";
 import {
   abreviar, agrupar, aniosDe, mesesEnVentana, resumir,
   type AgrupacionBI, type MonedaBI, type PeriodoBI, type SerieBI, type VentanaBI,
@@ -42,8 +43,8 @@ export function HistoriaBI({ empresa = "sumigases", height = 280 }: { empresa?: 
   const r = resumir(ps);
   const n = ps.length;
   const fmt = (v: number) => (moneda === "bs"
-    ? `${Math.round(v).toLocaleString("es-VE")} Bs`
-    : `$${Math.round(v).toLocaleString("es-VE")}`);
+    ? fmtBs(v)
+    : fmtUsd(v));
 
   if (h.months.length === 0) return <p className="text-sm text-muted">Sin datos para esta empresa.</p>;
 

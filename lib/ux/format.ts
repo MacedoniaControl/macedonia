@@ -39,3 +39,8 @@ export function fmtNum(n: number): string {
 export function fmtPct(n: number): string {
   return `${n.toFixed(1)}%`;
 }
+
+/** La tasa BCV, con sus 4 decimales (3 como mínimo). Sin «Bs». */
+export function fmtTasa(n: number): string {
+  return n.toLocaleString("es-VE", DECIMALES);
+}

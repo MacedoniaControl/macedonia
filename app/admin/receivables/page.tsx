@@ -39,6 +39,7 @@ import { LiquidacionesDelCliente } from "@/components/finanzas/Liquidaciones";
 import { listarLiquidaciones } from "@/lib/finanzas/liquidaciones-db";
 import { Switch } from "@/components/ui/Switch";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
+import { CASI_CERO } from "@/lib/ux/decimales";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
 
@@ -474,7 +475,7 @@ function CuentasPorCobrar() {
                       <td className="py-3">
                         <span className="flex items-center gap-2">
                           <StatusBadge tone={eg.tone}>{eg.label}</StatusBadge>
-                          {gerencia && g.cuentas.some((c) => c.estado === "abierta" && c.saldo > 0.005) && (
+                          {gerencia && g.cuentas.some((c) => c.estado === "abierta" && c.saldo > CASI_CERO) && (
                             <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
                               onClick={(ev) => { ev.stopPropagation(); setExito(""); setLiquidar(g.cliente); }}>Liquidar</button>
                           )}
@@ -489,7 +490,7 @@ function CuentasPorCobrar() {
                       </td>
                     </tr>
                     {abierto && (() => {
-                      const pagada = (c: CuentaDb) => c.estado === "liquidada" || c.saldo <= 0.005;
+                      const pagada = (c: CuentaDb) => c.estado === "liquidada" || c.saldo <= CASI_CERO;
                       const nPagadas = g.cuentas.filter(pagada).length;
                       const todo = conPagadas.has(g.cliente);
                       return (
@@ -503,7 +504,7 @@ function CuentasPorCobrar() {
                         </tr>
                       );
                     })()}
-                    {abierto && g.cuentas.filter((c) => conPagadas.has(g.cliente) || !(c.estado === "liquidada" || c.saldo <= 0.005)).map((c) => {
+                    {abierto && g.cuentas.filter((c) => conPagadas.has(g.cliente) || !(c.estado === "liquidada" || c.saldo <= CASI_CERO)).map((c) => {
                       const e = estadoDe(c.saldo, c.dias);
                       return (
                         <tr key={c.id} onClick={() => setAbierta(c.id)} tabIndex={0}
@@ -531,7 +532,7 @@ function CuentasPorCobrar() {
                           <td className="py-2">
                             {/* Liquidada gana sobre vencida: una cuenta cerrada ya
                                 no le debe nada a nadie, aunque su fecha pasara. */}
-                            {c.estado === "liquidada" || c.saldo <= 0.005
+                            {c.estado === "liquidada" || c.saldo <= CASI_CERO
                               ? <StatusBadge tone="ok">Pagada</StatusBadge>
                               : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
                           </td>

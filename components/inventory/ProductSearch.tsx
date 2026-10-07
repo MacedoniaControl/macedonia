@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { precioSinIva } from "@/lib/documentos/precio-documento";
 import { Icon } from "@/components/ui/Icon";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
+import { fmtUsd } from "@/lib/ux/format";
 
 export type ProductoCatalogo = {
   codigo: string;
@@ -157,7 +158,7 @@ export function ProductSearch({
                   <span className="font-mono text-[11px] text-muted">{p.codigo}</span>
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-muted">
-                  {p.precio > 0 ? (ivaPct === undefined ? `$${p.precio.toFixed(2)}` : `$${precioSinIva(p.precio, ivaPct).toFixed(2)} sin IVA`) : "sin precio"}
+                  {p.precio > 0 ? (ivaPct === undefined ? fmtUsd(p.precio) : `${fmtUsd(precioSinIva(p.precio, ivaPct))} sin IVA`) : "sin precio"}
                 </span>
               </button>
             </li>
