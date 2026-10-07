@@ -1,3 +1,5 @@
+import { Cifra } from "@/components/ui/Cifra";
+
 type StatCardProps = {
   label: string;
   value: string;
@@ -27,10 +29,10 @@ export function StatCard({ label, value, sub, bs, bsAproximado = true, accent }:
           "$2.365.456" necesitaba 113: el numero se cortaba. Achicar el tipo es
           preferible a truncar una cifra — un monto a medias no se lee, engaña.
           `tabular-nums` mantiene las columnas alineadas al cambiar de tamaño. */}
-      <p className="mt-1.5 text-base font-semibold leading-tight tabular-nums text-text [overflow-wrap:anywhere] sm:text-xl">
-        {value}
+      <p className="mt-1.5 text-base font-semibold leading-tight tabular-nums text-text [overflow-wrap:normal] sm:text-xl">
+        <Cifra texto={value} />
       </p>
-      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:anywhere]">{bsAproximado ? "≈ " : ""}{bs}</p>}
+      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:normal]">{bsAproximado ? "≈ " : ""}<Cifra texto={bs} /></p>}
       {sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
     </div>
   );

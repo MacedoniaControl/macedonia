@@ -1,3 +1,4 @@
+import { Cifra } from "@/components/ui/Cifra";
 type KpiTone = "brand" | "navy" | "ok" | "warn" | "danger" | "info";
 
 const accent: Record<KpiTone, string> = {
@@ -32,10 +33,10 @@ export function KpiCard({ label, value, sub, bs, bsAproximado = true, tone = "br
       </div>
       {/* Achica en movil y puede envolver: los montos en bolivares tienen
           siete y ocho digitos, y truncar una cifra la vuelve mentira. */}
-      <p className="mt-2 text-lg font-semibold leading-tight tracking-tight tabular-nums text-text [overflow-wrap:anywhere] sm:text-2xl">
-        {value}
+      <p className="mt-2 text-lg font-semibold leading-tight tracking-tight tabular-nums text-text [overflow-wrap:normal] sm:text-2xl">
+        <Cifra texto={value} />
       </p>
-      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:anywhere]">{bsAproximado ? "≈ " : ""}{bs}</p>}
+      {bs && <p className="mt-0.5 text-xs font-medium tabular-nums text-text/80 [overflow-wrap:normal]">{bsAproximado ? "≈ " : ""}<Cifra texto={bs} /></p>}
       {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
     </div>
   );

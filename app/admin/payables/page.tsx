@@ -43,7 +43,7 @@ const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
   saldo <= 0 ? { label: "Pagada", tone: "ok" }
   : d < 0 ? { label: `Vencida (${-d}d)`, tone: "danger" }
   : d <= 7 ? { label: `Alerta (${d}d)`, tone: "warn" }
-  : { label: "Al día", tone: "info" };
+  : { label: "Pendiente", tone: "info" };
 const inputClass = "sumi-campo";
 /** El mismo proveedor escrito con espacios o mayúsculas distintas. */
 const mismoProveedor = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toUpperCase() === b.trim().replace(/\s+/g, " ").toUpperCase();
