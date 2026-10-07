@@ -83,6 +83,8 @@ function CuentasPorCobrar() {
   const { rol } = useRol();
   const gerencia = puedeVerFinanzas(rol);
   const [liquidar, setLiquidar] = useState<string | null>(null);
+  // Al liquidar UNA nota desde su detalle: esa nota y lo que ya se escribió del pago.
+  const [liquidarDesde, setLiquidarDesde] = useState<{ ids: number[]; pago: { fecha: string; metodo: string; referencia: string } } | null>(null);
   // Anexar: una nota nueva que amplía la deuda del cliente, desde su fila.
   const [anexar, setAnexar] = useState<{ cliente: string; deuda: number } | null>(null);
   // Las dos carteras: la propia y la de vendedores externos (migración 36).
@@ -107,8 +109,11 @@ function CuentasPorCobrar() {
   const [ordenDe, setOrdenDe] = useState<Map<string, Orden>>(new Map());
   const verPagadas = (cli: string, v: boolean) => setConPagadas((s) => { const n = new Set(s); if (v) n.add(cli); else n.delete(cli); return n; });
   // Las liquidaciones, por cliente: el historial de pagos de cada uno.
-  const liq = useCarga(`liq:cobrar:${empresaKey}:${recarga}`, () => listarLiquidaciones(empresaKey, "cobrar"));
+  const liq = useCarga(`liq:cobrar:${empresaKey}:${recarga}`, () => listarLiquidaciones(empresaKey, "cobrar", 1000));
   const liquidacionesDe = (cli: string) => (liq.datos ?? []).filter((l) => claveCliente(l.contraparte) === claveCliente(cli));
+  // Las notas pagadas con una liquidación vigente se ven DENTRO de ella, no
+  // repetidas como «Pagada» en la lista del cliente.
+  const enLiquidacion = new Set((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.map((d) => d.cuentaId)));
 
   async function registrarAbono(): Promise<boolean> {
     setMsg("");
@@ -118,6 +123,14 @@ function CuentasPorCobrar() {
     if (a === null) { setMsg("ERR:No se entiende ese monto. Ejemplo: 1.500,50"); return false; }
     if (a <= 0) { setMsg("ERR:Ingresa un abono mayor a 0."); return false; }
 
+    // El pago que completa una nota de entrega es una liquidación (migración 40):
+    // se abre «Liquidar Notas» con esa nota marcada.
+    if (c.clase === "nota_entrega" && a >= c.saldoNeto - CASI_CERO && a <= c.saldoNeto + CASI_CERO) {
+      setAbono(""); setDocSel(""); setExito("");
+      setLiquidarDesde({ ids: [c.id], pago: { fecha: new Date().toISOString().slice(0, 10), metodo: "", referencia: "" } });
+      setLiquidar(c.contraparte);
+      return true;
+    }
     // La base vuelve a comprobar que el abono no supere el saldo: dos personas
     // abonando a la vez podrian pasarse si solo se validara aqui.
     const r = await abonar(c.id, a);
@@ -537,7 +550,10 @@ function CuentasPorCobrar() {
                         </tr>
                       );
                     })()}
-                    {abierto && g.cuentas.filter((c) => conPagadas.has(g.cliente) || !(c.estado === "liquidada" || c.saldo <= CASI_CERO)).map((c) => {
+                    {abierto && g.cuentas.filter((c) => {
+                      const pagada = c.estado === "liquidada" || c.saldo <= CASI_CERO;
+                      return !pagada || (conPagadas.has(g.cliente) && !enLiquidacion.has(c.id));
+                    }).map((c) => {
                       const e = estadoDe(c.saldo, c.dias);
                       return (
                         <tr key={c.id} onClick={() => setAbierta(c.id)} tabIndex={0}
@@ -577,7 +593,7 @@ function CuentasPorCobrar() {
                     {abierto && conPagadas.has(g.cliente) && liquidacionesDe(g.cliente).length > 0 && (
                       <tr className="bg-surface-2/60">
                         <td colSpan={5} className="px-3 pb-3 pl-8 pt-1">
-                          <LiquidacionesDelCliente lista={liquidacionesDe(g.cliente)} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} />
+                          <LiquidacionesDelCliente lista={liquidacionesDe(g.cliente)} gerencia={gerencia} onCambio={() => setRecarga((n) => n + 1)} onAbrirCuenta={setAbierta} />
                         </td>
                       </tr>
                     )}
@@ -592,9 +608,10 @@ function CuentasPorCobrar() {
 
 
       {liquidar !== null && (
-        <Modal titulo="Liquidar Notas" onCerrar={() => setLiquidar(null)}>
+        <Modal titulo="Liquidar Notas" onCerrar={() => { setLiquidar(null); setLiquidarDesde(null); }}>
           <LiquidarNotas empresa={empresaKey} cuentas={cuentas} clienteInicial={liquidar || undefined}
-            onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setLiquidar(null)} />
+            idsIniciales={liquidarDesde?.ids} pagoInicial={liquidarDesde?.pago}
+            onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => { setLiquidar(null); setLiquidarDesde(null); }} />
         </Modal>
       )}
 
@@ -654,6 +671,7 @@ function CuentasPorCobrar() {
               empresa={empresaKey}
               onCambio={() => setRecarga((n) => n + 1)}
               onEditar={(d) => setEditando(d)}
+              onLiquidar={(d, pago) => { setAbierta(null); setExito(""); setLiquidarDesde({ ids: [d.id], pago }); setLiquidar(d.contraparte); }}
             />
           )}
         </Modal>

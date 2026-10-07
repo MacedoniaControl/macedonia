@@ -46,13 +46,16 @@ export async function liquidarCuentas(
   return { ok: true, numero: r.numero, total: Number(r.total), cuentas: r.cuentas };
 }
 
+/** Una nota (o factura) que entró en una liquidación, con lo que se le abonó. */
+export type DocumentoLiquidado = { cuentaId: number; documento: string; emitida: string | null; vence: string | null; monto: number };
+
 export type Liquidacion = {
   id: number; numero: string; contraparte: string; fecha: string; total: number; cuentas: number;
   metodo: string | null; referencia: string | null; nota: string | null; imagenRuta: string | null;
   creadoNombre: string; creadoEn: string;
   anuladaEn: string | null; anuladaNombre: string | null; anuladaMotivo: string | null;
   /** Los documentos que liquidó y cuánto se le abonó a cada uno (vacío si se anuló). */
-  documentos: { documento: string; monto: number }[];
+  documentos: DocumentoLiquidado[];
 };
 
 /** Las últimas liquidaciones de la empresa, con sus documentos. */
@@ -68,11 +71,15 @@ export async function listarLiquidaciones(empresa: string, tipo: "cobrar" | "pag
   }
   const filas = data ?? [];
   const ids = filas.map((l) => l.id);
-  const docs = new Map<number, { documento: string; monto: number }[]>();
+  const docs = new Map<number, DocumentoLiquidado[]>();
   if (ids.length) {
-    const { data: ab } = await sb.from("abonos").select("liquidacion_id, monto, cuentas(documento)").in("liquidacion_id", ids);
-    for (const a of (ab ?? []) as unknown as { liquidacion_id: number; monto: number; cuentas: { documento: string } | null }[]) {
-      docs.set(a.liquidacion_id, [...(docs.get(a.liquidacion_id) ?? []), { documento: a.cuentas?.documento ?? "—", monto: Number(a.monto) }]);
+    const { data: ab } = await sb.from("abonos").select("liquidacion_id, cuenta_id, monto, cuentas(documento, emitida, vence)").in("liquidacion_id", ids);
+    type Fila = { liquidacion_id: number; cuenta_id: number; monto: number; cuentas: { documento: string; emitida: string | null; vence: string | null } | null };
+    for (const a of (ab ?? []) as unknown as Fila[]) {
+      docs.set(a.liquidacion_id, [...(docs.get(a.liquidacion_id) ?? []), {
+        cuentaId: Number(a.cuenta_id), documento: a.cuentas?.documento ?? "—",
+        emitida: a.cuentas?.emitida ?? null, vence: a.cuentas?.vence ?? null, monto: Number(a.monto),
+      }]);
     }
   }
   return filas.map((l) => ({
