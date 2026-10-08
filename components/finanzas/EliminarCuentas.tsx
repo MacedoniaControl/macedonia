@@ -53,6 +53,16 @@ export function BotonEliminar({ onClick, titulo }: { onClick: (ev: React.MouseEv
   );
 }
 
+/** El botón de una nota dentro de la cartera: solo la papelera. */
+export function BotonEliminarNota({ onClick, titulo }: { onClick: (ev: React.MouseEvent) => void; titulo: string }) {
+  return (
+    <button type="button" title={titulo} aria-label={titulo} onClick={onClick}
+      className="sumi-pulsable inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-danger/40 text-danger hover:bg-danger/10">
+      <Icon name="trash" size={13} />
+    </button>
+  );
+}
+
 type CuentaEliminable = { id: number; documento: string; emitida: string; monto: number; saldo: number; estado: string };
 
 /** Elegir qué cuentas de un cliente (o proveedor) se eliminan. */

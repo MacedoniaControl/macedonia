@@ -33,7 +33,7 @@ import type { EmpresaId } from "@/lib/ux/empresas";
 import { Icon } from "@/components/ui/Icon";
 import { Switch } from "@/components/ui/Switch";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
-import { BotonEliminar, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
+import { BotonEliminar, BotonEliminarNota, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
 import { leerConfig } from "@/lib/config/config-db";
 import { porClase, resumenDe } from "@/lib/finanzas/resumen-clases";
 import { TarjetaSegmento } from "@/components/finanzas/TarjetaSegmento";
@@ -90,6 +90,8 @@ function CuentasPorPagar() {
   const habilitadoEliminar = eliminarHabilitado(cfg.datos);
   const puedeEliminar = gerencia && habilitadoEliminar && !!cfg.datos;
   const [eliminar, setEliminar] = useState<string | null>(null);
+  // Eliminar UNA cuenta desde su fila en la cartera.
+  const [eliminarNota, setEliminarNota] = useState<CuentaDb | null>(null);
   // Que cuenta se esta mirando, y si esta en modo edicion. Son dos estados
   // distintos: se puede abrir el detalle sin editar.
   const [abierta, setAbierta] = useState<number | null>(null);
@@ -139,6 +141,21 @@ function CuentasPorPagar() {
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());
   const [ordenDe, setOrdenDe] = useState<Map<string, Orden>>(new Map());
+  // La cabecera de las notas dentro de una cuenta: ordena SUS notas (lo mismo que «Ordenar»).
+  const COLUMNAS_NOTAS: { label: string; clave: ClaveOrden; align: "left" | "right"; cls?: string }[] = [
+    { label: "Documento", clave: "nombre", align: "left", cls: "pl-8" }, { label: "Clase", clave: "documentos", align: "left" },
+    { label: "Saldo", clave: "saldo", align: "right" }, { label: "Emisión", clave: "emision", align: "left" },
+    { label: "Vence", clave: "vence", align: "left" }, { label: "Estado", clave: "estado", align: "left" },
+  ];
+  const cabeceraNotas = (contraparte: string, od: Orden) => (
+    <tr className="bg-surface-2/60 text-[11px] uppercase tracking-wide text-muted">
+      {COLUMNAS_NOTAS.map((col) => (
+        <SortableTh key={col.clave} label={col.label} sortKey={col.clave} align={col.align} className={col.cls} compacto
+          ariaSort={(k) => ariaOrden(od, k)} onSort={() => setOrdenDe((m) => new Map(m).set(contraparte, siguienteOrden(od, col.clave)))} />
+      ))}
+    </tr>
+  );
+
   const filasP: CuentaP[] = conSaldo.map((c) => ({ ...c, montoFactura: c.monto, monto: c.neto, saldo: c.saldoNeto }));
   const pagadaP = (c: CuentaP) => c.estado === "liquidada" || c.saldo <= CASI_CERO;
   const emisionDe = (g: ClienteCartera<CuentaP>) => g.cuentas.filter((c) => !pagadaP(c)).map((c) => c.emitida).sort()[0] ?? null;
@@ -146,7 +163,8 @@ function CuentasPorPagar() {
     k === "nombre" ? g.cliente : k === "documentos" ? g.documentos : k === "monto" ? g.monto : k === "saldo" ? g.saldo
     : k === "emision" ? emisionDe(g) : k === "vence" ? g.masVieja?.vence ?? null : g.masVieja ? gravedad(g.saldo, g.masVieja.dias) : null;
   const valorCuenta = (c: CuentaP, k: ClaveOrden) =>
-    k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "emision" ? c.emitida : k === "vence" ? c.vence
+    k === "nombre" ? c.documento : k === "documentos" ? CLASES.find((x) => x.id === c.clase)?.label ?? c.clase
+    : k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "emision" ? c.emitida : k === "vence" ? c.vence
     : k === "estado" ? gravedad(c.saldo, c.d, c.estado === "liquidada") : null;
   const tp = buscaProveedor.trim();
   // Por nombre o por el código de una cuenta: el proveedor que la tiene se abre solo con esa cuenta.
@@ -512,6 +530,7 @@ function CuentasPorPagar() {
                         </td>
                       </tr>
                     )}
+                    {abierto && cabeceraNotas(g.cliente, od)}
                     {abierto && g.cuentas.filter((c) => porCodigo(g.cliente)
                       ? busqueda.get(g.cliente)!.docs.has(c.id) // buscando por código: las que coinciden, pagadas o no
                       : !pagadaP(c) || (todoP && !enLiquidacion.has(c.id))).map((c) => {
@@ -532,7 +551,13 @@ function CuentasPorPagar() {
                           <td className="whitespace-nowrap py-2 pr-3 text-muted">{fechaVista(c.vence)}</td>
                           <td className="py-2">
                             {/* Liquidada gana sobre vencida: una cuenta cerrada ya no se debe. */}
-                            {pagadaP(c) ? <StatusBadge tone="ok">Pagada</StatusBadge> : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                            <span className="flex items-center gap-2">
+                              {pagadaP(c) ? <StatusBadge tone="ok">Pagada</StatusBadge> : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                              {puedeEliminar && (
+                                <BotonEliminarNota titulo={`Eliminar ${c.documento}`}
+                                  onClick={(ev) => { ev.stopPropagation(); setExito(""); setEliminarNota(ctas.find((x) => x.id === c.id) ?? null); }} />
+                              )}
+                            </span>
                           </td>
                         </tr>
                       );
@@ -564,6 +589,12 @@ function CuentasPorPagar() {
         </Modal>
       )}
 
+      {eliminarNota && (
+        <Modal titulo="Eliminar Cuenta" onCerrar={() => setEliminarNota(null)}>
+          <EliminarCuentasDe empresa={empresaKey} contraparte={eliminarNota.contraparte} cuentas={[{ ...eliminarNota, saldo: eliminarNota.saldoNeto }]}
+            onHecho={(t) => { setExitoTitulo("Cuenta Eliminada"); setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminarNota(null)} />
+        </Modal>
+      )}
       {eliminar !== null && (
         <Modal titulo="Eliminar Cuentas" onCerrar={() => setEliminar(null)}>
           <EliminarCuentasDe empresa={empresaKey} contraparte={eliminar}

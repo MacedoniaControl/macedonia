@@ -12,7 +12,7 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, asignacionesClientes, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
 import { claveCliente, enCartera, porCartera, vendedoresEnCartera, type FiltroCartera } from "@/lib/finanzas/cartera-vendedores";
 import { VendedorCliente, VendedorCuenta } from "@/components/finanzas/VendedorCartera";
-import { BotonEliminar, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
+import { BotonEliminar, BotonEliminarNota, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
 import { leerConfig } from "@/lib/config/config-db";
 import { FiltroClase } from "@/components/finanzas/FiltroClase";
 import { CLASES, grupoDeClase } from "@/lib/finanzas/retencion";
@@ -104,12 +104,29 @@ function CuentasPorCobrar() {
   const habilitadoEliminar = eliminarHabilitado(cfg.datos);
   const puedeEliminar = gerencia && habilitadoEliminar && !!cfg.datos;
   const [eliminar, setEliminar] = useState<string | null>(null);
+  // Eliminar UNA nota desde su fila en la cartera.
+  const [eliminarNota, setEliminarNota] = useState<CuentaDb | null>(null);
   // Cada cliente desplegado muestra sus pendientes; con el interruptor, también las pagadas.
   const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());
   // El orden de los documentos dentro de cada cliente. Por defecto, Estado ↓:
   // vencidas arriba (la más vieja primero), luego por vencer y pendientes por
   // fecha, y las pagadas al final. La cabecera ordena los clientes.
   const [ordenDe, setOrdenDe] = useState<Map<string, Orden>>(new Map());
+  // La cabecera de las notas dentro de una cuenta: ordena SUS notas (lo mismo que «Ordenar»).
+  const COLUMNAS_NOTAS: { label: string; clave: ClaveOrden; align: "left" | "right"; cls?: string }[] = [
+    { label: "Documento", clave: "nombre", align: "left", cls: "pl-8" }, { label: "Clase", clave: "documentos", align: "left" },
+    { label: "Saldo", clave: "saldo", align: "right" }, { label: "Emisión", clave: "emision", align: "left" },
+    { label: "Vence", clave: "vence", align: "left" }, { label: "Estado", clave: "estado", align: "left" },
+  ];
+  const cabeceraNotas = (contraparte: string, od: Orden) => (
+    <tr className="bg-surface-2/60 text-[11px] uppercase tracking-wide text-muted">
+      {COLUMNAS_NOTAS.map((col) => (
+        <SortableTh key={col.clave} label={col.label} sortKey={col.clave} align={col.align} className={col.cls} compacto
+          ariaSort={(k) => ariaOrden(od, k)} onSort={() => setOrdenDe((m) => new Map(m).set(contraparte, siguienteOrden(od, col.clave)))} />
+      ))}
+    </tr>
+  );
+
   const verPagadas = (cli: string, v: boolean) => setConPagadas((s) => { const n = new Set(s); if (v) n.add(cli); else n.delete(cli); return n; });
   // Las liquidaciones, por cliente: el historial de pagos de cada uno.
   const liq = useCarga(`liq:cobrar:${empresaKey}:${recarga}`, () => listarLiquidaciones(empresaKey, "cobrar", 1000));
@@ -270,7 +287,8 @@ function CuentasPorCobrar() {
     : k === "emision" ? emisionCliente(g)
     : k === "vence" ? g.masVieja?.vence ?? null : g.masVieja ? gravedad(g.saldo, g.masVieja.dias) : null;
   const valorCuenta = (c: CuentaDb, k: ClaveOrden) =>
-    k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "emision" ? c.emitida : k === "vence" ? c.vence
+    k === "nombre" ? c.documento : k === "documentos" ? CLASES.find((x) => x.id === c.clase)?.label ?? c.clase
+    : k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "emision" ? c.emitida : k === "vence" ? c.vence
     : k === "estado" ? gravedad(c.saldo, c.dias, c.estado === "liquidada") : null;
   // Por nombre o por el código de una nota: el cliente que la tiene se abre solo con esa nota.
   const busqueda = new Map(clientes.map((g) => [g.cliente, buscarEnCartera(g, buscaCliente)] as const));
@@ -569,6 +587,7 @@ function CuentasPorCobrar() {
                       ];
                       const actual = OPCIONES.find((o) => o.orden.clave === od?.clave && o.orden.dir === od?.dir)?.id ?? "";
                       return (
+                        <>
                         <tr className="bg-surface-2/60">
                           <td colSpan={6} className="px-3 py-2 pl-8">
                             <span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
@@ -594,6 +613,8 @@ function CuentasPorCobrar() {
                             </span>
                           </td>
                         </tr>
+                        {cabeceraNotas(g.cliente, od)}
+                        </>
                       );
                     })()}
                     {abierto && g.cuentas.filter((c) => {
@@ -632,9 +653,15 @@ function CuentasPorCobrar() {
                           <td className="py-2">
                             {/* Liquidada gana sobre vencida: una cuenta cerrada ya
                                 no le debe nada a nadie, aunque su fecha pasara. */}
-                            {c.estado === "liquidada" || c.saldo <= CASI_CERO
-                              ? <StatusBadge tone="ok">Pagada</StatusBadge>
-                              : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                            <span className="flex items-center gap-2">
+                              {c.estado === "liquidada" || c.saldo <= CASI_CERO
+                                ? <StatusBadge tone="ok">Pagada</StatusBadge>
+                                : <StatusBadge tone={e.tone}>{e.label}</StatusBadge>}
+                              {puedeEliminar && (
+                                <BotonEliminarNota titulo={`Eliminar ${c.documento}`}
+                                  onClick={(ev) => { ev.stopPropagation(); setExito(""); setEliminarNota(c); }} />
+                              )}
+                            </span>
                           </td>
                         </tr>
                       );
@@ -664,6 +691,12 @@ function CuentasPorCobrar() {
         </Modal>
       )}
 
+      {eliminarNota && (
+        <Modal titulo="Eliminar Nota" onCerrar={() => setEliminarNota(null)}>
+          <EliminarCuentasDe empresa={empresaKey} contraparte={eliminarNota.contraparte} cuentas={[eliminarNota]}
+            onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminarNota(null)} />
+        </Modal>
+      )}
       {eliminar && (
         <Modal titulo="Eliminar Cuentas" onCerrar={() => setEliminar(null)}>
           <EliminarCuentasDe empresa={empresaKey} contraparte={eliminar}
