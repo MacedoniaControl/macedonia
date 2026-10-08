@@ -55,11 +55,11 @@ test("una plantilla vacía lo dice", () => {
   assert.match(leerPlantilla([COLUMNAS.pagar], new Set()).problemas[0].motivo, /no tiene filas/);
 });
 
-test("plantilla por cobrar: la nota de entrega que vence el día de emisión va a los 30 días; la factura no", () => {
+test("plantilla: la nota de entrega vence el mismo día del mes siguiente, por cobrar y por pagar; la factura no", () => {
   const hoja = [["Contraparte", "Documento", "Emitida", "Vence", "Monto", "Nota"],
     ["ISMESOL", "NE-9301", "07/10/2026", "07/10/2026", "100", ""],
     ["ISMESOL", "FAC-55", "07/10/2026", "07/10/2026", "100", ""]];
   const c = leerPlantilla(hoja, new Set(), "cobrar").filas.map((f) => f.vence);
-  assert.deepEqual(c, ["2026-11-06", "2026-10-07"]);
-  assert.deepEqual(leerPlantilla(hoja, new Set(), "pagar").filas.map((f) => f.vence), ["2026-10-07", "2026-10-07"]);
+  assert.deepEqual(c, ["2026-11-07", "2026-10-07"]);
+  assert.deepEqual(leerPlantilla(hoja, new Set(), "pagar").filas.map((f) => f.vence), ["2026-11-07", "2026-10-07"]);
 });

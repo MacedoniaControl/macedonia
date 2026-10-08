@@ -20,7 +20,7 @@ import { CLASES, desglosar, PCT_IVA, PCT_RETENCION, type ClaseCuenta } from "@/l
 import { documentoAnexo, yaAnexados } from "@/lib/finanzas/anexar";
 import { fmtUsdCentavos } from "@/lib/ux/format";
 import { SelectorVendedor, VALOR_PROPIA } from "@/components/finanzas/VendedorCartera";
-import { DIAS_NOTA_ENTREGA, venceNotaEntrega } from "@/lib/finanzas/vencimiento";
+import { venceNotaEntrega } from "@/lib/finanzas/vencimiento";
 import { fechaVista } from "@/lib/ux/tabla-export";
 
 const campo = "sumi-campo";
@@ -73,7 +73,8 @@ export function FormularioCuenta({
   const documento = anexo ? documentoAnexo(clase, f.documento, tipo) : f.documento.trim();
   const repetidos = anexo ? yaAnexados(documento, anexo.documentos) : [];
   // La nota de entrega por cobrar vence a los 30 días: solo se pide la emisión.
-  const venceSolo = tipo === "cobrar" && clase === "nota_entrega";
+  // La nota de entrega (por cobrar o por pagar) vence sola, por la regla.
+  const venceSolo = clase === "nota_entrega";
   const vence = venceSolo ? venceNotaEntrega(f.emitida || hoy()) : f.vence;
   const aCobrar = d ? d.total - (conIva && retiene ? d.retencion : 0) : 0;
 
@@ -158,7 +159,7 @@ export function FormularioCuenta({
           <div>
             <span className={lbl}>Vence</span>
             <p className={`${campo} flex items-center bg-surface-2 text-muted`} aria-live="polite">
-              {fechaVista(vence)} · {DIAS_NOTA_ENTREGA} días
+              {fechaVista(vence)} · el mismo día del mes siguiente
             </p>
           </div>
         ) : (

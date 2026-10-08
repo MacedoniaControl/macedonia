@@ -161,13 +161,12 @@ export function leerValery(tipo: TipoPlantilla, hojas: HojaLeida[]): LecturaVale
       monto = dosDec(monto);
       if (monto < 0) return void problemas.push({ linea, motivo: `${pre}${tipoDoc} ${numero} de ${quien}: saldo negativo (${fmt(monto)}).` });
       if (monto === 0) { enCero++; return; }
-      // Valery no trae vencimiento en por cobrar. La nota de entrega vence a los
-      // 30 días (regla de la empresa); lo demás, el día que se emitió. Si Valery
-      // trae para una nota de entrega el mismo día de emisión, también van los 30
-      // días: si no, la nota nacería vencida.
-      const esNotaCobrar = tipo === "cobrar" && claseDe(tipoDoc) === "nota_entrega";
-      const sinVence = esNotaCobrar ? venceNotaEntrega(emitida) : emitida;
-      const vence = venceValery && (esNotaCobrar ? venceValery > emitida : venceValery >= emitida) ? venceValery : sinVence;
+      // La nota de entrega (por cobrar o por pagar) vence por la regla de la
+      // empresa —el mismo día del mes siguiente, o 30 días si es un 31 o fin de
+      // febrero—, traiga Valery la fecha que traiga. Lo demás: la de Valery, o el
+      // día que se emitió si no trae.
+      const esNota = claseDe(tipoDoc) === "nota_entrega";
+      const vence = esNota ? venceNotaEntrega(emitida) : venceValery && venceValery >= emitida ? venceValery : emitida;
       if (!venceValery) sinVencimiento++;
       filas.push({
         contraparte: quien, documento: `${tipoDoc}-${numero}`, emitida, vence, monto,
