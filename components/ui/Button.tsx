@@ -34,7 +34,7 @@ export function Button({
     <button
       disabled={disabled ?? cargando}
       aria-busy={cargando || undefined}
-      className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition active:scale-[0.972] disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-[44px] items-center justify-center gap-2 sumi-pulsable rounded-xl px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
       {...rest}
     >
       {icon && <Icon name={icon} size={18} />}

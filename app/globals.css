@@ -317,6 +317,43 @@ select.sumi-campo { line-height: 1.2; }
 .sumi-realce:focus-visible::after { opacity: 1; }
 .sumi-realce:active { transform: translateY(0); }
 
+/* Botones: respuesta al pasar el cursor y al presionar.
+ *
+ * Mismo criterio que .sumi-realce: solo `transform` y la opacidad de una
+ * sombra dibujada una vez en un pseudo-elemento (composición, sin repintar).
+ *   · Cursor encima: sube 1px y aparece la sombra (solo con ratón: en el
+ *     teléfono un «hover» pegado después del toque confunde).
+ *   · Presionar: se hunde al instante (80ms, sin rebote) — la respuesta tiene
+ *     que llegar antes de que el dedo se levante.
+ *   · Al soltar vuelve con una salida suave (160ms, ease-out).
+ * Deshabilitado no se mueve: un botón que no hace nada no debe parecer vivo.
+ */
+.sumi-pulsable {
+  position: relative;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 140ms ease, border-color 140ms ease,
+              color 140ms ease, filter 140ms ease;
+}
+.sumi-pulsable::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--text) 30%, transparent);
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .sumi-pulsable:not(:disabled):hover { transform: translateY(-1px); }
+  .sumi-pulsable:not(:disabled):hover::after { opacity: 1; }
+}
+.sumi-pulsable:not(:disabled):active {
+  transform: translateY(0) scale(0.96);
+  transition-duration: 80ms;
+}
+.sumi-pulsable:not(:disabled):active::after { opacity: 0; }
+
 /* Entrada de tarjetas y secciones: sube y aparece.
  * `backwards` deja el estado inicial aplicado antes de arrancar, para que no
  * haya un cuadro con el elemento ya colocado. */
@@ -333,6 +370,11 @@ select.sumi-campo { line-height: 1.2; }
   .sumi-realce:hover,
   .sumi-realce:focus-visible { transform: none; }
   .sumi-entra { animation: none; }
+  /* Sin movimiento: el botón solo cambia de color al pasar y al presionar. */
+  .sumi-pulsable,
+  .sumi-pulsable::after { transition: none; }
+  .sumi-pulsable:hover,
+  .sumi-pulsable:active { transform: none !important; }
 }
 
 /* ---------------------------------------------------------------- teléfono

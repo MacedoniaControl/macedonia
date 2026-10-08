@@ -53,7 +53,7 @@ export function BotonDescargar({ empresa }: { empresa: string }) {
   return (
     <div className="relative">
       <button type="button" onClick={abrir} aria-haspopup="menu" aria-expanded={abierto}
-        className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-border-strong bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2 active:scale-[0.972]">
+        className="sumi-pulsable inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-border-strong bg-surface px-4 text-sm font-medium text-text hover:bg-surface-2">
         <Icon name="report" size={16} />
         Descargar
         <Icon name="chevronDown" size={14} />

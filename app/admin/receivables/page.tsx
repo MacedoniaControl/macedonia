@@ -540,10 +540,10 @@ function CuentasPorCobrar() {
                             );
                           })()}
                           {gerencia && g.cuentas.some((c) => c.estado === "abierta" && c.saldo > CASI_CERO) && (
-                            <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
+                            <button type="button" className="sumi-pulsable rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
                               onClick={(ev) => { ev.stopPropagation(); setExito(""); setLiquidar(g.cliente); }}>Liquidar</button>
                           )}
-                          <button type="button" className="rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
+                          <button type="button" className="sumi-pulsable rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2"
                             title={`Anexar una nota a la deuda de ${g.cliente}`}
                             onClick={(ev) => { ev.stopPropagation(); setExito(""); setAnexar({ cliente: g.cliente, deuda: g.saldo }); }}>Anexar</button>
                           {puedeEliminar && (
@@ -584,7 +584,7 @@ function CuentasPorCobrar() {
                               </label>
                               <button type="button" disabled={descargando === g.cliente}
                                 title={todo ? `Estado de cuenta de ${g.cliente}, con las pagadas` : `Estado de cuenta de ${g.cliente}: lo pendiente`}
-                                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 font-medium text-text hover:bg-surface disabled:opacity-60"
+                                className="sumi-pulsable inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 font-medium text-text hover:bg-surface disabled:opacity-60"
                                 onClick={() => pdfCliente(g, todo)}>
                                 <Icon name="report" size={13} /> {descargando === g.cliente ? "Generando…" : "Descargar PDF"}
                               </button>

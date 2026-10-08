@@ -59,7 +59,7 @@ export function PildoraPanel({
             if (f) { setAbierto(true); onSoltarArchivo(f); }
           },
         } : {})}
-        className={`flex h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition
+        className={`sumi-pulsable flex h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-medium
           ${encima ? "border-brand border-dashed bg-brand-soft text-brand ring-2 ring-brand/30"
             : abierto
             ? "border-brand-strong bg-brand-soft text-brand"
