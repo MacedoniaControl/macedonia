@@ -30,7 +30,7 @@ import { fmtUsd, fmtUsdCentavos } from "@/lib/ux/format";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { fechaVista, textoCelda } from "@/lib/ux/tabla-export";
-import { agruparPorCliente, type ClienteCartera } from "@/lib/finanzas/cartera";
+import { buscarEnCartera, agruparPorCliente, type ClienteCartera } from "@/lib/finanzas/cartera";
 import { ariaOrden, gravedad, ordenar, siguienteOrden, type ClaveOrden, type Orden } from "@/lib/finanzas/orden-cartera";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { Icon } from "@/components/ui/Icon";
@@ -272,7 +272,10 @@ function CuentasPorCobrar() {
   const valorCuenta = (c: CuentaDb, k: ClaveOrden) =>
     k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "emision" ? c.emitida : k === "vence" ? c.vence
     : k === "estado" ? gravedad(c.saldo, c.dias, c.estado === "liquidada") : null;
-  const clientesVisibles = ordenar(tc ? clientes.filter((g) => g.cliente.toLowerCase().includes(tc)) : clientes, orden, valorCliente)
+  // Por nombre o por el código de una nota: el cliente que la tiene se abre solo con esa nota.
+  const busqueda = new Map(clientes.map((g) => [g.cliente, buscarEnCartera(g, buscaCliente)] as const));
+  const porCodigo = (cliente: string) => { const b = busqueda.get(cliente); return !!b && b.docs.size > 0; };
+  const clientesVisibles = ordenar(clientes.filter((g) => busqueda.get(g.cliente)?.visible), orden, valorCliente)
     .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, ordenDe.get(g.cliente) ?? ORDEN_DOCUMENTOS, valorCuenta) }));
   const thOrden = (label: string, clave: ClaveOrden, align: "left" | "right" = "left") => (
     <SortableTh label={label} sortKey={clave} align={align} ariaSort={(k) => ariaOrden(orden, k)} onSort={() => setOrden((o) => siguienteOrden(o, clave))} />
@@ -461,8 +464,8 @@ function CuentasPorCobrar() {
       <div className="mt-6">
       <SectionCard title="Cartera" description="Lo que debe cada cliente. Toca un cliente para ver sus documentos.">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <input type="search" className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1 sm:max-w-sm" placeholder="Buscar cliente"
-              aria-label="Buscar cliente" value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} />
+            <input type="search" className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1 sm:max-w-sm" placeholder="Buscar cliente o nota (NE-8734)"
+              aria-label="Buscar cliente o nota por su código" value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} />
             <Button variant="ghost" onClick={() => setAbiertos(todosAbiertos ? new Set() : new Set(clientesVisibles.map((g) => g.cliente)))}>
               {todosAbiertos ? "Contraer todos" : "Desplegar todos"}
             </Button>
@@ -472,9 +475,9 @@ function CuentasPorCobrar() {
             cargando={carga.cargando}
             error={carga.error}
             vacio={clientesVisibles.length === 0}
-            tituloVacio={tc ? "Ningún cliente coincide" : "Sin Cuentas por Cobrar"}
+            tituloVacio={tc ? "Nada coincide" : "Sin Cuentas por Cobrar"}
             mensajeVacio={
-              tc ? `No hay clientes con «${buscaCliente.trim()}».`
+              tc ? `No hay clientes ni notas con «${buscaCliente.trim()}».`
                 : filtroClase === "todas"
                 ? "Nadie debe nada todavía. Carga una con «Nueva cuenta» o importa la cartera."
                 : `No hay ninguna cuenta de esa clase. Hay ${cuentas.length} en total: toca «Todas».`
@@ -493,7 +496,7 @@ function CuentasPorCobrar() {
                 </tr>
               </thead>
               {clientesVisibles.map((g) => {
-                const abierto = abiertos.has(g.cliente);
+                const abierto = abiertos.has(g.cliente) || porCodigo(g.cliente);
                 const eg = g.masVieja ? estadoDe(g.saldo, g.masVieja.dias) : { label: "Pagado", tone: "ok" as Tone };
                 return (
                   <tbody key={g.cliente} className="border-b border-border">
@@ -594,6 +597,8 @@ function CuentasPorCobrar() {
                       );
                     })()}
                     {abierto && g.cuentas.filter((c) => {
+                      // Buscando por código se ven las notas que coinciden, pagadas o no.
+                      if (porCodigo(g.cliente)) return busqueda.get(g.cliente)!.docs.has(c.id);
                       const pagada = c.estado === "liquidada" || c.saldo <= CASI_CERO;
                       return !pagada || (conPagadas.has(g.cliente) && !enLiquidacion.has(c.id));
                     }).map((c) => {

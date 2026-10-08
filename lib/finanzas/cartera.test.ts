@@ -34,3 +34,17 @@ test("cuenta los documentos por clase", () => {
   const g = agruparPorCliente([c(1, "A", 1, "2026-01-01", 1), c(2, "A", 1, "2026-01-01", 1, { clase: "ajuste" })]);
   assert.deepEqual(g[0].porClase, { nota_entrega: 1, ajuste: 1 });
 });
+
+test("el buscador encuentra por nombre o por el código de la nota", async () => {
+  const { buscarEnCartera, codigoBuscable } = await import("./cartera.ts");
+  const g = { cliente: "ISMESOL", cuentas: [{ id: 1, documento: "NE-8734·ISMESOL" }, { id: 2, documento: "NE-8791" }, { id: 3, documento: "FAC-8734" }] };
+  assert.equal(codigoBuscable("ne 8734"), "NE8734");
+  assert.deepEqual([...buscarEnCartera(g, "8734").docs], [1, 3]);
+  assert.deepEqual([...buscarEnCartera(g, "NE-8734").docs], [1]);
+  assert.deepEqual([...buscarEnCartera(g, "ne8791").docs], [2]);
+  assert.equal(buscarEnCartera(g, "ismes").porNombre, true);
+  assert.equal(buscarEnCartera(g, "ismes").docs.size, 0);
+  assert.equal(buscarEnCartera(g, "ne").visible, false);   // sin dígitos no busca por código
+  assert.equal(buscarEnCartera(g, "9999").visible, false);
+  assert.equal(buscarEnCartera(g, "  ").visible, true);
+});

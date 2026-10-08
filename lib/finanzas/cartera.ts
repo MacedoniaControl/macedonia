@@ -63,3 +63,23 @@ export function agruparPorCliente<C extends CuentaCartera>(cuentas: C[]): Client
     // Primero quien más debe; a igual saldo, por nombre.
     .sort((a, b) => b.saldo - a.saldo || a.cliente.localeCompare(b.cliente, "es"));
 }
+
+/** El código de un documento para buscarlo: «NE-8734», «ne 8734» y «NE-8734·ISMESOL» dan «NE8734». */
+export const codigoBuscable = (s: string) => s.split("·")[0].toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/**
+ * El buscador de la cartera: por nombre del cliente (o proveedor) o por el
+ * código de una nota («8734», «NE-8734»). Para buscar por código hace falta
+ * algún dígito: «ne» solo coincidiría con todas las notas.
+ * `docs` son las cuentas que coinciden por código.
+ */
+export function buscarEnCartera<C extends { id: number; documento: string }>(
+  grupo: { cliente: string; cuentas: C[] }, consulta: string,
+): { visible: boolean; porNombre: boolean; docs: Set<number> } {
+  const q = consulta.trim();
+  if (!q) return { visible: true, porNombre: true, docs: new Set() };
+  const porNombre = grupo.cliente.toLowerCase().includes(q.toLowerCase());
+  const qc = codigoBuscable(q);
+  const docs = new Set(/\d/.test(qc) ? grupo.cuentas.filter((c) => codigoBuscable(c.documento).includes(qc)).map((c) => c.id) : []);
+  return { visible: porNombre || docs.size > 0, porNombre, docs };
+}
