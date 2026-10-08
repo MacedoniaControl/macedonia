@@ -27,7 +27,7 @@ test("el reporte de la otra cartera se rechaza y dice dónde va", () => {
 test("por cobrar: el cliente sale de su fila de grupo, el monto del saldo inicial (no del acumulado)", () => {
   const l = leerValery("cobrar", hojas("valery-por-cobrar.xls"));
   assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.emitida, f.vence, f.monto]), [
-    ["CLIENTE DE PRUEBA UNO, C.A.", "NE-0000017809", "2026-03-02", "2026-04-01", 153.97],
+    ["CLIENTE DE PRUEBA UNO, C.A.", "NE-0000017809", "2026-03-02", "2026-04-02", 153.97],
     ["CLIENTE DE PRUEBA UNO, C.A.", "NE-0000018142", "2026-04-10", "2026-05-10", 21.78],
     ["CLIENTE ÑANDÚ, C.A", "NE-S/N 31-12-2024", "2024-12-31", "2025-01-30", 4004.14],
   ]);
@@ -94,7 +94,7 @@ test("un pedazo del reporte copiado a un libro nuevo, sin cabecera ni «-», tam
   assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.emitida, f.vence, f.monto, f.linea]), [
     ["FERRETERÍA EL CLAVO", "NE-9068", "2026-09-28", "2026-10-28", 20, 2],
     // Vencimiento anterior a la emisión: como nota de entrega, a los 30 días.
-    ["FERRETERÍA EL CLAVO", "NE-9138", "2026-10-02", "2026-11-01", 35.5, 3],
+    ["FERRETERÍA EL CLAVO", "NE-9138", "2026-10-02", "2026-11-02", 35.5, 3],
   ]);
 });
 
@@ -138,15 +138,17 @@ test("la misma nota escrita «NE-8432·ISMESOL» o «NE-8432» es duplicada", ()
   assert.equal(s.duplicadas.length, 1);
 });
 
-test("por cobrar: la nota de entrega sin vencimiento en Valery vence a los 30 días", () => {
+test("por cobrar: la nota de entrega sin vencimiento en Valery vence el mismo día del mes siguiente", () => {
   const h: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "1", "2026-10-07", "", "", "10", "", "", "", "10"]] };
-  assert.equal(leerValery("cobrar", [h]).filas[0].vence, "2026-11-06");
+  assert.equal(leerValery("cobrar", [h]).filas[0].vence, "2026-11-07");
 });
 
-test("por cobrar: la nota de entrega que en Valery vence el día que se emitió va a los 30 días", () => {
+test("la nota de entrega vence por la regla, traiga Valery la fecha que traiga", () => {
   const h: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "1", "2026-10-07", "2026-10-07", "", "10", "", "", "", "10"]] };
-  assert.equal(leerValery("cobrar", [h]).filas[0].vence, "2026-11-06");
-  // Con una fecha posterior, manda la de Valery.
+  assert.equal(leerValery("cobrar", [h]).filas[0].vence, "2026-11-07");
   const h2: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "2", "2026-10-07", "2026-10-20", "", "10", "", "", "", "10"]] };
-  assert.equal(leerValery("cobrar", [h2]).filas[0].vence, "2026-10-20");
+  assert.equal(leerValery("cobrar", [h2]).filas[0].vence, "2026-11-07");
+  // Un 31: 30 días exactos.
+  const h3: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "3", "2026-07-31", "2026-08-31", "", "10", "", "", "", "10"]] };
+  assert.equal(leerValery("cobrar", [h3]).filas[0].vence, "2026-08-30");
 });
