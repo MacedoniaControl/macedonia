@@ -53,7 +53,7 @@ const estadoDe = (saldo: number, d: number): { label: string; tone: Tone } =>
 const inputClass = "sumi-campo";
 /** El mismo proveedor escrito con espacios o mayúsculas distintas. */
 const mismoProveedor = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toUpperCase() === b.trim().replace(/\s+/g, " ").toUpperCase();
-const pildora = "rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2";
+const pildora = "sumi-pulsable rounded-full border border-border-strong px-2.5 py-0.5 text-xs font-medium text-text hover:bg-surface-2";
 /** El orden de las cuentas de un proveedor si no se elige otro: Estado ↓. */
 const ORDEN_DOCUMENTOS: Orden = { clave: "estado", dir: "desc" };
 /** Una cuenta por pagar en la cartera: el saldo y el monto son NETOS (sin el IVA retenido). */
@@ -498,7 +498,7 @@ function CuentasPorPagar() {
                               </label>
                               <button type="button" disabled={descargando === g.cliente}
                                 title={todoP ? `Estado de cuenta con ${g.cliente}, con las pagadas` : `Estado de cuenta con ${g.cliente}: lo pendiente`}
-                                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 font-medium text-text hover:bg-surface disabled:opacity-60"
+                                className="sumi-pulsable inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 font-medium text-text hover:bg-surface disabled:opacity-60"
                                 onClick={() => pdfProveedor(g, todoP)}>
                                 <Icon name="report" size={13} /> {descargando === g.cliente ? "Generando…" : "Descargar PDF"}
                               </button>
