@@ -46,3 +46,11 @@ test("aria-sort solo en la columna activa", () => {
   assert.equal(ariaOrden({ clave: "monto", dir: "desc" }, "monto"), "descending");
   assert.equal(ariaOrden({ clave: "monto", dir: "desc" }, "saldo"), "none");
 });
+
+test("los códigos de documento se ordenan por su número, no como texto", () => {
+  const filas = ["NE-8687·CORPO ALASKA", "NE-28284·CORPO ALASKA", "NE-7481·CORPO ALASKA", "NE-8181·NAVIERA(2)", "NE-8181"].map((documento) => ({ documento }));
+  const asc = ordenar(filas, { clave: "nombre", dir: "asc" }, (f) => f.documento).map((f) => f.documento);
+  assert.deepEqual(asc, ["NE-7481·CORPO ALASKA", "NE-8181", "NE-8181·NAVIERA(2)", "NE-8687·CORPO ALASKA", "NE-28284·CORPO ALASKA"]);
+  const desc = ordenar(filas, { clave: "nombre", dir: "desc" }, (f) => f.documento).map((f) => f.documento);
+  assert.equal(desc[0], "NE-28284·CORPO ALASKA");
+});

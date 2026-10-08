@@ -40,7 +40,10 @@ export function SortableTh({
       >
         {label}
         <span aria-hidden="true" className={activo ? "text-brand" : "text-muted opacity-40"}>
-          <Icon name={estado === "descending" ? "chevronDown" : "chevronRight"} size={14} />
+          {/* Abajo = de mayor a menor; arriba = de menor a mayor; sin ordenar, de lado y tenue. */}
+          <span className={`inline-flex transition-transform ${estado === "ascending" ? "rotate-180" : ""}`}>
+            <Icon name={estado === "none" ? "chevronRight" : "chevronDown"} size={14} />
+          </span>
         </span>
       </button>
     </th>

@@ -49,7 +49,9 @@ export function ordenar<T>(filas: T[], orden: Orden, valor: (fila: T, clave: Cla
       if (a.v === null || b.v === null) return a.v === b.v ? a.i - b.i : a.v === null ? 1 : -1;
       const d = typeof a.v === "number" && typeof b.v === "number"
         ? a.v - b.v
-        : String(a.v).localeCompare(String(b.v), "es", { sensitivity: "base" });
+        // `numeric`: los códigos por su número, no como texto. Como texto,
+        // «NE-28284» quedaba antes que «NE-7481» (el 2 va antes que el 7).
+        : String(a.v).localeCompare(String(b.v), "es", { sensitivity: "base", numeric: true });
       return d === 0 ? a.i - b.i : d * signo;
     })
     .map((x) => x.f);
