@@ -26,7 +26,7 @@ import { fmtUsd, fmtUsdCentavos } from "@/lib/ux/format";
 import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
 import { LiquidacionesDelCliente } from "@/components/finanzas/Liquidaciones";
 import { listarLiquidaciones } from "@/lib/finanzas/liquidaciones-db";
-import { agruparPorCliente, type ClienteCartera } from "@/lib/finanzas/cartera";
+import { agruparPorCliente, buscarEnCartera, type ClienteCartera } from "@/lib/finanzas/cartera";
 import { descargarEstadoCuenta } from "@/lib/finanzas/estado-cuenta-pdf";
 import { proveedorPorNombre } from "@/lib/directorio/directorio-db";
 import type { EmpresaId } from "@/lib/ux/empresas";
@@ -148,8 +148,12 @@ function CuentasPorPagar() {
   const valorCuenta = (c: CuentaP, k: ClaveOrden) =>
     k === "monto" ? c.monto : k === "saldo" ? c.saldo : k === "emision" ? c.emitida : k === "vence" ? c.vence
     : k === "estado" ? gravedad(c.saldo, c.d, c.estado === "liquidada") : null;
-  const tp = buscaProveedor.trim().toLowerCase();
-  const proveedores = ordenar(agruparPorCliente(filasP).filter((g) => !tp || g.cliente.toLowerCase().includes(tp)), orden, valorProveedor)
+  const tp = buscaProveedor.trim();
+  // Por nombre o por el código de una cuenta: el proveedor que la tiene se abre solo con esa cuenta.
+  const grupos = agruparPorCliente(filasP);
+  const busqueda = new Map(grupos.map((g) => [g.cliente, buscarEnCartera(g, buscaProveedor)] as const));
+  const porCodigo = (p: string) => { const b = busqueda.get(p); return !!b && b.docs.size > 0; };
+  const proveedores = ordenar(grupos.filter((g) => busqueda.get(g.cliente)?.visible), orden, valorProveedor)
     .map((g) => ({ ...g, cuentas: ordenar(g.cuentas, ordenDe.get(g.cliente) ?? ORDEN_DOCUMENTOS, valorCuenta) }));
   const alternar = (k: string) => setAbiertos((x) => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const todosAbiertos = proveedores.length > 0 && proveedores.every((g) => abiertos.has(g.cliente));
@@ -399,17 +403,18 @@ function CuentasPorPagar() {
                 : `No hay ninguna cuenta de esa clase. Hay ${ctas.length} en total: toca «Todas».`
             }
           >
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <input type="search" className={`${inputClass} max-w-xs`} placeholder="Buscar proveedor" value={buscaProveedor}
-                onChange={(e) => setBuscaProveedor(e.target.value)} aria-label="Buscar proveedor" />
-              <span className="flex items-center gap-3 text-xs text-muted">
-                <button type="button" className="text-brand hover:underline"
-                  onClick={() => setAbiertos(todosAbiertos ? new Set() : new Set(proveedores.map((g) => g.cliente)))}>
-                  {todosAbiertos ? "Recoger todos" : "Desplegar todos"}
-                </button>
-                {proveedores.length} proveedor(es)
-              </span>
+            {/* El mismo buscador que la cartera de Cuentas por Cobrar. */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <input type="search" className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1 sm:max-w-sm" placeholder="Buscar proveedor o documento (FCM-80460)"
+                aria-label="Buscar proveedor o documento por su código" value={buscaProveedor} onChange={(e) => setBuscaProveedor(e.target.value)} />
+              <Button variant="ghost" onClick={() => setAbiertos(todosAbiertos ? new Set() : new Set(proveedores.map((g) => g.cliente)))}>
+                {todosAbiertos ? "Contraer todos" : "Desplegar todos"}
+              </Button>
+              <span className="text-xs text-muted">{proveedores.length} proveedor(es)</span>
             </div>
+            {tp && proveedores.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted">No hay proveedores ni documentos con «{tp}».</p>
+            )}
             <div className="sumi-scroll max-w-full overflow-x-auto">
             <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
@@ -423,7 +428,7 @@ function CuentasPorPagar() {
                 </tr>
               </thead>
               {proveedores.map((g) => {
-                const abierto = abiertos.has(g.cliente);
+                const abierto = abiertos.has(g.cliente) || porCodigo(g.cliente);
                 const eg = g.masVieja ? estadoDe(g.saldo, g.masVieja.dias) : { label: "Pagada", tone: "ok" as Tone };
                 const nv = g.cuentas.filter((c) => !pagadaP(c) && c.d < 0).length;
                 const todoP = conPagadas.has(g.cliente);
@@ -507,7 +512,9 @@ function CuentasPorPagar() {
                         </td>
                       </tr>
                     )}
-                    {abierto && g.cuentas.filter((c) => !pagadaP(c) || (todoP && !enLiquidacion.has(c.id))).map((c) => {
+                    {abierto && g.cuentas.filter((c) => porCodigo(g.cliente)
+                      ? busqueda.get(g.cliente)!.docs.has(c.id) // buscando por código: las que coinciden, pagadas o no
+                      : !pagadaP(c) || (todoP && !enLiquidacion.has(c.id))).map((c) => {
                       const e = estadoDe(c.saldo, c.d);
                       return (
                         <tr key={c.id} onClick={() => setAbierta(c.id)} tabIndex={0}
