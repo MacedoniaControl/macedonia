@@ -4,11 +4,10 @@
 // ventana «Clientes» de Valery (pedido del usuario, 10-10-2026): Código, Tipo y
 // R.I.F. arriba; «Datos e Información Fiscal y Tributaria», «Datos del
 // Cliente», «Clasificación y Opciones de Crédito» y «Precios y Comentarios»; a
-// la derecha los totales y el estatus; abajo «F9 Registrar» y «ESC Cerrar»
-// (también con el teclado). El RIF y la dirección de esta ficha llenan el
-// estado de cuenta en PDF.
+// la derecha los totales y el estatus; abajo «Guardar» y «Cerrar». El RIF y la
+// dirección de esta ficha llenan el estado de cuenta en PDF.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { CampoMonto } from "@/components/ui/CampoMonto";
 import { guardarCliente, guardarProveedor, type Cliente, type Proveedor, type TipoPersona } from "@/lib/directorio/directorio-db";
@@ -111,14 +110,6 @@ export function FichaContacto({ rol, ficha, nombreSugerido = "", resumen, vended
     } finally { setGuardando(false); }
   }
 
-  // F9 registra, como en Valery (ESC ya cierra la ventana).
-  const registrarRef = useRef(registrar);
-  useEffect(() => { registrarRef.current = registrar; });
-  useEffect(() => {
-    const tecla = (e: KeyboardEvent) => { if (e.key === "F9") { e.preventDefault(); registrarRef.current(); } };
-    window.addEventListener("keydown", tecla);
-    return () => window.removeEventListener("keydown", tecla);
-  }, []);
 
   const quien = rol === "cliente" ? "Cliente" : "Proveedor";
   const saldo = resumen?.saldo ?? 0;
@@ -223,8 +214,8 @@ export function FichaContacto({ rol, ficha, nombreSugerido = "", resumen, vended
 
       {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger lg:col-span-2">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
-        {puedeEditar && <Button icon="check" cargando={guardando} textoCargando="Registrando…" onClick={registrar}>F9 Registrar</Button>}
-        <Button variant="secondary" icon="close" onClick={onCerrar}>ESC Cerrar</Button>
+        {puedeEditar && <Button icon="check" cargando={guardando} textoCargando="Guardando…" onClick={registrar}>Guardar</Button>}
+        <Button variant="secondary" icon="close" onClick={onCerrar}>Cerrar</Button>
       </div>
     </div>
   );
