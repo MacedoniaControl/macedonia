@@ -97,6 +97,8 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; ger
   const [anulando, setAnulando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);
+  // El aviso cuando se toca «Anular» sin motivo.
+  const [faltaMotivo, setFaltaMotivo] = useState(false);
   const [pago, setPago] = useState({ fecha: l.fecha, metodo: l.metodo ?? "", referencia: l.referencia ?? "", nota: l.nota ?? "" });
   const [guardando, setGuardando] = useState(false);
 
@@ -201,18 +203,39 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; ger
         )}
         {gerencia && !l.anuladaEn && (
           <>
-            <input className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1" value={motivo} onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Motivo para anular" aria-label="Motivo para anular la liquidación" />
+            <input id={`motivo-${l.id}`} className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1" value={motivo}
+              onChange={(e) => { setMotivo(e.target.value); if (error) setError(null); }}
+              placeholder="Motivo para anular (obligatorio)" aria-label="Motivo para anular la liquidación" />
             <ConfirmDialog
               title={`¿Anular ${l.numero}?`}
               message={`Se borran sus ${l.documentos.length} abono(s) y las cuentas de ${l.contraparte} vuelven a quedar abiertas por ${fmtUsd(l.total)}. La liquidación queda en el registro como anulada.`}
               confirmLabel="Sí, anular" cancelLabel="No" onConfirm={anular}
-              trigger={(abrir) => <Button variant="secondary" disabled={anulando || !motivo.trim()} onClick={abrir}>{anulando ? "Anulando…" : "Anular"}</Button>}
+              trigger={(abrir) => (
+                <Button variant="secondary" disabled={anulando}
+                  onClick={() => {
+                    // Antes el botón quedaba gris sin decir por qué: ahora dice qué falta.
+                    if (!motivo.trim()) return setFaltaMotivo(true);
+                    abrir();
+                  }}>{anulando ? "Anulando…" : "Anular"}</Button>
+              )}
             />
           </>
         )}
       </div>
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+      {faltaMotivo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="alertdialog" aria-modal="true" aria-labelledby={`falta-motivo-${l.id}`}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-xl">
+            <h2 id={`falta-motivo-${l.id}`} className="text-base font-semibold text-text">Falta el Motivo</h2>
+            <p className="mt-2 text-sm text-muted">
+              Para anular {l.numero} debes agregar un motivo. Queda en el registro de la liquidación.
+            </p>
+            <div className="mt-5 flex justify-end">
+              <Button onClick={() => { setFaltaMotivo(false); setTimeout(() => document.getElementById(`motivo-${l.id}`)?.focus(), 0); }}>Agregar motivo</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
