@@ -5,7 +5,8 @@
 //   · Borra la cuenta, sus abonos y sus fotos: NO queda registro.
 //   · Lo usan el Owner y un Administrador mientras el Owner lo tenga
 //     habilitado (un interruptor por empresa, solo del Owner).
-//   · No se elimina lo que está en una liquidación vigente: primero se anula.
+//   · No se elimina lo que está en una liquidación activa: sale un aviso y hay
+//     que anular la liquidación primero (la base lo vuelve a impedir, 43).
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -66,13 +67,19 @@ export function BotonEliminarNota({ onClick, titulo }: { onClick: (ev: React.Mou
 type CuentaEliminable = { id: number; documento: string; emitida: string; monto: number; saldo: number; estado: string };
 
 /** Elegir qué cuentas de un cliente (o proveedor) se eliminan. */
-export function EliminarCuentasDe({ empresa, contraparte, cuentas, onHecho, onCerrar }: {
+export function EliminarCuentasDe({ empresa, contraparte, cuentas, enLiquidacion, onHecho, onCerrar }: {
   empresa: string; contraparte: string; cuentas: CuentaEliminable[];
+  /** En qué liquidación activa está cada cuenta (id → LQ-…): esas no se eliminan. */
+  enLiquidacion?: Map<number, string>;
   onHecho: (texto: string) => void; onCerrar: () => void;
 }) {
   const [elegidas, setElegidas] = useState<Set<number>>(() => new Set(cuentas.length === 1 ? [cuentas[0].id] : []));
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // El aviso: las notas marcadas que están en una liquidación activa.
+  const [bloqueo, setBloqueo] = useState<{ documento: string; lq: string }[] | null>(null);
+  const bloqueadas = () => cuentas.filter((c) => elegidas.has(c.id) && enLiquidacion?.has(c.id))
+    .map((c) => ({ documento: c.documento.split("·")[0], lq: enLiquidacion!.get(c.id)! }));
   const alternar = (id: number) => setElegidas((s) => { const x = new Set(s); if (x.has(id)) x.delete(id); else x.add(id); return x; });
   const lista = cuentas.filter((c) => elegidas.has(c.id));
   const total = lista.reduce((a, c) => a + c.saldo, 0);
@@ -81,6 +88,8 @@ export function EliminarCuentasDe({ empresa, contraparte, cuentas, onHecho, onCe
     setGuardando(true); setError(null);
     try {
       const r = await eliminarCuentas(empresa, [...elegidas]);
+      // Si la base lo impide por una liquidación (alguien liquidó mientras tanto), el mismo aviso.
+      if (!r.ok && /liquidación (activa|vigente)/.test(r.error)) return setBloqueo(bloqueadas().length ? bloqueadas() : [{ documento: "Alguna de las notas", lq: "una liquidación activa" }]);
       if (!r.ok) return setError(r.error);
       onHecho(`${r.cuentas} cuenta(s) de ${contraparte} eliminada(s).`);
       onCerrar();
@@ -121,13 +130,43 @@ export function EliminarCuentasDe({ empresa, contraparte, cuentas, onHecho, onCe
           confirmLabel="Sí, eliminar" cancelLabel="No" onConfirm={eliminar}
           trigger={(abrir) => (
             <Button variant="danger" icon="trash" className="flex-1" cargando={guardando} textoCargando="Eliminando…"
-              onClick={() => { if (!elegidas.size) return setError("Marca al menos una cuenta."); setError(null); abrir(); }}>
+              onClick={() => {
+                if (!elegidas.size) return setError("Marca al menos una cuenta.");
+                setError(null);
+                const b = bloqueadas();
+                if (b.length) return setBloqueo(b);
+                abrir();
+              }}>
               Eliminar {elegidas.size || ""}
             </Button>
           )}
         />
         <Button variant="secondary" onClick={onCerrar}>Cancelar</Button>
       </div>
+      {bloqueo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="alertdialog" aria-modal="true" aria-labelledby="bloqueo-titulo">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-xl">
+            <h2 id="bloqueo-titulo" className="flex items-center gap-2 text-base font-semibold text-text">
+              <Icon name="alert" size={18} /> No Se Puede Eliminar
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Las notas de entrega que estás intentando eliminar se encuentran dentro de una <b className="text-text">liquidación activa</b>.
+              No está permitido eliminarlas: primero debes <b className="text-text">anular la liquidación</b>.
+            </p>
+            <ul className="mt-3 max-h-40 divide-y divide-border overflow-y-auto rounded-lg border border-border text-xs">
+              {bloqueo.map((b) => (
+                <li key={b.documento + b.lq} className="flex justify-between gap-3 px-2.5 py-1.5">
+                  <span className="font-mono text-text">{b.documento}</span><span className="text-muted">{b.lq}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-muted">La liquidación se anula desde «Pagadas» → «Liquidaciones de este cliente».</p>
+            <div className="mt-5 flex justify-end">
+              <Button onClick={() => setBloqueo(null)}>Entendido</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

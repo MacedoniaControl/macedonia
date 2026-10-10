@@ -61,7 +61,12 @@ export type Liquidacion = {
   metodo: string | null; referencia: string | null; nota: string | null; imagenRuta: string | null;
   creadoNombre: string; creadoEn: string;
   anuladaEn: string | null; anuladaNombre: string | null; anuladaMotivo: string | null;
-  /** Los documentos que liquidó y cuánto se le abonó a cada uno (vacío si se anuló). */
+  /** Migración 43: quién la modificó o la restableció por última vez. */
+  modificadaEn: string | null; modificadaNombre: string | null;
+  restablecidaEn: string | null; restablecidaNombre: string | null;
+  /** Anulada con su detalle guardado: se puede restablecer. */
+  restablecible: boolean;
+  /** Los documentos que liquidó y cuánto se le abonó a cada uno (si se anuló, los que tenía). */
   documentos: DocumentoLiquidado[];
 };
 
@@ -69,7 +74,7 @@ export type Liquidacion = {
 export async function listarLiquidaciones(empresa: string, tipo: "cobrar" | "pagar" = "cobrar", limite = 50): Promise<Liquidacion[]> {
   const sb = await createClient();
   const { data, error } = await sb.from("liquidaciones")
-    .select("id, numero, contraparte, fecha, total, cuentas, metodo, referencia, nota, imagen_ruta, creado_nombre, creado_en, anulada_en, anulada_nombre, anulada_motivo")
+    .select("id, numero, contraparte, fecha, total, cuentas, metodo, referencia, nota, imagen_ruta, creado_nombre, creado_en, anulada_en, anulada_nombre, anulada_motivo, detalle, modificada_en, modificada_nombre, restablecida_en, restablecida_nombre")
     .eq("empresa_id", empresa).eq("tipo", tipo).order("id", { ascending: false }).limit(limite);
   if (error) {
     // Sin la migración 33 la tabla no existe: la sección simplemente no se muestra.
@@ -91,13 +96,46 @@ export async function listarLiquidaciones(empresa: string, tipo: "cobrar" | "pag
       }]);
     }
   }
+  // Las anuladas ya no tienen abonos: sus notas salen del detalle que se guardó al anular.
+  type Det = { cuenta_id: number; monto: number; saldada: boolean };
+  const deAnuladas = filas.filter((l) => l.anulada_en && Array.isArray(l.detalle));
+  const idsDet = [...new Set(deAnuladas.flatMap((l) => (l.detalle as Det[]).map((d) => Number(d.cuenta_id))))];
+  if (idsDet.length) {
+    const { data: cs } = await sb.from("cuentas").select("id, documento, emitida, vence").in("id", idsDet);
+    const porId = new Map((cs ?? []).map((c) => [Number(c.id), c]));
+    for (const l of deAnuladas) {
+      docs.set(l.id, (l.detalle as Det[]).map((d) => {
+        const c = porId.get(Number(d.cuenta_id));
+        return { cuentaId: Number(d.cuenta_id), documento: c?.documento ?? "(eliminada)", emitida: c?.emitida ?? null, vence: c?.vence ?? null, monto: Number(d.monto), saldada: !!d.saldada };
+      }));
+    }
+  }
   return filas.map((l) => ({
     id: l.id, numero: l.numero, contraparte: l.contraparte, fecha: l.fecha, total: Number(l.total), cuentas: l.cuentas,
     metodo: l.metodo, referencia: l.referencia, nota: l.nota, imagenRuta: l.imagen_ruta,
     creadoNombre: l.creado_nombre, creadoEn: l.creado_en,
     anuladaEn: l.anulada_en, anuladaNombre: l.anulada_nombre, anuladaMotivo: l.anulada_motivo,
+    modificadaEn: l.modificada_en, modificadaNombre: l.modificada_nombre,
+    restablecidaEn: l.restablecida_en, restablecidaNombre: l.restablecida_nombre,
+    restablecible: !!l.anulada_en && Array.isArray(l.detalle) && l.detalle.length > 0,
     documentos: (docs.get(l.id) ?? []).sort((a, b) => a.documento.localeCompare(b.documento)),
   }));
+}
+
+/** Restablece una liquidación anulada: vuelve activa con las mismas notas y montos (migración 43). */
+export async function restablecerLiquidacion(id: number): Promise<{ ok: true; abonos: number } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("restablecer_liquidacion", { p_id: id });
+  return error ? { ok: false, error: error.message } : { ok: true, abonos: Number(data) || 0 };
+}
+
+/** Modifica los datos del pago de una liquidación activa: fecha, método, referencia y nota (migración 43). */
+export async function editarLiquidacion(id: number, pago: { fecha: string; metodo: string; referencia: string; nota: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = await createClient();
+  const { error } = await sb.rpc("editar_liquidacion", {
+    p_id: id, p_fecha: pago.fecha, p_metodo: pago.metodo, p_referencia: pago.referencia, p_nota: pago.nota,
+  });
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
 /** Anula una liquidación hecha por error: sus notas vuelven a quedar abiertas. */
