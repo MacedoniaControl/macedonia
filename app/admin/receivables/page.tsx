@@ -135,6 +135,8 @@ function CuentasPorCobrar() {
   // repetidas como «Pagada» en la lista del cliente.
   // En qué liquidación se pagó cada nota (para el estado de cuenta en PDF).
   const lqDeCuenta = new Map((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.filter((d) => d.saldada).map((d) => [d.cuentaId, l.numero] as const)));
+  // Las cuentas que están en una liquidación activa (saldadas o con el restante): no se eliminan.
+  const lqActivaDe = new Map((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.map((d) => [d.cuentaId, l.numero] as const)));
   const [descargando, setDescargando] = useState<string | null>(null);
   async function pdfCliente(g: ClienteCartera<CuentaDb>, conPag: boolean) {
     setDescargando(g.cliente);
@@ -693,13 +695,13 @@ function CuentasPorCobrar() {
 
       {eliminarNota && (
         <Modal titulo="Eliminar Nota" onCerrar={() => setEliminarNota(null)}>
-          <EliminarCuentasDe empresa={empresaKey} contraparte={eliminarNota.contraparte} cuentas={[eliminarNota]}
+          <EliminarCuentasDe empresa={empresaKey} enLiquidacion={lqActivaDe} contraparte={eliminarNota.contraparte} cuentas={[eliminarNota]}
             onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminarNota(null)} />
         </Modal>
       )}
       {eliminar && (
         <Modal titulo="Eliminar Cuentas" onCerrar={() => setEliminar(null)}>
-          <EliminarCuentasDe empresa={empresaKey} contraparte={eliminar}
+          <EliminarCuentasDe empresa={empresaKey} enLiquidacion={lqActivaDe} contraparte={eliminar}
             cuentas={cuentas.filter((c) => claveCliente(c.contraparte) === claveCliente(eliminar))
               .sort((x, y) => x.emitida.localeCompare(y.emitida) || x.documento.localeCompare(y.documento))}
             onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminar(null)} />

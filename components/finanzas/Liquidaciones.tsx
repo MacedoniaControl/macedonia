@@ -4,6 +4,8 @@
 // número, cliente, notas, total, comprobante y quién lo hizo. El Owner o un
 // Administrador puede anular una hecha por error (con motivo): sus notas
 // vuelven a quedar abiertas y la liquidación queda marcada, no se borra.
+// También puede modificar los datos del pago de una activa y restablecer una
+// anulada, que vuelve con las mismas notas y montos (migración 43).
 
 import { useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -11,7 +13,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useCarga } from "@/lib/ux/use-carga";
-import { anularLiquidacion, listarLiquidaciones, type Liquidacion } from "@/lib/finanzas/liquidaciones-db";
+import { anularLiquidacion, editarLiquidacion, listarLiquidaciones, restablecerLiquidacion, type Liquidacion } from "@/lib/finanzas/liquidaciones-db";
 import { urlComprobante } from "@/lib/finanzas/cuentas-db";
 import { fmtUsd } from "@/lib/ux/format";
 import { fechaVista } from "@/lib/ux/tabla-export";
@@ -94,6 +96,26 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; ger
   const [motivo, setMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [pago, setPago] = useState({ fecha: l.fecha, metodo: l.metodo ?? "", referencia: l.referencia ?? "", nota: l.nota ?? "" });
+  const [guardando, setGuardando] = useState(false);
+
+  async function guardarCambios() {
+    setGuardando(true); setError(null);
+    try {
+      const r = await editarLiquidacion(l.id, pago);
+      if (!r.ok) return setError(r.error);
+      setEditando(false); onCambio();
+    } finally { setGuardando(false); }
+  }
+  async function restablecer() {
+    setGuardando(true); setError(null);
+    try {
+      const r = await restablecerLiquidacion(l.id);
+      if (!r.ok) return setError(r.error);
+      onCambio();
+    } finally { setGuardando(false); }
+  }
 
   async function ver() {
     if (!l.imagenRuta) return;
@@ -116,7 +138,26 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; ger
       <p className="text-xs text-muted">
         {[l.metodo, l.referencia && `ref. ${l.referencia}`].filter(Boolean).join(" · ") || "Sin método ni referencia"}
         {l.nota ? ` · «${l.nota}»` : ""} · registró {l.creadoNombre} el {hora(l.creadoEn)}
+        {l.modificadaEn ? ` · modificó ${l.modificadaNombre} el ${hora(l.modificadaEn)}` : ""}
+        {l.restablecidaEn ? ` · restableció ${l.restablecidaNombre} el ${hora(l.restablecidaEn)}` : ""}
       </p>
+      {editando && (
+        <div className="grid gap-2 rounded-lg border border-border bg-surface p-2.5 sm:grid-cols-2">
+          <label className="block text-xs"><span className="mb-1 block font-medium text-muted">Fecha del pago</span>
+            <input type="date" className="sumi-campo" value={pago.fecha} onChange={(e) => setPago({ ...pago, fecha: e.target.value })} /></label>
+          <label className="block text-xs"><span className="mb-1 block font-medium text-muted">Método</span>
+            <input className="sumi-campo" value={pago.metodo} onChange={(e) => setPago({ ...pago, metodo: e.target.value })} placeholder="Transferencia, Zelle…" /></label>
+          <label className="block text-xs"><span className="mb-1 block font-medium text-muted">Referencia</span>
+            <input className="sumi-campo" value={pago.referencia} onChange={(e) => setPago({ ...pago, referencia: e.target.value })} placeholder="N° de operación" /></label>
+          <label className="block text-xs"><span className="mb-1 block font-medium text-muted">Nota</span>
+            <input className="sumi-campo" value={pago.nota} onChange={(e) => setPago({ ...pago, nota: e.target.value })} placeholder="Opcional" /></label>
+          <p className="text-[11px] text-muted sm:col-span-2">Las notas y los montos no se cambian aquí: para eso se anula la liquidación y se liquida de nuevo.</p>
+          <div className="flex gap-2 sm:col-span-2">
+            <Button icon="check" cargando={guardando} textoCargando="Guardando…" onClick={guardarCambios}>Guardar cambios</Button>
+            <Button variant="secondary" onClick={() => { setEditando(false); setPago({ fecha: l.fecha, metodo: l.metodo ?? "", referencia: l.referencia ?? "", nota: l.nota ?? "" }); }}>Cancelar</Button>
+          </div>
+        </div>
+      )}
       {l.documentos.length > 0 ? (
         <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface text-xs">
           {l.documentos.map((d) => {
@@ -142,10 +183,22 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; ger
       {l.anuladaEn && (
         <p className="rounded-lg bg-danger/10 px-2 py-1.5 text-xs text-danger">
           Anulada por {l.anuladaNombre} el {hora(l.anuladaEn)}: «{l.anuladaMotivo}». Sus notas volvieron a quedar abiertas.
+          {l.restablecible ? " Se puede restablecer con las mismas notas y montos." : ""}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         {l.imagenRuta && <Button variant="secondary" icon="report" onClick={ver}>Ver comprobante</Button>}
+        {gerencia && l.anuladaEn && l.restablecible && (
+          <ConfirmDialog
+            title={`¿Restablecer ${l.numero}?`}
+            message={`Vuelve a quedar activa con sus ${l.documentos.length} nota(s) y los mismos montos (${fmtUsd(l.total)}). Si alguna nota cambió de saldo desde que se anuló, no se restablece.`}
+            confirmLabel="Sí, restablecer" cancelLabel="No" onConfirm={restablecer}
+            trigger={(abrir) => <Button icon="check" disabled={guardando} onClick={abrir}>{guardando ? "Restableciendo…" : "Restablecer"}</Button>}
+          />
+        )}
+        {gerencia && !l.anuladaEn && !editando && (
+          <Button variant="secondary" icon="settings" onClick={() => { setError(null); setEditando(true); }}>Modificar</Button>
+        )}
         {gerencia && !l.anuladaEn && (
           <>
             <input className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1" value={motivo} onChange={(e) => setMotivo(e.target.value)}
