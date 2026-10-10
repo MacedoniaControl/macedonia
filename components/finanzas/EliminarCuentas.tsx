@@ -5,7 +5,8 @@
 //   · Borra la cuenta, sus abonos y sus fotos: NO queda registro.
 //   · Lo usan el Owner y un Administrador mientras el Owner lo tenga
 //     habilitado (un interruptor por empresa, solo del Owner).
-//   · No se elimina lo que está en una liquidación vigente: primero se anula.
+//   · Una liquidación se borra con sus cuentas si se eliminan TODAS; si pagó
+//     otras que se quedan, no se elimina (migración 42).
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -89,7 +90,10 @@ export function EliminarCuentasDe({ empresa, contraparte, cuentas, onHecho, onCe
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">Se borran las cuentas que marques, con sus abonos y sus fotos. <b className="text-danger">No queda registro y no se puede deshacer.</b></p>
+      <p className="text-sm text-muted">
+        Se borran las cuentas que marques, con sus abonos y sus fotos. Si marcas todas las cuentas de una liquidación, la
+        liquidación también se borra. <b className="text-danger">No queda registro y no se puede deshacer.</b>
+      </p>
       <div className="rounded-xl border border-border">
         <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs">
           <span className="text-muted">{elegidas.size} de {cuentas.length} · saldo <b className="tabular-nums text-text">{fmtUsdCentavos(total)}</b></span>
