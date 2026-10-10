@@ -92,7 +92,23 @@ export function LiquidacionesDelCliente({ lista, gerencia, onCambio, onAbrirCuen
   );
 }
 
-function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; gerencia: boolean; onCambio: () => void; onAbrirCuenta?: (id: number) => void }) {
+/** Una liquidación sola, con sus notas y sus acciones (para abrirla desde el aviso de «Eliminar»). */
+export function DetalleLiquidacion(props: { l: Liquidacion; gerencia: boolean; onCambio: () => void; onAbrirCuenta?: (id: number) => void }) {
+  const { l } = props;
+  return (
+    <div className="space-y-2">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="font-mono text-text">{l.numero}</span>
+        <span className="text-muted">{l.contraparte} · {fechaVista(l.fecha)}</span>
+        <span className="ml-auto font-semibold tabular-nums text-text">{fmtUsd(l.total)}</span>
+        {l.anuladaEn ? <StatusBadge tone="danger">Anulada</StatusBadge> : <StatusBadge tone="ok">Activa</StatusBadge>}
+      </p>
+      <div className="overflow-hidden rounded-lg border border-border"><Detalle {...props} enfocarMotivo /></div>
+    </div>
+  );
+}
+
+function Detalle({ l, gerencia, onCambio, onAbrirCuenta, enfocarMotivo = false }: { l: Liquidacion; gerencia: boolean; onCambio: () => void; onAbrirCuenta?: (id: number) => void; enfocarMotivo?: boolean }) {
   const [motivo, setMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +219,7 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta }: { l: Liquidacion; ger
         )}
         {gerencia && !l.anuladaEn && (
           <>
-            <input id={`motivo-${l.id}`} className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1" value={motivo}
+            <input id={`motivo-${l.id}`} autoFocus={enfocarMotivo} className="sumi-campo sumi-campo--auto min-w-[12rem] flex-1" value={motivo}
               onChange={(e) => { setMotivo(e.target.value); if (error) setError(null); }}
               placeholder="Motivo para anular (obligatorio)" aria-label="Motivo para anular la liquidación" />
             <ConfirmDialog
