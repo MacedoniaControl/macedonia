@@ -21,6 +21,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Cotizaciones", href: "/admin/quotes", icon: "quote" },
       { label: "Notas de Entrega", href: "/admin/delivery-notes", icon: "delivery" },
+      { label: "Directorio", href: "/admin/directory", icon: "building" },
     ],
   },
   {

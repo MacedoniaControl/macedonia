@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 import { useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarOrdenes, crearOrden, recibir, type Orden as OrdenDb } from "@/lib/compras/compras-db";
@@ -9,7 +11,6 @@ import { crearProducto } from "@/lib/inventory/productos-db";
 import { EstadoDatos } from "@/components/ui/EstadoDatos";
 import { useCarga } from "@/lib/ux/use-carga";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { PanelProveedores } from "./PanelProveedores";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
@@ -32,7 +33,7 @@ const etiqueta: Record<string, string> = {
 };
 const inputClass = "sumi-campo";
 
-// «Descargar» baja la pestaña abierta: las órdenes o los proveedores.
+// «Descargar» baja las órdenes. Los proveedores viven en el Directorio (Operación).
 export default function PurchasesPage() {
   return <ProveedorExportar><Compras /></ProveedorExportar>;
 }
@@ -42,7 +43,6 @@ function Compras() {
   // Las ordenes viven en la base y el estado se DEDUCE de cuanto llego:
   // nadie tiene que acordarse de marcar "recibida parcial".
   const [recarga, setRecarga] = useState(0);
-  const [tab, setTab] = useState<"ordenes" | "proveedores">("ordenes");
   const carga = useCarga(`${empresaKey}:${recarga}`, () => listarOrdenes(empresaKey));
   const ordenes: OrdenDb[] = carga.datos ?? [];
   // Proveedores y productos salen de la BASE. Antes eran dos listas escritas a
@@ -131,30 +131,15 @@ function Compras() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="brand">{ordenes.length} orden(es)</StatusBadge>
+            <Link href={`/admin/${empresaKey}/directory`} className="sumi-pulsable inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-border-strong bg-surface px-4 text-sm font-medium text-text hover:bg-surface-2">
+              <Icon name="building" size={16} /> Proveedores
+            </Link>
             <BotonDescargar empresa={empresaKey} />
           </div>
         }
       />
-      <div className="sumi-tabs mb-4 flex gap-1 overflow-x-auto">
-        {([["ordenes", "Órdenes de Compra"], ["proveedores", "Proveedores"]] as const).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            aria-current={tab === id ? "page" : undefined}
-            className={`min-h-11 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition ${
-              tab === id ? "bg-brand-strong text-white" : "border border-border text-muted hover:text-text"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <ExportaOrdenes ordenes={ordenes} />
 
-      {tab === "proveedores" && <PanelProveedores todos={proveedores} />}
-      {tab === "ordenes" && <ExportaOrdenes ordenes={ordenes} />}
-
-      {tab === "ordenes" && (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.5fr]">
         <SectionCard title="Nueva Orden de Compra" description="Los productos salen del inventario de la empresa.">
           <div className="space-y-3">
@@ -256,7 +241,6 @@ function Compras() {
           </EstadoDatos>
         </SectionCard>
       </div>
-      )}
 
       {/* El producto no existe todavia. En vez de mandar a Inventario y hacer
           que la orden se cargue dos veces, se crea aquí y la compra sigue. */}

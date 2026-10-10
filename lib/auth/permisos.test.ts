@@ -99,8 +99,8 @@ describe("puedeVer", () => {
 
 describe("CLAVES_MODULO", () => {
   // 16 desde que se eliminaron Auditoria y Comisiones y bonos (26-ago-2026).
-  test("cubre las 16 secciones del menu", () => {
-    assert.equal(CLAVES_MODULO.length, 16);
+  test("cubre las 17 secciones del menu (con el Directorio)", () => {
+    assert.equal(CLAVES_MODULO.length, 17);
   });
 
   test("no tiene claves repetidas", () => {
