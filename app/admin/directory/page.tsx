@@ -331,7 +331,7 @@ function DetalleContacto({ c, empresa, gerencia, vendedor, gemelo, onVolver, onI
             <Dato k="Contacto" v={f.contacto} /><Dato k="Teléfonos" v={f.telefonos} /><Dato k="Correo" v={f.correo} />
             <div className="sm:col-span-2 xl:col-span-3"><Dato k="Dirección" v={f.direccion} /></div>
             <Dato k="Ciudad" v={f.ciudad} /><Dato k="Estado" v={f.estadoRegion} /><Dato k="Municipio" v={f.municipio} />
-            <Dato k="País" v={f.pais} /><Dato k="Fax" v={f.fax} /><Dato k="Grupo" v={f.grupo} />
+            <Dato k="Fax" v={f.fax} /><Dato k="Grupo" v={f.grupo} />
             <Dato k="Días de crédito" v={String(f.diasCredito)} /><Dato k="Límite de crédito" v={f.limiteCredito ? fmtUsd(f.limiteCredito) : null} /><Dato k="Referencia" v={f.referencia} />
             {cli && <><Dato k="Zona de ventas" v={cli.zonaVentas} /><Dato k="Tipo de precio" v={cli.tipoPrecio} /><Dato k="% Descuento especial" v={cli.descuentoPct ? `${cli.descuentoPct} %` : null} /><Dato k="Acepta cheque" v={cli.aceptaCheque ? "Sí" : "No"} /></>}
             {prov && <><Dato k="Origen" v={prov.nacional ? "Nacional" : "Extranjero"} /><Dato k="% Retención IVA" v={`${prov.pctRetencion} %`} /></>}

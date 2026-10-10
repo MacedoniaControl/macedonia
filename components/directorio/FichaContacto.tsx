@@ -40,7 +40,7 @@ function Fila({ k, v, fuerte }: { k: string; v: string; fuerte?: boolean }) {
 
 type Datos = {
   codigo: string; tipoPersona: TipoPersona; rif: string; nombre: string; denominacion: string;
-  contacto: string; correo: string; direccion: string; pais: string; estadoRegion: string; ciudad: string; municipio: string;
+  contacto: string; correo: string; direccion: string; estadoRegion: string; ciudad: string; municipio: string;
   telefonos: string; fax: string; diasCredito: string; limiteCredito: string; referencia: string;
   zonaVentas: string; grupo: string; tipoPrecio: string; descuentoPct: string; pctRetencion: string; nacional: boolean;
   notas: string; activo: boolean; aceptaCheque: boolean;
@@ -64,7 +64,7 @@ export function FichaContacto({ rol, ficha, nombreSugerido = "", resumen, vended
     codigo: ficha?.codigo ?? "", tipoPersona: ficha?.tipoPersona ?? "juridica", rif: ficha?.rif ?? "",
     nombre: ficha?.nombre ?? nombreSugerido, denominacion: (cli?.denominacion ?? prov?.denominacion) || DENOMINACIONES[0],
     contacto: ficha?.contacto ?? "", correo: ficha?.correo ?? "", direccion: ficha?.direccion ?? "",
-    pais: ficha?.pais ?? "", estadoRegion: ficha?.estadoRegion ?? "", ciudad: ficha?.ciudad ?? "", municipio: ficha?.municipio ?? "",
+    estadoRegion: ficha?.estadoRegion ?? "", ciudad: ficha?.ciudad ?? "", municipio: ficha?.municipio ?? "",
     telefonos: ficha?.telefonos ?? "", fax: ficha?.fax ?? "",
     diasCredito: String(ficha?.diasCredito ?? 0), limiteCredito: ficha ? fmtMonto(ficha.limiteCredito) : "",
     referencia: ficha?.referencia ?? "", zonaVentas: cli?.zonaVentas ?? "", grupo: ficha?.grupo ?? "",
@@ -89,7 +89,7 @@ export function FichaContacto({ rol, ficha, nombreSugerido = "", resumen, vended
     const pct = (s: string) => (s.trim() ? parseMonto(s) : 0);
     const comun = {
       codigo: d.codigo, tipoPersona: d.tipoPersona, nombre: d.nombre, contacto: d.contacto, correo: d.correo === "@" ? "" : d.correo,
-      direccion: d.direccion, pais: d.pais, estadoRegion: d.estadoRegion, ciudad: d.ciudad, municipio: d.municipio,
+      direccion: d.direccion, estadoRegion: d.estadoRegion, ciudad: d.ciudad, municipio: d.municipio,
       telefonos: d.telefonos, fax: d.fax, diasCredito: dias, limiteCredito: limite, referencia: d.referencia, grupo: d.grupo,
       notas: d.notas, activo: d.activo, denominacion: d.denominacion,
     };
@@ -152,8 +152,8 @@ export function FichaContacto({ rol, ficha, nombreSugerido = "", resumen, vended
             <Campo label="Correo Electrónico"><input type="email" className={campo} value={d.correo} onChange={set("correo")} placeholder="@" /></Campo>
           </div>
           <Campo label="Dirección"><input className={campo} value={d.direccion} onChange={set("direccion")} /></Campo>
-          <div className="grid gap-3 sm:grid-cols-4">
-            <Campo label="País"><input className={campo} value={d.pais} onChange={set("pais")} placeholder="LOCAL" /></Campo>
+          {/* Sin «País»: todos los clientes y proveedores son nacionales. */}
+          <div className="grid gap-3 sm:grid-cols-3">
             <Campo label="Estado"><input className={campo} value={d.estadoRegion} onChange={set("estadoRegion")} placeholder="LOCAL" /></Campo>
             <Campo label="Ciudad"><input className={campo} value={d.ciudad} onChange={set("ciudad")} placeholder="LOCAL" /></Campo>
             <Campo label="Municipio"><input className={campo} value={d.municipio} onChange={set("municipio")} placeholder="LOCAL" /></Campo>
