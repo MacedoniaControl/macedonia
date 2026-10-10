@@ -4,8 +4,8 @@
 //
 // Antes era una imagen fija de 40 meses: no se podía ver un número, ni acotar
 // el período, ni comparar trimestres. Ahora:
-//   · ventana (12 o 24 meses, un año o todo), agrupación (mes, trimestre, año)
-//     y moneda (dólares o los bolívares FACTURADOS);
+//   · ventana (12 o 24 meses, un año o todo) en un desplegable, agrupación
+//     (mes, trimestre, año) y moneda (dólares o los bolívares FACTURADOS);
 //   · el gráfico (GraficoBI): líneas o barras, series que se encienden y
 //     apagan, globo con montos, variación, margen y ROI;
 //   · arriba, el resumen de lo que se está viendo; abajo, la tabla.
@@ -13,7 +13,7 @@
 
 import { useMemo, useState } from "react";
 import { getHistory } from "@/lib/ux/history-data";
-import { GraficoBI, Grupo } from "@/components/ui/GraficoBI";
+import { GraficoBI } from "@/components/ui/GraficoBI";
 import { fmtBs, fmtUsd } from "@/lib/ux/format";
 import {
   abreviar, agrupar, aniosDe, mesesEnVentana, resumir,
@@ -26,6 +26,21 @@ const SERIES: { key: SerieBI; nombre: string; color: string; encendida: boolean 
   { key: "util", nombre: "Utilidad", color: "var(--color-ok)", encendida: true },
   { key: "costo", nombre: "Costo", color: "var(--color-info)", encendida: false },
 ];
+
+/** Un control segmentado: las opciones juntas en una sola cápsula. */
+function Segmentos<T extends string>({ etiqueta, opciones, valor, onCambio }: {
+  etiqueta: string; opciones: { id: T; label: string; titulo?: string }[]; valor: T; onCambio: (v: T) => void;
+}) {
+  return (
+    <div className="inline-flex h-11 shrink-0 items-center rounded-full border border-border bg-surface-2 p-[3px]" role="group" aria-label={etiqueta}>
+      {opciones.map((o) => (
+        <button key={o.id} type="button" aria-pressed={valor === o.id} onClick={() => onCambio(o.id)}
+          title={o.titulo} aria-label={o.titulo}
+          className={`h-full rounded-full px-3.5 text-xs font-medium transition-colors ${valor === o.id ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"}`}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
 
 export function HistoriaBI({ empresa = "sumigases", height = 280 }: { empresa?: string; height?: number }) {
   const h = getHistory(empresa);
@@ -50,16 +65,21 @@ export function HistoriaBI({ empresa = "sumigases", height = 280 }: { empresa?: 
 
   return (
     <div className="w-full min-w-0">
-      {/* ---------------- Filtros */}
-      <div className="mb-3 flex flex-col gap-2">
-        <Grupo etiqueta="Período" valor={ventana} onCambio={setVentana}
-          opciones={[{ id: "12m", label: "12 meses" }, { id: "24m", label: "24 meses" }, ...anios.map((a) => ({ id: a, label: a })), { id: "todo", label: "Todo" }]} />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Grupo etiqueta="Agrupar por" valor={agr} onCambio={setAgr}
-            opciones={[{ id: "mes", label: "Mes" }, { id: "trimestre", label: "Trimestre" }, { id: "anio", label: "Año" }]} />
-          <Grupo etiqueta="Moneda" valor={moneda} onCambio={setMoneda}
-            opciones={[{ id: "usd", label: "Dólares" }, { id: "bs", label: "Bolívares facturados" }]} />
-        </div>
+      {/* ---------------- Filtros: una sola fila. El período es un desplegable
+          (eran siete píldoras); agrupar y moneda, dos controles segmentados. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <label className="sr-only" htmlFor={`hbi-periodo-${empresa}`}>Período</label>
+        <select id={`hbi-periodo-${empresa}`} className="sumi-campo sumi-campo--auto text-xs font-medium" style={{ borderRadius: 9999, borderColor: "var(--border)", paddingInline: "0.875rem" }}
+          value={ventana} onChange={(e) => setVentana(e.target.value as VentanaBI)}>
+          <option value="12m">Últimos 12 meses</option>
+          <option value="24m">Últimos 24 meses</option>
+          {[...anios].reverse().map((a) => <option key={a} value={a}>{a}</option>)}
+          <option value="todo">Todo el histórico</option>
+        </select>
+        <Segmentos etiqueta="Agrupar por" valor={agr} onCambio={setAgr}
+          opciones={[{ id: "mes", label: "Mes" }, { id: "trimestre", label: "Trimestre" }, { id: "anio", label: "Año" }]} />
+        <Segmentos etiqueta="Moneda" valor={moneda} onCambio={setMoneda}
+          opciones={[{ id: "usd", label: "US$", titulo: "Dólares" }, { id: "bs", label: "Bs", titulo: "Bolívares facturados" }]} />
       </div>
 
       {/* ---------------- Resumen de lo que se ve */}
