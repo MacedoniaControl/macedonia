@@ -67,10 +67,12 @@ export function BotonEliminarNota({ onClick, titulo }: { onClick: (ev: React.Mou
 type CuentaEliminable = { id: number; documento: string; emitida: string; monto: number; saldo: number; estado: string };
 
 /** Elegir qué cuentas de un cliente (o proveedor) se eliminan. */
-export function EliminarCuentasDe({ empresa, contraparte, cuentas, enLiquidacion, onHecho, onCerrar }: {
+export function EliminarCuentasDe({ empresa, contraparte, cuentas, enLiquidacion, onAnularLiquidacion, onHecho, onCerrar }: {
   empresa: string; contraparte: string; cuentas: CuentaEliminable[];
   /** En qué liquidación activa está cada cuenta (id → LQ-…): esas no se eliminan. */
   enLiquidacion?: Map<number, string>;
+  /** Abrir esa liquidación para anularla (desde el aviso). */
+  onAnularLiquidacion?: (numero: string) => void;
   onHecho: (texto: string) => void; onCerrar: () => void;
 }) {
   const [elegidas, setElegidas] = useState<Set<number>>(() => new Set(cuentas.length === 1 ? [cuentas[0].id] : []));
@@ -161,8 +163,13 @@ export function EliminarCuentasDe({ empresa, contraparte, cuentas, enLiquidacion
               ))}
             </ul>
             <p className="mt-3 text-xs text-muted">La liquidación se anula desde «Pagadas» → «Liquidaciones de este cliente».</p>
-            <div className="mt-5 flex justify-end">
-              <Button onClick={() => setBloqueo(null)}>Entendido</Button>
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+              <span className="flex flex-wrap gap-2">
+                {onAnularLiquidacion && [...new Set(bloqueo.map((b) => b.lq))].filter((n) => n.startsWith("LQ-")).map((n) => (
+                  <Button key={n} variant="danger" icon="close" onClick={() => { setBloqueo(null); onAnularLiquidacion(n); }}>Anular {n}</Button>
+                ))}
+              </span>
+              <Button variant="secondary" onClick={() => setBloqueo(null)}>Entendido</Button>
             </div>
           </div>
         </div>

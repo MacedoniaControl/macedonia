@@ -35,7 +35,7 @@ import { ariaOrden, gravedad, ordenar, siguienteOrden, type ClaveOrden, type Ord
 import { SortableTh } from "@/components/ui/SortableTh";
 import { Icon } from "@/components/ui/Icon";
 import { LiquidarNotas } from "@/components/finanzas/LiquidarNotas";
-import { LiquidacionesDelCliente } from "@/components/finanzas/Liquidaciones";
+import { DetalleLiquidacion, LiquidacionesDelCliente } from "@/components/finanzas/Liquidaciones";
 import { descargarEstadoCuenta } from "@/lib/finanzas/estado-cuenta-pdf";
 import { clientePorNombre } from "@/lib/directorio/directorio-db";
 import type { EmpresaId } from "@/lib/ux/empresas";
@@ -137,6 +137,9 @@ function CuentasPorCobrar() {
   const lqDeCuenta = new Map((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.filter((d) => d.saldada).map((d) => [d.cuentaId, l.numero] as const)));
   // Las cuentas que están en una liquidación activa (saldadas o con el restante): no se eliminan.
   const lqActivaDe = new Map((liq.datos ?? []).filter((l) => !l.anuladaEn).flatMap((l) => l.documentos.map((d) => [d.cuentaId, l.numero] as const)));
+  // La liquidación abierta para anularla (desde el aviso de «Eliminar»).
+  const [anularLq, setAnularLq] = useState<string | null>(null);
+  const lqParaAnular = anularLq ? (liq.datos ?? []).find((l) => l.numero === anularLq) ?? null : null;
   const [descargando, setDescargando] = useState<string | null>(null);
   async function pdfCliente(g: ClienteCartera<CuentaDb>, conPag: boolean) {
     setDescargando(g.cliente);
@@ -693,15 +696,23 @@ function CuentasPorCobrar() {
         </Modal>
       )}
 
+      {lqParaAnular && (
+        <Modal titulo="Anular Liquidación" onCerrar={() => setAnularLq(null)}>
+          <DetalleLiquidacion l={lqParaAnular} gerencia={gerencia}
+            onCambio={() => { setAnularLq(null); setRecarga((n) => n + 1); }} />
+        </Modal>
+      )}
       {eliminarNota && (
         <Modal titulo="Eliminar Nota" onCerrar={() => setEliminarNota(null)}>
-          <EliminarCuentasDe empresa={empresaKey} enLiquidacion={lqActivaDe} contraparte={eliminarNota.contraparte} cuentas={[eliminarNota]}
+          <EliminarCuentasDe empresa={empresaKey} enLiquidacion={lqActivaDe}
+            onAnularLiquidacion={(n) => { setEliminar(null); setEliminarNota(null); setAnularLq(n); }} contraparte={eliminarNota.contraparte} cuentas={[eliminarNota]}
             onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminarNota(null)} />
         </Modal>
       )}
       {eliminar && (
         <Modal titulo="Eliminar Cuentas" onCerrar={() => setEliminar(null)}>
-          <EliminarCuentasDe empresa={empresaKey} enLiquidacion={lqActivaDe} contraparte={eliminar}
+          <EliminarCuentasDe empresa={empresaKey} enLiquidacion={lqActivaDe}
+            onAnularLiquidacion={(n) => { setEliminar(null); setEliminarNota(null); setAnularLq(n); }} contraparte={eliminar}
             cuentas={cuentas.filter((c) => claveCliente(c.contraparte) === claveCliente(eliminar))
               .sort((x, y) => x.emitida.localeCompare(y.emitida) || x.documento.localeCompare(y.documento))}
             onHecho={(t) => { setExito(t); setRecarga((n) => n + 1); }} onCerrar={() => setEliminar(null)} />
