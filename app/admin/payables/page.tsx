@@ -138,11 +138,14 @@ function CuentasPorPagar() {
   // La cartera por proveedor (como en Cuentas por Cobrar): una fila con lo que
   // se le debe y sus cuentas adentro. Todo en NETO.
   const [buscaProveedor, setBuscaProveedor] = useState("");
-  // «?buscar=» llega desde el Directorio («Abrir en …»): se busca ese nombre.
+  // «?buscar=» y «?abrir=» llegan desde el Directorio: se busca ese nombre y,
+  // si viene, se abre esa cuenta.
   useEffect(() => {
-    const b = new URLSearchParams(window.location.search).get("buscar");
+    const u = new URLSearchParams(window.location.search);
+    const b = u.get("buscar"), id = Number(u.get("abrir"));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- se lee la URL una sola vez al entrar
     if (b) setBuscaProveedor(b);
+    if (Number.isInteger(id) && id > 0) setAbierta(id);
   }, []);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());

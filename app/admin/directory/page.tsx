@@ -244,6 +244,8 @@ function DetalleContacto({ c, empresa, gerencia, vendedor, gemelo, onVolver, onI
   onVolver: () => void; onIr: (clave: string) => void; onEditar: () => void;
 }) {
   const [pestana, setPestana] = useState<"ficha" | "cuentas">("ficha");
+  // Las 10 últimas (por emisión), ordenadas por monto o por vencimiento.
+  const [ordenUltimas, setOrdenUltimas] = useState<"monto" | "vence">("monto");
   const [conPagadas, setConPagadas] = useState(false);
   const [generando, setGenerando] = useState(false);
   const f = c.ficha;
@@ -255,6 +257,9 @@ function DetalleContacto({ c, empresa, gerencia, vendedor, gemelo, onVolver, onI
   const tel = (f?.telefonos ?? "").split(/[\/,;]/)[0]?.replace(/[^\d+]/g, "") ?? "";
   const ws = tel ? tel.replace(/^\+/, "").replace(/^0/, "58") : "";
   const ruta = c.rol === "cliente" ? "receivables" : "payables";
+  const enlaceCuenta = (id: number) => `/admin/${empresa}/${ruta}?buscar=${encodeURIComponent(c.nombre)}&abrir=${id}`;
+  const ultimas = [...c.cuentas].sort((a, b) => b.emitida.localeCompare(a.emitida) || b.id - a.id).slice(0, 10)
+    .sort((a, b) => ordenUltimas === "monto" ? b.monto - a.monto : a.vence.localeCompare(b.vence));
 
   async function pdf() {
     setGenerando(true);
@@ -314,6 +319,37 @@ function DetalleContacto({ c, empresa, gerencia, vendedor, gemelo, onVolver, onI
             ? <StatCard label="Crédito Disponible" value={f && f.limiteCredito > 0 ? fmtUsd(Math.max(0, f.limiteCredito - r.saldo)) : "Sin límite"} sub={f && f.limiteCredito > 0 ? `límite ${fmtUsd(f.limiteCredito)}` : "no tiene límite cargado"} />
             : <StatCard label="Retención de IVA" value={prov ? `${prov.pctRetencion.toLocaleString("es-VE")} %` : "—"} sub={prov ? (prov.nacional ? "Nacional" : "Extranjero") : "—"} />}
           <StatCard label="Días de Crédito" value={f ? String(f.diasCredito) : "—"} sub={`facturado ${fmtUsd(r.debitos)}`} />
+        </div>
+      )}
+
+      {gerencia && ultimas.length > 0 && (
+        <div className="rounded-xl border border-border">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
+            <p className="text-sm font-semibold text-text">Últimas {ultimas.length} {c.rol === "cliente" ? "notas/facturas" : "cuentas"}</p>
+            <div className="flex gap-1 rounded-lg bg-surface-2 p-0.5 text-xs" role="tablist" aria-label="Ordenar las últimas">
+              {([["monto", "Mayor monto"], ["vence", "Vencimiento"]] as const).map(([v, t]) => (
+                <button key={v} type="button" role="tab" aria-selected={ordenUltimas === v} onClick={() => setOrdenUltimas(v)}
+                  className={`rounded-md px-2.5 py-1 font-medium ${ordenUltimas === v ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"}`}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <ul className="divide-y divide-border">
+            {ultimas.map((x) => { const e = estadoDe(x); return (
+              <li key={x.id}>
+                <Link href={enlaceCuenta(x.id)} title={`Abrir ${x.documento.split("·")[0]} en ${c.rol === "cliente" ? "Cuentas por Cobrar" : "Cuentas por Pagar"}`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-xs hover:bg-surface-2">
+                  <span className="font-mono text-text">{x.documento.split("·")[0]}</span>
+                  <span className="text-muted">{nombreClase(x.clase)} · emitida {fechaVista(x.emitida)} · vence {fechaVista(x.vence)}</span>
+                  <span className="ml-auto text-right tabular-nums">
+                    <span className="block font-semibold text-text">{fmtUsd(x.monto)}</span>
+                    {Math.abs(x.monto - x.saldo) > 0.00005 && <span className="block text-[10px] text-muted">saldo {fmtUsd(x.saldo)}</span>}
+                  </span>
+                  <StatusBadge tone={e.tone}>{e.label}</StatusBadge>
+                  <span className="text-muted" aria-hidden><Icon name="chevronRight" size={14} /></span>
+                </Link>
+              </li>
+            ); })}
+          </ul>
         </div>
       )}
 

@@ -279,11 +279,14 @@ function CuentasPorCobrar() {
 
   // La cartera por cliente: una fila con lo que debe, y sus documentos adentro.
   const [buscaCliente, setBuscaCliente] = useState("");
-  // «?buscar=» llega desde el Directorio («Abrir en …»): se busca ese nombre.
+  // «?buscar=» y «?abrir=» llegan desde el Directorio: se busca ese nombre y,
+  // si viene, se abre esa cuenta.
   useEffect(() => {
-    const b = new URLSearchParams(window.location.search).get("buscar");
+    const u = new URLSearchParams(window.location.search);
+    const b = u.get("buscar"), id = Number(u.get("abrir"));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- se lee la URL una sola vez al entrar
     if (b) setBuscaCliente(b);
+    if (Number.isInteger(id) && id > 0) setAbierta(id);
   }, []);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const clientes = agruparPorCliente(conSaldo);
