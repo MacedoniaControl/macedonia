@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { CampoMonto } from "@/components/ui/CampoMonto";
 import { parseMonto } from "@/lib/ux/monto";
@@ -158,7 +158,7 @@ function CuentasPorCobrar() {
       await descargarEstadoCuenta({
         empresa: empresaKey as EmpresaId,
         emitido: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date()),
-        cliente: { nombre: g.cliente, rif: ficha?.rif, telefonos: ficha?.telefonos, direccion: ficha?.direccion },
+        cliente: { nombre: g.cliente, rif: ficha?.rif, telefonos: ficha?.telefonos, direccion: [ficha?.direccion, ficha?.ciudad].filter(Boolean).join(", ") || null },
         filas, conPagadas: conPag,
       });
     } catch (e) {
@@ -279,6 +279,12 @@ function CuentasPorCobrar() {
 
   // La cartera por cliente: una fila con lo que debe, y sus documentos adentro.
   const [buscaCliente, setBuscaCliente] = useState("");
+  // «?buscar=» llega desde el Directorio («Abrir en …»): se busca ese nombre.
+  useEffect(() => {
+    const b = new URLSearchParams(window.location.search).get("buscar");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- se lee la URL una sola vez al entrar
+    if (b) setBuscaCliente(b);
+  }, []);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const clientes = agruparPorCliente(conSaldo);
   const tc = buscaCliente.trim().toLowerCase();

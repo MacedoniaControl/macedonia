@@ -8,8 +8,8 @@ import { useEffect, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
 
 export function Modal({
-  titulo, children, onCerrar,
-}: { titulo: string; children: ReactNode; onCerrar: () => void }) {
+  titulo, children, onCerrar, ancho = "max-w-xl",
+}: { titulo: string; children: ReactNode; onCerrar: () => void; /** Ancho máximo (clase de Tailwind). */ ancho?: string }) {
   // Escape cierra. Sin esto, quien navega con teclado queda encerrado dentro.
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onCerrar();
@@ -31,7 +31,7 @@ export function Modal({
       aria-label={titulo}
       onClick={(e) => { if (e.target === e.currentTarget) onCerrar(); }}
     >
-      <div className="sumi-entra my-auto w-full max-w-xl rounded-2xl border border-border bg-surface shadow-lg">
+      <div className={`sumi-entra my-auto w-full ${ancho} rounded-2xl border border-border bg-surface shadow-lg`}>
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold text-text">{titulo}</h2>
           <button type="button" onClick={onCerrar} aria-label="Cerrar"

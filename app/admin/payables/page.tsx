@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { listarCuentas, abonar, type Cuenta as CuentaDb, type CuentaDetalle } from "@/lib/finanzas/cuentas-db";
 import { FiltroClase } from "@/components/finanzas/FiltroClase";
@@ -138,6 +138,12 @@ function CuentasPorPagar() {
   // La cartera por proveedor (como en Cuentas por Cobrar): una fila con lo que
   // se le debe y sus cuentas adentro. Todo en NETO.
   const [buscaProveedor, setBuscaProveedor] = useState("");
+  // «?buscar=» llega desde el Directorio («Abrir en …»): se busca ese nombre.
+  useEffect(() => {
+    const b = new URLSearchParams(window.location.search).get("buscar");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- se lee la URL una sola vez al entrar
+    if (b) setBuscaProveedor(b);
+  }, []);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());
   const [ordenDe, setOrdenDe] = useState<Map<string, Orden>>(new Map());
@@ -205,7 +211,7 @@ function CuentasPorPagar() {
       await descargarEstadoCuenta({
         empresa: empresaKey as EmpresaId, tipo: "pagar",
         emitido: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date()),
-        cliente: { nombre: g.cliente, rif: ficha?.rif, telefonos: ficha?.telefonos, direccion: ficha?.direccion },
+        cliente: { nombre: g.cliente, rif: ficha?.rif, telefonos: ficha?.telefonos, direccion: [ficha?.direccion, ficha?.ciudad].filter(Boolean).join(", ") || null },
         filas, conPagadas: conPag,
       });
     } catch (e) {
