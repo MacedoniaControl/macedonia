@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { hojasXls, leerXls } from "../ux/xls.ts";
-import { errorDeValery, esValery, leerValery, mismaContraparte, numeroDocumento, reporteValery, separarDuplicadas, type HojaLeida } from "./valery-cuentas.ts";
+import { CABECERAS_VALERY, errorDeValery, esValery, leerValery, mismaContraparte, numeroDocumento, planearCreditos, reporteValery, separarDuplicadas, type HojaLeida } from "./valery-cuentas.ts";
 
 // Archivos de prueba con la estructura de los reportes de Valery y datos inventados.
 const hojas = (n: string): HojaLeida[] => {
@@ -151,4 +151,53 @@ test("la nota de entrega vence por la regla, traiga Valery la fecha que traiga",
   // Un 31: 30 días exactos.
   const h3: HojaLeida = { nombre: "R", filas: [["", "Descripción Cliente A"], ["", "NE", "3", "2026-07-31", "2026-08-31", "", "10", "", "", "", "10"]] };
   assert.equal(leerValery("cobrar", [h3]).filas[0].vence, "2026-08-30");
+});
+
+// ---------------------------------------------------------------- rarezas del estado de cuenta (12-10-2026)
+// Fechas como las da Excel (número de serie): 46216 = 13-07-2026, 46241 = 07-08-2026, 45318 = 27-01-2024.
+const cuenta = (...filas: (string | number | null)[][]): HojaLeida[] => [{ nombre: "h", filas: [[...CABECERAS_VALERY.cobrar[0]], ...filas] }];
+const cli = (n: string) => ["-", `Descripción Cliente : ${n}`];
+const ne = (tipo: string, doc: string, em: number, deb: number, cred: number | null, saldo: number) => ["", tipo, doc, em, em + 31, null, null, null, deb, cred, saldo];
+
+test("un crédito más grande que su nota: la nota entra con su débito y el crédito se liquida con las demás", () => {
+  const l = leerValery("cobrar", cuenta(cli("AUTO LLANATS POZUELOS"), ne("NE", "8277", 46216, 230, null, 230), ne("NE", "8534", 46241, 6, 110, 126)));
+  assert.deepEqual(l.problemas, []);
+  assert.deepEqual(l.filas.map((f) => [f.documento, f.monto]), [["NE-8277", 230], ["NE-8534", 6]]);
+  assert.deepEqual(l.creditos, [{ contraparte: "AUTO LLANATS POZUELOS", documento: "NE-8534", linea: 4, credito: 110 }]);
+  const notas = l.filas.map((f, i) => ({ clave: String(i), contraparte: f.contraparte, documento: f.documento, vence: f.vence, monto: f.monto }));
+  const [p] = planearCreditos(l.creditos, notas);
+  assert.deepEqual([p.saldadas, p.restante, p.destino, p.error], [["1"], 104, "0", null]);   // salda la 8534 y abona 104 a la 8277: queda 126
+});
+
+test("un crédito mayor que todo lo que debe el cliente no se liquida y lo dice", () => {
+  const l = leerValery("cobrar", cuenta(cli("X"), ne("NE", "1", 46216, 10, null, 10), ne("NE", "2", 46241, 5, 50, -35)));
+  const [p] = planearCreditos(l.creditos, l.filas.map((f, i) => ({ clave: String(i), contraparte: f.contraparte, documento: f.documento, vence: f.vence, monto: f.monto })));
+  assert.match(p.error ?? "", /mayor que lo que debe X/);
+});
+
+test("un documento sin tipo toma el del anterior; un saldo sin documento al empezar el cliente es su saldo anterior", () => {
+  const l = leerValery("cobrar", cuenta(
+    cli("TAGUICHO"), [null, null, null, null, null, null, null, null, null, null, 31.75], ["", "NE", "1588", 45318, null, null, null, null, 1.4, null, 33.15],
+    cli("SUPPLYREGA"), ["", "NE", "7772", 46170, 46201, null, 8, null, null, null, 8], ["", "     ", "7887", 46181, 46211, null, 32, null, null, null, 40],
+    [null, null, null, null, null, null, null, null, 0, 0, 40],
+  ));
+  assert.deepEqual(l.problemas, []);
+  assert.deepEqual(l.filas.map((f) => [f.contraparte, f.documento, f.clase, f.emitida, f.monto]), [
+    ["TAGUICHO", "SALDO ANTERIOR-S/N 27-01-2024", "ajuste", "2024-01-27", 31.75],
+    ["TAGUICHO", "NE-1588", "nota_entrega", "2024-01-27", 1.4],
+    ["SUPPLYREGA", "NE-7772", "nota_entrega", "2026-05-28", 8],
+    ["SUPPLYREGA", "NE-7887", "nota_entrega", "2026-06-08", 32],
+  ]);
+  assert.match(l.filas[3].nota ?? "", /tipo de documento en blanco/);
+});
+
+test("en el mismo archivo: el cliente pegado dos veces entra una vez; el mismo número con otra fecha es otra nota", () => {
+  const l = leerValery("cobrar", cuenta(
+    cli("TAGUICHO"), ne("NE", "5504", 45665, 3.18, null, 3.18), ne("NE", "5504", 45785, 3.18, null, 6.36),
+    cli("CAUCHO 352"), ne("NE", "7784", 46171, 100, null, 100), cli("CAUCHO 352"), ne("NE", "7784", 46171, 100, null, 100),
+  ));
+  const s = separarDuplicadas(l.filas, []);
+  assert.deepEqual(s.nuevas.map((f) => f.documento), ["NE-5504", "NE-5504 (2)", "NE-7784"]);
+  assert.deepEqual(s.enArchivo.map((d) => d.fila.documento), ["NE-7784"]);
+  assert.equal(numeroDocumento("NE-5504 (2)"), "5504");
 });

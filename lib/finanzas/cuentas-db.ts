@@ -219,7 +219,7 @@ export async function listarCuentas(empresa: string, tipo: TipoCuenta): Promise<
 export async function crearCuenta(
   c: CuentaNueva,
   empresa: string,
-): Promise<{ ok: boolean; error?: string; aviso?: string }> {
+): Promise<{ ok: boolean; error?: string; aviso?: string; id?: number }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
   if (!c.contraparte.trim()) {
@@ -267,19 +267,20 @@ export async function crearCuenta(
     ({ data, error } = await sb.from("cuentas").insert(base).select("id").single());
   }
   if (error) return { ok: false, error: error.message };
+  // El id va de vuelta: el importador lo usa para liquidar los créditos de Valery.
+  const id = (data as { id: number }).id;
 
   if (!c.imagen) {
     return sinMigrar
-      ? { ok: true, aviso: `La cuenta se creó, pero no se guardó su clase. ${AVISO_MIGRACION}` }
-      : { ok: true };
+      ? { ok: true, id, aviso: `La cuenta se creó, pero no se guardó su clase. ${AVISO_MIGRACION}` }
+      : { ok: true, id };
   }
 
   if (sinMigrar) {
     // La cuenta ya existe: decirlo, y decir que la imagen se quedo fuera.
-    return { ok: true, aviso: `La cuenta se creó, pero no se pudo guardar su imagen ni su clase. ${AVISO_MIGRACION}` };
+    return { ok: true, id, aviso: `La cuenta se creó, pero no se pudo guardar su imagen ni su clase. ${AVISO_MIGRACION}` };
   }
 
-  const id = (data as { id: number }).id;
   const ext = c.imagen.name.split(".").pop()?.toLowerCase() || "jpg";
   const ruta = `${empresa}/cuenta-${id}/${Date.now()}.${ext}`;
   const { error: errSubida } = await sb.storage
@@ -288,15 +289,15 @@ export async function crearCuenta(
 
   if (errSubida) {
     // La cuenta ya quedo creada; borrarla por una imagen seria peor. Se avisa.
-    return { ok: true, aviso: `La cuenta se creó, pero la imagen no subió: ${errSubida.message}` };
+    return { ok: true, id, aviso: `La cuenta se creó, pero la imagen no subió: ${errSubida.message}` };
   }
 
   const { error: errRuta } = await sb.from("cuentas").update({ imagen_ruta: ruta }).eq("id", id);
   if (errRuta) {
     await sb.storage.from(BUCKET_COMPROBANTES).remove([ruta]);
-    return { ok: true, aviso: "La cuenta se creó, pero la imagen no quedó enlazada." };
+    return { ok: true, id, aviso: "La cuenta se creó, pero la imagen no quedó enlazada." };
   }
-  return { ok: true };
+  return { ok: true, id };
 }
 
 /**
