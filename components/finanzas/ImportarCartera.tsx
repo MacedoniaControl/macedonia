@@ -18,7 +18,9 @@ import { PildoraPanel } from "@/components/ui/PildoraPanel";
 import { Button } from "@/components/ui/Button";
 import { crearCuenta, listarCuentas, type TipoCuenta } from "@/lib/finanzas/cuentas-db";
 import { errorDePlantilla, HOJA, HOJA_MARCA, leerPlantilla, type FilaPlantilla } from "@/lib/finanzas/plantilla-cuentas";
-import { errorDeValery, esValery, leerValery, separarDuplicadas, type Celda, type Duplicada, type HojaLeida } from "@/lib/finanzas/valery-cuentas";
+import { errorDeValery, esValery, leerValery, planearCreditos, separarDuplicadas, type Celda, type CreditoValery, type Duplicada, type HojaLeida, type PlanCredito } from "@/lib/finanzas/valery-cuentas";
+import { liquidarCuentas } from "@/lib/finanzas/liquidaciones-db";
+import { hoyISO } from "@/lib/ux/rango";
 import type { ClaseCuenta } from "@/lib/finanzas/retencion";
 import { descargarPlantilla } from "@/lib/finanzas/plantilla-cuentas-xlsx";
 import { leerXlsx, hojasDe, pareceXlsx } from "@/lib/ux/xlsx";
@@ -37,6 +39,8 @@ type Lectura = {
   enCero: number;
   sinVencimiento: number;
   sinNumero: number;
+  /** Por cobrar: los créditos de Valery más grandes que su nota, y cómo se liquidan (claves = índice en `nuevas`). */
+  creditos: PlanCredito[];
 };
 
 const dmy = (iso: string) => iso.split("-").reverse().join("-");
@@ -84,12 +88,14 @@ export function ImportarCartera({
       if (!hojas) return setError(`Solo se admite Excel (.xls o .xlsx): el reporte «${reporte}» de Valery o la plantilla de Macedonia.`);
 
       let filas: Fila[];
-      let base: Omit<Lectura, "nuevas" | "duplicadas" | "enArchivo">;
+      let base: Omit<Lectura, "nuevas" | "duplicadas" | "enArchivo" | "creditos">;
+      let creditos: CreditoValery[] = [];
       if (esValery(hojas)) {
         const e = errorDeValery(t, hojas);
         if (e) return setError(e);
         const l = leerValery(t, hojas);
         filas = l.filas;
+        creditos = l.creditos;
         base = { origen: "valery", problemas: l.problemas, enCero: l.enCero, sinVencimiento: l.sinVencimiento, sinNumero: l.sinNumero };
       } else {
         // La plantilla: la marca vive en una hoja oculta.
@@ -112,7 +118,8 @@ export function ImportarCartera({
       // El saldo NETO (sin la retención), que es como lo da Valery: así solo se marca lo que de verdad cambió.
       const cartera = (await listarCuentas(empresa, tipo)).map((c) => ({ ...c, saldo: c.saldoNeto ?? c.saldo }));
       const s = separarDuplicadas(filas, cartera);
-      setLectura({ ...base, ...s });
+      const planes = planearCreditos(creditos, s.nuevas.map((f, i) => ({ clave: String(i), contraparte: f.contraparte, documento: f.documento, vence: f.vence, monto: f.monto })), fmtUsd);
+      setLectura({ ...base, ...s, creditos: planes });
       if (!filas.length && !base.problemas.length) setError("El archivo no trae cuentas con saldo.");
     } catch (e) {
       setError(`No se pudo leer el archivo: ${(e as Error).message}`);
@@ -127,7 +134,8 @@ export function ImportarCartera({
     try {
       let ok = 0;
       const fallos: string[] = [];
-      for (const f of lectura.nuevas) {
+      const ids = new Map<string, number>();
+      for (const [i, f] of lectura.nuevas.entries()) {
         const r = await crearCuenta({
           tipo, contraparte: f.contraparte, documento: f.documento, monto: f.monto, emitida: f.emitida, vence: f.vence, nota: f.nota,
           // De quién es la cartera: sin elegir, cada cuenta sigue a su cliente (o a su nota de Macedonia).
@@ -135,15 +143,29 @@ export function ImportarCartera({
           // Del reporte de Valery el saldo ya viene sin la retención: no se vuelve a calcular.
           ...(lectura.origen === "valery" ? { clase: f.clase, aplicaRetencion: false } : {}),
         }, empresa);
-        if (r.ok) ok++;
+        if (r.ok) { ok++; if (r.id) ids.set(String(i), r.id); }
         else fallos.push(`${f.documento}: ${r.error}`);
+      }
+      // Los créditos de Valery: una liquidación cada uno, con las notas recién cargadas.
+      let liquidadas = 0;
+      for (const p of lectura.creditos) {
+        if (p.error) continue;
+        const saldar = p.saldadas.map((k) => ids.get(k));
+        const destino = p.destino ? ids.get(p.destino) : null;
+        if (saldar.some((x) => !x) || (p.destino && !destino)) { fallos.push(`${p.credito.documento}: no se liquidó su crédito (falta una nota)`); continue; }
+        const r = await liquidarCuentas(empresa, saldar as number[], {
+          fecha: hoyISO(), metodo: "Otro", referencia: "Crédito en Valery",
+          nota: `Crédito de ${fmtUsd(p.credito.credito)} registrado en Valery sobre la ${p.credito.documento} (importado de ${nombre}).`,
+        }, t, destino ? { cuentaId: destino, monto: p.restante } : null);
+        if (r.ok) liquidadas++;
+        else fallos.push(`${p.credito.documento}: no se liquidó su crédito: ${r.error}`);
       }
       onImportada();
       const rep = lectura.duplicadas.length + lectura.enArchivo.length;
       setResultado(
         fallos.length
           ? `${ok} cargada(s), ${fallos.length} rechazada(s) por la base: ${fallos.slice(0, 3).join(" · ")}`
-          : `${ok} cuenta(s) cargadas.${rep ? ` ${rep} duplicada(s) no se tocaron.` : ""}`,
+          : `${ok} cuenta(s) cargadas.${liquidadas ? ` ${liquidadas} crédito(s) de Valery liquidado(s).` : ""}${rep ? ` ${rep} duplicada(s) no se tocaron.` : ""}`,
       );
       setLectura(null);
       if (!fallos.length) cerrar();
@@ -218,6 +240,26 @@ export function ImportarCartera({
                   <p className="text-xs font-semibold text-warn">{lectura.enArchivo.length} cuenta(s) repetidas dentro del mismo archivo (entra una sola vez):</p>
                   <ul className="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-[11px] text-warn">
                     {lectura.enArchivo.map((d, i) => <li key={i}><b>{d.fila.documento}</b> · {d.fila.contraparte} · {fmtUsd(d.fila.monto)}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {lectura.creditos.length > 0 && (
+                <div className="rounded-lg border border-info/30 bg-info/10 p-2">
+                  <p className="text-xs font-semibold text-info">
+                    {lectura.creditos.length} crédito(s) de Valery más grandes que su nota: al importar se liquidan solos (método «Otro», referencia «Crédito en Valery»).
+                  </p>
+                  <ul className="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-[11px] text-info">
+                    {lectura.creditos.map((p, i) => {
+                      const doc = (k: string) => lectura.nuevas[Number(k)]?.documento ?? "";
+                      return (
+                        <li key={i} className={p.error ? "text-danger" : undefined}>
+                          <b>{p.credito.documento}</b> · {p.credito.contraparte} · crédito {fmtUsd(p.credito.credito)}
+                          {p.error ? ` · no se liquida: ${p.error}`
+                            : ` → salda ${p.saldadas.map(doc).join(", ")}${p.destino ? ` y abona ${fmtUsd(p.restante)} a la ${doc(p.destino)}` : ""}`}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
