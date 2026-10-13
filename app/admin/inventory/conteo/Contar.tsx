@@ -36,6 +36,15 @@ import { useExportable } from "@/lib/ux/exportar";
 import { AgregarArticulo } from "./AgregarArticulo";
 import { RevisarCierre } from "./RevisarCierre";
 import { CampoConto } from "./CampoConto";
+import { CambiarConteo, ElegirConteo } from "./IniciarConteo";
+
+/** El nombre del conteo, para el encabezado: «Los 75 Más Vendidos», «05 · Soldadura», «Todo el Inventario». */
+function nombreConteo(c: Conteo) {
+  if (c.origen === "planilla") return "Los 75 Más Vendidos";
+  if (c.origen === "general") return "Todo el Inventario";
+  if (c.departamento) return `${c.departamento} · ${c.departamentoNombre ?? ""}`;
+  return "Conteo sin departamento";
+}
 
 export type Fila = {
   renglon: number | null;
@@ -55,26 +64,38 @@ export type Fila = {
   error?: string;
 };
 
-export function Contar({ empresa, gerencia, onCerrado, onIniciar }: { empresa: string; gerencia: boolean; onCerrado: (id: number) => void; onIniciar: () => void }) {
+export function Contar({ empresa, gerencia, onCerrado, onCambio, onHistorial }: {
+  empresa: string; gerencia: boolean; onCerrado: (id: number) => void;
+  /** Se empezó o se cambió el conteo: hay que volver a leerlo. */
+  onCambio: () => void;
+  /** Abrir el Historial (Owner y Administrador). */
+  onHistorial?: () => void;
+}) {
   // Se vuelve a leer cuando ConteoFisico lo monta de nuevo (al iniciar o cerrar un conteo).
   const carga = useCarga(`abierto:${empresa}`, () => conteoAbierto(empresa));
 
   if (carga.cargando) return <EstadoDatos cargando vacio={false}>{null}</EstadoDatos>;
   if (carga.error) return <AlertCard tone="danger" titulo="No se pudo leer el conteo" mensaje={carga.error} />;
-  if (!carga.datos) return <SinConteo onIniciar={onIniciar} />;
+  if (!carga.datos) return <SinConteo empresa={empresa} onListo={onCambio} onHistorial={onHistorial} />;
   const c = carga.datos;
-  return <Planilla key={`${c.id}:${c.departamento}:${c.zona}`} empresa={empresa} gerencia={gerencia} conteo={c} onCerrado={onCerrado} />;
+  return <Planilla key={`${c.id}:${c.departamento}:${c.zona}`} empresa={empresa} gerencia={gerencia} conteo={c} onCerrado={onCerrado} onCambio={onCambio} onHistorial={onHistorial} />;
 }
 
 // ---------------------------------------------------------------- abrir
 
-function SinConteo({ onIniciar }: { onIniciar: () => void }) {
+// Sin conteo abierto no hay nada más que hacer que empezar uno: la pregunta
+// es la pantalla misma, sin ventana de por medio.
+function SinConteo({ empresa, onListo, onHistorial }: { empresa: string; onListo: () => void; onHistorial?: () => void }) {
   return (
-    <section className="flex max-w-xl flex-col items-start gap-3 rounded-2xl border border-border bg-surface p-6">
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand"><Icon name="inventory" size={24} /></span>
-      <h2 className="text-lg font-semibold text-text">No Hay Ningún Conteo Abierto</h2>
-      <p className="text-sm text-muted">Toca <b>Iniciar Conteo</b> y elige qué vas a contar: los 75 más vendidos, un departamento o todo el inventario.</p>
-      <Button icon="plus" className="sumi-pulsable min-h-12 px-5 text-base" onClick={onIniciar}>Iniciar Conteo</Button>
+    <section className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-text">Iniciar Conteo</h2>
+          <p className="mt-1 text-sm text-muted">No hay ningún conteo abierto. Elige qué vas a contar y toca «Empezar».</p>
+        </div>
+        {onHistorial && <Button variant="secondary" icon="report" className="sumi-pulsable" onClick={onHistorial}>Historial</Button>}
+      </div>
+      <ElegirConteo empresa={empresa} abierto={null} onListo={onListo} />
     </section>
   );
 }
@@ -91,7 +112,9 @@ const grupoDe = (f: Fila) => f.departamento ?? (f.extra ? AGREGADOS : SIN_DEPTO)
 const ordenGrupo = (k: string) => (k === SIN_DEPTO ? "\uffff1" : k === AGREGADOS ? "\uffff2" : k);
 const porGrupo = (a: string, b: string) => (ordenGrupo(a) < ordenGrupo(b) ? -1 : ordenGrupo(a) > ordenGrupo(b) ? 1 : 0);
 
-function Planilla({ empresa, gerencia, conteo, onCerrado }: { empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void }) {
+type Acciones = { onCambio: () => void; onHistorial?: () => void };
+
+function Planilla({ empresa, gerencia, conteo, onCerrado, onCambio, onHistorial }: { empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void } & Acciones) {
   const datos = useCarga(`planilla:${conteo.id}:${conteo.departamento}:${conteo.zona}`, async () => {
     const [items, lineas] = await Promise.all([planillaDe(empresa, conteo), lineasDe(conteo.id)]);
     return { items, lineas };
@@ -100,12 +123,13 @@ function Planilla({ empresa, gerencia, conteo, onCerrado }: { empresa: string; g
   if (datos.error || !datos.datos) return <AlertCard tone="danger" titulo="No se pudo leer la planilla" mensaje={datos.error ?? ""} />;
   // Se monta recien con los datos: asi arranca con sus filas, sin un efecto que
   // las copie despues.
-  return <PlanillaLista empresa={empresa} gerencia={gerencia} conteo={conteo} onCerrado={onCerrado} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
+  return <PlanillaLista empresa={empresa} gerencia={gerencia} conteo={conteo} onCerrado={onCerrado} onCambio={onCambio} onHistorial={onHistorial} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
 }
 
-function PlanillaLista({ empresa, gerencia, conteo, onCerrado, inicial }: {
+function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHistorial, inicial }: {
   empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void; inicial: Fila[];
-}) {
+} & Acciones) {
+  const [verCambio, setVerCambio] = useState(false);
   const [filas, setFilas] = useState<Fila[]>(inicial);
   // El departamento que se esta mirando ("" = todos). Se recuerda en este
   // navegador; el general arranca en el primero, no con 2.000 renglones.
@@ -275,12 +299,28 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, inicial }: {
 
   return (
     <div className="space-y-4">
+      {/* Qué se está contando: el conteo abierto ES la pantalla. Desde aquí
+          se cambia lo que se cuenta; empezar otro no se ofrece, porque solo
+          puede haber uno abierto. */}
+      <section className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border bg-surface p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ok">Conteo en Curso</p>
+          <h2 className="mt-0.5 text-xl font-semibold text-text">{nombreConteo(conteo)}</h2>
+          <p className="mt-1 text-sm text-muted">
+            Abierto el {conteo.abiertoEn} · {contados} de {total} contados · lo contado se guarda solo, puedes cerrar y seguir después.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" className="sumi-pulsable" onClick={async () => { for (const f of pendientes) await guardar(f); setVerCambio(true); }}>
+            Cambiar qué se cuenta
+          </Button>
+          {onHistorial && <Button variant="secondary" icon="report" className="sumi-pulsable" onClick={onHistorial}>Historial</Button>}
+        </div>
+      </section>
+
       {/* Los datos del papel */}
       <section className="rounded-2xl border border-border bg-surface p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Datos de la Planilla</h2>
-          <p className="text-xs text-muted">Abierto el {conteo.abiertoEn} · el número se asigna al cerrar</p>
-        </div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Datos de la Planilla</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
             <span className="mb-1 block text-xs font-medium text-muted">Fecha del conteo</span>
@@ -429,6 +469,10 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, inicial }: {
             irA(fila.codigo, grupoDe(fila));
           }}
         />
+      )}
+      {verCambio && (
+        <CambiarConteo empresa={empresa} conteo={{ ...conteo, renglones: filas.filter((f) => f.guardado).length }}
+          onCerrar={() => setVerCambio(false)} onListo={() => { setVerCambio(false); onCambio(); }} />
       )}
       {revisar && (
         <RevisarCierre
