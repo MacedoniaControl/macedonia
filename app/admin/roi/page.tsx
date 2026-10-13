@@ -21,6 +21,7 @@ import {
 import { getHistory } from "@/lib/ux/history-data";
 import { HistoriaBI } from "@/components/ui/HistoriaBI";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
+import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
 
 const EMPRESAS = [
   { id: "sumigases", label: "Sumigases" },
@@ -36,6 +37,7 @@ export default function RoiPage() {
   const deRuta = pathname.match(/^\/admin\/(sumigases|sudematin)(\/|$)/)?.[1] ?? null;
   const [elegida, setEmpresa] = usePersistedState("roi:empresa", "sumigases");
   const empresa = deRuta ?? elegida;
+  useMesesCargados();   // redibuja al cerrar un mes
   const h = getHistory(empresa);
   // Los indicadores siguen el rango elegido; antes eran siempre el total
   // historico, dijera lo que dijera el selector.

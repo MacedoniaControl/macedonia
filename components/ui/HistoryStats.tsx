@@ -4,12 +4,14 @@ import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fmtBsCorto, fmtUsd } from "@/lib/ux/format";
 import { getHistory } from "@/lib/ux/history-data";
+import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
 
 type Props = { empresa?: string };
 
 /** KPIs del histórico completo de la empresa. */
 // Los bolívares son lo facturado: cada venta a la tasa de su día, no a la de hoy.
 export function HistoryKpis({ empresa = "sumigases" }: Props) {
+  useMesesCargados();   // redibuja al cerrar un mes
   const h = getHistory(empresa);
   const mes = (ym: string) => ym.split("-").reverse().join("-");
   return (
@@ -26,6 +28,7 @@ export function HistoryKpis({ empresa = "sumigases" }: Props) {
 
 /** Tabla comparativa por año con margen y ROI. */
 export function HistoryYearly({ empresa = "sumigases" }: Props) {
+  useMesesCargados();   // redibuja al cerrar un mes
   const h = getHistory(empresa);
   const ultimoAnio = h.years.length ? h.years[h.years.length - 1].year : null;
   return (
@@ -61,6 +64,7 @@ export function HistoryYearly({ empresa = "sumigases" }: Props) {
 
 /** Top productos por utilidad histórica. */
 export function HistoryTopProductos({ empresa = "sumigases" }: Props) {
+  useMesesCargados();   // redibuja al cerrar un mes
   const h = getHistory(empresa);
   return (
     <ul className="divide-y divide-border">
@@ -81,6 +85,7 @@ export function HistoryTopProductos({ empresa = "sumigases" }: Props) {
 }
 
 export function HistoryTopClientes({ empresa = "sumigases" }: Props) {
+  useMesesCargados();   // redibuja al cerrar un mes
   const h = getHistory(empresa);
   return (
     <ul className="divide-y divide-border">
@@ -95,6 +100,7 @@ export function HistoryTopClientes({ empresa = "sumigases" }: Props) {
 }
 
 export function HistoryTopProveedores({ empresa = "sumigases" }: Props) {
+  useMesesCargados();   // redibuja al cerrar un mes
   const h = getHistory(empresa);
   return (
     <ul className="divide-y divide-border">

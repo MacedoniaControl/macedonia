@@ -12,7 +12,13 @@
 //   · lo que Sumigases y Sudematin se venden entre sí no cuenta (meta.entreEmpresas),
 //     ni lo que cada una se vende a sí misma (meta.consumoPropio);
 //   · un renglón con el precio mal cargado no suma a nada (meta.revisar, motivo «precio»).
-// No editar a mano: volver a correr el script.
+// No editar a mano: volver a correr el script. (El script reemplaza solo la
+// línea de HISTORY; lo de arriba y lo de abajo se conserva.)
+//
+// getHistory() le suma los meses cerrados a mano en Matrices Administrativas
+// que Valery todavía no trae (lib/ux/historico-meses.ts).
+
+import { conMesesCargados, mesesCargadosDe, versionMesesCargados } from "./historico-meses.ts";
 
 /** Los …Bs son lo facturado en bolívares, cada renglón a la tasa de su día (no a la de hoy). */
 export type HistMonth = {
@@ -40,6 +46,8 @@ export type CompanyHistory = {
     entreEmpresas: { ventas: number; compras: number };
     /** Lo que la empresa se «vendió» a sí misma (consumo interno): no entra. */
     consumoPropio: number;
+    /** Meses cerrados a mano en Matrices (no vienen de Valery), y quién los cargó. */
+    manuales?: { ym: string; por: string }[];
   };
   totals: {
     venta: number; costo: number; util: number; compra: number; margen: number; roi: number;
@@ -77,6 +85,7 @@ export function notaHistorico(h: CompanyHistory): string {
     ...(precio ? [`${precio} renglón(es) con el precio mal cargado no suman`] : []),
     ...(costo ? [`${costo} con el costo mal cargado suman a los totales pero no a los rankings`] : []),
     ...(h.meta.costosCorregidos?.length ? [`${h.meta.costosCorregidos.length} con un costo absurdo en Valery se recalcularon con el costo habitual del producto`] : []),
+    ...(h.meta.manuales?.length ? [`${h.meta.manuales.map((m) => mesLargo(m.ym)).join(", ")} ${h.meta.manuales.length === 1 ? "se cargó" : "se cargaron"} a mano en Matrices Administrativas (cierre de mes)`] : []),
   ];
   return `${partes.map((p) => p[0].toUpperCase() + p.slice(1)).join(". ")}.`;
 }
@@ -87,5 +96,13 @@ export function getHistory(empresa: string): CompanyHistory {
   // El fallback era HISTORY.all: una empresa desconocida devolvia la suma de
   // las dos, que es justo lo que no debe existir. Ahora cae a Sumigases, igual
   // que CompanySelector, y nunca a un numero que no es de nadie.
-  return HISTORY[empresa as EmpresaHist] ?? HISTORY.sumigases;
+  const id: EmpresaHist = empresa in HISTORY ? (empresa as EmpresaHist) : "sumigases";
+  const v = versionMesesCargados();
+  const c = cache.get(id);
+  if (c && c.version === v) return c.h;
+  const h = conMesesCargados(HISTORY[id], mesesCargadosDe(id));
+  cache.set(id, { version: v, h });
+  return h;
 }
+
+const cache = new Map<EmpresaHist, { version: number; h: CompanyHistory }>();

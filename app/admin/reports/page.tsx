@@ -25,7 +25,8 @@ import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO, type Periodo } from "@/lib/ux/historico-rango";
-import { HISTORY, type EmpresaHist } from "@/lib/ux/history-data";
+import { getHistory } from "@/lib/ux/history-data";
+import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { fmtBsCorto, fmtUsd, fmtBs } from "@/lib/ux/format";
 import type { TipoColumna } from "@/lib/ux/tabla-export";
@@ -146,6 +147,7 @@ export default function ReportsPage() {
 }
 
 function Reportes() {
+  useMesesCargados();   // redibuja al cerrar un mes
   const empresa = useEmpresaActiva();
   const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
   const [selId, setSel] = useState(REPORTES[0].id);
@@ -156,7 +158,7 @@ function Reportes() {
 
   const periodos = historicoEnRango(empresa, rango);
   const t = totalesDe(periodos);
-  const meta = (HISTORY[empresa as EmpresaHist] ?? HISTORY.sumigases).meta;
+  const meta = getHistory(empresa).meta;
   const hasta = meta.hasta.split("-").reverse().join("-");
   const porAnio = rango.agrupacion === "anio";
   const puntos = periodos.map((p) => punto(p, porAnio, meta.incompletos.map((m) => m.ym)));

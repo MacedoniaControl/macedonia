@@ -7,7 +7,7 @@
 // HISTORY sí trae el mes con su año (2023-04 → 2026-07), que es lo que permite
 // que el rango signifique algo.
 
-import { HISTORY, type EmpresaHist, type HistMonth } from "./history-data.ts";
+import { getHistory, type HistMonth } from "./history-data.ts";
 import { claveDe, etiquetaDe, type Rango, type Agrupacion } from "./rango.ts";
 
 /** Los datos del histórico son MENSUALES: agrupar por semana no es posible. */
@@ -36,7 +36,7 @@ export type Periodo = {
 };
 
 export function historicoEnRango(empresa: string, r: Rango): Periodo[] {
-  const h = HISTORY[empresa as EmpresaHist] ?? HISTORY.sumigases;
+  const h = getHistory(empresa);   // con los meses cerrados a mano
 
   // Con datos mensuales, "semana" se comporta como "mes": es lo más fino que
   // hay. Mostrar semanas repartiendo el mes seria inventar.
