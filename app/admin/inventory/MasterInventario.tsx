@@ -1,270 +1,243 @@
 "use client";
 
-// Master: lo que dice el papel contra lo que alguien contó.
+// Master: lo que dice el sistema (Valery) contra lo que alguien contó.
 //
-// Antes comparaba `existencia` contra `existencia_fisica`, y las DOS salían del
-// kardex. Con eso el Master no podía detectar lo que se fue sin registrarse —
-// que es exactamente la razón por la que este producto existe (ver PRODUCT.md).
+// Rediseño del 13-10-2026 (pedido del usuario: «no tiene lógica»). El de antes
+// era una tabla con cuatro filtros que mezclaban tres preguntas distintas y
+// ponía «0» en Contado cuando nadie había contado. Ahora arriba hay tres
+// preguntas, cada una con su número, y tocar una muestra su lista:
 //
-// Ahora una columna es Valery y la otra es un conteo humano, con su fecha.
-// Sin fecha el número engaña: un conteo de hace tres meses no dice nada de hoy.
+//   ¿Qué hay que contar?      con existencia y sin conteo vigente, lo que más vale primero;
+//   ¿Qué falta o sobra?       lo contado que no cuadra, en unidades y en dinero;
+//   ¿Qué está mal en Valery?  existencia negativa: salidas sin su entrada.
 //
-// Mientras nadie cuente, el Master YA muestra el lado de Valery con el manual
-// en cero. Antes escondía la tabla entera hasta el primer conteo, y esconder la
-// mitad que sí existe no la vuelve más cierta: la vuelve invisible.
-//
-// La existencia de Valery viene del kardex de ventas 2023-2026. Las compras no
-// traen detalle por producto, así que no hay entradas que las compensen y todo
-// producto vendido queda en negativo. Ese número es cierto -salió esa cantidad
-// sin que se registrara su ingreso- pero un negativo suelto se lee como un
-// error del sistema, así que va rotulado.
+// Y «Todo el catálogo», que absorbe la vieja pestaña Valery. Nunca se muestra
+// un 0 por un producto que nadie contó: dice «Nunca contado». Tampoco se suman
+// unidades de productos distintos (no significa nada); los totales van en
+// dinero, para quien puede ver costos. Las cuentas: lib/inventory/master-vista.ts.
 
 import { useMemo, useState } from "react";
 import { useCarga } from "@/lib/ux/use-carga";
-import { SectionCard } from "@/components/ui/SectionCard";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { master, type FilaMaster } from "@/lib/inventory/conteos-db";
+import { Icon } from "@/components/ui/Icon";
+import { Button } from "@/components/ui/Button";
+import { EstadoDatos } from "@/components/ui/EstadoDatos";
+import { AlertCard } from "@/components/ui/AlertCard";
+import { master } from "@/lib/inventory/conteos-db";
+import { filasDe, prepararMaster, resumirMaster, vistaInicial, DIAS_CONTEO_VIEJO, type FilaVista, type VistaMaster } from "@/lib/inventory/master-vista";
 import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
+import { fmtUsd } from "@/lib/ux/format";
+import { hoyISO } from "@/lib/ux/rango";
 
-// Cuatro filtros con su cantidad, para que siempre se vea qué hay. Antes era
-// una casilla «Solo los que no cuadran» marcada de fábrica: con un solo
-// producto contado y cuadrando, la tabla quedaba vacía y la etiqueta decía
-// «todo cuadra» aunque faltaran 2.207 por contar y 49 estuvieran en negativo.
-type Filtro = "nocuadran" | "negativo" | "sincontar" | "todos";
-const FILTROS: { id: Filtro; label: string }[] = [
-  { id: "nocuadran", label: "No cuadran" },
-  { id: "negativo", label: "En negativo" },
-  { id: "sincontar", label: "Sin contar" },
-  { id: "todos", label: "Todos" },
-];
+const PAGINA = 100;
+const cant = (n: number) => n.toLocaleString("es-VE", { maximumFractionDigits: 2 });
+const conSigno = (n: number) => (n > 0 ? `+${cant(n)}` : n < 0 ? `−${cant(-n)}` : "0");
+const usdSigno = (n: number) => (n > 0 ? `+${fmtUsd(n)}` : n < 0 ? `−${fmtUsd(-n)}` : fmtUsd(0));
+const haceTexto = (d: number) => (d <= 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`);
 
-const dias = (iso: string) =>
-  Math.round((Date.now() - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
+const EXPLICA: Record<VistaMaster, string> = {
+  contar: `Productos con existencia que nadie ha contado, o cuyo último conteo tiene más de ${DIAS_CONTEO_VIEJO} días. Arriba, los que más valen: contarlos primero cubre la mayor parte del dinero.`,
+  diferencias: "Lo que se contó y no cuadra con el sistema. Arriba, lo que más pesa.",
+  valery: "Valery los tiene en negativo porque salió mercancía sin que se registrara su entrada. Se corrige en Valery cargando la entrada; contarlos dice cuánto hay de verdad.",
+  todo: "Todo el catálogo con la existencia del sistema y su último conteo.",
+};
 
 export function MasterInventario({
-  empresa, filtro, recarga = 0,
-}: { empresa: string; filtro: string; recarga?: number }) {
+  empresa, filtro, recarga = 0, onContar,
+}: { empresa: string; filtro: string; recarga?: number; onContar?: () => void }) {
   const carga = useCarga(`${empresa}:${recarga}`, () => master(empresa));
-  const filas: FilaMaster[] = carga.datos ?? [];
-  const [elegido, setElegido] = useState<Filtro | null>(null);
+  const filas = useMemo(() => prepararMaster(carga.datos ?? [], hoyISO()), [carga.datos]);
+  const r = useMemo(() => resumirMaster(filas), [filas]);
+  const [elegida, setElegida] = useState<VistaMaster | null>(null);
+  const [cuantas, setCuantas] = useState(PAGINA);
+  const vista: VistaMaster = elegida ?? vistaInicial(r);
+  const lista = useMemo(() => filasDe(filas, vista, filtro), [filas, vista, filtro]);
+  const elegir = (v: VistaMaster) => { setElegida(v); setCuantas(PAGINA); };
 
-  const contados = filas.filter((f) => f.contado !== null).length;
-  const conDiferencia = filas.filter((f) => f.diferencia !== null && f.diferencia !== 0).length;
-  const sinEntrada = filas.filter((f) => f.valery < 0).length;
-  const cuantos: Record<Filtro, number> = {
-    nocuadran: conDiferencia, negativo: sinEntrada, sincontar: filas.length - contados, todos: filas.length,
-  };
-  // Sin elegir: lo que no cuadra; si no hay, lo que está en negativo (lo que
-  // más urge contar); si tampoco, todo.
-  const vista: Filtro = elegido ?? (conDiferencia > 0 ? "nocuadran" : sinEntrada > 0 ? "negativo" : "todos");
-
-  const visibles = useMemo(() => {
-    const t = filtro.trim().toLowerCase();
-    const entra: Record<Filtro, (f: FilaMaster) => boolean> = {
-      nocuadran: (f) => f.diferencia !== null && f.diferencia !== 0,
-      negativo: (f) => f.valery < 0,
-      sincontar: (f) => f.contado === null,
-      todos: () => true,
-    };
-    const orden: Record<Filtro, (a: FilaMaster, b: FilaMaster) => number> = {
-      nocuadran: (a, b) => Math.abs(b.diferencia ?? 0) - Math.abs(a.diferencia ?? 0),
-      negativo: (a, b) => a.valery - b.valery,
-      sincontar: (a, b) => a.codigo.localeCompare(b.codigo),
-      todos: (a, b) => Math.abs(b.diferencia ?? 0) - Math.abs(a.diferencia ?? 0) || a.codigo.localeCompare(b.codigo),
-    };
-    return filas
-      .filter((f) => !t || f.codigo.toLowerCase().includes(t) || f.nombre.toLowerCase().includes(t))
-      .filter(entra[vista])
-      .sort(orden[vista]);
-  }, [filas, filtro, vista]);
-
-  const consolidado = useMemo(
-    () => filas.reduce(
-      (a, f) => ({ valery: a.valery + f.valery, contado: a.contado + (f.contado ?? 0) }),
-      { valery: 0, contado: 0 },
-    ),
-    [filas],
-  );
-  const num = (v: number) => v.toLocaleString("es-VE", { maximumFractionDigits: 2 });
-
-  // Lo mismo que la tabla, pero TODAS las filas del filtro (la pantalla corta
-  // en 300). El consolidado es el de todo el catalogo, como abajo.
   useExportable(() => ({
     seccion: "Master",
     titulo: "Inventario Master",
     detalle: [
-      `Filtro: ${FILTROS.find((x) => x.id === vista)?.label} (${num(visibles.length)})`,
+      { contar: "Por contar", diferencias: "Diferencias", valery: "Revisar en Valery", todo: "Todo el catálogo" }[vista] + ` (${cant(lista.length)})`,
       ...(filtro.trim() ? [`Búsqueda: «${filtro.trim()}»`] : []),
-      vista === "negativo" ? "Ordenado del más negativo al menos" : vista === "sincontar" ? "Ordenado por código" : "Ordenado por diferencia, de mayor a menor",
-      `${contados.toLocaleString("es-VE")} de ${filas.length.toLocaleString("es-VE")} productos contados`,
+      `${cant(r.verificados)} de ${cant(r.conExistencia)} productos con existencia verificados`,
     ],
     columnas: [
-      { titulo: "Código", tipo: "codigo" }, { titulo: "Producto" }, { titulo: "Valery", tipo: "num" },
-      { titulo: "Contado", tipo: "num" }, { titulo: "Diferencia", tipo: "dif" }, { titulo: "Estado" }, { titulo: "Contado el", tipo: "fecha" },
+      { titulo: "Código", tipo: "codigo" }, { titulo: "Producto" }, { titulo: "Unidad" }, { titulo: "Sistema", tipo: "num" },
+      { titulo: "Contado", tipo: "num" }, { titulo: "Contado el", tipo: "fecha" }, { titulo: "Diferencia", tipo: "dif" },
+      ...(r.conCosto ? [{ titulo: "Valor en sistema", tipo: "usd" as const }, { titulo: "Diferencia $", tipo: "usd" as const }] : []),
     ],
-    filas: visibles.map((f) => [
-      f.codigo, f.nombre, f.valery, f.contado, f.diferencia, estadoMaster(f), fechaVista(f.fechaConteo),
+    filas: lista.map((f) => [
+      f.codigo, f.nombre, f.unidad || null, f.valery, f.contado, fechaVista(f.fechaConteo), f.diferencia,
+      ...(r.conCosto ? [f.valor, f.difValor] : []),
     ]),
-    totales: [
-      "", `Consolidado · ${num(filas.length)} productos`, consolidado.valery, consolidado.contado,
-      contados === 0 ? null : consolidado.contado - consolidado.valery, `${num(contados)} contados`, "",
-    ],
-    nota: "El consolidado suma todo el catálogo, no solo las filas de este filtro. Valery en negativo: salió mercancía sin que se registrara su entrada.",
+    nota: "Contado vacío = nunca contado (no es cero). Sistema en negativo: salió mercancía sin que se registrara su entrada en Valery.",
   }));
 
+  if (carga.cargando) return <EstadoDatos cargando vacio={false}>{null}</EstadoDatos>;
+  if (carga.error) return <AlertCard tone="danger" titulo="No se pudo leer el Master" mensaje={carga.error} />;
+
+  if (r.vacio) {
+    return (
+      <section className="flex max-w-2xl flex-col items-start gap-3 rounded-2xl border border-border bg-surface p-6">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2 text-muted"><Icon name="inventory" size={24} /></span>
+        <h2 className="text-lg font-semibold text-text">Todavía No Hay Existencia Cargada</h2>
+        <p className="text-sm text-muted">
+          Los {cant(r.total)} productos del catálogo están en cero porque la existencia de Valery de esta empresa no se ha cargado, y nadie ha contado
+          todavía. Cuando se cargue, o al cerrar el primer conteo, aquí vas a ver qué contar y qué no cuadra.
+        </p>
+        {onContar && <Button icon="plus" className="sumi-pulsable" onClick={onContar}>Iniciar Conteo</Button>}
+      </section>
+    );
+  }
+
+  const pctVerif = r.valorTotal ? (r.valorVerificado ?? 0) / r.valorTotal : r.conExistencia ? r.verificados / r.conExistencia : 0;
+  const visibles = lista.slice(0, cuantas);
+
   return (
-    <SectionCard
-      title="Master"
-      action={
-        !carga.cargando && (
-          <StatusBadge tone={contados === 0 ? "muted" : conDiferencia > 0 ? "warn" : "ok"}>
-            {contados === 0
-              ? "Sin conteos"
-              : `${num(contados)} de ${num(filas.length)} contados · ${conDiferencia > 0 ? `${num(conDiferencia)} no cuadran` : "cuadra"}`}
-          </StatusBadge>
-        )
-      }
-    >
-      {carga.error && <p className="text-sm text-danger">{carga.error}</p>}
-
-      {!carga.cargando && (
-        <>
-          <div role="tablist" aria-label="Qué mostrar" className="sumi-scroll -mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
-            {FILTROS.map((x) => (
-              <button key={x.id} type="button" role="tab" aria-selected={vista === x.id} onClick={() => setElegido(x.id)}
-                className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm font-medium transition ${
-                  vista === x.id ? "bg-brand-strong text-white" : "border border-border text-muted hover:text-text"}`}>
-                {x.label}
-                <span className={`rounded-md px-1.5 text-xs tabular-nums ${vista === x.id ? "bg-white/20" : "bg-surface-2"}`}>{num(cuantos[x.id])}</span>
-              </button>
-            ))}
+    <div className="space-y-4">
+      {/* Las tres preguntas */}
+      <div role="tablist" aria-label="Qué mirar del inventario" className="grid gap-3 md:grid-cols-3">
+        <Pregunta activa={vista === "contar"} onClick={() => elegir("contar")} titulo="¿Qué hay que contar?"
+          numero={cant(r.porContar)} texto={r.porContar === 1 ? "producto por contar" : "productos por contar"}>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+            <span className="block h-full rounded-full bg-ok" style={{ width: `${Math.max(pctVerif * 100, pctVerif > 0 ? 1.5 : 0)}%` }} />
           </div>
+          <p className="mt-1.5 text-xs text-muted">
+            {cant(r.verificados)} de {cant(r.conExistencia)} con existencia verificados
+            {r.valorTotal ? ` · ${pctVerif > 0 && pctVerif < 0.001 ? "menos de 0,1" : (pctVerif * 100).toLocaleString("es-VE", { maximumFractionDigits: 1 })}% del valor` : ""}
+          </p>
+        </Pregunta>
+        <Pregunta activa={vista === "diferencias"} onClick={() => elegir("diferencias")} titulo="¿Qué falta o sobra?"
+          numero={cant(r.diferencias)} texto={r.diferencias === 1 ? "producto no cuadra" : "productos no cuadran"} tono={r.diferencias ? "warn" : undefined}>
+          <p className="mt-3 text-xs text-muted">
+            {r.diferencias === 0
+              ? (r.verificados ? "Todo lo contado cuadra con el sistema." : "Todavía no hay conteos para comparar.")
+              : r.faltante !== null
+                ? `Faltan ${fmtUsd(r.faltante)} · sobran ${fmtUsd(r.sobrante ?? 0)}`
+                : `Faltan ${cant(r.faltanteUnidades)} und. · sobran ${cant(r.sobranteUnidades)} und.`}
+          </p>
+        </Pregunta>
+        <Pregunta activa={vista === "valery"} onClick={() => elegir("valery")} titulo="¿Qué está mal en Valery?"
+          numero={cant(r.negativos)} texto={r.negativos === 1 ? "producto en negativo" : "productos en negativo"} tono={r.negativos ? "warn" : undefined}>
+          <p className="mt-3 text-xs text-muted">{r.negativos ? "Salidas sin su entrada registrada." : "Ninguno en negativo."}</p>
+        </Pregunta>
+      </div>
 
-          {vista === "negativo" && visibles.length > 0 && (
-            <p className="mb-3 text-xs text-muted">
-              Salió mercancía sin que se registrara su entrada, por eso Valery los marca en negativo. Al contarlos, la existencia se corrige.
-            </p>
-          )}
+      {/* La lista de la pregunta elegida */}
+      <section className="overflow-hidden rounded-2xl border border-border bg-surface" aria-label="Productos">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+          <p className="max-w-3xl text-sm text-muted">{EXPLICA[vista]}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {vista === "contar" && onContar && r.porContar > 0 && <Button icon="plus" className="sumi-pulsable" onClick={onContar}>Iniciar Conteo</Button>}
+            <button type="button" role="tab" aria-selected={vista === "todo"} onClick={() => elegir("todo")}
+              className={`min-h-10 rounded-xl border px-3 text-sm font-medium transition ${vista === "todo" ? "border-brand-strong bg-brand-soft text-brand" : "border-border text-muted hover:text-text"}`}>
+              Todo el catálogo · {cant(r.total)}
+            </button>
+          </div>
+        </div>
 
-          {visibles.length === 0 ? (
-            <div className="space-y-3 py-8 text-center text-sm text-muted">
-              <p>
-                {filtro.trim()
-                  ? "Nada coincide con la búsqueda en este filtro."
-                  : vista === "nocuadran"
-                    ? (contados === 0 ? "Todavía no se contó ningún producto." : `Todo lo contado cuadra con Valery (${num(contados)} producto${contados === 1 ? "" : "s"}).`)
-                    : vista === "negativo" ? "Ningún producto está en negativo."
-                    : vista === "sincontar" ? "Ya se contaron todos los productos."
-                    : "No hay productos en el catálogo."}
-              </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {vista !== "negativo" && sinEntrada > 0 && (
-                  <button type="button" onClick={() => setElegido("negativo")}
-                    className="min-h-10 rounded-xl border border-border px-3 text-sm font-medium text-text hover:bg-surface-2">
-                    Ver en negativo ({num(sinEntrada)})
-                  </button>
-                )}
-                {vista !== "todos" && (
-                  <button type="button" onClick={() => setElegido("todos")}
-                    className="min-h-10 rounded-xl border border-border px-3 text-sm font-medium text-text hover:bg-surface-2">
-                    Ver todos ({num(filas.length)})
-                  </button>
-                )}
-              </div>
+        {lista.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-muted">
+            {filtro.trim() ? `Nada coincide con «${filtro.trim()}» en esta lista.`
+              : vista === "contar" ? "Todo lo que tiene existencia está contado y al día."
+              : vista === "diferencias" ? (r.verificados ? "Todo lo contado cuadra con el sistema." : "Todavía no hay conteos. Cuando se cierre uno, aquí aparece lo que no cuadre.")
+              : vista === "valery" ? "Ningún producto está en negativo en Valery."
+              : "El catálogo está vacío."}
+          </p>
+        ) : (
+          <>
+            <div className={`hidden gap-3 border-b border-border bg-surface-2 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted md:grid ${columnas(vista, r.conCosto)}`}>
+              <span>Producto</span><span className="text-right">Sistema</span><span>Último conteo</span>
+              {ultimaCol(vista, r.conCosto) && <span className="text-right">{ultimaCol(vista, r.conCosto)}</span>}
             </div>
-          ) : (
-            <div className="sumi-scroll max-w-full overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="text-xs uppercase tracking-wide text-muted">
-                  <tr className="border-b border-border">
-                    <th className="py-2.5 pr-3 font-medium">Código</th>
-                    <th className="py-2.5 pr-3 font-medium">Producto</th>
-                    <th className="py-2.5 pr-3 text-right font-medium">Valery</th>
-                    <th className="py-2.5 pr-3 text-right font-medium">Contado</th>
-                    <th className="py-2.5 pr-3 text-right font-medium">Diferencia</th>
-                    <th className="py-2.5 pr-3 font-medium">Estado</th>
-                    <th className="whitespace-nowrap py-2.5 font-medium">Contado el</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {visibles.slice(0, 300).map((f) => {
-                    const d = f.diferencia;
-                    const viejo = f.fechaConteo ? dias(f.fechaConteo) : 0;
-                    return (
-                      <tr key={f.codigo} className="hover:bg-surface-2">
-                        <td className="py-2.5 pr-3 font-mono text-xs text-muted">{f.codigo}</td>
-                        <td className="py-2.5 pr-3 text-text">{f.nombre}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{f.valery}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-text">
-                          {f.contado ?? <span className="text-muted">0</span>}
-                        </td>
-                        <td className={`py-2.5 pr-3 text-right font-semibold tabular-nums ${
-                          d === null ? "text-muted" : d === 0 ? "text-ok" : d < 0 ? "text-danger" : "text-warn"
-                        }`}>
-                          {/* El signo se escribe: el color solo no alcanza para
-                              quien no distingue rojo de verde. */}
-                          {d === null ? "—" : d > 0 ? `+${d}` : d}
-                        </td>
-                        <td className="py-2.5 pr-3 text-xs">
-                          {/* Un negativo suelto se lee como error del sistema.
-                              Rotulado dice lo que de verdad pasó. */}
-                          {f.valery < 0 ? (
-                            <span title="Salió mercancía sin que se registrara su entrada" className="whitespace-nowrap">
-                              <StatusBadge tone="warn">Sin entrada</StatusBadge>
-                            </span>
-                          ) : f.contado === null ? (
-                            <span className="text-muted">Sin contar</span>
-                          ) : (
-                            <StatusBadge tone={f.diferencia === 0 ? "ok" : "warn"}>
-                              {f.diferencia === 0 ? "Cuadra" : "No cuadra"}
-                            </StatusBadge>
-                          )}
-                        </td>
-                        <td className="py-2.5 text-xs text-muted">
-                          {f.fechaConteo ?? "—"}
-                          {f.fechaConteo && viejo > 30 && (
-                            <span className="ml-1.5 text-warn">· hace {viejo} días</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                {/* Consolidado de las dos mitades. Suma TODO el catalogo, no solo
-                    lo visible: un total que cambia con el filtro no es un total. */}
-                <tfoot>
-                  <tr className="border-t-2 border-border">
-                    <td className="py-2.5 pr-3 font-semibold text-text" colSpan={2}>
-                      Consolidado · {num(filas.length)} productos
-                    </td>
-                    <td className="py-2.5 pr-3 text-right font-semibold tabular-nums text-text">{num(consolidado.valery)}</td>
-                    <td className="py-2.5 pr-3 text-right font-semibold tabular-nums text-text">{num(consolidado.contado)}</td>
-                    <td className="py-2.5 pr-3 text-right font-semibold tabular-nums text-text">
-                      {contados === 0 ? <span className="text-muted">—</span> : num(consolidado.contado - consolidado.valery)}
-                    </td>
-                    <td className="py-2.5 pr-3 text-xs text-muted" colSpan={2}>
-                      {num(contados)} de {num(filas.length)} contados
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-              {visibles.length > 300 && (
-                <p className="py-2 text-center text-xs text-muted">
-                  Mostrando 300 de {visibles.length}. Busca para acotar.
-                </p>
+            <ul className="divide-y divide-border">
+              {visibles.map((f) => <Fila key={f.codigo} f={f} vista={vista} conCosto={r.conCosto} />)}
+            </ul>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-surface-2 px-4 py-2.5 text-xs text-muted">
+              <span>{cant(visibles.length)} de {cant(lista.length)}</span>
+              {lista.length > cuantas && (
+                <button type="button" className="font-medium text-brand hover:underline" onClick={() => setCuantas((n) => n + PAGINA)}>
+                  Ver {cant(Math.min(PAGINA, lista.length - cuantas))} más
+                </button>
               )}
             </div>
-          )}
-        </>
-      )}
-    </SectionCard>
+          </>
+        )}
+      </section>
+    </div>
   );
 }
 
-/** El estado de una fila, con las mismas palabras que la pantalla. */
-function estadoMaster(f: FilaMaster): string {
-  if (f.valery < 0) return "Sin entrada registrada";
-  if (f.contado === null) return "Sin contar";
-  return f.diferencia === 0 ? "Cuadra" : "No cuadra";
+function Pregunta({ activa, onClick, titulo, numero, texto, tono, children }: {
+  activa: boolean; onClick: () => void; titulo: string; numero: string; texto: string; tono?: "warn"; children?: React.ReactNode;
+}) {
+  return (
+    <button type="button" role="tab" aria-selected={activa} onClick={onClick}
+      className={`sumi-pulsable rounded-2xl border-2 bg-surface p-4 text-left transition ${activa ? "border-brand" : "border-border hover:border-border-strong"}`}>
+      <span className="block text-sm font-medium text-muted">{titulo}</span>
+      <span className="mt-1 flex items-baseline gap-2">
+        <span className={`text-3xl font-semibold tabular-nums ${tono === "warn" ? "text-warn" : "text-text"}`}>{numero}</span>
+        <span className="text-sm text-muted">{texto}</span>
+      </span>
+      {children}
+    </button>
+  );
+}
+
+/** La última columna depende de la pregunta: el valor para contar, la diferencia para lo demás. */
+function ultimaCol(vista: VistaMaster, conCosto: boolean): string | null {
+  if (vista === "contar") return conCosto ? "Valor en sistema" : null;
+  if (vista === "valery") return null;
+  return "Diferencia";
+}
+function columnas(vista: VistaMaster, conCosto: boolean) {
+  return ultimaCol(vista, conCosto) ? "md:grid-cols-[minmax(0,1fr)_7rem_12rem_10rem]" : "md:grid-cols-[minmax(0,1fr)_7rem_12rem]";
+}
+
+function Fila({ f, vista, conCosto }: { f: FilaVista; vista: VistaMaster; conCosto: boolean }) {
+  const ultima = ultimaCol(vista, conCosto);
+  const d = f.diferencia;
+  return (
+    <li className={`grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-3 text-sm md:items-center ${columnas(vista, conCosto)}`}>
+      <div className="col-span-2 min-w-0 md:col-span-1">
+        <p className="font-medium text-text [overflow-wrap:anywhere]">{f.nombre}</p>
+        <p className="text-xs text-muted"><span className="font-mono">{f.codigo}</span>{f.unidad ? ` · ${f.unidad}` : ""}</p>
+      </div>
+      <div className="md:text-right">
+        <span className="text-[11px] uppercase tracking-wide text-muted md:hidden">Sistema </span>
+        <span className={`font-semibold tabular-nums ${f.valery < 0 ? "text-warn" : "text-text"}`}>{cant(f.valery)}</span>
+        {f.valery < 0 && <span className="sr-only"> (negativo en Valery)</span>}
+      </div>
+      <div>
+        <span className="text-[11px] uppercase tracking-wide text-muted md:hidden">Último conteo </span>
+        {f.contado === null ? (
+          <span className="text-muted">Nunca contado</span>
+        ) : (
+          <span className="tabular-nums text-text">
+            {cant(f.contado)}{" "}
+            <span className={f.viejo ? "text-warn" : "text-muted"} title={f.fechaConteo ? `Contado el ${fechaVista(f.fechaConteo)}` : undefined}>
+              · {haceTexto(f.hace ?? 0)}{f.viejo ? " (viejo)" : ""}
+            </span>
+          </span>
+        )}
+      </div>
+      {ultima && (
+        <div className="col-span-2 md:col-span-1 md:text-right">
+          <span className="text-[11px] uppercase tracking-wide text-muted md:hidden">{ultima} </span>
+          {vista === "contar" ? (
+            <span className="tabular-nums text-text">{f.valor !== null ? fmtUsd(f.valor) : "—"}</span>
+          ) : d === null ? (
+            <span className="text-muted">—</span>
+          ) : (
+            // El signo va escrito: el color solo no alcanza para quien no distingue rojo de verde.
+            <span className={`font-semibold tabular-nums ${d === 0 ? "text-ok" : d < 0 ? "text-danger" : "text-warn"}`}>
+              {d === 0 ? "Cuadra" : conSigno(d)}
+              {d !== 0 && f.difValor !== null && <span className="ml-1 text-xs font-normal">· {usdSigno(f.difValor)}</span>}
+            </span>
+          )}
+        </div>
+      )}
+    </li>
+  );
 }

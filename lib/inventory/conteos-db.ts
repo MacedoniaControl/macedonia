@@ -575,6 +575,9 @@ export async function rechazarAjuste(id: number, nota: string): Promise<{ ok: bo
 export type FilaMaster = {
   codigo: string;
   nombre: string;
+  unidad: string;
+  /** Costo unitario sin IVA; null = esta persona no puede ver costos. */
+  costo: number | null;
   valery: number;
   contado: number | null;
   fechaConteo: string | null;
@@ -592,11 +595,20 @@ export async function master(empresa: string): Promise<FilaMaster[]> {
   const sb = await createClient();
 
   const [prod, cont, ex] = await Promise.all([
-    todasLasFilas<{ codigo: string; nombre: string }>((d, h, cuenta) => sb.from("productos").select("codigo, nombre", cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa).order("codigo").range(d, h)),
+    todasLasFilas<{ codigo: string; nombre: string; unidad: string | null }>((d, h, cuenta) => sb.from("productos").select("codigo, nombre, unidad", cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa).order("codigo").range(d, h)),
     todasLasFilas<{ codigo: string; cantidad: number; fecha: string; zona: string | null }>((d, h, cuenta) =>
       sb.from("ultimo_conteo").select("codigo, cantidad, fecha, zona", cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa).order("codigo").range(d, h)),
     todasLasFilas<{ codigo: string; existencia: number }>((d, h, cuenta) => sb.from("existencias").select("codigo, existencia", cuenta ? { count: "exact" } : undefined).eq("empresa_id", empresa).order("codigo").range(d, h)),
   ]).catch((e: Error) => { throw new Error(`No se pudo leer el Master: ${e.message}`); });
+
+  // El costo solo si la persona puede (Owner o Administrador): sin él, el
+  // Master ordena por existencia en vez de por valor.
+  let costoDe: Map<string, number> | null = null;
+  try {
+    const { data, error } = await sb.rpc("costos_productos", { e: empresa });
+    // Quien no puede ver costos recibe la lista vacía, no un error.
+    if (!error && (data as unknown[] | null)?.length) costoDe = new Map((data as { codigo: string; costo: number }[]).map((c) => [c.codigo, Number(c.costo) || 0]));
+  } catch { /* sin permiso de costos */ }
 
   const valeryDe = new Map(ex.map((e) => [e.codigo, Number(e.existencia)]));
   const contadoDe = new Map(cont.map((c) => [c.codigo, { n: Number(c.cantidad), fecha: c.fecha, zona: c.zona }]));
@@ -607,6 +619,8 @@ export async function master(empresa: string): Promise<FilaMaster[]> {
     return {
       codigo: p.codigo,
       nombre: p.nombre,
+      unidad: p.unidad ?? "",
+      costo: costoDe ? costoDe.get(p.codigo) ?? 0 : null,
       valery,
       contado: c ? c.n : null,
       fechaConteo: c ? c.fecha : null,
