@@ -241,7 +241,7 @@ async function existenciasDe(sb: Cliente, empresa: string, codigos: string[]): P
 export async function cambiarAlcance(
   conteoId: number,
   empresa: string,
-  a: { general: true } | { departamento: string },
+  a: { general: true } | { departamento: string } | { planilla: true },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const sb = await createClient();
   const { data: c } = await sb.from("conteos").select("departamento, zona, cerrado").eq("id", conteoId).eq("empresa_id", empresa).maybeSingle();
@@ -249,10 +249,12 @@ export async function cambiarAlcance(
   if (c.cerrado) return { ok: false, error: "El conteo ya está cerrado." };
   const { data: lineas, error: el } = await sb.from("conteo_lineas").select("codigo, renglon").eq("conteo_id", conteoId);
   if (el) return { ok: false, error: el.message };
-  if ("departamento" in a && (lineas ?? []).length > 0) {
+  if (("departamento" in a || "planilla" in a) && (lineas ?? []).length > 0) {
     return { ok: false, error: "Este conteo ya tiene cantidades anotadas: no se cambia de departamento. Amplíalo a todos los departamentos, o ciérralo y abre otro." };
   }
-  const nuevo = "general" in a ? { departamento: null, zona: ZONA_GENERAL } : { departamento: a.departamento, zona: null };
+  const nuevo = "general" in a ? { departamento: null, zona: ZONA_GENERAL }
+    : "planilla" in a ? { departamento: null, zona: ZONA_PLANILLA_75 }
+    : { departamento: a.departamento, zona: null };
   const { error } = await sb.from("conteos").update(nuevo).eq("id", conteoId);
   if (error) return { ok: false, error: `No se pudo cambiar: ${error.message}` };
 
