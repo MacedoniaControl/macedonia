@@ -44,6 +44,7 @@ import { useSesion } from "@/components/auth/SesionProvider";
 import { puedeVer } from "@/lib/auth/permisos";
 import { puedeVerFinanzas, useRol } from "@/lib/ux/session";
 import { Cifra } from "@/components/ui/Cifra";
+import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
 
 const selectClass = "sumi-campo sumi-campo--auto min-w-[9rem]";
 
@@ -93,6 +94,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   const cil = (estado: string) => porEstado.find((c) => c.estado === estado)?.cantidad ?? 0;
 
   // El período, del histórico real de la empresa activa.
+  useMesesCargados();   // redibuja al cerrar un mes
   const hist = getHistory(empresa);
   const periodos = historicoEnRango(empresa, f.rango);
   const t = totalesDe(periodos);

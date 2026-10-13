@@ -2,12 +2,16 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { EMPRESAS, EMPRESA_IDS } from "@/lib/ux/empresas";
-import { getHistory } from "@/lib/ux/history-data";
+import { HISTORY, type EmpresaHist } from "@/lib/ux/history-data";
+import { conMesesCargados } from "@/lib/ux/historico-meses";
+import { listarMesesCargados } from "@/lib/ux/historico-meses-db";
 import { fmtUsd } from "@/lib/ux/format";
 import { MenuUsuario } from "@/components/layout/MenuUsuario";
 
 
-export function CentroDeControl() {
+export async function CentroDeControl() {
+  // Con los meses cerrados a mano en Matrices, igual que el resto de las pantallas.
+  const cargados = await listarMesesCargados();
   return (
     <main className="relative min-h-screen overflow-hidden">
       {/* Fondo: halo naranja (Sumigases) a la izquierda + azul (Sudematin) a la derecha */}
@@ -40,7 +44,7 @@ export function CentroDeControl() {
           <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2">
             {EMPRESA_IDS.map((id) => {
               const emp = EMPRESAS[id];
-              const h = getHistory(id);
+              const h = conMesesCargados(HISTORY[id as EmpresaHist], cargados.filter((m) => m.empresa === id));
               const t = h.totals;
               return (
                 <Link

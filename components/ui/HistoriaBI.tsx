@@ -13,6 +13,7 @@
 
 import { useMemo, useState } from "react";
 import { getHistory } from "@/lib/ux/history-data";
+import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
 import { GraficoBI } from "@/components/ui/GraficoBI";
 import { fmtBs, fmtUsd } from "@/lib/ux/format";
 import {
@@ -43,6 +44,7 @@ function Segmentos<T extends string>({ etiqueta, opciones, valor, onCambio }: {
 }
 
 export function HistoriaBI({ empresa = "sumigases", height = 280 }: { empresa?: string; height?: number }) {
+  const vMeses = useMesesCargados();   // redibuja al cerrar un mes
   const h = getHistory(empresa);
   const [ventana, setVentana] = useState<VentanaBI>("todo");
   const [agr, setAgr] = useState<AgrupacionBI>("mes");
@@ -53,7 +55,7 @@ export function HistoriaBI({ empresa = "sumigases", height = 280 }: { empresa?: 
   const ps: PeriodoBI[] = useMemo(
     () => agrupar(mesesEnVentana(h.months, ventana), agr, moneda, incompletos),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [empresa, ventana, agr, moneda],
+    [empresa, ventana, agr, moneda, vMeses],
   );
   const r = resumir(ps);
   const n = ps.length;

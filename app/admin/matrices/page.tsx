@@ -9,15 +9,23 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { fmtUsd } from "@/lib/ux/format";
+import { getHistory } from "@/lib/ux/history-data";
+import { puedeVerFinanzas, useRol } from "@/lib/ux/session";
+import { BotonCierreDeMes } from "@/components/historico/CierreDeMes";
+import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
 
 export default function MatricesPage() {
+  useMesesCargados();   // redibuja al cerrar un mes
   const empresa = useEmpresaActiva();
   const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
   // Sale del historico con mes y año, no de los doce meses sueltos de 2024:
   // con aquellos el selector de rango no podia significar nada.
+  const { rol } = useRol();
   const periodos = historicoEnRango(empresa, rango);
+  // Los meses cerrados a mano (no vienen de Valery) se marcan en la tabla.
+  const manuales = new Map((getHistory(empresa).meta.manuales ?? []).map((m) => [m.ym, m.por]));
   const rows = periodos.map((p) => ({
-    m: p.etiqueta, ventas: p.venta, compras: p.compra,
+    m: p.etiqueta, manual: rango.agrupacion === "anio" ? null : manuales.get(p.clave) ?? null, ventas: p.venta, compras: p.compra,
     costo: p.costo, utilidad: p.util, roi: p.roi,
   }));
   const t = totalesDe(periodos);
@@ -34,6 +42,7 @@ export default function MatricesPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {aviso && <span className="text-xs text-muted">{aviso}</span>}
+            {puedeVerFinanzas(rol) && <BotonCierreDeMes empresa={empresa} />}
             <SubirArchivo
               etiqueta="Crear matriz" acepta=".xls,.xlsx"
               onArchivos={(fs) => {
@@ -66,7 +75,14 @@ export default function MatricesPage() {
             <tbody className="divide-y divide-border">
               {rows.map((r) => (
                 <tr key={r.m} className="hover:bg-surface-2">
-                  <td className="py-2.5 pr-3 text-text">{r.m}</td>
+                  <td className="py-2.5 pr-3 text-text">
+                    {r.m}
+                    {r.manual !== null && (
+                      <span className="ml-2 rounded-full bg-info/10 px-2 py-0.5 text-[10px] font-medium text-info" title={`Cerrado a mano${r.manual ? ` por ${r.manual}` : ""}: todavía no viene de Valery`}>
+                        cierre de mes
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(r.ventas)}</td>
                   <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(r.compras)}</td>
                   <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(r.costo)}</td>

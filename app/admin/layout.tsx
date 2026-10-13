@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { SesionProvider } from "@/components/auth/SesionProvider";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
+import { CargarMesesHistorico } from "@/components/historico/CargarMesesHistorico";
 
 // La identidad se resuelve aquí, en el servidor, contra la tabla `usuarios`.
 // Antes el rol lo ponia el navegador y por defecto era "owner".
@@ -13,6 +14,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         u ? { nombre: u.nombre, usuario: u.usuario, rol: u.rol, empresaId: u.empresaId, permisos: u.permisos } : null
       }
     >
+      {u && <CargarMesesHistorico />}
       <AppShell>{children}</AppShell>
     </SesionProvider>
   );
