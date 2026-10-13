@@ -9,6 +9,8 @@
 import { useState } from "react";
 import { Contar } from "./Contar";
 import { Historial } from "./Historial";
+import { IniciarConteo } from "./IniciarConteo";
+import { Button } from "@/components/ui/Button";
 
 // El historial es del Owner y el Administrador: el Técnico solo cuenta.
 export function ConteoFisico({ empresa, gerencia, inicial, onCerrado }: {
@@ -19,23 +21,29 @@ export function ConteoFisico({ empresa, gerencia, inicial, onCerrado }: {
   const [vista, setVista] = useState<"contar" | "historial">(inicial?.vista ?? "contar");
   const [abrir, setAbrir] = useState<number | null>(inicial?.abrir ?? null);
   const [recarga, setRecarga] = useState(0);
+  // «Iniciar Conteo»: la ventana que pregunta qué se va a contar.
+  const [iniciar, setIniciar] = useState(false);
 
   return (
     <div className="space-y-4">
-      {gerencia && <div role="tablist" aria-label="Vista del conteo" className="inline-flex gap-1 rounded-xl border border-border bg-surface-2 p-1">
-        {([["contar", "Contar"], ["historial", "Historial"]] as const).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => setVista(id)}
-            className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition ${vista === id ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"}`}>
-            {label}
-          </button>
-        ))}
-      </div>}
+      <div className="flex flex-wrap items-center gap-3">
+        {gerencia && <div role="tablist" aria-label="Vista del conteo" className="inline-flex gap-1 rounded-xl border border-border bg-surface-2 p-1">
+          {([["contar", "Contar"], ["historial", "Historial"]] as const).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => setVista(id)}
+              className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition ${vista === id ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"}`}>
+              {label}
+            </button>
+          ))}
+        </div>}
+        <Button icon="plus" className="sumi-pulsable min-h-12 px-5 text-base" onClick={() => setIniciar(true)}>Iniciar Conteo</Button>
+      </div>
 
       {vista === "contar" || !gerencia ? (
         <Contar
           key={recarga}
           empresa={empresa}
           gerencia={gerencia}
+          onIniciar={() => setIniciar(true)}
           onCerrado={(id) => {
             setRecarga((n) => n + 1); onCerrado();
             if (gerencia) { setAbrir(id); setVista("historial"); }
@@ -43,6 +51,11 @@ export function ConteoFisico({ empresa, gerencia, inicial, onCerrado }: {
         />
       ) : (
         <Historial empresa={empresa} abrirId={abrir} recarga={recarga} onIrAContar={() => setVista("contar")} />
+      )}
+
+      {iniciar && (
+        <IniciarConteo empresa={empresa} onCerrar={() => setIniciar(false)}
+          onListo={() => { setIniciar(false); setRecarga((n) => n + 1); setVista("contar"); }} />
       )}
     </div>
   );
