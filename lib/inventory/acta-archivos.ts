@@ -231,8 +231,8 @@ function cabecera(ws: ExcelJS.Worksheet, fila: number, titulos: string[], derech
 
 const FMT_NUM = "#,##0.###;-#,##0.###;0";
 const FMT_DIF = "+#,##0.###;-#,##0.###;0";
-const FMT_USD = '"$"#,##0.00##';
-const FMT_USD_SIGNO = '+"$"#,##0.00##;-"$"#,##0.00##;0';
+const FMT_USD = '"$"#,##0.00';
+const FMT_USD_SIGNO = '+"$"#,##0.00;-"$"#,##0.00;0';
 
 export async function actaExcel(a: Acta): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
