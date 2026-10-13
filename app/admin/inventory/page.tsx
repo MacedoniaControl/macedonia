@@ -105,8 +105,8 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
         {([
           ["master", "Master"],
-          ["conteo", "Conteo"],
           ["valery", `Valery (${fisico.length})`],
+          ["conteo", "Conteo"],
           // Productos y catalogo pasa a subdepartamento del inventario.
           ["productos", "Productos y Catálogo"],
           ["movimientos", "Movimientos"],
