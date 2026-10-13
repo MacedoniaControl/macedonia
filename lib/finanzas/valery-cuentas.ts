@@ -100,7 +100,7 @@ function claseDe(tipoDoc: string): ClaseCuenta {
 
 const num = (v: Celda | undefined) => (typeof v === "number" ? v : Number(t(v).replace(",", ".")) || 0);
 const dosDec = aMonto;
-const fmt = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const fmt = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export type FilaValery = FilaPlantilla & { clase: ClaseCuenta; hoja: string; linea: number; sinVencimiento: boolean; sinNumero: boolean };
 

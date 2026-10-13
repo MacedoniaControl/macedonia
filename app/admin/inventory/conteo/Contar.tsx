@@ -35,6 +35,7 @@ import {
 import { useExportable } from "@/lib/ux/exportar";
 import { AgregarArticulo } from "./AgregarArticulo";
 import { RevisarCierre } from "./RevisarCierre";
+import { CampoConto } from "./CampoConto";
 
 export type Fila = {
   renglon: number | null;
@@ -285,10 +286,7 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, inicial }: {
             <span className="mb-1 block text-xs font-medium text-muted">Fecha del conteo</span>
             <p className="flex h-11 items-center rounded-xl border border-border bg-surface-2 px-3 text-sm">{conteo.fecha.split("-").reverse().join("-")}</p>
           </div>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-muted">Contó <span className="text-danger">*</span></span>
-            <input className="sumi-campo" value={conto} onChange={(e) => cambiarConto(e.target.value)} placeholder="Quién hizo el conteo" autoComplete="off" />
-          </label>
+          <CampoConto empresa={empresa} valor={conto} onCambio={cambiarConto} />
           {grupos.length > 1 ? (
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">Ver departamento</span>
@@ -434,7 +432,7 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, inicial }: {
       )}
       {revisar && (
         <RevisarCierre
-          conteoId={conteo.id} titulo={titulo} gerencia={gerencia} fecha={conteo.fecha} conto={conto} onConto={cambiarConto}
+          conteoId={conteo.id} empresa={empresa} titulo={titulo} gerencia={gerencia} fecha={conteo.fecha} conto={conto} onConto={cambiarConto}
           filas={filas} sinContar={cuenta.sin} errores={filas.filter((f) => leerCantidad(f.texto).estado === "error")}
           onCerrar={() => setRevisar(false)}
           onCerrado={() => { try { localStorage.removeItem(claveConto); } catch { /* idem */ } onCerrado(conteo.id); }}

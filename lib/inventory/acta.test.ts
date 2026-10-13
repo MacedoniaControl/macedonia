@@ -112,7 +112,7 @@ describe("formato del acta", () => {
     assert.equal(fmtDif(2), "+2");
     assert.equal(fmtDif(0), "0");
     assert.equal(fmtDif(null), "nuevo");
-    assert.equal(fmtUsdSigno(-241.4684), "−$241,4684");
+    assert.equal(fmtUsdSigno(-241.4684), "−$241,47");   // se ven 2; la base guarda 4
     assert.equal(fmtUsdSigno(13.52), "+$13,52");
   });
 });

@@ -15,11 +15,12 @@ import { leerCantidad, vaEntera, fmtCantidad } from "@/lib/inventory/cantidad";
 import { esSkuMacedonia, fmtDif, fmtNum } from "@/lib/inventory/acta";
 import { cerrarConteo, urlActa, type TipoArchivo } from "@/lib/inventory/conteos-db";
 import type { Fila } from "./Contar";
+import { CampoConto } from "./CampoConto";
 
-export function RevisarCierre({ conteoId, titulo, gerencia, fecha, conto, onConto, filas, sinContar, errores, onCerrar, onCerrado }: {
+export function RevisarCierre({ conteoId, empresa, titulo, gerencia, fecha, conto, onConto, filas, sinContar, errores, onCerrar, onCerrado }: {
   /** Owner o Administrador: ven las actas y el historial. El Técnico, no. */
   gerencia: boolean;
-  conteoId: number; titulo: string; fecha: string; conto: string; onConto: (v: string) => void;
+  conteoId: number; empresa: string; titulo: string; fecha: string; conto: string; onConto: (v: string) => void;
   filas: Fila[]; sinContar: number; errores: Fila[];
   onCerrar: () => void; onCerrado: () => void;
 }) {
@@ -79,10 +80,7 @@ export function RevisarCierre({ conteoId, titulo, gerencia, fecha, conto, onCont
           <Cifra n={ceros.length} t="quedan en cero" c="text-warn" />
           <Cifra n={sinContar} t="sin contar: no se tocan, siguen como están" c="text-text" />
         </div>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted">Contó <span className="text-danger">*</span></span>
-          <input className="sumi-campo" value={conto} onChange={(e) => onConto(e.target.value)} placeholder="Quién hizo el conteo" />
-        </label>
+        <CampoConto empresa={empresa} valor={conto} onCambio={onConto} />
         {bloqueos.length > 0 && (
           <div role="alert" className="space-y-1 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{bloqueos.map((b) => <p key={b}>{b}</p>)}</div>
         )}

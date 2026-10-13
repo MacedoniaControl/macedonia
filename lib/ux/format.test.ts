@@ -9,10 +9,10 @@ test("dólares con los separadores de Venezuela y 2 decimales por defecto", () =
   assert.equal(fmtUsd(0), "$0,00");
 });
 
-test("no redondea: si la cifra tiene más decimales, se ven hasta 4", () => {
-  assert.equal(fmtUsd(72.361), "$72,361");
-  assert.equal(fmtUsd(21.2345), "$21,2345");
-  assert.equal(fmtBs(855.6612), "855,6612 Bs");
+test("se ven 2 decimales aunque la base guarde 4 (pedido del 13-10-2026)", () => {
+  assert.equal(fmtUsd(72.361), "$72,36");
+  assert.equal(fmtUsd(185.5978), "$185,60");
+  assert.equal(fmtBs(855.6612), "855,66 Bs");
 });
 
 test("bolívares completos, sin abreviar", () => {

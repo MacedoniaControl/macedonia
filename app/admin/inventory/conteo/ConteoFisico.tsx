@@ -10,7 +10,7 @@ import { useState } from "react";
 import { Contar } from "./Contar";
 import { Historial } from "./Historial";
 import { IniciarConteo } from "./IniciarConteo";
-import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 
 // El historial es del Owner y el Administrador: el Técnico solo cuenta.
 export function ConteoFisico({ empresa, gerencia, inicial, onCerrado }: {
@@ -26,16 +26,21 @@ export function ConteoFisico({ empresa, gerencia, inicial, onCerrado }: {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        {gerencia && <div role="tablist" aria-label="Vista del conteo" className="inline-flex gap-1 rounded-xl border border-border bg-surface-2 p-1">
-          {([["contar", "Contar"], ["historial", "Historial"]] as const).map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => setVista(id)}
-              className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition ${vista === id ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"}`}>
-              {label}
-            </button>
-          ))}
-        </div>}
-        <Button icon="plus" className="sumi-pulsable min-h-12 px-5 text-base" onClick={() => setIniciar(true)}>Iniciar Conteo</Button>
+      {/* «Iniciar Conteo» es a la vez la pestaña de contar: abre la planilla y
+          la ventana que pregunta qué contar (si ya hay uno abierto, ahí mismo
+          se sigue con ese). El Historial es del Owner y el Administrador. */}
+      <div role="tablist" aria-label="Vista del conteo" className="inline-flex gap-1 rounded-xl border border-border bg-surface-2 p-1">
+        <button type="button" role="tab" aria-selected={vista === "contar" || !gerencia}
+          onClick={() => { setVista("contar"); setIniciar(true); }}
+          className={`sumi-pulsable inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${vista === "contar" || !gerencia ? "bg-brand-strong text-white shadow-sm" : "text-muted hover:text-text"}`}>
+          <Icon name="plus" size={16} /> Iniciar Conteo
+        </button>
+        {gerencia && (
+          <button type="button" role="tab" aria-selected={vista === "historial"} onClick={() => setVista("historial")}
+            className={`min-h-11 rounded-lg px-4 text-sm font-semibold transition ${vista === "historial" ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"}`}>
+            Historial
+          </button>
+        )}
       </div>
 
       {vista === "contar" || !gerencia ? (

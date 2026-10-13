@@ -160,7 +160,7 @@ export async function valorizadaPdf(a: ActaValorizada): Promise<Buffer> {
       { stack: [{ text: l.codigo, fontSize: 7.5 }, { text: l.esNuevo ? "SKU MACEDONIA" : "VALERY", fontSize: 6, color: l.esNuevo ? C.marron : C.gris }] },
       { text: l.nombre }, { text: l.unidad, color: C.gris },
       { text: fmtDif(l.diferencia), alignment: "right", bold: true, color: colorDif(l.diferencia) },
-      { text: l.costo == null ? "sin costo" : "$" + l.costo.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 }), alignment: "right", color: C.gris },
+      { text: l.costo == null ? "sin costo" : "$" + l.costo.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), alignment: "right", color: C.gris },
       { text: fmtUsdSigno(l.valor ?? null), alignment: "right", bold: true, color: l.valor == null ? C.marron : l.valor < 0 ? C.rojo : C.azul },
     ]),
     [{ text: "" }, { text: "" }, { text: "Diferencia Neta", bold: true }, { text: "" }, { text: "" }, { text: "" },
