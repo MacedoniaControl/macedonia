@@ -23,8 +23,9 @@ import { Historial } from "./Historial";
 import { IniciarConteo } from "./IniciarConteo";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useCarga } from "@/lib/ux/use-carga";
-import { conteosAbiertos, type Conteo } from "@/lib/inventory/conteos-db";
+import { conteosAbiertos, eliminarConteo, type Conteo } from "@/lib/inventory/conteos-db";
 
 export function ConteoFisico({ empresa, gerencia, inicial, iniciarAlEntrar, onCerrado }: {
   empresa: string; gerencia: boolean; onCerrado: () => void;
@@ -80,7 +81,9 @@ export function ConteoFisico({ empresa, gerencia, inicial, iniciarAlEntrar, onCe
 
       {enCurso.length > 0 && (
         <div className="space-y-3" aria-label="Conteos en curso">
-          {enCurso.map((c) => <EnCurso key={c.id} c={c} onSeguir={() => setContando(c.id)} />)}
+          {enCurso.map((c) => (
+            <EnCurso key={c.id} c={c} gerencia={gerencia} onSeguir={() => setContando(c.id)} onEliminado={() => setRecarga((n) => n + 1)} />
+          ))}
         </div>
       )}
 
@@ -99,8 +102,15 @@ export function ConteoFisico({ empresa, gerencia, inicial, iniciarAlEntrar, onCe
   );
 }
 
-/** Un conteo en curso, arriba del historial. */
-function EnCurso({ c, onSeguir }: { c: Conteo; onSeguir: () => void }) {
+/**
+ * Un conteo en curso, arriba del historial. El Owner y el Administrador pueden
+ * eliminarlo (pedido del usuario, 15-10-2026), con confirmación: la base solo
+ * se lo permite a ellos, y en el historial queda la línea «eliminado por…».
+ */
+function EnCurso({ c, gerencia, onSeguir, onEliminado }: { c: Conteo; gerencia: boolean; onSeguir: () => void; onEliminado: () => void }) {
+  const [yendo, setYendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const anotados = c.renglones === 1 ? "el artículo anotado" : `los ${c.renglones} artículos anotados`;
   return (
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-ok/40 bg-ok/5 p-4 sm:p-5" aria-label={`Conteo en curso: ${nombreDe(c)}`}>
       <div className="min-w-0">
@@ -114,7 +124,31 @@ function EnCurso({ c, onSeguir }: { c: Conteo; onSeguir: () => void }) {
           Abierto el {c.abiertoEn}{c.conto ? ` · cuenta ${c.conto}` : ""} · {c.renglones} {c.renglones === 1 ? "artículo anotado" : "artículos anotados"}. Lo contado se guarda solo.
         </p>
       </div>
-      <Button icon="check" className="sumi-pulsable min-h-12 text-base" onClick={onSeguir}>Seguir contando</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {gerencia && (
+          <ConfirmDialog
+            title="¿Eliminar el conteo?"
+            message={`Se eliminará el conteo en curso de ${nombreDe(c)}${c.renglones ? `, con ${anotados}` : ""}. En el historial quedará una línea con tu nombre y la hora. No se puede deshacer.`}
+            confirmLabel="Sí, eliminar"
+            cancelLabel="No"
+            onConfirm={async () => {
+              setError(null); setYendo(true);
+              const r = await eliminarConteo(c.id);
+              setYendo(false);
+              if (!r.ok) return setError(r.error ?? "No se pudo eliminar.");
+              onEliminado();
+            }}
+            trigger={(abrir) => (
+              <Button variant="ghost" icon="close" cargando={yendo} textoCargando="Eliminando…" onClick={abrir}
+                className="sumi-pulsable min-h-12 text-danger hover:bg-danger/10">
+                Eliminar
+              </Button>
+            )}
+          />
+        )}
+        <Button icon="check" className="sumi-pulsable min-h-12 text-base" onClick={onSeguir}>Seguir contando</Button>
+      </div>
+      {error && <p role="alert" className="w-full text-sm text-danger">{error}</p>}
     </section>
   );
 }
