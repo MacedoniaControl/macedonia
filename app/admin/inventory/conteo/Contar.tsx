@@ -29,19 +29,19 @@ import { beep } from "@/lib/inventory/scan-feedback";
 import { leerCantidad, vaEntera, fmtCantidad } from "@/lib/inventory/cantidad";
 import { esSkuMacedonia, fmtDif, fmtNum } from "@/lib/inventory/acta";
 import {
-  anotar, borrarRenglon, conteoAbierto, departamentosDe, lineasDe, planillaDe,
+  anotar, borrarRenglon, conteoAbierto, departamentosDe, guardarConto, lineasDe, planillaDe,
   type Conteo, type ItemPlanilla,
 } from "@/lib/inventory/conteos-db";
 import { useExportable } from "@/lib/ux/exportar";
 import { AgregarArticulo } from "./AgregarArticulo";
 import { RevisarCierre } from "./RevisarCierre";
 import { CampoConto } from "./CampoConto";
-import { CambiarConteo, ElegirConteo } from "./IniciarConteo";
+import { CambiarConteo } from "./IniciarConteo";
 
-/** El nombre del conteo, para el encabezado: «Los 75 Más Vendidos», «05 · Soldadura», «Todo el Inventario». */
+/** El nombre del conteo, para el encabezado: «Los 75 Más Vendidos», «05 · Soldadura», «Todos los Items». */
 function nombreConteo(c: Conteo) {
   if (c.origen === "planilla") return "Los 75 Más Vendidos";
-  if (c.origen === "general") return "Todo el Inventario";
+  if (c.origen === "general") return "Todos los Items";
   if (c.departamento) return `${c.departamento} · ${c.departamentoNombre ?? ""}`;
   return "Conteo sin departamento";
 }
@@ -64,40 +64,28 @@ export type Fila = {
   error?: string;
 };
 
-export function Contar({ empresa, gerencia, onCerrado, onCambio, onHistorial }: {
+export function Contar({ empresa, gerencia, onCerrado, onCambio, onSinConteo }: {
   empresa: string; gerencia: boolean; onCerrado: (id: number) => void;
-  /** Se empezó o se cambió el conteo: hay que volver a leerlo. */
+  /** Se cambió el conteo: hay que volver a leerlo. */
   onCambio: () => void;
-  /** Abrir el Historial (Owner y Administrador). */
-  onHistorial?: () => void;
+  /** No hay conteo abierto (lo cerró otra persona): volver a la lista. */
+  onSinConteo: () => void;
 }) {
   // Se vuelve a leer cuando ConteoFisico lo monta de nuevo (al iniciar o cerrar un conteo).
   const carga = useCarga(`abierto:${empresa}`, () => conteoAbierto(empresa));
 
   if (carga.cargando) return <EstadoDatos cargando vacio={false}>{null}</EstadoDatos>;
   if (carga.error) return <AlertCard tone="danger" titulo="No se pudo leer el conteo" mensaje={carga.error} />;
-  if (!carga.datos) return <SinConteo empresa={empresa} onListo={onCambio} onHistorial={onHistorial} />;
+  if (!carga.datos) {
+    return (
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-5">
+        <p className="text-sm text-muted">No hay ningún conteo en curso: puede que alguien lo haya cerrado.</p>
+        <Button variant="secondary" onClick={onSinConteo}>Ver los conteos</Button>
+      </section>
+    );
+  }
   const c = carga.datos;
-  return <Planilla key={`${c.id}:${c.departamento}:${c.zona}`} empresa={empresa} gerencia={gerencia} conteo={c} onCerrado={onCerrado} onCambio={onCambio} onHistorial={onHistorial} />;
-}
-
-// ---------------------------------------------------------------- abrir
-
-// Sin conteo abierto no hay nada más que hacer que empezar uno: la pregunta
-// es la pantalla misma, sin ventana de por medio.
-function SinConteo({ empresa, onListo, onHistorial }: { empresa: string; onListo: () => void; onHistorial?: () => void }) {
-  return (
-    <section className="space-y-4 rounded-2xl border border-border bg-surface p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-text">Iniciar Conteo</h2>
-          <p className="mt-1 text-sm text-muted">No hay ningún conteo abierto. Elige qué vas a contar y toca «Empezar».</p>
-        </div>
-        {onHistorial && <Button variant="secondary" icon="report" className="sumi-pulsable" onClick={onHistorial}>Historial</Button>}
-      </div>
-      <ElegirConteo empresa={empresa} abierto={null} onListo={onListo} />
-    </section>
-  );
+  return <Planilla key={`${c.id}:${c.departamento}:${c.zona}`} empresa={empresa} gerencia={gerencia} conteo={c} onCerrado={onCerrado} onCambio={onCambio} />;
 }
 
 // ---------------------------------------------------------------- la planilla
@@ -112,9 +100,9 @@ const grupoDe = (f: Fila) => f.departamento ?? (f.extra ? AGREGADOS : SIN_DEPTO)
 const ordenGrupo = (k: string) => (k === SIN_DEPTO ? "\uffff1" : k === AGREGADOS ? "\uffff2" : k);
 const porGrupo = (a: string, b: string) => (ordenGrupo(a) < ordenGrupo(b) ? -1 : ordenGrupo(a) > ordenGrupo(b) ? 1 : 0);
 
-type Acciones = { onCambio: () => void; onHistorial?: () => void };
+type Acciones = { onCambio: () => void };
 
-function Planilla({ empresa, gerencia, conteo, onCerrado, onCambio, onHistorial }: { empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void } & Acciones) {
+function Planilla({ empresa, gerencia, conteo, onCerrado, onCambio }: { empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void } & Acciones) {
   const datos = useCarga(`planilla:${conteo.id}:${conteo.departamento}:${conteo.zona}`, async () => {
     const [items, lineas] = await Promise.all([planillaDe(empresa, conteo), lineasDe(conteo.id)]);
     return { items, lineas };
@@ -123,10 +111,10 @@ function Planilla({ empresa, gerencia, conteo, onCerrado, onCambio, onHistorial 
   if (datos.error || !datos.datos) return <AlertCard tone="danger" titulo="No se pudo leer la planilla" mensaje={datos.error ?? ""} />;
   // Se monta recien con los datos: asi arranca con sus filas, sin un efecto que
   // las copie despues.
-  return <PlanillaLista empresa={empresa} gerencia={gerencia} conteo={conteo} onCerrado={onCerrado} onCambio={onCambio} onHistorial={onHistorial} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
+  return <PlanillaLista empresa={empresa} gerencia={gerencia} conteo={conteo} onCerrado={onCerrado} onCambio={onCambio} inicial={armarFilas(datos.datos.items, datos.datos.lineas)} />;
 }
 
-function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHistorial, inicial }: {
+function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, inicial }: {
   empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void; inicial: Fila[];
 } & Acciones) {
   const [verCambio, setVerCambio] = useState(false);
@@ -160,12 +148,18 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
   const [aviso, setAviso] = useState<{ ok: boolean; text: string } | null>(null);
   const [agregar, setAgregar] = useState(false);
   const [revisar, setRevisar] = useState(false);
-  // "Contó" se recuerda en este navegador hasta cerrar: es un borrador, la base
-  // lo recibe al cerrar el conteo. Este componente solo existe en el navegador
-  // (se monta despues de traer los datos), asi que leerlo al arrancar es seguro.
-  const claveConto = `sumi:conteo:${conteo.id}:conto`;
-  const [conto, setConto] = useState(() => { try { return localStorage.getItem(claveConto) ?? ""; } catch { return ""; } });
-  const cambiarConto = (v: string) => { setConto(v); try { localStorage.setItem(claveConto, v); } catch { /* sin almacenamiento */ } };
+  // «Contó» se elige al iniciar y viaja con el conteo en la base: quien lo siga
+  // o lo cierre en otro equipo ve el mismo nombre. Si se corrige aquí, se
+  // guarda un momento después de dejar de escribir.
+  const [conto, setConto] = useState(conteo.conto ?? "");
+  const contoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cambiarConto = (v: string) => {
+    setConto(v);
+    if (contoTimer.current) clearTimeout(contoTimer.current);
+    contoTimer.current = setTimeout(() => {
+      void guardarConto(conteo.id, empresa, v).then((r) => { if (!r.ok) setAviso({ ok: false, text: r.error ?? "No se pudo guardar quién cuenta." }); });
+    }, 600);
+  };
   const refs = useRef(new Map<string, HTMLInputElement>());
 
   const cuenta = useMemo(() => {
@@ -373,12 +367,9 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
               Fecha del conteo {fecha} · {abierto} · lo contado se guarda solo: puedes salir y seguir después.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" className="sumi-pulsable" onClick={async () => { for (const f of pendientes) await guardar(f); setVerCambio(true); }}>
-              Cambiar qué se cuenta
-            </Button>
-            {onHistorial && <Button variant="secondary" icon="report" className="sumi-pulsable" onClick={onHistorial}>Historial</Button>}
-          </div>
+          <Button variant="secondary" className="sumi-pulsable" onClick={async () => { for (const f of pendientes) await guardar(f); setVerCambio(true); }}>
+            Cambiar qué se cuenta
+          </Button>
         </div>
 
         <div className={`grid gap-3 ${grupos.length > 1 ? "sm:grid-cols-2" : "sm:max-w-sm"}`}>
@@ -563,7 +554,7 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
           conteoId={conteo.id} empresa={empresa} titulo={titulo} gerencia={gerencia} fecha={conteo.fecha} conto={conto} onConto={cambiarConto}
           filas={filas} sinContar={cuenta.sin} errores={filas.filter((f) => leerCantidad(f.texto).estado === "error")}
           onCerrar={() => setRevisar(false)}
-          onCerrado={() => { try { localStorage.removeItem(claveConto); } catch { /* idem */ } onCerrado(conteo.id); }}
+          onCerrado={() => onCerrado(conteo.id)}
         />
       )}
     </div>

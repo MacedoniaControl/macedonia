@@ -42,6 +42,8 @@ export type Conteo = {
   origen: "departamento" | "planilla" | "general" | "libre";
   abiertoEn: string;
   renglones: number;
+  /** Quién cuenta: se elige al iniciar y viaja con el conteo, no con el navegador. */
+  conto: string | null;
 };
 
 export type ItemPlanilla = { renglon: number; codigo: string; nombre: string; unidad: string; sistema: number; departamento: string | null };
@@ -117,7 +119,7 @@ export async function conteoAbierto(empresa: string): Promise<Conteo | null> {
   const sb = await createClient();
   const { data } = await sb
     .from("conteos_resumen")
-    .select("id, fecha, departamento, departamento_nombre, zona, abierto_en, renglones")
+    .select("id, fecha, departamento, departamento_nombre, zona, abierto_en, renglones, conto")
     .eq("empresa_id", empresa)
     .eq("cerrado", false)
     .is("eliminado_en", null)
@@ -128,14 +130,27 @@ export async function conteoAbierto(empresa: string): Promise<Conteo | null> {
   return {
     id: data.id, fecha: data.fecha, departamento: data.departamento, departamentoNombre: data.departamento_nombre,
     zona: zonaVisible(data.zona), abiertoEn: fechaHora(data.abierto_en), renglones: data.renglones,
-    origen: origenDe(data.departamento, data.zona),
+    origen: origenDe(data.departamento, data.zona), conto: (data.conto as string | null)?.trim() || null,
   };
+}
+
+/**
+ * Cambia quién cuenta en un conteo abierto. La base no deja tocar uno cerrado
+ * (conteo_inmutable); al cerrar, cerrar_conteo lo vuelve a fijar.
+ */
+export async function guardarConto(conteoId: number, empresa: string, conto: string): Promise<{ ok: boolean; error?: string }> {
+  const sb = await createClient();
+  const { error } = await sb.from("conteos").update({ conto: conto.trim() || null })
+    .eq("id", conteoId).eq("empresa_id", empresa).eq("cerrado", false);
+  return error ? { ok: false, error: `No se pudo guardar quién cuenta: ${error.message}` } : { ok: true };
 }
 
 /** Abre un conteo de un departamento, de los 75 de mayor rotación, o de todo (consolidado). */
 export async function abrirConteo(
   empresa: string,
   que: { departamento: string } | { planilla: true } | { general: true },
+  /** Quién va a contar: un usuario de la lista o el nombre escrito. */
+  conto?: string,
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
@@ -148,6 +163,7 @@ export async function abrirConteo(
       departamento: "departamento" in que ? que.departamento : null,
       zona: "planilla" in que ? ZONA_PLANILLA_75 : "general" in que ? ZONA_GENERAL : null,
       usuario_id: usuario.id,
+      conto: conto?.trim() || null,
     })
     .select("id")
     .single();
