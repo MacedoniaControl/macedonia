@@ -40,7 +40,7 @@ const ESTADO: Record<string, { t: string; tone: "info" | "warn" | "ok" | "danger
 };
 
 export function Historial({ empresa, gerencia, abrirId, recarga, onIrAContar }: {
-  empresa: string; abrirId: number | null; recarga: number; onIrAContar: () => void;
+  empresa: string; abrirId: number | null; recarga: number; onIrAContar: (id: number) => void;
   /** Owner o Administrador: abren cada conteo cerrado (actas, diferencias, verificar). El Técnico ve la lista. */
   gerencia: boolean;
 }) {
@@ -108,7 +108,7 @@ export function Historial({ empresa, gerencia, abrirId, recarga, onIrAContar }: 
 }
 
 function Fila({ c, abierta, aprueba, gerencia, onToggle, onCambio, onIrAContar }: {
-  c: ResumenConteo; abierta: boolean; aprueba: boolean; gerencia: boolean; onToggle: () => void; onCambio: () => void; onIrAContar: () => void;
+  c: ResumenConteo; abierta: boolean; aprueba: boolean; gerencia: boolean; onToggle: () => void; onCambio: () => void; onIrAContar: (id: number) => void;
 }) {
   if (c.eliminado) return <Eliminado e={c.eliminado} />;
   const est = ESTADO[c.cerrado ? c.ajuste ?? "pendiente" : "abierto"];
@@ -132,7 +132,7 @@ function Fila({ c, abierta, aprueba, gerencia, onToggle, onCambio, onIrAContar }
         ? <Detalle c={c} aprueba={aprueba} onCambio={onCambio} />
         : (
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4">
-            <p className="text-sm text-muted">Todavía no tiene acta: se genera cuando se cierre. <button type="button" className="font-medium text-brand" onClick={onIrAContar}>Seguir contando →</button></p>
+            <p className="text-sm text-muted">Todavía no tiene acta: se genera cuando se cierre. <button type="button" className="font-medium text-brand" onClick={() => onIrAContar(c.id)}>Seguir contando →</button></p>
             {aprueba && <BotonEliminar c={c} onEliminado={onCambio} />}
           </div>
         ))}

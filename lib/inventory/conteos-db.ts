@@ -115,7 +115,12 @@ export async function departamentosDe(empresa: string): Promise<Departamento[]> 
 // ---------------------------------------------------------------- abrir y contar
 
 /** El conteo abierto de esta empresa, si hay uno. */
-export async function conteoAbierto(empresa: string): Promise<Conteo | null> {
+/**
+ * Los conteos en curso de la empresa, del más reciente al más antiguo. Puede
+ * haber varios a la vez (pedido del usuario, 15-10-2026), siempre que no
+ * compartan artículos: ver `cruceConAbiertos`.
+ */
+export async function conteosAbiertos(empresa: string): Promise<Conteo[]> {
   const sb = await createClient();
   const { data } = await sb
     .from("conteos_resumen")
@@ -123,15 +128,52 @@ export async function conteoAbierto(empresa: string): Promise<Conteo | null> {
     .eq("empresa_id", empresa)
     .eq("cerrado", false)
     .is("eliminado_en", null)
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!data) return null;
-  return {
-    id: data.id, fecha: data.fecha, departamento: data.departamento, departamentoNombre: data.departamento_nombre,
-    zona: zonaVisible(data.zona), abiertoEn: fechaHora(data.abierto_en), renglones: data.renglones,
-    origen: origenDe(data.departamento, data.zona), conto: (data.conto as string | null)?.trim() || null,
-  };
+    .order("id", { ascending: false });
+  return (data ?? []).map((d) => ({
+    id: d.id, fecha: d.fecha, departamento: d.departamento, departamentoNombre: d.departamento_nombre,
+    zona: zonaVisible(d.zona), abiertoEn: fechaHora(d.abierto_en), renglones: d.renglones,
+    origen: origenDe(d.departamento, d.zona), conto: (d.conto as string | null)?.trim() || null,
+  }));
+}
+
+/** Un conteo en curso: el indicado, o el más reciente si no se indica cuál. */
+export async function conteoAbierto(empresa: string, id?: number): Promise<Conteo | null> {
+  const todos = await conteosAbiertos(empresa);
+  return (id ? todos.find((c) => c.id === id) : todos[0]) ?? null;
+}
+
+type Alcance = { departamento: string } | { planilla: true } | { general: true };
+
+/** Lo que abarca un conteo, como lo guarda la base (la zona de Conteo es la visible). */
+function alcanceDe(c: Pick<Conteo, "departamento" | "origen">): { departamento: string | null; zona: string | null } {
+  return c.departamento ? { departamento: c.departamento, zona: null }
+    : c.origen === "planilla" ? { departamento: null, zona: ZONA_PLANILLA_75 }
+    : c.origen === "general" ? { departamento: null, zona: ZONA_GENERAL }
+    : { departamento: null, zona: null };
+}
+
+/**
+ * ¿Lo que se quiere contar comparte artículos con un conteo en curso? Si dos
+ * conteos abiertos tienen el mismo artículo, al verificar los dos su diferencia
+ * entraría dos veces a la existencia (cada uno la mide contra la foto del
+ * sistema al cerrar). Devuelve el motivo para decírselo a la persona, o null.
+ */
+export async function cruceConAbiertos(empresa: string, que: Alcance, excepto?: number): Promise<string | null> {
+  const otros = (await conteosAbiertos(empresa)).filter((c) => c.id !== excepto);
+  if (!otros.length) return null;
+  const sb = await createClient();
+  const nuevo = "general" in que ? { departamento: null, zona: ZONA_GENERAL }
+    : "planilla" in que ? { departamento: null, zona: ZONA_PLANILLA_75 }
+    : { departamento: que.departamento, zona: null };
+  const N = new Set((await productosDelConteo(sb, empresa, nuevo)).map((p) => p.codigo));
+  for (const o of otros) {
+    const comunes = (await productosDelConteo(sb, empresa, alcanceDe(o))).filter((p) => N.has(p.codigo)).length;
+    if (comunes > 0) {
+      const nombre = o.departamento ? `${o.departamento} - ${o.departamentoNombre ?? ""}` : o.origen === "planilla" ? "Los 75 Más Vendidos" : o.origen === "general" ? "Todos los Items" : "otro conteo";
+      return `Se cruza con «${nombre.trim()}», que está en curso: ${comunes} ${comunes === 1 ? "artículo estaría" : "artículos estarían"} en los dos, y su diferencia entraría dos veces al inventario. Termina ese conteo o elige otro departamento.`;
+    }
+  }
+  return null;
 }
 
 /**
@@ -154,7 +196,8 @@ export async function abrirConteo(
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const usuario = await getUsuarioSesion();
   if (!usuario) return { ok: false, error: "Sin sesión." };
-  if (await conteoAbierto(empresa)) return { ok: false, error: "Ya hay un conteo abierto: ciérralo o síguelo antes de abrir otro." };
+  const cruce = await cruceConAbiertos(empresa, que);
+  if (cruce) return { ok: false, error: cruce };
   const sb = await createClient();
   const { data, error } = await sb
     .from("conteos")
@@ -268,6 +311,8 @@ export async function cambiarAlcance(
   if (("departamento" in a || "planilla" in a) && (lineas ?? []).length > 0) {
     return { ok: false, error: "Este conteo ya tiene cantidades anotadas: no se cambia de departamento. Amplíalo a todos los departamentos, o ciérralo y abre otro." };
   }
+  const cruce = await cruceConAbiertos(empresa, a, conteoId);
+  if (cruce) return { ok: false, error: cruce };
   const nuevo = "general" in a ? { departamento: null, zona: ZONA_GENERAL }
     : "planilla" in a ? { departamento: null, zona: ZONA_PLANILLA_75 }
     : { departamento: a.departamento, zona: null };

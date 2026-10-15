@@ -11,14 +11,15 @@
 // con un conteo abierto, sale desde «Cambiar qué se cuenta» (CambiarConteo):
 // sin nada contado lo cambia sin perder nada; con algo contado solo se puede
 // pasar a Todos los Items, que lo conserva.
-// Solo puede haber un conteo abierto por empresa.
+// Puede haber varios conteos en curso, siempre que no compartan artículos: lo
+// comprueba el servidor (cruceConAbiertos) al pasar al segundo paso y al abrir.
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useCarga } from "@/lib/ux/use-carga";
-import { abrirConteo, cambiarAlcance, departamentosDe, type Conteo } from "@/lib/inventory/conteos-db";
+import { abrirConteo, cambiarAlcance, cruceConAbiertos, departamentosDe, type Conteo } from "@/lib/inventory/conteos-db";
 import { contadoresDe } from "@/lib/inventory/contadores";
 
 type Tipo = "planilla" | "departamento" | "general";
@@ -45,10 +46,12 @@ export function CambiarConteo({ empresa, conteo, onCerrar, onListo }: { empresa:
 }
 
 /** Elegir qué contar. Sin `abierto` empieza un conteo; con él, lo cambia. */
-export function ElegirConteo({ empresa, abierto: c, onListo, onCancelar, onSiguiente }: {
+export function ElegirConteo({ empresa, abierto: c, onListo, onCancelar, onSiguiente, enCurso = [] }: {
   empresa: string; abierto: Conteo | null; onListo: () => void; onCancelar?: () => void;
   /** Al iniciar: en vez de abrir el conteo aquí, pasa al paso «¿Quién va a contar?». */
   onSiguiente?: (que: Que, nombre: string) => void;
+  /** Los conteos que ya están en curso: sus departamentos se marcan. */
+  enCurso?: Conteo[];
 }) {
   const deps = useCarga(`dep:${empresa}`, () => departamentosDe(empresa));
   const [tipo, setTipo] = useState<Tipo | null>(null);
@@ -70,7 +73,12 @@ export function ElegirConteo({ empresa, abierto: c, onListo, onCancelar, onSigui
     setError(null); setYendo(true);
     try {
       const que: Que = tipo === "planilla" ? { planilla: true } : tipo === "general" ? { general: true } : { departamento: depto! };
-      if (onSiguiente && !c) return onSiguiente(que, nombreElegido);
+      if (onSiguiente && !c) {
+        // Antes de preguntar quién cuenta: si se cruza con uno en curso, decirlo ya.
+        const cruce = await cruceConAbiertos(empresa, que);
+        if (cruce) return setError(cruce);
+        return onSiguiente(que, nombreElegido);
+      }
       const r = c ? await cambiarAlcance(c.id, empresa, que) : await abrirConteo(empresa, que);
       if (!r.ok) return setError(r.error);
       onListo();
@@ -89,7 +97,7 @@ export function ElegirConteo({ empresa, abierto: c, onListo, onCancelar, onSigui
                 <>
                   <p className="font-semibold">Ya contaste {c.renglones} artículo(s) en {queCuenta(c)}.</p>
                   <p className="mt-1 text-muted">
-                    Para contar otra cosa, primero cierra este conteo con «Revisar y cerrar».
+                    Para contar otra cosa, inicia otro conteo desde «Iniciar Conteo», o cierra este con «Revisar y cerrar».
                     {c.origen !== "general" && " Lo que sí puedes es pasarlo a Todos los Items: lo contado se conserva."}
                   </p>
                 </>
@@ -131,12 +139,14 @@ export function ElegirConteo({ empresa, abierto: c, onListo, onCancelar, onSigui
               <div className="sumi-scroll grid max-h-[38vh] gap-2 overflow-y-auto pr-1 sm:max-h-[50vh] sm:grid-cols-2" role="radiogroup" aria-label="Departamento">
                 {contables.map((d) => {
                   const activo = depto === d.codigo;
+                  const yaEnCurso = enCurso.some((x) => x.departamento === d.codigo);
                   return (
-                    <button key={d.codigo} type="button" role="radio" aria-checked={activo} onClick={() => setDepto(d.codigo)}
-                      className={`sumi-pulsable flex min-h-14 items-center gap-3 rounded-xl border-2 px-3 text-left transition
+                    <button key={d.codigo} type="button" role="radio" aria-checked={activo} disabled={yaEnCurso} onClick={() => { setDepto(d.codigo); setError(null); }}
+                      className={`sumi-pulsable flex min-h-14 items-center gap-3 rounded-xl border-2 px-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60
                         ${activo ? "border-brand bg-brand-soft" : "border-border bg-surface hover:border-border-strong"}`}>
                       <span className={`flex h-9 min-w-9 items-center justify-center rounded-lg px-1.5 text-sm font-semibold tabular-nums ${activo ? "bg-brand text-white" : "bg-surface-2 text-muted"}`}>{d.codigo}</span>
                       <span className="text-sm font-medium text-text">{capitalizar(d.nombre)}</span>
+                      {yaEnCurso && <span className="ml-auto shrink-0 rounded-full bg-ok/10 px-2 py-0.5 text-[11px] font-semibold text-ok">En curso</span>}
                     </button>
                   );
                 })}
@@ -181,7 +191,9 @@ function capitalizar(s: string) {
  * guarda con el conteo desde el principio: así lo ve cualquiera que lo siga o
  * lo cierre, en el teléfono o en la computadora.
  */
-export function IniciarConteo({ empresa, onCerrar, onIniciado }: { empresa: string; onCerrar: () => void; onIniciado: () => void }) {
+export function IniciarConteo({ empresa, enCurso, onCerrar, onIniciado }: {
+  empresa: string; enCurso: Conteo[]; onCerrar: () => void; onIniciado: (id: number) => void;
+}) {
   const [que, setQue] = useState<{ que: Que; nombre: string } | null>(null);
   return (
     <Modal titulo={que ? "¿Quién Va a Contar?" : "¿Qué Vas a Contar?"} onCerrar={onCerrar} ancho="max-w-2xl">
@@ -194,13 +206,13 @@ export function IniciarConteo({ empresa, onCerrar, onIniciado }: { empresa: stri
       </div>
       {que
         ? <ElegirQuien empresa={empresa} que={que} onVolver={() => setQue(null)} onIniciado={onIniciado} />
-        : <ElegirConteo empresa={empresa} abierto={null} onListo={onIniciado} onCancelar={onCerrar} onSiguiente={(q, nombre) => setQue({ que: q, nombre })} />}
+        : <ElegirConteo empresa={empresa} abierto={null} enCurso={enCurso} onListo={onCerrar} onCancelar={onCerrar} onSiguiente={(q, nombre) => setQue({ que: q, nombre })} />}
     </Modal>
   );
 }
 
 function ElegirQuien({ empresa, que, onVolver, onIniciado }: {
-  empresa: string; que: { que: Que; nombre: string }; onVolver: () => void; onIniciado: () => void;
+  empresa: string; que: { que: Que; nombre: string }; onVolver: () => void; onIniciado: (id: number) => void;
 }) {
   const lista = useCarga(`contadores:${empresa}`, () => contadoresDe(empresa));
   const [elegido, setElegido] = useState<string | null>(null);
@@ -217,7 +229,7 @@ function ElegirQuien({ empresa, que, onVolver, onIniciado }: {
     try {
       const r = await abrirConteo(empresa, que.que, nombre);
       if (!r.ok) return setError(r.error);
-      onIniciado();
+      onIniciado(r.id);
     } finally { setYendo(false); }
   }
 
