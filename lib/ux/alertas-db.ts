@@ -8,7 +8,7 @@
 // el login ya dejaba en la base los intentos de acceso fallidos y nadie los
 // veía. Ahora todo sale de la base, y cada rol ve solo lo suyo:
 //
-//   · Conteos del inventario por verificar ........ Owner y Administrador
+//   · Conteos del inventario sin aplicar ........... Owner y Administrador
 //   · Conteo de Rampa por verificar ................ Owner y Administrador
 //     (el Técnico ve que el suyo sigue esperando)
 //   · Productos con existencia negativa ............ Owner y Administrador
@@ -51,7 +51,8 @@ export async function alertasDe(empresa: string): Promise<Alerta[]> {
   const base = `/admin/${empresa}`;
 
   const partes = await Promise.all([
-    // Conteos del inventario cerrados que esperan que alguien los certifique.
+    // Conteos del inventario cerrados que quedaron sin aplicar (solo de antes
+    // de la migración 46: desde entonces cerrar ya ajusta).
     gerencia && sesionPuede(u, "inventory") ? regla(async () => {
       const { data, error } = await sb.from("conteos").select("id, numero").eq("empresa_id", empresa)
         .eq("cerrado", true).is("eliminado_en", null).in("ajuste", ["pendiente", "sin_diferencias"]).order("id");
@@ -60,8 +61,8 @@ export async function alertasDe(empresa: string): Promise<Alerta[]> {
       if (!c.length) return [];
       return [{
         id: "conteos-inventario", tono: "warn",
-        titulo: c.length === 1 ? `Conteo ${c[0].numero} por verificar` : `${c.length} conteos del inventario por verificar`,
-        mensaje: c.length === 1 ? "La existencia cambia cuando lo verificas." : `${c.map((x) => x.numero).join(", ")}. La existencia cambia cuando los verificas.`,
+        titulo: c.length === 1 ? `Conteo ${c[0].numero} sin aplicar` : `${c.length} conteos del inventario sin aplicar`,
+        mensaje: c.length === 1 ? "La existencia cambia cuando lo aplicas." : `${c.map((x) => x.numero).join(", ")}. La existencia cambia cuando los aplicas.`,
         enlace: `${base}/inventory?vista=conteo-historial${c.length === 1 ? `&conteo=${c[0].id}` : ""}`,
       } satisfies Alerta];
     }) : [],
