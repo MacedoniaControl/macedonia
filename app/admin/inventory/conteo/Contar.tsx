@@ -12,10 +12,10 @@
 //     pierde lo contado.
 //   · El lector de codigos del panel viejo se conserva, para contar con el
 //     telefono en el galpon.
-//   · El Departamento de arriba solo elige qué parte ver: en un conteo de
-//     varios departamentos (todo el inventario, o los 75 más vendidos) muestra
-//     uno a la vez con su avance. Qué se cuenta se elige con «Iniciar Conteo»
-//     (IniciarConteo.tsx), no aquí: mezclar las dos cosas confundía.
+//   · El Departamento de arriba solo elige qué parte ver: en Todos los Items
+//     muestra un departamento a la vez con su avance. En Los 75 Más Vendidos,
+//     en su lugar van los botones para pasar a otro modo de conteo; abren la
+//     misma ventana «Cambiar qué se cuenta» (IniciarConteo.tsx).
 
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/Button";
@@ -36,7 +36,7 @@ import { useExportable } from "@/lib/ux/exportar";
 import { AgregarArticulo } from "./AgregarArticulo";
 import { RevisarCierre } from "./RevisarCierre";
 import { CampoConto } from "./CampoConto";
-import { CambiarConteo } from "./IniciarConteo";
+import { CambiarConteo, type Tipo } from "./IniciarConteo";
 
 /** El nombre del conteo, para el encabezado: «Los 75 Más Vendidos», «05 · Soldadura», «Todos los Items». */
 function nombreConteo(c: Conteo) {
@@ -119,7 +119,8 @@ function Planilla({ empresa, gerencia, conteo, onCerrado, onCambio }: { empresa:
 function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, inicial }: {
   empresa: string; gerencia: boolean; conteo: Conteo; onCerrado: (id: number) => void; inicial: Fila[];
 } & Acciones) {
-  const [verCambio, setVerCambio] = useState(false);
+  // La ventana «Cambiar qué se cuenta»; con un modo, ya viene elegido.
+  const [verCambio, setVerCambio] = useState<{ inicial?: Tipo } | null>(null);
   const [filas, setFilas] = useState<Fila[]>(inicial);
   // El departamento que se esta mirando ("" = todos). Se recuerda en este
   // navegador; el general arranca en el primero, no con 2.000 renglones.
@@ -342,6 +343,13 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, inicial
     return !f.guardado || f.guardado.cantidad !== l.valor || f.guardado.obs !== f.obs.trim();
   });
   const contados = cuenta.ok + cuenta.cero;
+  const esPlanilla = conteo.origen === "planilla";
+  // Con algo guardado, el cambio solo puede ir a Todos los Items (lo conserva).
+  const conAnotado = filas.some((f) => f.guardado) || pendientes.length > 0;
+  async function abrirCambio(inicial?: Tipo) {
+    for (const f of pendientes) await guardar(f);
+    setVerCambio({ inicial });
+  }
   const titulo = conteo.departamento ? `${conteo.departamento} - ${conteo.departamentoNombre}` : conteo.zona ?? "Sin departamento";
   const fecha = conteo.fecha.split("-").reverse().join("-");
   // «abierto a las 16:19» si se abrió el mismo día del conteo; si no, con su fecha.
@@ -350,9 +358,6 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, inicial
 
   return (
     <div className="space-y-4">
-      {/* Qué se está contando: el conteo abierto ES la pantalla. Desde aquí
-          se cambia lo que se cuenta; empezar otro no se ofrece, porque solo
-          puede haber uno abierto. */}
       {/* Una sola cabecera, como el encabezado del papel: qué se cuenta, cuándo,
           quién contó y cuánto va. Antes eran tres tarjetas, y en el teléfono el
           primer renglón quedaba pantalla y media más abajo. */}
@@ -369,14 +374,36 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, inicial
               Fecha del conteo {fecha} · {abierto} · lo contado se guarda solo: puedes salir y seguir después.
             </p>
           </div>
-          <Button variant="secondary" className="sumi-pulsable" onClick={async () => { for (const f of pendientes) await guardar(f); setVerCambio(true); }}>
-            Cambiar qué se cuenta
-          </Button>
+          {/* En Los 75 Más Vendidos el cambio está abajo, con los dos modos a la vista. */}
+          {!esPlanilla && (
+            <Button variant="secondary" className="sumi-pulsable" onClick={() => void abrirCambio()}>
+              Cambiar qué se cuenta
+            </Button>
+          )}
         </div>
 
-        <div className={`grid gap-3 ${grupos.length > 1 ? "sm:grid-cols-2" : "sm:max-w-sm"}`}>
+        <div className={`grid gap-3 ${grupos.length > 1 || esPlanilla ? "sm:grid-cols-2" : "sm:max-w-sm"}`}>
           <CampoConto empresa={empresa} valor={conto} onCambio={cambiarConto} />
-          {grupos.length > 1 && (
+          {/* Contando Los 75 Más Vendidos no hace falta mirar por departamento:
+              lo que se pide aquí es pasar a otro modo de conteo. */}
+          {esPlanilla ? (
+            <div role="group" aria-labelledby="modo-titulo" aria-describedby="modo-ayuda">
+              <span id="modo-titulo" className="mb-1 block text-xs font-medium text-muted">Cambiar modo de conteo</span>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="secondary" icon="building" className="sumi-pulsable min-h-11 whitespace-nowrap px-3"
+                  disabled={conAnotado} onClick={() => void abrirCambio("departamento")}>
+                  Por Departamento
+                </Button>
+                <Button variant="secondary" icon="inventory" className="sumi-pulsable min-h-11 whitespace-nowrap px-3"
+                  onClick={() => void abrirCambio("general")}>
+                  Todos los Items
+                </Button>
+              </div>
+              <span id="modo-ayuda" className="mt-1 block text-xs text-muted">
+                {conAnotado ? "Ya contaste artículos: solo puedes pasar a Todos los Items, que conserva lo contado." : "Todavía no has contado nada: cambia sin perder nada."}
+              </span>
+            </div>
+          ) : grupos.length > 1 && (
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">Ver departamento</span>
               <select className="sumi-campo font-medium" value={verDepto} aria-describedby="depto-ayuda" onChange={(e) => cambiarDepto(e.target.value)}>
@@ -548,8 +575,8 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, inicial
         />
       )}
       {verCambio && (
-        <CambiarConteo empresa={empresa} conteo={{ ...conteo, renglones: filas.filter((f) => f.guardado).length }}
-          onCerrar={() => setVerCambio(false)} onListo={() => { setVerCambio(false); onCambio(); }} />
+        <CambiarConteo empresa={empresa} conteo={{ ...conteo, renglones: filas.filter((f) => f.guardado).length }} inicial={verCambio.inicial}
+          onCerrar={() => setVerCambio(null)} onListo={() => { setVerCambio(null); onCambio(); }} />
       )}
       {revisar && (
         <RevisarCierre
