@@ -75,13 +75,8 @@ export function Historial({ empresa, gerencia, abrirId, recarga, onIrAContar }: 
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-surface">
-      <div className="space-y-1 p-4">
+      <div className="p-4">
         <h2 className="text-base font-semibold text-text">Historial de Conteos</h2>
-        <p className="max-w-[70ch] text-sm text-muted">
-          {gerencia
-            ? "Cada conteo cerrado queda con su número y su acta en Excel y PDF. Toca uno para ver lo contado contra el sistema."
-            : "Cada conteo cerrado queda con su número, y sus diferencias ya entraron al inventario."}
-        </p>
       </div>
       {/* Solo para conteos de antes de la migración 46 que no se aplicaron. */}
       {carga.datos?.aprueba && pendientes.length > 0 && (

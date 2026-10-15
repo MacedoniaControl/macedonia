@@ -70,12 +70,7 @@ export function ConteoFisico({ empresa, gerencia, inicial, iniciarAlEntrar, onCe
   return (
     <div className="space-y-4">
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold text-text">Conteos</h2>
-          <p className="mt-1 max-w-[65ch] text-sm text-muted">
-            Los conteos que se hacen en Macedonia, del más reciente al más antiguo. Al cerrar un conteo, sus diferencias entran al inventario y queda el acta con su número.
-          </p>
-        </div>
+        <h2 className="min-w-0 text-xl font-semibold text-text">Conteos</h2>
         <Button icon="plus" className="sumi-pulsable min-h-12 text-base" disabled={abiertos.cargando} onClick={pedirIniciar}>Iniciar Conteo</Button>
       </section>
 
