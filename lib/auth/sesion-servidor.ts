@@ -4,6 +4,7 @@
 // Quien manda es esto (y por debajo, el RLS de Postgres, que vuelve a comprobarlo
 // aunque el front tenga un bug).
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/ux/session";
 import type { EmpresaId } from "@/lib/ux/empresas";
@@ -21,19 +22,27 @@ export type UsuarioSesion = {
   permisos: Permisos;
 };
 
-/** Usuario autenticado, o null. Consulta la tabla `usuarios`, no el token. */
-export async function getUsuarioSesion(): Promise<UsuarioSesion | null> {
+/**
+ * Usuario autenticado, o null. Consulta la tabla `usuarios`, no el token.
+ *
+ * El token se verifica por su firma (getClaims, clave pública en memoria), sin
+ * un viaje al servidor de Auth por cada acción. Y se resuelve UNA vez por
+ * petición (`cache`): una acción que llama a varias funciones que la piden no
+ * repite la consulta.
+ */
+export const getUsuarioSesion = cache(async (): Promise<UsuarioSesion | null> => {
   const sb = await createClient();
 
-  const { data: auth } = await sb.auth.getUser();
-  if (!auth?.user) return null;
+  const { data: auth } = await sb.auth.getClaims();
+  const id = auth?.claims?.sub as string | undefined;
+  if (!id) return null;
 
   // El rol vive en `usuarios`, no en los metadatos del token: los metadatos los
   // puede alterar el propio usuario en algunas configuraciones, la tabla no.
   const { data, error } = await sb
     .from("usuarios")
     .select("id, nombre, rol, empresa_id, activo, permisos")
-    .eq("id", auth.user.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (error || !data || !data.activo) return null;
@@ -43,10 +52,10 @@ export async function getUsuarioSesion(): Promise<UsuarioSesion | null> {
     nombre: data.nombre,
     rol: data.rol as Rol,
     empresaId: (data.empresa_id as EmpresaId | null) ?? null,
-    usuario: (auth.user.email ?? "").split("@")[0],
+    usuario: String(auth?.claims?.email ?? "").split("@")[0],
     permisos: (data.permisos as Permisos | null) ?? {},
   };
-}
+});
 
 /** ¿Puede entrar al panel de esta empresa? Owner: todas. Los demás: solo la suya. */
 export function puedeEntrarAEmpresa(u: UsuarioSesion, empresa: string): boolean {
