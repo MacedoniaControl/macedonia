@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { guardarDocumento, listarDocumentos, correlativoPrevisto, type DocumentoGuardado } from "@/lib/documentos/documentos-db";
 import { useCarga } from "@/lib/ux/use-carga";
@@ -12,6 +10,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fmtUsd } from "@/lib/ux/format";
+import { fechaVista } from "@/lib/ux/tabla-export";
 import {
   notaEntregaHtml, devolucionHtml, printDoc,
   type NEDoc, type DevDoc,
@@ -102,7 +101,6 @@ export default function DeliveryNotesPage() {
   const { rol } = useRol();
   const verRegistros = puedeVerRegistros(rol);
   const [period, setPeriod] = useState("mes");
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = docs.filter((d) => inPeriod(d.fecha, period));
 
@@ -162,15 +160,16 @@ export default function DeliveryNotesPage() {
         }
       />
 
-      {/* Tabs */}
-      <div className="sumi-tabs mb-4 gap-2">
+      {/* Pestañas: las mismas que Inventario (segmentadas, 44px, la activa en
+          el color de la empresa), para que el panel se lea como uno solo. */}
+      <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Notas de entrega y devoluciones">
         {([
           ["ne", "Nueva Nota de Entrega"] as const,
           ["dev", "Nueva Devolución"] as const,
           ...(verRegistros ? ([["registro", "Registro"]] as const) : []),
         ]).map(([k, l]) => (
-          <button key={k} type="button" onClick={() => setTab(k)}
-            className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${tab === k ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-text hover:bg-surface-2"}`}>{l}</button>
+          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === k ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>{l}</button>
         ))}
       </div>
 
@@ -195,10 +194,10 @@ export default function DeliveryNotesPage() {
                     <td className="py-2.5 pr-3"><StatusBadge tone={d.tipo === "entrega" ? "ok" : "warn"}>{d.tipo === "entrega" ? "Nota entrega" : "Devolución"}</StatusBadge></td>
                     <td className="py-2.5 pr-3 font-mono text-xs text-muted">{d.correlativo}</td>
                     <td className="py-2.5 pr-3 text-text">{d.cliente}</td>
-                    <td className="py-2.5 pr-3 text-muted">{d.fecha}</td>
-                    <td className="py-2.5 pr-3 text-right text-text">{d.total ? fmtUsd(d.total) : "—"}</td>
+                    <td className="py-2.5 pr-3 tabular-nums text-muted">{fechaVista(d.fecha)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-text">{d.total ? fmtUsd(d.total) : "—"}</td>
                     <td className="py-2.5 pr-3"><StatusBadge tone={d.origen === "Valery" ? "navy" : "brand"}>{d.origen === "Valery" ? "Valery" : "Macedonia"}</StatusBadge></td>
-                    <td className="py-2.5"><button type="button" onClick={() => verDoc(d)} className="text-sm font-medium text-brand hover:underline">Ver / PDF</button></td>
+                    <td className="py-1"><button type="button" onClick={() => verDoc(d)} className="min-h-11 px-1 text-sm font-medium text-brand hover:underline">Ver / PDF</button></td>
                   </tr>
                 ))}
               </tbody>

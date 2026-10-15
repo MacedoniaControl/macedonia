@@ -40,7 +40,8 @@ export function EditorRenglones({
   /** El IVA de la empresa: el catálogo trae el precio con IVA y el renglón va sin él. */
   ivaPct: number;
   /** El número previsto del documento, arriba a la derecha. */
-  numero: string;
+  /** Se muestra en la esquina; sin él, el número va en la cabecera del documento. */
+  numero?: string;
   lineas: Renglon[];
   setLineas: Dispatch<SetStateAction<Renglon[]>>;
   /** Gases para agregar a un toque (Cotizaciones). */
@@ -95,7 +96,7 @@ export function EditorRenglones({
 
   return (
     <SectionCard title="Productos" className={className}
-      action={<span className="font-mono text-xs text-muted">N° {numero}</span>}>
+      action={numero ? <span className="font-mono text-xs text-muted">N° {numero}</span> : undefined}>
       <div className="flex items-end gap-2">
         <div className="min-w-0 flex-1">
           <label className="mb-1 block text-xs font-medium text-muted">Buscar en el catálogo</label>
