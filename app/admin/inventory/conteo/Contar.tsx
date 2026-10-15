@@ -143,8 +143,20 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
   const deps = useCarga(`dep:${empresa}`, () => departamentosDe(empresa));
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [q, setQ] = useState("");
-  const [verSistema, setVerSistema] = useState(false);
+  // El conteo es ciego: lo que dice el sistema solo lo destapan el Owner y el
+  // Administrador. Quien cuenta no debe saber cuánto «tendría que haber».
+  const [verSistemaElegido, setVerSistema] = useState(false);
+  const verSistema = gerencia && verSistemaElegido;
   const [lector, setLector] = useState(false);
+  // Con el lector abierto, Enter en la cantidad devuelve el foco al lector:
+  // escanear → anotar → Enter → escanear, sin tocar la pantalla.
+  const lectorRef = useRef(false);
+  const scanRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { lectorRef.current = lector; }, [lector]);
+  // El último renglón que tuvo el foco: desde ahí busca «Siguiente sin contar».
+  const ultimoRef = useRef<string | null>(null);
+  // Los toques en − / + se guardan juntos, un momento después del último.
+  const pasosRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [aviso, setAviso] = useState<{ ok: boolean; text: string } | null>(null);
   const [agregar, setAgregar] = useState(false);
   const [revisar, setRevisar] = useState(false);
@@ -282,6 +294,45 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
     });
   }
 
+  // − / + : para contar pocas piezas con guantes, sin abrir el teclado.
+  // Vacío y + es 1; − nunca baja de 0 ni convierte «sin contar» en algo.
+  function paso(codigo: string, p: 1 | -1) {
+    const f = filasRef.current.find((x) => x.codigo === codigo);
+    if (!f) return;
+    const l = leerCantidad(f.texto);
+    if (l.estado === "error" || (l.estado === "vacio" && p < 0)) return;
+    const base = l.estado === "vacio" ? 0 : l.valor;
+    const texto = fmtCantidad(Math.max(0, Math.round((base + p) * 1000) / 1000));
+    cambiar(codigo, { texto, estado: "", error: undefined });
+    ultimoRef.current = codigo;
+    const t = pasosRef.current.get(codigo);
+    if (t) clearTimeout(t);
+    pasosRef.current.set(codigo, setTimeout(() => {
+      pasosRef.current.delete(codigo);
+      const x = filasRef.current.find((y) => y.codigo === codigo);
+      if (x) void guardar(x);
+    }, 700));
+  }
+
+  // El próximo renglón sin contar, siguiendo el orden de la hoja desde donde
+  // se iba; primero en el departamento que se ve, después en los demás.
+  function siguienteSinContar() {
+    const sinContar = (f: Fila) => leerCantidad(f.texto).estado === "vacio";
+    const todas = filasRef.current;
+    const ordenadas = verDepto ? [...todas.filter((f) => grupoDe(f) === verDepto), ...todas.filter((f) => grupoDe(f) !== verDepto)] : todas;
+    const desde = ordenadas.findIndex((f) => f.codigo === ultimoRef.current);
+    const destino = [...ordenadas.slice(desde + 1), ...ordenadas.slice(0, desde + 1)].find(sinContar);
+    if (!destino) return setAviso({ ok: true, text: "No queda nada sin contar. Cuando quieras, «Revisar y cerrar»." });
+    setAviso(null);
+    irA(destino.codigo);
+  }
+
+  // Enter en la cantidad: con el lector abierto vuelve al lector; si no, baja al siguiente.
+  function alEnter(codigo: string) {
+    if (lectorRef.current && scanRef.current) { scanRef.current.focus({ preventScroll: true }); return; }
+    mover(codigo, 1);
+  }
+
   function agregarFila(p: { codigo: string; nombre: string; unidad: string | null }) {
     const ya = filas.find((f) => f.codigo.toUpperCase() === p.codigo.toUpperCase());
     if (!ya) setFilas((fs) => [...fs, { renglon: null, codigo: p.codigo, nombre: p.nombre, unidad: p.unidad ?? "", sistema: 0, departamento: null, extra: true, texto: "", obs: "", guardado: null, estado: "" }]);
@@ -296,54 +347,75 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
   });
   const contados = cuenta.ok + cuenta.cero;
   const titulo = conteo.departamento ? `${conteo.departamento} - ${conteo.departamentoNombre}` : conteo.zona ?? "Sin departamento";
+  const fecha = conteo.fecha.split("-").reverse().join("-");
+  // «abierto a las 16:19» si se abrió el mismo día del conteo; si no, con su fecha.
+  const [diaAbierto, horaAbierto] = conteo.abiertoEn.split(" ");
+  const abierto = diaAbierto === fecha && horaAbierto ? `abierto a las ${horaAbierto}` : `abierto el ${conteo.abiertoEn}`;
 
   return (
     <div className="space-y-4">
       {/* Qué se está contando: el conteo abierto ES la pantalla. Desde aquí
           se cambia lo que se cuenta; empezar otro no se ofrece, porque solo
           puede haber uno abierto. */}
-      <section className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border bg-surface p-5">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ok">Conteo en Curso</p>
-          <h2 className="mt-0.5 text-xl font-semibold text-text">{nombreConteo(conteo)}</h2>
-          <p className="mt-1 text-sm text-muted">
-            Abierto el {conteo.abiertoEn} · {contados} de {total} contados · lo contado se guarda solo, puedes cerrar y seguir después.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" className="sumi-pulsable" onClick={async () => { for (const f of pendientes) await guardar(f); setVerCambio(true); }}>
-            Cambiar qué se cuenta
-          </Button>
-          {onHistorial && <Button variant="secondary" icon="report" className="sumi-pulsable" onClick={onHistorial}>Historial</Button>}
-        </div>
-      </section>
-
-      {/* Los datos del papel */}
-      <section className="rounded-2xl border border-border bg-surface p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Datos de la Planilla</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <div>
-            <span className="mb-1 block text-xs font-medium text-muted">Fecha del conteo</span>
-            <p className="flex h-11 items-center rounded-xl border border-border bg-surface-2 px-3 text-sm">{conteo.fecha.split("-").reverse().join("-")}</p>
+      {/* Una sola cabecera, como el encabezado del papel: qué se cuenta, cuándo,
+          quién contó y cuánto va. Antes eran tres tarjetas, y en el teléfono el
+          primer renglón quedaba pantalla y media más abajo. */}
+      <section className="space-y-4 rounded-2xl border border-border bg-surface p-4 sm:p-5" aria-label="Conteo en curso">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xl font-semibold text-text">
+              {nombreConteo(conteo)}
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-ok/10 px-2.5 py-0.5 text-xs font-semibold text-ok">
+                <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />En curso
+              </span>
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Fecha del conteo {fecha} · {abierto} · lo contado se guarda solo: puedes salir y seguir después.
+            </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="sumi-pulsable" onClick={async () => { for (const f of pendientes) await guardar(f); setVerCambio(true); }}>
+              Cambiar qué se cuenta
+            </Button>
+            {onHistorial && <Button variant="secondary" icon="report" className="sumi-pulsable" onClick={onHistorial}>Historial</Button>}
+          </div>
+        </div>
+
+        <div className={`grid gap-3 ${grupos.length > 1 ? "sm:grid-cols-2" : "sm:max-w-sm"}`}>
           <CampoConto empresa={empresa} valor={conto} onCambio={cambiarConto} />
-          {grupos.length > 1 ? (
+          {grupos.length > 1 && (
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">Ver departamento</span>
               <select className="sumi-campo font-medium" value={verDepto} aria-describedby="depto-ayuda" onChange={(e) => cambiarDepto(e.target.value)}>
                 <option value="">Todos · {contados} de {total}</option>
                 {grupos.map(([g, n]) => (
-                  <option key={g} value={g}>{etiqueta(g)} · {n.contados} de {n.total}{n.contados === n.total ? " ✓" : ""}</option>
+                  <option key={g} value={g}>{etiqueta(g)} · {n.contados} de {n.total}{n.contados === n.total ? " · listo" : ""}</option>
                 ))}
               </select>
-              <span id="depto-ayuda" className="mt-1 block text-[11px] text-muted">Muestra un departamento a la vez, con lo que llevas contado.</span>
+              <span id="depto-ayuda" className="mt-1 block text-xs text-muted">Muestra un departamento a la vez, con lo que llevas contado.</span>
             </label>
-          ) : (
-            <div>
-              <span className="mb-1 block text-xs font-medium text-muted">Qué se cuenta</span>
-              <p className="flex h-11 items-center rounded-xl border border-border bg-surface-2 px-3 text-sm font-medium">{titulo}</p>
-            </div>
           )}
+        </div>
+
+        {/* Avance */}
+        <div className="border-t border-border pt-4">
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <p className="text-2xl font-semibold tabular-nums text-text">{contados} <span className="text-sm font-medium text-muted">de {total} contados</span></p>
+            <p className="text-xs text-muted tabular-nums">
+              {cuenta.ok} con cantidad · {cuenta.cero} en cero · {cuenta.sin} sin contar
+              {cuenta.error > 0 && <span className="font-semibold text-danger"> · {cuenta.error} por corregir</span>}
+            </p>
+            {verDepto && (
+              <p className="text-xs font-medium text-text tabular-nums">
+                {etiqueta(verDepto)}: {cuentaVista.ok + cuentaVista.cero} de {cuentaVista.total}
+              </p>
+            )}
+          </div>
+          <div className="mt-2 flex h-2.5 overflow-hidden rounded-full border border-border bg-surface-2"
+            role="progressbar" aria-label="Avance del conteo" aria-valuemin={0} aria-valuemax={total} aria-valuenow={contados}>
+            <span className="block h-full bg-ok transition-[width]" style={{ width: `${(cuenta.ok / Math.max(total, 1)) * 100}%` }} />
+            <span className="block h-full bg-warn transition-[width]" style={{ width: `${(cuenta.cero / Math.max(total, 1)) * 100}%` }} />
+          </div>
         </div>
       </section>
 
@@ -352,29 +424,12 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
           mensaje="Se abrió antes de que existieran los departamentos, así que no trae planilla. Agrega los artículos uno por uno con «Agregar artículo»." />
       )}
 
-      {/* Avance */}
-      <section className="rounded-2xl border border-border bg-surface p-4" aria-label="Avance del conteo">
-        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-          <p className="text-xl font-semibold tabular-nums text-text">{contados} <span className="text-sm font-medium text-muted">de {total} contados</span></p>
-          <p className="text-xs text-muted tabular-nums">{cuenta.ok} con cantidad · {cuenta.cero} en cero · {cuenta.sin + cuenta.error} sin contar</p>
-          {verDepto && (
-            <p className="text-xs font-medium text-text tabular-nums">
-              {etiqueta(verDepto)}: {cuentaVista.ok + cuentaVista.cero} de {cuentaVista.total}
-            </p>
-          )}
-        </div>
-        <div className="mt-2 flex h-2 overflow-hidden rounded-full border border-border bg-surface-2" aria-hidden>
-          <span className="block h-full bg-ok transition-[width]" style={{ width: `${(cuenta.ok / Math.max(total, 1)) * 100}%` }} />
-          <span className="block h-full bg-warn transition-[width]" style={{ width: `${(cuenta.cero / Math.max(total, 1)) * 100}%` }} />
-        </div>
-      </section>
-
       {/* Herramientas */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="-mx-1 flex w-full gap-1.5 overflow-x-auto px-1 pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Filtrar renglones">
           {([["todos", "Todos", cuentaVista.total], ["sin", "Sin Contar", cuentaVista.sin], ["contados", "Contados", cuentaVista.ok + cuentaVista.cero], ["cero", "En Cero", cuentaVista.cero]] as const).map(([id, label, n]) => (
             <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)}
-              className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-xs font-medium ${filtro === id ? "border-navy bg-navy text-white" : "border-border bg-surface text-muted hover:text-text"}`}>
+              className={`sumi-pulsable min-h-11 shrink-0 whitespace-nowrap rounded-full border px-3.5 text-sm font-medium ${filtro === id ? "border-navy bg-navy text-white" : "border-border bg-surface text-muted hover:text-text"}`}>
               {label} <b className="tabular-nums">{n}</b>
             </button>
           ))}
@@ -382,31 +437,40 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
         <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-1 sm:flex-wrap sm:justify-end">
           <input type="search" className="sumi-campo sumi-campo--auto col-span-2 min-w-[14rem] flex-1 sm:max-w-sm" placeholder="Buscar por N°, código o nombre"
             aria-label="Buscar en la planilla" value={q} onChange={(e) => setQ(e.target.value)} />
-          <label className="order-last col-span-2 flex min-h-9 items-center gap-2 text-xs text-muted sm:order-none">
-            <input type="checkbox" checked={verSistema} onChange={(e) => setVerSistema(e.target.checked)} className="h-4 w-4 accent-[var(--brand)]" />
-            Ver lo que dice el sistema
-          </label>
-          <Button variant="secondary" icon="scan" className="px-3" onClick={() => setLector((v) => !v)}>{lector ? "Ocultar lector" : "Usar lector"}</Button>
-          <Button icon="plus" className="px-3" onClick={() => setAgregar(true)}>Agregar artículo</Button>
+          {/* Quien cuenta no ve lo que dice el sistema: solo el Owner y el Administrador. */}
+          {gerencia && (
+            <label className="order-last col-span-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-muted sm:order-none">
+              <input type="checkbox" checked={verSistemaElegido} onChange={(e) => setVerSistema(e.target.checked)} className="h-5 w-5 accent-[var(--brand)]" />
+              Ver lo que dice el sistema
+            </label>
+          )}
+          <Button variant={lector ? "primary" : "secondary"} icon="scan" className="px-3" aria-pressed={lector} onClick={() => setLector((v) => !v)}>{lector ? "Cerrar lector" : "Usar lector"}</Button>
+          <Button variant="secondary" icon="plus" className="px-3" onClick={() => setAgregar(true)}>Agregar artículo</Button>
         </div>
       </div>
 
-      {lector && (
-        <ScanBar hint="Dispara el lector: el producto queda listo para anotar su cantidad."
-          onScan={async (cod) => {
-            const f = filas.find((x) => x.codigo.toUpperCase() === cod.toUpperCase());
-            if (f) { beep(true); setAviso({ ok: true, text: `${f.codigo} · ${f.nombre}` }); return irA(f.codigo); }
-            const r = await escanear(cod, empresa);
-            if (r.estado !== "encontrado") { beep(false); return setAviso(mensajeDeEscaneo(r)); }
-            beep(true);
-            setAviso({ ok: true, text: `${r.producto.codigo} · ${r.producto.nombre} (no estaba en la planilla: se agregó)` });
-            agregarFila(r.producto);
-          }} />
-      )}
-      {aviso && (
-        <p className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${aviso.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
-          <Icon name={aviso.ok ? "check" : "alert"} size={14} /> {aviso.text}
-        </p>
+      {/* El lector queda fijo arriba mientras se cuenta, con su aviso al lado:
+          si se va de la pantalla, no se sabe si sigue escuchando. */}
+      {(lector || aviso) && (
+        <div className={lector ? "sticky top-[4.5rem] z-20 space-y-2 rounded-2xl bg-bg/95 pb-1 backdrop-blur" : ""}>
+          {lector && (
+            <ScanBar entrada={scanRef} hint="Dispara el lector, anota la cantidad y Enter: vuelve aquí para el siguiente."
+              onScan={async (cod) => {
+                const f = filas.find((x) => x.codigo.toUpperCase() === cod.toUpperCase());
+                if (f) { beep(true); setAviso({ ok: true, text: `${f.codigo} · ${f.nombre}` }); return irA(f.codigo); }
+                const r = await escanear(cod, empresa);
+                if (r.estado !== "encontrado") { beep(false); return setAviso(mensajeDeEscaneo(r)); }
+                beep(true);
+                setAviso({ ok: true, text: `${r.producto.codigo} · ${r.producto.nombre} (no estaba en la planilla: se agregó)` });
+                agregarFila(r.producto);
+              }} />
+          )}
+          {aviso && (
+            <p role="status" className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${aviso.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
+              <Icon name={aviso.ok ? "check" : "alert"} size={14} /> {aviso.text}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Los renglones */}
@@ -416,9 +480,19 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
           {verSistema && <><span className="text-right">Sistema</span><span className="text-right">Diferencia</span></>}
         </div>
         {visibles.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-muted">
-            {t ? `Ningún renglón coincide con «${q}»${verDepto ? ` en ${etiqueta(verDepto)}` : ""}.` : "No hay renglones en este filtro."}
-          </p>
+          <div className="px-4 py-10 text-center text-sm text-muted">
+            {t ? (
+              <p>Ningún renglón coincide con «{q.trim()}»{verDepto ? ` en ${etiqueta(verDepto)}` : ""}. Si el artículo existe pero no está en la planilla, agrégalo con «Agregar artículo».</p>
+            ) : filtro === "sin" ? (
+              <p><b className="text-ok">No queda nada sin contar{verDepto ? ` en ${etiqueta(verDepto)}` : ""}.</b> Cuando quieras, «Revisar y cerrar».</p>
+            ) : filtro === "contados" ? (
+              <p>Todavía no hay nada contado{verDepto ? ` en ${etiqueta(verDepto)}` : ""}. Anota la primera cantidad en «Todos».</p>
+            ) : filtro === "cero" ? (
+              <p>Ningún artículo quedó en cero.</p>
+            ) : (
+              <p>No hay renglones en esta vista.</p>
+            )}
+          </div>
         ) : (
           <ul className="divide-y divide-border">
             {visibles.map((f) => (
@@ -427,32 +501,42 @@ function PlanillaLista({ empresa, gerencia, conteo, onCerrado, onCambio, onHisto
                 onTexto={(v) => cambiar(f.codigo, { texto: v, estado: "", error: undefined })}
                 onObs={(v) => cambiar(f.codigo, { obs: v })}
                 onGuardar={() => { const x = filasRef.current.find((y) => y.codigo === f.codigo); if (x) guardar(x); }}
-                onMover={(p) => mover(f.codigo, p)} />
+                onMover={(p) => mover(f.codigo, p)}
+                onEnter={() => alEnter(f.codigo)}
+                onPaso={(p) => paso(f.codigo, p)}
+                onFoco={() => { ultimoRef.current = f.codigo; }} />
             ))}
           </ul>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-2 px-4 py-3 text-xs text-muted">
           <span>¿Falta un artículo? Agrégalo con «Agregar artículo».</span>
-          <span className="hidden gap-3 xl:flex"><span><kbd className="rounded border border-border px-1">Enter</kbd> o <kbd className="rounded border border-border px-1">↓</kbd> siguiente</span><span>Vacío = sin contar · 0 = no hay ninguno</span></span>
+          <span>Vacío = sin contar · 0 = no hay ninguno</span>
+          <span className="hidden xl:inline"><kbd className="rounded border border-border px-1">Enter</kbd> o <kbd className="rounded border border-border px-1">↓</kbd> siguiente renglón</span>
         </div>
       </section>
 
-      {/* Barra fija */}
+      {/* Barra fija: cómo va lo guardado, ir a lo que falta y cerrar. */}
       <div className="sumi-barra-fija z-30 rounded-2xl border border-border bg-surface/95 px-3 py-2.5 shadow-lg backdrop-blur sm:px-4 sm:py-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="flex min-w-0 flex-1 items-center gap-2 text-[11px] leading-snug text-muted sm:text-xs" aria-live="polite">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <p className="flex min-w-0 flex-1 items-center gap-2 text-xs leading-snug text-muted" aria-live="polite">
             <span className={`h-2 w-2 shrink-0 rounded-full ${filas.some((f) => f.estado === "guardando") ? "bg-warn" : pendientes.length ? "bg-info" : "bg-ok"}`} />
             {filas.some((f) => f.estado === "guardando") ? "Guardando…"
               : pendientes.length ? `${pendientes.length} renglón(es) sin guardar: se guardan al salir de la casilla`
-              : "Todo guardado · puedes cerrar y seguir después"}
+              : contados === 0 ? "Anota al menos una cantidad para poder cerrar."
+              : "Todo guardado · puedes salir y seguir después"}
           </p>
-          <Button icon="check" className="shrink-0" disabled={contados === 0} onClick={async () => {
-            // Lo que quedo escrito sin salir de la casilla se guarda antes de revisar.
-            for (const f of pendientes) await guardar(f);
-            setRevisar(true);
-          }}>
-            Revisar y cerrar
-          </Button>
+          <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+            <Button variant="secondary" icon="arrow-down" disabled={cuenta.sin === 0} onClick={siguienteSinContar}>
+              <span className="sm:hidden">Siguiente</span><span className="hidden sm:inline">Siguiente sin contar</span>
+            </Button>
+            <Button icon="check" disabled={contados === 0} onClick={async () => {
+              // Lo que quedo escrito sin salir de la casilla se guarda antes de revisar.
+              for (const f of pendientes) await guardar(f);
+              setRevisar(true);
+            }}>
+              Revisar y cerrar
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -516,10 +600,14 @@ function armarFilas(items: ItemPlanilla[], lineas: Awaited<ReturnType<typeof lin
 // estado al momento de usarse, no al dibujarse.
 const Renglon = memo(RenglonBase, (a, b) => a.f === b.f && a.verSistema === b.verSistema);
 
-function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMover }: {
+function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMover, onEnter, onPaso, onFoco }: {
   f: Fila; verSistema: boolean;
   refInput: (el: HTMLInputElement | null) => void;
   onTexto: (v: string) => void; onObs: (v: string) => void; onGuardar: () => void; onMover: (p: 1 | -1) => void;
+  /** Enter en la cantidad: al lector si está abierto; si no, al siguiente renglón. */
+  onEnter: () => void;
+  onPaso: (p: 1 | -1) => void;
+  onFoco: () => void;
 }) {
   // En el telefono la observacion se abre a pedido: casi nunca se usa, y
   // siempre abierta hace cada renglon el doble de alto.
@@ -541,7 +629,8 @@ function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMov
   const borde = f.estado === "error" || l.estado === "error" ? "border-danger bg-danger/5" : l.estado === "cero" ? "border-warn" : l.estado === "ok" ? "border-ok/50" : "border-border-strong";
 
   const teclas = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); onGuardar(); onMover(1); }
+    if (e.key === "Enter") { e.preventDefault(); onGuardar(); onEnter(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); onGuardar(); onMover(1); }
     else if (e.key === "ArrowUp") { e.preventDefault(); onGuardar(); onMover(-1); }
   };
 
@@ -550,9 +639,10 @@ function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMov
       <span className="pt-0 text-xs tabular-nums text-muted xl:pt-3">{f.renglon ?? "+"}</span>
       <span className="col-start-2 row-start-2 flex items-center gap-2 xl:col-start-auto xl:row-start-auto xl:block xl:pt-2.5">
         <span className="font-mono text-xs text-text">{f.codigo}</span>
-        <span className={`inline-block rounded px-1.5 text-[10px] font-semibold uppercase tracking-wide xl:mt-0.5 xl:block xl:w-fit ${nuevo ? "bg-brand/10 text-brand" : "bg-surface-2 text-muted ring-1 ring-inset ring-border"}`}>
-          {nuevo ? "SKU Macedonia" : "Valery"}
-        </span>
+        {/* Casi todo viene de Valery: solo se marca lo que no. */}
+        {nuevo && (
+          <span className="inline-block rounded bg-brand/10 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand xl:mt-0.5 xl:block xl:w-fit">SKU Macedonia</span>
+        )}
       </span>
       <span className="col-start-2 row-start-1 text-sm font-medium text-text xl:col-start-auto xl:row-start-auto xl:pt-2.5">
         {f.nombre}
@@ -561,16 +651,27 @@ function RenglonBase({ f, verSistema, refInput, onTexto, onObs, onGuardar, onMov
       <div className="col-span-2 grid gap-2 sm:grid-cols-2 xl:contents">
       <div>
         <div className={`flex overflow-hidden rounded-xl border bg-surface-2 focus-within:border-brand ${borde}`}>
+          {/* − y + para contar pocas piezas con guantes; en la computadora sobran. */}
+          <button type="button" tabIndex={-1} aria-label={`Uno menos de ${f.nombre}`} disabled={l.estado === "vacio" || l.estado === "error"}
+            onClick={() => onPaso(-1)}
+            className="sumi-pulsable flex h-11 w-11 shrink-0 items-center justify-center border-r border-border bg-surface text-text disabled:text-muted disabled:opacity-50 xl:hidden">
+            <Icon name="minus" size={18} />
+          </button>
           <input ref={refInput} inputMode="decimal" enterKeyHint="next" autoComplete="off" placeholder="—" value={f.texto}
             aria-label={`Cantidad contada de ${f.nombre}`}
-            onChange={(e) => onTexto(e.target.value)} onBlur={onGuardar} onKeyDown={teclas}
+            onChange={(e) => onTexto(e.target.value)} onBlur={onGuardar} onKeyDown={teclas} onFocus={onFoco}
             className="sumi-renglon-campo h-11 min-w-0 flex-1 bg-transparent px-3 text-right text-base font-semibold tabular-nums text-text outline-none xl:h-10" />
           <span className="flex min-w-[3rem] items-center justify-center border-l border-border bg-surface px-2 text-xs font-medium text-muted">{f.unidad || "—"}</span>
+          <button type="button" tabIndex={-1} aria-label={`Uno más de ${f.nombre}`} disabled={l.estado === "error"}
+            onClick={() => onPaso(1)}
+            className="sumi-pulsable flex h-11 w-11 shrink-0 items-center justify-center border-l border-border bg-surface text-text disabled:text-muted disabled:opacity-50 xl:hidden">
+            <Icon name="plus" size={18} />
+          </button>
         </div>
         <div className="mt-1 flex min-h-4 items-start justify-between gap-2">
-          <p className={`text-[11px] tabular-nums ${tono}`}>{estadoTexto}</p>
+          <p className={`text-xs tabular-nums ${tono}`}>{estadoTexto}</p>
           {!verObs && (
-            <button type="button" className="-my-2 shrink-0 px-1 py-2 text-[11px] font-medium text-brand sm:hidden"
+            <button type="button" className="-my-3 min-h-11 shrink-0 px-2 text-xs font-medium text-brand sm:hidden"
               onClick={() => { setConObs(true); setTimeout(() => obsRef.current?.focus(), 0); }}>
               + Observación
             </button>
