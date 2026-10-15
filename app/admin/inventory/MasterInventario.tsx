@@ -12,7 +12,8 @@
 //   ¿Qué está mal en Valery?  existencia negativa: salidas sin su entrada.
 //
 // Y «Todo el catálogo», que absorbe la vieja pestaña Valery. Nunca se muestra
-// un 0 por un producto que nadie contó: dice «Nunca contado». Tampoco se suman
+// un 0 por un producto que nadie contó: la columna «Macedonia» (lo contado en
+// los conteos de Macedonia, pedido del 14-10-2026) dice «Sin Conteo». Tampoco se suman
 // unidades de productos distintos (no significa nada); los totales van en
 // dinero, para quien puede ver costos. Las cuentas: lib/inventory/master-vista.ts.
 
@@ -39,7 +40,7 @@ const EXPLICA: Record<VistaMaster, string> = {
   contar: `Productos con existencia que nadie ha contado, o cuyo último conteo tiene más de ${DIAS_CONTEO_VIEJO} días. Arriba, los que más valen: contarlos primero cubre la mayor parte del dinero.`,
   diferencias: "Lo que se contó y no cuadra con el sistema. Arriba, lo que más pesa.",
   valery: "Valery los tiene en negativo porque salió mercancía sin que se registrara su entrada. Se corrige en Valery cargando la entrada; contarlos dice cuánto hay de verdad.",
-  todo: "Todo el catálogo con la existencia del sistema y su último conteo.",
+  todo: "Todo el catálogo con la existencia del sistema y lo último que se contó en Macedonia.",
 };
 
 export function MasterInventario({
@@ -64,14 +65,14 @@ export function MasterInventario({
     ],
     columnas: [
       { titulo: "Código", tipo: "codigo" }, { titulo: "Producto" }, { titulo: "Unidad" }, { titulo: "Sistema", tipo: "num" },
-      { titulo: "Contado", tipo: "num" }, { titulo: "Contado el", tipo: "fecha" }, { titulo: "Diferencia", tipo: "dif" },
+      { titulo: "Macedonia", tipo: "num" }, { titulo: "Contado el", tipo: "fecha" }, { titulo: "Diferencia", tipo: "dif" },
       ...(r.conCosto ? [{ titulo: "Valor en sistema", tipo: "usd" as const }, { titulo: "Diferencia $", tipo: "usd" as const }] : []),
     ],
     filas: lista.map((f) => [
       f.codigo, f.nombre, f.unidad || null, f.valery, f.contado, fechaVista(f.fechaConteo), f.diferencia,
       ...(r.conCosto ? [f.valor, f.difValor] : []),
     ]),
-    nota: "Contado vacío = nunca contado (no es cero). Sistema en negativo: salió mercancía sin que se registrara su entrada en Valery.",
+    nota: "Macedonia vacío = sin conteo (no es cero). Sistema en negativo: salió mercancía sin que se registrara su entrada en Valery.",
   }));
 
   if (carga.cargando) return <EstadoDatos cargando vacio={false}>{null}</EstadoDatos>;
@@ -148,7 +149,7 @@ export function MasterInventario({
         ) : (
           <>
             <div className={`hidden gap-3 border-b border-border bg-surface-2 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted md:grid ${columnas(vista, r.conCosto)}`}>
-              <span>Producto</span><span className="text-right">Sistema</span><span>Último conteo</span>
+              <span>Producto</span><span className="text-right">Sistema</span><span>Macedonia</span>
               {ultimaCol(vista, r.conCosto) && <span className="text-right">{ultimaCol(vista, r.conCosto)}</span>}
             </div>
             <ul className="divide-y divide-border">
@@ -210,9 +211,10 @@ function Fila({ f, vista, conCosto }: { f: FilaVista; vista: VistaMaster; conCos
         {f.valery < 0 && <span className="sr-only"> (negativo en Valery)</span>}
       </div>
       <div>
-        <span className="text-[11px] uppercase tracking-wide text-muted md:hidden">Último conteo </span>
+        <span className="text-[11px] uppercase tracking-wide text-muted md:hidden">Macedonia </span>
         {f.contado === null ? (
-          <span className="text-muted">Nunca contado</span>
+          // Una etiqueta, no un número: nadie lo ha contado, que no es lo mismo que cero.
+          <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 ring-inset ring-border">Sin Conteo</span>
         ) : (
           <span className="tabular-nums text-text">
             {cant(f.contado)}{" "}

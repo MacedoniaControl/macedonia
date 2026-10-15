@@ -39,8 +39,10 @@ const ESTADO: Record<string, { t: string; tone: "info" | "warn" | "ok" | "danger
   sin_diferencias: { t: "Por verificar", tone: "warn" },
 };
 
-export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
+export function Historial({ empresa, gerencia, abrirId, recarga, onIrAContar }: {
   empresa: string; abrirId: number | null; recarga: number; onIrAContar: () => void;
+  /** Owner o Administrador: abren cada conteo cerrado (actas, diferencias, verificar). El Técnico ve la lista. */
+  gerencia: boolean;
 }) {
   const [propia, setPropia] = useState(0);
   const carga = useCarga(`hist:${empresa}:${recarga}:${propia}`, async () => {
@@ -76,7 +78,9 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
       <div className="space-y-1 p-4">
         <h2 className="text-base font-semibold text-text">Historial de Conteos</h2>
         <p className="max-w-[70ch] text-sm text-muted">
-          Cada conteo cerrado queda con su número y su acta en Excel y PDF. Las diferencias entran a la existencia cuando el Owner o un Administrador lo verifican.
+          {gerencia
+            ? "Cada conteo cerrado queda con su número y su acta en Excel y PDF. Toca uno para ver lo contado contra el sistema."
+            : "Cada conteo cerrado queda con su número. El Owner o un Administrador revisan sus diferencias."}
         </p>
       </div>
       {/* Lo que espera una decisión va arriba: contar no ajusta, aprobar sí. */}
@@ -93,7 +97,7 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
         tituloVacio="Todavía no hay conteos" mensajeVacio="El primero aparece aquí apenas se abra.">
         <ul className="divide-y divide-border border-t border-border">
           {(carga.datos?.lista ?? []).map((c) => (
-            <Fila key={c.id} c={c} abierta={abierta === c.id} aprueba={!!carga.datos?.aprueba}
+            <Fila key={c.id} c={c} abierta={abierta === c.id} aprueba={!!carga.datos?.aprueba} gerencia={gerencia}
               onToggle={() => setAbierta(abierta === c.id ? null : c.id)}
               onCambio={() => setPropia((n) => n + 1)} onIrAContar={onIrAContar} />
           ))}
@@ -103,16 +107,18 @@ export function Historial({ empresa, abrirId, recarga, onIrAContar }: {
   );
 }
 
-function Fila({ c, abierta, aprueba, onToggle, onCambio, onIrAContar }: {
-  c: ResumenConteo; abierta: boolean; aprueba: boolean; onToggle: () => void; onCambio: () => void; onIrAContar: () => void;
+function Fila({ c, abierta, aprueba, gerencia, onToggle, onCambio, onIrAContar }: {
+  c: ResumenConteo; abierta: boolean; aprueba: boolean; gerencia: boolean; onToggle: () => void; onCambio: () => void; onIrAContar: () => void;
 }) {
   if (c.eliminado) return <Eliminado e={c.eliminado} />;
   const est = ESTADO[c.cerrado ? c.ajuste ?? "pendiente" : "abierto"];
   const titulo = c.departamento ? `${c.departamento} - ${c.departamentoNombre}` : c.zona ?? "Sin departamento";
+  // El Técnico no abre un conteo cerrado: su detalle trae lo que decía el sistema.
+  const seAbre = gerencia || !c.cerrado;
   return (
     <li>
-      <button type="button" onClick={onToggle} aria-expanded={abierta}
-        className="grid w-full grid-cols-[minmax(0,1fr)_1.5rem] items-center gap-x-3 gap-y-1 px-4 py-3 text-left hover:bg-surface-2 md:grid-cols-[10rem_minmax(0,1fr)_9rem_10rem_1.5rem]">
+      <button type="button" onClick={seAbre ? onToggle : undefined} aria-expanded={seAbre ? abierta : undefined} disabled={!seAbre}
+        className="grid w-full disabled:cursor-default disabled:hover:bg-transparent grid-cols-[minmax(0,1fr)_1.5rem] items-center gap-x-3 gap-y-1 px-4 py-3 text-left hover:bg-surface-2 md:grid-cols-[10rem_minmax(0,1fr)_9rem_10rem_1.5rem]">
         <span className={`font-mono text-sm font-bold ${c.numero ? "text-brand" : "font-medium text-muted"}`}>{c.numero ?? "Sin número"}</span>
         <span className="col-start-1 min-w-0 md:col-start-auto">
           <b className="block truncate text-sm font-semibold text-text">{titulo}</b>
@@ -120,9 +126,9 @@ function Fila({ c, abierta, aprueba, onToggle, onCambio, onIrAContar }: {
         </span>
         <span className="col-start-1 text-xs tabular-nums text-muted md:col-start-auto"><b className="text-text">{c.renglones}</b> contados · <b className="text-text">{c.diferencias}</b> dif.</span>
         <span className="col-start-1 md:col-start-auto"><StatusBadge tone={est.tone}>{est.t}</StatusBadge></span>
-        <span className={`col-start-2 row-start-1 text-muted transition md:col-start-auto md:row-start-auto ${abierta ? "rotate-90" : ""}`} aria-hidden><Icon name="chevronRight" size={16} /></span>
+        <span className={`col-start-2 row-start-1 text-muted transition md:col-start-auto md:row-start-auto ${abierta ? "rotate-90" : ""} ${seAbre ? "" : "invisible"}`} aria-hidden><Icon name="chevronRight" size={16} /></span>
       </button>
-      {abierta && (c.cerrado
+      {abierta && seAbre && (c.cerrado
         ? <Detalle c={c} aprueba={aprueba} onCambio={onCambio} />
         : (
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4">

@@ -46,9 +46,12 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
   const { rol } = useRol();
   const gerencia = esGerencia(rol);
   const cuenta = puedeContar(rol);
-  const permitidas: Tab[] = ["master", ...(cuenta ? ["conteo" as const] : []), "productos", ...(gerencia ? ["movimientos" as const] : [])];
+  const permitidas: Tab[] = ["master", "productos", ...(cuenta ? ["conteo" as const] : []), ...(gerencia ? ["movimientos" as const] : [])];
   const tab: Tab = permitidas.includes(tabElegida) ? tabElegida : "master";
   const [recargaMaster, setRecargaMaster] = useState(0);
+  // «Iniciar Conteo» desde el Master: lleva a Conteo con la ventana ya abierta.
+  const [iniciar, setIniciar] = useState(false);
+  const irA = (t: Tab) => { setTab(t); setIniciar(false); };
   const [q, setQ] = useState("");
 
 
@@ -59,10 +62,10 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
         breadcrumbs={[{ label: "Inventario" }, { label: "Inventario" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {/* Cargar conteo va primero: es la acción principal de esta
+            {/* Iniciar Conteo va primero: es la acción principal de esta
                 pantalla, y la razón por la que el Master significa algo. Dentro
-                de Conteo no se muestra: llevaría al mismo lugar. */}
-            {cuenta && tab !== "conteo" && <Button icon="inventory" onClick={() => setTab("conteo")}>Cargar conteo</Button>}
+                de Conteo no se muestra: ahí está su propio botón. */}
+            {cuenta && tab !== "conteo" && <Button icon="inventory" onClick={() => { setTab("conteo"); setIniciar(true); }}>Iniciar Conteo</Button>}
             <BotonDescargar empresa={empresa} />
           </div>
         }
@@ -70,14 +73,15 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
 
 
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
+        {/* Orden pedido por el usuario (14-10-2026): Master, Productos y Catálogo, Conteo, Movimientos. */}
         {([
           ["master", "Master"],
-          ["conteo", "Conteo"],
           // Productos y catalogo pasa a subdepartamento del inventario.
           ["productos", "Productos y Catálogo"],
+          ["conteo", "Conteo"],
           ["movimientos", "Movimientos"],
         ] as [Tab, string][]).filter(([id]) => permitidas.includes(id)).map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button key={id} onClick={() => irA(id)}
             className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>
             {label}
           </button>
@@ -101,7 +105,7 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 
       {/* El conteo fisico: planilla, historial y actas. */}
-      {tab === "conteo" && <ConteoFisico empresa={empresa} gerencia={gerencia} inicial={inicial} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
+      {tab === "conteo" && <ConteoFisico empresa={empresa} gerencia={gerencia} inicial={inicial} iniciarAlEntrar={iniciar} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
 
 
       {/* -------- MASTER dividido en 3 apartados -------- */}
@@ -109,7 +113,7 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
         <>
           {/* Valery contra lo contado a mano. Es la razon de ser del producto:
               lo que se fue sin registrarse no aparece en ningun kardex. */}
-          <MasterInventario empresa={empresa} filtro={q} recarga={recargaMaster} onContar={cuenta ? () => setTab("conteo") : undefined} />
+          <MasterInventario empresa={empresa} filtro={q} recarga={recargaMaster} onContar={cuenta ? () => { setTab("conteo"); setIniciar(true); } : undefined} />
         </>
       )}
 
