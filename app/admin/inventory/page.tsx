@@ -60,8 +60,9 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Cargar conteo va primero: es la acción principal de esta
-                pantalla, y la razón por la que el Master significa algo. */}
-            {cuenta && <Button icon="inventory" onClick={() => setTab("conteo")}>Cargar conteo</Button>}
+                pantalla, y la razón por la que el Master significa algo. Dentro
+                de Conteo no se muestra: llevaría al mismo lugar. */}
+            {cuenta && tab !== "conteo" && <Button icon="inventory" onClick={() => setTab("conteo")}>Cargar conteo</Button>}
             <BotonDescargar empresa={empresa} />
           </div>
         }

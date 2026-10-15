@@ -5,23 +5,27 @@
 // (los lectores HID teclean el código + Enter) y estado ACTIVO/PAUSADO visible,
 // porque si el campo pierde el foco la lectura se pierde en silencio.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { Icon } from "@/components/ui/Icon";
 
 export function ScanBar({
   onScan,
   hint = "Dispara el lector sobre el código del producto.",
+  entrada,
 }: {
   onScan: (codigo: string) => void;
   hint?: string;
+  /** Para que quien la usa le devuelva el foco (el conteo, después de anotar la cantidad). */
+  entrada?: RefObject<HTMLInputElement | null>;
 }) {
   const [valor, setValor] = useState("");
   const [enfocado, setEnfocado] = useState(false);
-  const ref = useRef<HTMLInputElement>(null);
+  const propio = useRef<HTMLInputElement>(null);
+  const ref = entrada ?? propio;
 
   useEffect(() => {
     ref.current?.focus();
-  }, []);
+  }, [ref]);
 
   function procesar(raw: string) {
     const codigo = raw.trim();
