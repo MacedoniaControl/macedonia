@@ -22,7 +22,7 @@ import { useCarga } from "@/lib/ux/use-carga";
 import { abrirConteo, cambiarAlcance, cruceConAbiertos, departamentosDe, type Conteo } from "@/lib/inventory/conteos-db";
 import { contadoresDe } from "@/lib/inventory/contadores";
 
-type Tipo = "planilla" | "departamento" | "general";
+export type Tipo = "planilla" | "departamento" | "general";
 type Que = { planilla: true } | { general: true } | { departamento: string };
 
 const OPCIONES: { id: Tipo; titulo: string; texto: string; icono: IconName }[] = [
@@ -37,24 +37,28 @@ export const queCuenta = (c: Conteo) =>
     : c.departamento ? `el departamento ${c.departamento} - ${c.departamentoNombre ?? ""}` : "un conteo sin departamento";
 
 /** La ventana «Cambiar qué se cuenta», para un conteo que ya está abierto. */
-export function CambiarConteo({ empresa, conteo, onCerrar, onListo }: { empresa: string; conteo: Conteo; onCerrar: () => void; onListo: () => void }) {
+export function CambiarConteo({ empresa, conteo, inicial, onCerrar, onListo }: {
+  empresa: string; conteo: Conteo; onCerrar: () => void; onListo: () => void;
+  /** La opción que ya viene elegida (desde los botones de modo de la planilla). */
+  inicial?: Tipo;
+}) {
   return (
     <Modal titulo="Cambiar Qué Se Cuenta" onCerrar={onCerrar} ancho="max-w-2xl">
-      <ElegirConteo empresa={empresa} abierto={conteo} onListo={onListo} onCancelar={onCerrar} />
+      <ElegirConteo empresa={empresa} abierto={conteo} inicial={inicial} onListo={onListo} onCancelar={onCerrar} />
     </Modal>
   );
 }
 
 /** Elegir qué contar. Sin `abierto` empieza un conteo; con él, lo cambia. */
-export function ElegirConteo({ empresa, abierto: c, onListo, onCancelar, onSiguiente, enCurso = [] }: {
-  empresa: string; abierto: Conteo | null; onListo: () => void; onCancelar?: () => void;
+export function ElegirConteo({ empresa, abierto: c, inicial = null, onListo, onCancelar, onSiguiente, enCurso = [] }: {
+  empresa: string; abierto: Conteo | null; inicial?: Tipo | null; onListo: () => void; onCancelar?: () => void;
   /** Al iniciar: en vez de abrir el conteo aquí, pasa al paso «¿Quién va a contar?». */
   onSiguiente?: (que: Que, nombre: string) => void;
   /** Los conteos que ya están en curso: sus departamentos se marcan. */
   enCurso?: Conteo[];
 }) {
   const deps = useCarga(`dep:${empresa}`, () => departamentosDe(empresa));
-  const [tipo, setTipo] = useState<Tipo | null>(null);
+  const [tipo, setTipo] = useState<Tipo | null>(inicial);
   const [depto, setDepto] = useState<string | null>(null);
   const [yendo, setYendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
