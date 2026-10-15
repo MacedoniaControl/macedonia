@@ -7,9 +7,9 @@
 //
 // Los números NO se guardan: los calcula la base sumando movimientos. Por eso
 // siempre cuadran con su propio historial. Para corregirlos se CUENTA: se
-// escribe lo que hay en el galpón y la Rampa queda así al guardar. El conteo
-// queda por verificar: el Owner o un Administrador lo verifica o lo rechaza
-// (rechazar lo deshace) en el Historial.
+// escribe lo que hay en el galpón y la Rampa queda así al guardar. Desde la
+// migración 46 (15-10-2026) el conteo queda verificado solo: nadie tiene que
+// autorizarlo, y se puede contar de nuevo enseguida. Queda en el Historial.
 
 import { useCarga } from "@/lib/ux/use-carga";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -90,7 +90,7 @@ export function SaldosCilindros({
       const r = await contarRampa(empresa, lineas, motivo);
       if (!r.ok) return setMsg({ ok: false, texto: r.error });
       setContando(false);
-      setMsg({ ok: true, texto: `Conteo ${r.numero} guardado: la Rampa ya quedó como la contaste (${r.diferencias} diferencia(s)). Queda por verificar por el Owner o un Administrador.` });
+      setMsg({ ok: true, texto: `Conteo ${r.numero} guardado: la Rampa ya quedó como la contaste (${r.diferencias} diferencia(s)). Queda en el Historial.` });
       onCambio?.();
     } catch (e) {
       setMsg({ ok: false, texto: e instanceof Error ? e.message : "No se pudo guardar el conteo." });

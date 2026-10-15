@@ -2,10 +2,9 @@
 // calcula la diferencia con lo registrado. Nadie tiene que sumar ni restar a
 // mano, que es donde se equivocaba el ajuste de «agregar/quitar N».
 //
-// Contar ajusta: al terminar el conteo, cada diferencia entra a la Rampa. El
-// conteo igual queda por verificar: el Owner o un Administrador lo verifica o
-// lo rechaza, y rechazarlo deshace el ajuste (migración 31, que también valida
-// todo esto otra vez).
+// Contar ajusta: al terminar el conteo, cada diferencia entra a la Rampa y el
+// conteo queda verificado, sin que nadie autorice (migraciones 31 y 46, que
+// también validan todo esto otra vez).
 //
 // Solo se cuentan llenos y vacíos: es lo que está físicamente en la planta.
 // Los que están en un cliente o en llenado no se ven, y fuera de servicio se

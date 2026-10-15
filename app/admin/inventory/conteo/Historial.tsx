@@ -6,11 +6,11 @@
 // el sistema, quien lo hizo, sus actas en Excel y PDF, y su linea de tiempo.
 // Las actas no se modifican: si algo salio mal, se hace un conteo nuevo.
 //
-// Todo conteo cerrado espera que el Owner o un Administrador lo VERIFIQUE:
-// certifica que es correcto y, si tiene diferencias, cada una entra a la
-// existencia. Sin diferencias también se verifica (migración 29). Verificar o
-// rechazar solo lo ven owner y admin, y la base lo vuelve a comprobar:
-// esconder el boton es comodidad, no seguridad.
+// Desde la migración 46 (15-10-2026) un conteo AJUSTA al cerrarse, sin que
+// nadie autorice: cada diferencia entra a la existencia como movimiento y el
+// conteo queda «Ajustado». Solo un conteo de antes que no se pudo aplicar
+// queda «Por aplicar»; el Owner o un Administrador lo aplica o lo rechaza
+// desde aquí, y la base lo vuelve a comprobar.
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -28,20 +28,20 @@ import {
 import { Descarga } from "./RevisarCierre";
 import { useExportable } from "@/lib/ux/exportar";
 
-/** Cerrado y esperando que el Owner o un Administrador lo certifique. */
+/** Cerrado y todavía sin aplicar (solo conteos de antes de la migración 46). */
 const porVerificar = (a: ResumenConteo["ajuste"]) => a === "pendiente" || a === "sin_diferencias";
 
 const ESTADO: Record<string, { t: string; tone: "info" | "warn" | "ok" | "danger" | "muted" }> = {
   abierto: { t: "En curso", tone: "info" },
-  pendiente: { t: "Por verificar", tone: "warn" },
-  aprobado: { t: "Verificado", tone: "ok" },
+  pendiente: { t: "Por aplicar", tone: "warn" },
+  aprobado: { t: "Ajustado", tone: "ok" },
   rechazado: { t: "Rechazado", tone: "danger" },
-  sin_diferencias: { t: "Por verificar", tone: "warn" },
+  sin_diferencias: { t: "Por aplicar", tone: "warn" },
 };
 
 export function Historial({ empresa, gerencia, abrirId, recarga, onIrAContar }: {
   empresa: string; abrirId: number | null; recarga: number; onIrAContar: (id: number) => void;
-  /** Owner o Administrador: abren cada conteo cerrado (actas, diferencias, verificar). El Técnico ve la lista. */
+  /** Owner o Administrador: abren cada conteo cerrado (actas, diferencias). El Técnico ve la lista. */
   gerencia: boolean;
 }) {
   const [propia, setPropia] = useState(0);
@@ -80,15 +80,15 @@ export function Historial({ empresa, gerencia, abrirId, recarga, onIrAContar }: 
         <p className="max-w-[70ch] text-sm text-muted">
           {gerencia
             ? "Cada conteo cerrado queda con su número y su acta en Excel y PDF. Toca uno para ver lo contado contra el sistema."
-            : "Cada conteo cerrado queda con su número. El Owner o un Administrador revisan sus diferencias."}
+            : "Cada conteo cerrado queda con su número, y sus diferencias ya entraron al inventario."}
         </p>
       </div>
-      {/* Lo que espera una decisión va arriba: contar no ajusta, aprobar sí. */}
+      {/* Solo para conteos de antes de la migración 46 que no se aplicaron. */}
       {carga.datos?.aprueba && pendientes.length > 0 && (
         <div className="mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5 text-sm">
           <p className="text-text">
-            <b>{pendientes.length === 1 ? "1 conteo espera" : `${pendientes.length} conteos esperan`} tu verificación</b> ({pendientes.map((c) => c.numero).join(", ")}).
-            La existencia cambia cuando lo verificas.
+            <b>{pendientes.length === 1 ? "1 conteo sin aplicar" : `${pendientes.length} conteos sin aplicar`}</b> ({pendientes.map((c) => c.numero).join(", ")}).
+            Son de antes de que los conteos ajustaran solos: aplícalos o recházalos.
           </p>
           <Button variant="secondary" onClick={() => setAbierta(pendientes[0].id)}>Revisar</Button>
         </div>
@@ -159,7 +159,7 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
       const r = que === "aprobar" ? await aprobarAjuste(c.id, nota) : que === "rechazar" ? await rechazarAjuste(c.id, nota) : await generarActas(c.id);
       if (!r.ok) return setMsg({ ok: false, t: r.error ?? "No se pudo." });
       const n = "movimientos" in r ? r.movimientos ?? 0 : 0;
-      setMsg({ ok: true, t: que === "aprobar" ? (n ? `Conteo verificado: ${n} movimiento(s) de inventario. La existencia ya cambió.` : "Conteo verificado. Sin diferencias: la existencia no cambia.") : que === "rechazar" ? "Conteo rechazado. Queda en el historial con el motivo." : "Actas generadas y archivadas." });
+      setMsg({ ok: true, t: que === "aprobar" ? (n ? `Conteo aplicado: ${n} movimiento(s) de inventario. La existencia ya cambió.` : "Conteo aplicado. Sin diferencias: la existencia no cambia.") : que === "rechazar" ? "Conteo rechazado. Queda en el historial con el motivo." : "Actas generadas y archivadas." });
       setNota(""); setVez((n) => n + 1); onCambio();
     } finally { setYendo(""); }
   };
@@ -225,20 +225,20 @@ function Detalle({ c, aprueba, onCambio }: { c: ResumenConteo; aprueba: boolean;
         <div className="space-y-2 rounded-xl bg-warn/10 p-3">
           <p className="text-sm text-text">
             {c.diferencias > 0
-              ? <><b>{c.diferencias} diferencia(s).</b> Al verificar, certificas que el conteo es correcto y cada diferencia entra a la existencia como un movimiento con motivo «Conteo {c.numero}».</>
-              : <><b>Sin diferencias.</b> Al verificar, certificas que el conteo es correcto. La existencia no cambia.</>}
+              ? <><b>{c.diferencias} diferencia(s) sin aplicar.</b> Al aplicarlo, cada diferencia entra a la existencia como un movimiento con motivo «Conteo {c.numero}».</>
+              : <><b>Sin diferencias.</b> Al aplicarlo queda cerrado del todo; la existencia no cambia.</>}
           </p>
           <input className="sumi-campo" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nota (obligatoria para rechazar)" />
           <div className="flex flex-wrap gap-2">
             <ConfirmDialog
-              title="¿Verificar el conteo?"
+              title="¿Aplicar el conteo?"
               message={c.diferencias > 0
-                ? `Certificas que ${c.numero} es correcto. Sus ${c.diferencias} diferencia(s) entran a la existencia del inventario y queda tu nombre en el historial.`
-                : `Certificas que ${c.numero} es correcto. No tiene diferencias: la existencia no cambia, y queda tu nombre en el historial.`}
-              confirmLabel="Sí, verificar" cancelLabel="No"
+                ? `Las ${c.diferencias} diferencia(s) de ${c.numero} entran a la existencia del inventario y queda tu nombre en el historial.`
+                : `${c.numero} no tiene diferencias: la existencia no cambia, y queda tu nombre en el historial.`}
+              confirmLabel="Sí, aplicar" cancelLabel="No"
               onConfirm={() => accion("aprobar")}
               trigger={(abrir) => (
-                <Button icon="check" cargando={yendo === "aprobar"} textoCargando="Verificando…" disabled={!!yendo} onClick={abrir}>Verificar conteo</Button>
+                <Button icon="check" cargando={yendo === "aprobar"} textoCargando="Aplicando…" disabled={!!yendo} onClick={abrir}>Aplicar al inventario</Button>
               )}
             />
             <Button variant="secondary" cargando={yendo === "rechazar"} textoCargando="Rechazando…" disabled={!!yendo || !nota.trim()} onClick={() => accion("rechazar")}>Rechazar</Button>
