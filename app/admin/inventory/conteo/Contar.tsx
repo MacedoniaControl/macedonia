@@ -64,22 +64,24 @@ export type Fila = {
   error?: string;
 };
 
-export function Contar({ empresa, gerencia, onCerrado, onCambio, onSinConteo }: {
+export function Contar({ empresa, conteoId, gerencia, onCerrado, onCambio, onSinConteo }: {
   empresa: string; gerencia: boolean; onCerrado: (id: number) => void;
+  /** El conteo en curso que se va a seguir: puede haber varios abiertos. */
+  conteoId: number;
   /** Se cambió el conteo: hay que volver a leerlo. */
   onCambio: () => void;
   /** No hay conteo abierto (lo cerró otra persona): volver a la lista. */
   onSinConteo: () => void;
 }) {
   // Se vuelve a leer cuando ConteoFisico lo monta de nuevo (al iniciar o cerrar un conteo).
-  const carga = useCarga(`abierto:${empresa}`, () => conteoAbierto(empresa));
+  const carga = useCarga(`abierto:${empresa}:${conteoId}`, () => conteoAbierto(empresa, conteoId));
 
   if (carga.cargando) return <EstadoDatos cargando vacio={false}>{null}</EstadoDatos>;
   if (carga.error) return <AlertCard tone="danger" titulo="No se pudo leer el conteo" mensaje={carga.error} />;
   if (!carga.datos) {
     return (
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-5">
-        <p className="text-sm text-muted">No hay ningún conteo en curso: puede que alguien lo haya cerrado.</p>
+        <p className="text-sm text-muted">Este conteo ya no está en curso: puede que alguien lo haya cerrado.</p>
         <Button variant="secondary" onClick={onSinConteo}>Ver los conteos</Button>
       </section>
     );
