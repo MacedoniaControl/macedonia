@@ -3,7 +3,6 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
 import { ProveedorExportar } from "@/lib/ux/exportar";
@@ -62,10 +61,8 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
         breadcrumbs={[{ label: "Inventario" }, { label: "Inventario" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {/* Iniciar Conteo va primero: es la acción principal de esta
-                pantalla, y la razón por la que el Master significa algo. Dentro
-                de Conteo no se muestra: ahí está su propio botón. */}
-            {cuenta && tab !== "conteo" && <Button icon="inventory" onClick={() => { setTab("conteo"); setIniciar(true); }}>Iniciar Conteo</Button>}
+            {/* Sin «Iniciar Conteo» en la cabecera (pedido del usuario, 15-10-2026):
+                se inicia desde la pestaña Conteo o desde el Master. */}
             <BotonDescargar empresa={empresa} />
           </div>
         }
