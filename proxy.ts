@@ -41,9 +41,12 @@ export async function proxy(req: NextRequest) {
     },
   });
 
-  // getUser() valida el token contra Supabase. No usar getSession() para decidir
-  // permisos: ese lee la cookie sin verificarla.
-  const { data: { user } } = await supabase.auth.getUser();
+  // getClaims() verifica la FIRMA del token (ES256) con la clave pública del
+  // proyecto, que queda en memoria: no hace un viaje al servidor de Auth en
+  // cada navegación, como hacía getUser(), y aun así refresca el token vencido.
+  // No usar getSession() para decidir permisos: ese lee la cookie sin verificarla.
+  const { data: claims } = await supabase.auth.getClaims();
+  const user = claims?.claims?.sub ? { id: claims.claims.sub as string } : null;
 
   const ruta = req.nextUrl.pathname;
   const esPublica = PUBLICAS.some((p) => ruta === p || ruta.startsWith(p + "/"));
