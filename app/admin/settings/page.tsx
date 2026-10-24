@@ -9,6 +9,8 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { leerConfig, guardarConfig, type Configuracion } from "@/lib/config/config-db";
 import { fetchBcvRate, useBcvRate } from "@/lib/ux/bcv-rate";
 import { fmtTasa } from "@/lib/ux/format";
+import { esGerencia, useRol } from "@/lib/ux/session";
+import { PuenteValery } from "@/components/valery/PuenteValery";
 
 const inputClass = "sumi-campo";
 
@@ -44,6 +46,7 @@ const metodos = [
 
 export default function SettingsPage() {
   const empresaKey = useEmpresaActiva();
+  const { rol } = useRol();
   // La configuración vive en la BASE, no en el navegador: el IVA y la tasa
   // tienen que ser los mismos para todos. Dos vendedores con IVA distinto emiten
   // totales distintos por el mismo producto.
@@ -165,6 +168,9 @@ export default function SettingsPage() {
             </Field>
           </div>
         </SectionCard>
+
+        {/* El puente con Valery: solo el Owner y los Administradores (la base lo vuelve a comprobar). */}
+        {esGerencia(rol) && <PuenteValery empresa={empresaKey} />}
 
         <SectionCard title="Métodos de Pago" description="Requisito y verificación por método.">
           <ul className="divide-y divide-border text-sm">
