@@ -119,6 +119,16 @@ export function errorDeVentas(cabecera: Celda[]): string | null {
     : `El archivo trae columnas de más (la ${col + 1}: «${c[col]}»). ${reconoce}`;
 }
 
+/**
+ * La base de la clave de un renglón: fecha|tipo|documento|código|cantidad|neto.
+ * La usan el importador de Excel y el Puente Valery: es lo que hace que un mismo
+ * renglón, llegue por donde llegue, no se importe dos veces. No cambiarla sin
+ * pensar en las claves que ya están guardadas en movimientos_inventario.renglon.
+ */
+export function claveBase(fecha: string, tipo: TipoDoc, documento: string, codigo: string, cantidad: number, netoBs: number): string {
+  return [fecha, tipo, documento, codigo, cantidad, netoBs.toFixed(2)].join("|");
+}
+
 /** Lee los renglones (la primera fila es la cabecera; la última de totales se ignora). */
 export function leerVentas(filas: Celda[][]): LecturaVentas {
   const formato = formatoDe(filas[0] ?? []);
@@ -158,7 +168,7 @@ export function leerVentas(filas: Celda[][]): LecturaVentas {
     if (cantidad === 0) { enCero++; return; }
     // Mismo renglón en dos archivos = misma clave. Si un documento trae dos
     // renglones idénticos, el contador los separa.
-    const base = [doc.fecha, doc.tipo, doc.documento, codigo, cantidad, netoBs.toFixed(2)].join("|");
+    const base = claveBase(doc.fecha, doc.tipo, doc.documento, codigo, cantidad, netoBs);
     const n = (veces.get(base) ?? 0) + 1;
     veces.set(base, n);
     renglones.push({

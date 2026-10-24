@@ -98,7 +98,8 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Todo menos archivos estáticos, imágenes y el endpoint público del BCV.
-    "/((?!_next/static|_next/image|favicon.ico|api/bcv|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Todo menos archivos estáticos, imágenes, el endpoint público del BCV y la
+    // puerta del agente del Puente Valery (se identifica con su clave, no con sesión).
+    "/((?!_next/static|_next/image|favicon.ico|api/bcv|api/valery/agente|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

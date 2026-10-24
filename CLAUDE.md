@@ -27,8 +27,13 @@ Valery Small Business es y sigue siendo el sistema fiscal. Macedonia produce not
 entrega, presupuestos y controles internos; **nunca** una factura fiscal.
 
 ### 2. NUNCA se escribe en Valery
-La integración es de **una sola vía**: se suben exports Excel de Valery a Macedonia.
-No hay API, no hay escritura, no hay sincronización de vuelta.
+La integración es de **una sola vía**: Valery → Macedonia. Nunca hay escritura ni
+sincronización de vuelta. Los datos entran de dos formas:
+- exports Excel de Valery que alguien sube a mano;
+- el **Puente Valery** (aprobado por el Owner, 2026-10-24): un agente en el servidor
+  del cliente que lee una **copia** de la base de Valery —nunca la base en uso—, con
+  transacciones de solo lectura, y le entrega a Macedonia lo que se le pide desde el
+  panel. Ver `docs/decisions/puente-valery.md`.
 
 ### 3. Pared entre empresas — POR DEFECTO cerrada
 Nadie ve datos de la otra empresa salvo el Owner. Configurable con el permiso
