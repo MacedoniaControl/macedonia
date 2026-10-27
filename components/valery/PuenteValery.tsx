@@ -71,6 +71,7 @@ export function PuenteValery({ empresa }: { empresa: string }) {
   const a = estado.agente;
   const vivo = conectado(a?.ultimoContacto ?? null);
   const info = (a?.info ?? {}) as Record<string, string | number | undefined>;
+  const baseVieja = !!info.ultimaVenta && String(info.ultimaVenta) < haceDias(30);
 
   async function pedir(tipo: TipoSolicitud) {
     setMsg(null); setYendo(tipo);
@@ -105,6 +106,10 @@ export function PuenteValery({ empresa }: { empresa: string }) {
               <div><dt className="inline text-muted">Servidor: </dt><dd className="inline font-medium text-text">{info.equipo ?? "—"}</dd></div>
               <div><dt className="inline text-muted">Copia: </dt><dd className="inline font-medium text-text">{info.metodoCopia ?? "todavía ninguna"}{info.copiaEn ? ` · ${fechaHora(String(info.copiaEn))}` : ""}</dd></div>
               <div><dt className="inline text-muted">Agente: </dt><dd className="inline font-medium text-text">{a.version ? `v${a.version}` : "—"} · instalado {fechaHora(a.creadoEn)}</dd></div>
+              <div className="sm:col-span-2"><dt className="inline text-muted">Base: </dt><dd className="inline break-all font-medium text-text">{info.base ?? "—"}</dd></div>
+              {info.ultimaVenta ? (
+                <div className="sm:col-span-2"><dt className="inline text-muted">Última venta en la copia: </dt><dd className={`inline font-medium ${baseVieja ? "text-warn" : "text-text"}`}>{fechaVista(String(info.ultimaVenta))}{baseVieja ? " — es vieja: puede que no sea la base en uso. Reinstala el agente para que la busque de nuevo." : ""}</dd></div>
+              ) : null}
             </dl>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => setInstalar(true)}>Reinstalar</Button>
