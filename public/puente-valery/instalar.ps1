@@ -42,21 +42,39 @@ if (-not [Environment]::Is64BitProcess) { Mal 'Este equipo no es de 64 bits.' }
 
 # ---------------------------------------------------------------- 1. la base
 Paso 'Buscando la base de Valery en este equipo...'
-$base = ''
-foreach ($ini in (Get-ChildItem -Path 'C:\', 'D:\' -Filter 'ValerySMB*' -Directory -ErrorAction SilentlyContinue | ForEach-Object { Join-Path $_.FullName 'CONTROL.INI' })) {
-  if (Test-Path -LiteralPath $ini) {
-    $l = Get-Content -LiteralPath $ini -Encoding Default | Where-Object { $_ -match '^\s*DB\s*=' } | Select-Object -First 1
-    if ($l) { $r = ($l -replace '^\s*DB\s*=\s*', '').Trim(); if (Test-Path -LiteralPath $r) { $base = $r; break } }
+# Puede haber varias instalaciones de Valery (una vieja olvidada al lado de la
+# que se usa): se juntan TODAS las bases y se elige la que esta en uso. Firebird
+# la tiene abierta, asi que no se deja abrir en exclusivo. Si nadie esta en
+# Valery ahora, gana la modificada mas reciente.
+function En-Uso([string]$f) {
+  try { $s = [IO.File]::Open($f, 'Open', 'Read', 'None'); $s.Close(); return $false } catch [IO.IOException] { return $true } catch { return $false }
+}
+$vistas = @{}
+foreach ($raiz in (Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Z]:\\$' } | ForEach-Object { $_.Root })) {
+  foreach ($dir in (Get-ChildItem -LiteralPath $raiz -Filter 'ValerySMB*' -Directory -ErrorAction SilentlyContinue)) {
+    $rutas = @(Join-Path $dir.FullName 'datos\valery3.mdf')
+    $ini = Join-Path $dir.FullName 'CONTROL.INI'
+    if (Test-Path -LiteralPath $ini) {
+      foreach ($l in (Get-Content -LiteralPath $ini -Encoding Default | Where-Object { $_ -match '^\s*DB\s*=' })) {
+        # DB= puede venir como SERVIDOR:D:\... ; se queda la ruta.
+        $rutas += (($l -replace '^\s*DB\s*=\s*', '').Trim() -replace '^[^:\\]{2,}:(?=[A-Za-z]:\\)', '')
+      }
+    }
+    foreach ($r in $rutas) { if ($r -and (Test-Path -LiteralPath $r -PathType Leaf)) { $vistas[$r.ToLower()] = $r } }
   }
 }
-if (-not $base) {
-  $cand = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Z]:\\$' } | ForEach-Object {
-    Get-ChildItem -Path $_.Root -Filter 'ValerySMB*' -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-      Get-ChildItem -Path (Join-Path $_.FullName 'datos') -Filter 'valery3.mdf' -File -ErrorAction SilentlyContinue }
-  } | Sort-Object Length -Descending
-  if ($cand) { $base = @($cand)[0].FullName }
+$cand = @($vistas.Values | ForEach-Object {
+  $i = Get-Item -LiteralPath $_
+  [pscustomobject]@{ ruta = $i.FullName; uso = (En-Uso $i.FullName); fecha = $i.LastWriteTime; mb = [math]::Round($i.Length / 1MB, 1) }
+} | Sort-Object @{ e = 'uso'; Descending = $true }, @{ e = 'fecha'; Descending = $true }, @{ e = 'mb'; Descending = $true })
+if (-not $cand.Count) { Mal 'No encontre la base de Valery (valery3.mdf) en este equipo. Este instalador va en el SERVIDOR donde esta la base.' }
+$base = $cand[0].ruta
+if ($cand.Count -gt 1) {
+  Write-Host ('   Hay {0} bases de Valery en este equipo:' -f $cand.Count)
+  foreach ($c in $cand) {
+    Write-Host ('   {0} {1}  ({2} MB, modificada {3:yyyy-MM-dd HH:mm}{4})' -f $(if ($c.ruta -eq $base) { '->' } else { '  ' }), $c.ruta, $c.mb, $c.fecha, $(if ($c.uso) { ', EN USO' } else { '' }))
+  }
 }
-if (-not $base) { Mal 'No encontre la base de Valery (valery3.mdf) en este equipo. Este instalador va en el SERVIDOR donde esta la base.' }
 $tam = [math]::Round((Get-Item -LiteralPath $base).Length / 1MB, 1)
 Bien ("Base: {0} ({1} MB)" -f $base, $tam)
 $libre = (Get-PSDrive -Name 'C').Free

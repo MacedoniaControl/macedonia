@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.0'
+$Version = '1.0.1'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -81,6 +81,9 @@ function Copiar-Base {
   $o = Get-Item -LiteralPath $origen
   $script:InfoCopia = @{ metodoCopia = $metodo; copiaEn = (Get-Date).ToString('s'); baseModificada = $o.LastWriteTime.ToString('s'); baseMB = [math]::Round($o.Length / 1MB, 1) }
   if ($errVss) { $script:InfoCopia.avisoVss = $errVss }
+  # Para que el panel muestre que base se lee: una base vieja se delata por su ultima venta.
+  $script:InfoCopia.base = $origen
+  try { $script:InfoCopia.ultimaVenta = [string](Consultar "select max(fecha_emision) as u from ventas where temporal <> 'T'")[0].u } catch {}
   Anotar ("Copia hecha por {0} ({1} MB)" -f $metodo, $script:InfoCopia.baseMB)
 }
 
@@ -205,6 +208,9 @@ if ($Prueba) {
   $e = (Consultar $SQL.estado)[0]
   Write-Host ("  Copia: {0}  |  ventas: {1}  |  ultima venta: {2}  |  CxC abiertas: {3}  |  CxP abiertas: {4}  |  productos: {5}" -f `
     $script:InfoCopia.metodoCopia, $e.ventas, $e.ultima_venta, $e.cxc_abiertas, $e.cxp_abiertas, $e.productos)
+  if ($e.ultima_venta -and ((Get-Date) - [datetime]$e.ultima_venta).TotalDays -gt 30) {
+    Write-Host ("  OJO: la ultima venta de esta base es del {0}. Si en Valery se factura a diario, esta NO es la base en uso." -f $e.ultima_venta) -ForegroundColor Yellow
+  }
   $r = Llamar @{ accion = 'siguiente'; version = $Version; info = (@{ equipo = $env:COMPUTERNAME; base = [string]$Config.base } + $script:InfoCopia) }
   Write-Host '  Conexion con Macedonia: OK'
   if ($r.solicitud) { Atender $r.solicitud }
