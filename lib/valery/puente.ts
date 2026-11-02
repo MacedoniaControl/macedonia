@@ -72,6 +72,19 @@ export function renglonesDesdePuente(filas: FilaVentaPuente[]): { renglones: Ren
   return { renglones, descartadas };
 }
 
+/**
+ * Las filas de una parte, como lista. PowerShell desenrolla los arreglos al
+ * asignarlos desde un `if`: una parte sin filas llega como null y una de una
+ * sola fila llega como esa fila suelta, no como lista de una. El agente 1.0.1
+ * lo hace así y ya está instalado; aquí se acepta. Otra cosa: null (inválido).
+ */
+export function filasDeParte(datos: unknown): unknown[] | null {
+  if (datos === null || datos === undefined) return [];
+  if (Array.isArray(datos)) return datos;
+  if (typeof datos === "object") return [datos];
+  return null;
+}
+
 /** Un rango de ventas válido para pedir: fechas reales, en orden y de no más de 400 días. */
 export function errorDeRango(desde: string, hasta: string): string | null {
   const ok = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`));

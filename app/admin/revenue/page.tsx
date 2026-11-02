@@ -231,6 +231,9 @@ function EstadoPuente({ empresa, estado, onCambio }: { empresa: EmpresaId; estad
     texto = "Todavía no se ha traído nada automáticamente.";
   }
   const sinAgente = !!estado.agente && !vivo && !enCamino;
+  // Un agente que lee una base vieja trae «cero ventas» y parece que todo va bien.
+  const ultimaBase = estado.agente?.ultimaVentaBase ?? null;
+  const baseVieja = !!ultimaBase && ultimaBase < masDias(hoyCaracas(), -30);
 
   async function actualizar() {
     setMsg(null); setYendo(true);
@@ -265,6 +268,12 @@ function EstadoPuente({ empresa, estado, onCambio }: { empresa: EmpresaId; estad
           </div>
         )}
       </div>
+      {baseVieja && (
+        <p className="mt-2 text-xs text-warn">
+          El agente está leyendo una base de Valery cuya última venta es del {fechaVista(ultimaBase)}{estado.agente?.base ? ` (${estado.agente.base})` : ""}: no parece la que se usa hoy.
+          Reinstálalo desde Configuración → Puente con Valery para que busque la base en uso.
+        </p>
+      )}
       {sinAgente && <p className="mt-2 text-xs text-warn">El agente del servidor no responde desde {haceCuanto(estado.agente!.ultimoContacto)}: las ventas se actualizan cuando vuelva.</p>}
       {msg && <p className="mt-2 text-xs text-danger">{msg}</p>}
     </div>

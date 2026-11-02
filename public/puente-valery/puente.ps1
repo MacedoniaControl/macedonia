@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.1'
+$Version = '1.0.2'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -188,7 +188,10 @@ function Atender($s) {
     $resumen = @{ filas = $n; agente = $Version; equipo = $env:COMPUTERNAME } + $script:InfoCopia
     if ($s.tipo -eq 'estado' -and $n -gt 0) { foreach ($k in @($filas[0].Keys)) { $resumen[$k] = $filas[0][$k] } }
     for ($p = 1; $p -le $total; $p++) {
-      $parte = if ($n) { [object[]]($filas.GetRange(($p - 1) * $tam, [math]::Min($tam, $n - ($p - 1) * $tam)).ToArray()) } else { [object[]]@() }
+      # Sin `$x = if (...) {...}`: PowerShell desenrolla el arreglo y una parte
+      # vacía salía como null, y una de una fila como la fila suelta.
+      $parte = [object[]]@()
+      if ($n) { $parte = $filas.GetRange(($p - 1) * $tam, [math]::Min($tam, $n - ($p - 1) * $tam)).ToArray() }
       $cuerpo = @{ accion = 'resultado'; solicitud = $s.id; parte = $p; total = $total; datos = $parte }
       if ($p -eq $total) { $cuerpo.resumen = $resumen }
       [void](Llamar $cuerpo)

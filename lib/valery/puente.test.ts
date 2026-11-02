@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COLUMNAS_VENTAS, leerVentas, type Celda } from "../inventory/ventas-valery.ts";
-import { conectado, errorDeRango, haceCuanto, renglonesDesdePuente, type FilaVentaPuente } from "./puente.ts";
+import { conectado, errorDeRango, filasDeParte, haceCuanto, renglonesDesdePuente, type FilaVentaPuente } from "./puente.ts";
 
 // El mismo documento, como lo exporta Valery a Excel (formato completo) y como
 // lo lee el agente de la base. Casos reales de febrero de 2026: neto con
@@ -65,4 +65,16 @@ test("conexión del agente: conectado si habló hace menos de 2 minutos", () => 
   assert.equal(conectado(null, ahora), false);
   assert.equal(haceCuanto("2026-10-24T11:59:30Z", ahora), "hace 30 s");
   assert.equal(haceCuanto(null, ahora), "nunca");
+});
+
+// Lo que manda el agente 1.0.1 (PowerShell desenrolla el arreglo): una parte
+// sin filas llegaba como null y el servidor respondía 400. Visto en producción
+// el 2-nov-2026 con la primera actualización automática.
+test("una parte sin filas o de una sola fila también es una lista", () => {
+  assert.deepEqual(filasDeParte(null), []);
+  assert.deepEqual(filasDeParte(undefined), []);
+  assert.deepEqual(filasDeParte({ codigo: "OXI6" }), [{ codigo: "OXI6" }]);
+  assert.deepEqual(filasDeParte([{ codigo: "OXI6" }, { codigo: "ARG6" }]), [{ codigo: "OXI6" }, { codigo: "ARG6" }]);
+  assert.equal(filasDeParte("hola"), null);
+  assert.equal(filasDeParte(5), null);
 });

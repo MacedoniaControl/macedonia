@@ -73,8 +73,12 @@ export async function programarVentasAuto(
   const corte = await corteDe(sb, empresa);
   if (!corte) return { ok: false, motivo: "sin_corte", mensaje: "Esta empresa todavía no tiene corte de inventario: sus ventas no se pueden aplicar al kardex." };
 
-  const { data: buena } = await sb.from("valery_solicitudes").select("parametros")
-    .eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(1).maybeSingle();
+  // Hasta dónde llegó la última que TRAJO algo. Una que volvió vacía no
+  // cuenta: si el agente leía una base vieja (pasó el 2-nov-2026), tomarla
+  // como buena dejaba fuera para siempre todo lo anterior a ese día.
+  const { data: buenas } = await sb.from("valery_solicitudes").select("parametros, resumen")
+    .eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(50);
+  const buena = (buenas ?? []).find((b) => Number((b.resumen as { renglones?: number } | null)?.renglones ?? 0) > 0);
   const ultimaHasta = ((buena?.parametros as { hasta?: string } | null)?.hasta) ?? null;
   const rango = rangoAuto(hoyCaracas(), corte, ultimaHasta);
 
