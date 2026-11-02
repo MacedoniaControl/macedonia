@@ -85,7 +85,7 @@ export async function pedirAlPuente(
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const g = await gerenciaDe(empresa);
   if ("error" in g) return { ok: false, error: g.error as string };
-  if (!["ventas", "cxc", "cxp", "existencias", "estado"].includes(tipo)) return { ok: false, error: "Pedido desconocido." };
+  if (!["ventas", "cxc", "cxp", "existencias", "estado", "diagnostico"].includes(tipo)) return { ok: false, error: "Pedido desconocido." };
   const p: Record<string, string> = {};
   if (tipo === "ventas") {
     const e = errorDeRango(parametros.desde ?? "", parametros.hasta ?? "");

@@ -64,3 +64,11 @@ test("se busca por cliente, RIF o número sin ceros", () => {
   assert.equal(buscarDocsValery(docs, "1626")[0].documento, "0000001626");
   assert.equal(buscarDocsValery(docs, "  ").length, 2);
 });
+
+test("documento en dólares: si Valery manda su saldo en dólares (1.0.4), se usa ese", () => {
+  const { docs: [usd, bs] } = docsDesdeAgente("cxc", [{ ...enDolares, saldo_me: 1200.5 }, { ...enBolivares, saldo_me: 590.7 }]);
+  assert.deepEqual(saldoUsd(usd, 889.5754), { usd: 1200.5, de: "documento" });
+  // El de bolívares sigue a la tasa de hoy: su «saldo en dólares» es a la tasa vieja del documento.
+  assert.deepEqual(saldoUsd(bs, 889.5754), { usd: 525475.97 / 889.5754, de: "hoy" });
+  assert.equal(docsDesdeAgente("cxc", [enDolares]).docs[0].saldoMe, null);
+});

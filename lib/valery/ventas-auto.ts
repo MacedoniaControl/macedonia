@@ -14,7 +14,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { todasLasFilas } from "@/lib/supabase/paginar";
 import { facturasAjenas, paraLaBase, planVentas, SERIE_FAC, type NotaPrevia } from "@/lib/inventory/ventas-valery";
-import { CADA_MIN_POR_DEFECTO, rangoAuto, renglonesDesdePuente, tocaActualizar, type FilaVentaPuente } from "./puente.ts";
+import { CADA_MIN_POR_DEFECTO, rangoAuto, renglonesDesdePuente, tocaActualizar, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
 
 export const restarDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) - n * 86400000).toISOString().slice(0, 10);
 export const hoyCaracas = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
@@ -41,10 +41,20 @@ export async function notasPreviasDe(sb: SupabaseClient, empresa: string, desde:
 }
 
 /** Si la empresa trae sus ventas sola y cada cuánto. Sin fila: encendido, cada hora. */
-export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number }> {
+export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean }> {
   const { data } = await sb.from("valery_ajustes").select("ventas_auto, cada_min").eq("empresa_id", empresa).maybeSingle();
-  return { auto: data?.ventas_auto ?? true, cadaMin: data?.cada_min ?? CADA_MIN_POR_DEFECTO };
+  // Aparte: si la migración 50 no se ha corrido, la columna no existe y no debe apagar lo demás.
+  const { data: h } = await sb.from("valery_ajustes").select("horas_rellenas").eq("empresa_id", empresa).maybeSingle();
+  return { auto: data?.ventas_auto ?? true, cadaMin: data?.cada_min ?? CADA_MIN_POR_DEFECTO, horasRellenas: h?.horas_rellenas ?? false };
 }
+
+/**
+ * La hora de cada venta llega desde el agente 1.0.4. Lo que entró antes no la
+ * tiene: la primera actualización con un agente que ya la manda pide todo
+ * desde el corte, una sola vez, y el importador le pone la hora a lo que ya
+ * estaba (migración 50). Al aplicarla bien, `horas_rellenas` queda en true.
+ */
+export const VERSION_CON_HORA = "1.0.4";
 
 export type Programacion =
   | { ok: true; id: number; desde: string; hasta: string }
@@ -80,10 +90,12 @@ export async function programarVentasAuto(
     .eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(50);
   const buena = (buenas ?? []).find((b) => Number((b.resumen as { renglones?: number } | null)?.renglones ?? 0) > 0);
   const ultimaHasta = ((buena?.parametros as { hasta?: string } | null)?.hasta) ?? null;
-  const rango = rangoAuto(hoyCaracas(), corte, ultimaHasta);
+  const { data: agente } = await sb.from("valery_agentes").select("version").eq("empresa_id", empresa).is("revocado_en", null).maybeSingle();
+  const rellenarHoras = !ajustes.horasRellenas && versionAlMenos(agente?.version, VERSION_CON_HORA);
+  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras ? null : ultimaHasta);
 
   const { data, error } = await sb.from("valery_solicitudes").insert({
-    empresa_id: empresa, tipo: "ventas", parametros: rango, automatica: true,
+    empresa_id: empresa, tipo: "ventas", parametros: rellenarHoras ? { ...rango, rellenarHoras: true } : rango, automatica: true,
     creado_por: usuario?.id ?? null, creado_nombre: usuario?.nombre ?? "Automático",
   }).select("id").single();
   if (error?.code === "23505") return { ok: false, motivo: "en_curso", mensaje: "Ya se están trayendo las ventas." };
@@ -100,8 +112,9 @@ export async function programarVentasAuto(
  */
 export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empresa: string): Promise<void> {
   const marcar = (campos: Record<string, unknown>) => admin.from("valery_solicitudes").update(campos).eq("id", id);
-  const { data: s } = await admin.from("valery_solicitudes").select("resumen").eq("id", id).maybeSingle();
+  const { data: s } = await admin.from("valery_solicitudes").select("resumen, parametros").eq("id", id).maybeSingle();
   const resumen = (s?.resumen as Record<string, unknown> | null) ?? {};
+  const parametros = (s?.parametros as { rellenarHoras?: boolean } | null) ?? {};
   try {
     const { data: partes, error } = await admin.from("valery_resultados").select("datos").eq("solicitud_id", id).order("parte");
     if (error) throw new Error(`No se pudo leer lo que entregó el agente: ${error.message}`);
@@ -133,6 +146,10 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
         // Los que se dieron de alta en el catálogo (migración 49), sin precio ni costo.
         productosNuevos: r.productos_creados ?? [] },
     });
+    // Las horas de lo anterior ya se pusieron: no se vuelve a pedir todo desde el corte.
+    if (parametros.rellenarHoras && versionAlMenos(String(resumen.agente ?? ""), VERSION_CON_HORA)) {
+      await admin.from("valery_ajustes").upsert({ empresa_id: empresa, horas_rellenas: true }, { onConflict: "empresa_id" });
+    }
   } catch (e) {
     await marcar({ estado: "error", error: (e as Error).message.slice(0, 2000) });
   } finally {

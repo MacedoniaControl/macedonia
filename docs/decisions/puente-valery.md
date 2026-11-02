@@ -110,6 +110,25 @@ Los saldos se muestran en bolívares, como los guarda Valery. El equivalente en
 dólares: el documento en dólares a la tasa del documento; el de bolívares a la
 tasa BCV de hoy, y se dice. Sin tasa de hoy, el total en dólares no se muestra.
 
+## Agente 1.0.4 (2026-11-02)
+
+- **Hora de cada venta.** El agente manda `VENTAS.HORA_EMISION`; Macedonia la
+  guarda en `movimientos_inventario.hora` (migración 50) y Ventas la muestra.
+  Lo que entró por Excel no la trae: «—». La primera actualización automática
+  con un agente 1.0.4 pide todo desde el corte, una vez, y el importador le
+  pone la hora a lo que ya estaba (solo llena; nunca cambia una hora puesta).
+- **Copia con instantánea.** La 1.0.3 fallaba al copiar por VSS en
+  SERVIDORSUD y copiaba directo. Ahora prueba primero `esentutl /y … /vss`
+  (Windows hace la instantánea y copia de ella), luego la instantánea por WMI
+  de antes, y solo al final la copia directa; si llega ahí, el panel dice por
+  qué fallaron las otras dos.
+- **Diagnóstico.** Pedido nuevo que devuelve solo conteos por tabla, tipo de
+  documento y estado (V3CXC, V3CXP, HCXC, HCXP, VENTAS, TIPOS_DOCUMENTOS),
+  sin un nombre ni un monto: para encontrar dónde guarda Valery las notas de
+  entrega a crédito antes de traer la CxC sola.
+- CxC y CxP traen también el saldo en dólares de Valery (`V3CXC_ME`,
+  `V3CXP_ME`).
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.

@@ -12,7 +12,7 @@
 
 import { claveBase, type RenglonVenta, type TipoDoc } from "../inventory/ventas-valery.ts";
 
-export type TipoSolicitud = "ventas" | "cxc" | "cxp" | "existencias" | "estado";
+export type TipoSolicitud = "ventas" | "cxc" | "cxp" | "existencias" | "estado" | "diagnostico";
 export type EstadoSolicitud = "pendiente" | "en_proceso" | "lista" | "error" | "aplicada" | "cancelada";
 
 export const NOMBRE_SOLICITUD: Record<TipoSolicitud, string> = {
@@ -21,11 +21,13 @@ export const NOMBRE_SOLICITUD: Record<TipoSolicitud, string> = {
   cxp: "Cuentas por pagar",
   existencias: "Existencias",
   estado: "Probar conexión",
+  diagnostico: "Diagnóstico",
 };
 
 /** Lo que entrega el agente por cada renglón de venta (tal cual está en Valery). */
 export type FilaVentaPuente = {
   fecha: string;        // aaaa-mm-dd
+  hora?: string | null; // hh:mm:ss, desde el agente 1.0.4
   tipo: string;         // FAC | NET | DEV
   documento: string;
   cliente: string;
@@ -64,12 +66,31 @@ export function renglonesDesdePuente(filas: FilaVentaPuente[]): { renglones: Ren
     const n = (veces.get(base) ?? 0) + 1;
     veces.set(base, n);
     renglones.push({
-      fila: i + 1, fecha: f.fecha, tipo, documento, cliente: String(f.cliente ?? "").trim(), codigo,
+      fila: i + 1, fecha: f.fecha, hora: horaValida(f.hora), tipo, documento, cliente: String(f.cliente ?? "").trim(), codigo,
       producto: String(f.producto ?? "").trim(), cantidad, netoBs, tasa,
       ventaUsd: tasa > 0 ? netoBs / tasa : 0, clave: `V|${base}|${n}`,
     });
   });
   return { renglones, descartadas };
+}
+
+/** «17:13:55», «17:13:55.0000» o «9:05» → «17:13:55» / «09:05:00». Otra cosa: null (no se inventa una hora). */
+export function horaValida(v: unknown): string | null {
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(v ?? "").trim());
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59 || Number(m[3] ?? 0) > 59) return null;
+  return `${m[1].padStart(2, "0")}:${m[2]}:${m[3] ?? "00"}`;
+}
+
+/** ¿La versión del agente es esta o una más nueva? «1.0.10» es más nueva que «1.0.4». */
+export function versionAlMenos(v: string | null | undefined, minima: string): boolean {
+  if (!v) return false;
+  const a = v.split(".").map(Number), b = minima.split(".").map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0, y = b[i] ?? 0;
+    if (Number.isNaN(x)) return false;
+    if (x !== y) return x > y;
+  }
+  return true;
 }
 
 /**
