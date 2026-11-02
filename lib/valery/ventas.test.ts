@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { claseVenta, resumirVentas, type MovVenta } from "./ventas.ts";
-import { rangoAuto, tocaActualizar } from "./puente.ts";
+import { rangoAuto, tocaActualizar, vaciaSospechosa } from "./puente.ts";
 
 const mov = (tipo: MovVenta["tipo"], documento: string, cliente: string, codigo: string, cantidad: number, montoUsd: number | null, fecha = "2026-10-30"): MovVenta =>
   ({ fecha, tipo, documento: `${tipo} ${documento}`, cliente, codigo, nombre: codigo, cantidad, montoUsd });
@@ -60,4 +60,15 @@ test("cada cuánto toca actualizar", () => {
   assert.equal(tocaActualizar(null, 60, ahora), true);
   assert.equal(tocaActualizar("2026-11-02T14:01:00Z", 60, ahora), false);
   assert.equal(tocaActualizar("2026-11-02T14:00:00Z", 60, ahora), true);
+});
+
+// El 2-nov-2026 el agente leía la base vieja y la pantalla decía «sin ventas
+// nuevas», como si todo estuviera bien.
+test("una actualización vacía de una semana o más es sospechosa", () => {
+  assert.equal(vaciaSospechosa("2026-09-24", "2026-11-02", 0), true);
+  assert.equal(vaciaSospechosa("2026-10-27", "2026-11-02", 0), true);    // 7 días
+  assert.equal(vaciaSospechosa("2026-10-31", "2026-11-02", 0), false);   // un fin de semana sin vender
+  assert.equal(vaciaSospechosa("2026-09-24", "2026-11-02", 12), false);
+  assert.equal(vaciaSospechosa("2026-09-24", "2026-11-02", null), false); // no se sabe: no se acusa
+  assert.equal(vaciaSospechosa(null, "2026-11-02", 0), false);
 });

@@ -40,6 +40,8 @@ export type Actualizacion = {
   desde: string | null;
   hasta: string | null;
   nuevos: number | null;
+  /** Cuántos renglones entregó Valery para el rango (repetidos incluidos). */
+  renglones: number | null;
   error: string | null;
 };
 
@@ -59,13 +61,14 @@ export type EstadoVentas = {
 
 type FilaSolicitud = {
   id: number; estado: EstadoSolicitud; creado_en: string; creado_nombre: string | null; terminado_en: string | null;
-  aplicado_en: string | null; parametros: { desde?: string; hasta?: string } | null; resumen: { nuevos?: number } | null; error: string | null;
+  aplicado_en: string | null; parametros: { desde?: string; hasta?: string } | null; resumen: { nuevos?: number; renglones?: number } | null; error: string | null;
 };
 const COLS = "id, estado, creado_en, creado_nombre, terminado_en, aplicado_en, parametros, resumen, error";
 const actualizacion = (s: FilaSolicitud | null): Actualizacion | null => s && ({
   id: s.id, estado: s.estado, creadoEn: s.creado_en, creadoNombre: s.creado_nombre, terminadoEn: s.terminado_en, aplicadoEn: s.aplicado_en,
   desde: s.parametros?.desde ?? null, hasta: s.parametros?.hasta ?? null,
-  nuevos: typeof s.resumen?.nuevos === "number" ? s.resumen.nuevos : null, error: s.error,
+  nuevos: typeof s.resumen?.nuevos === "number" ? s.resumen.nuevos : null,
+  renglones: typeof s.resumen?.renglones === "number" ? s.resumen.renglones : null, error: s.error,
 });
 
 export async function estadoVentas(empresa: string): Promise<EstadoVentas> {

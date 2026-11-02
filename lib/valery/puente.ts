@@ -116,6 +116,17 @@ export function rangoAuto(hoy: string, corte: string, ultimaHasta: string | null
   return { desde, hasta: hoy };
 }
 
+/**
+ * ¿Una actualización que volvió sin un solo renglón es sospechosa? En un día
+ * o dos sin vender puede pasar; en una semana o más, no: lo probable es que el
+ * agente esté leyendo otra base (pasó el 2-nov-2026 con D:\ValerySMB, la vieja).
+ * `renglones` null = no se sabe (el resumen no lo trae): no se acusa.
+ */
+export function vaciaSospechosa(desde: string | null, hasta: string | null, renglones: number | null): boolean {
+  if (renglones !== 0 || !desde || !hasta) return false;
+  return (Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86400000 >= 6;
+}
+
 /** ¿Ya toca otra actualización automática? */
 export function tocaActualizar(ultimaPedida: string | null, cadaMin: number, ahora = Date.now()): boolean {
   return !ultimaPedida || ahora - Date.parse(ultimaPedida) >= cadaMin * 60_000;

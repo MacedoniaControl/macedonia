@@ -26,7 +26,7 @@ import { useTableView } from "@/lib/ux/use-table-view";
 import { fechaVista } from "@/lib/ux/tabla-export";
 import { fmtUsd } from "@/lib/ux/format";
 import type { EmpresaId } from "@/lib/ux/empresas";
-import { conectado, haceCuanto } from "@/lib/valery/puente";
+import { conectado, haceCuanto, vaciaSospechosa } from "@/lib/valery/puente";
 import { resumirVentas, type CliVenta, type DocVenta, type ProdVenta, type ResumenVentas } from "@/lib/valery/ventas";
 import { actualizarVentasAhora, cambiarVentasAuto, estadoVentas, ventasDelPeriodo, type EstadoVentas } from "@/lib/valery/ventas-db";
 
@@ -224,6 +224,9 @@ function EstadoPuente({ empresa, estado, onCambio }: { empresa: EmpresaId; estad
   } else if (u?.estado === "error") {
     tono = "warn";
     texto = `La última actualización falló (${haceCuanto(u.terminadoEn ?? u.creadoEn)}): ${(u.error ?? "sin detalle").replace(/\.$/, "")}. Las ventas de antes siguen como estaban.`;
+  } else if (buena && vaciaSospechosa(buena.desde, buena.hasta, buena.renglones)) {
+    tono = "warn";
+    texto = `Valery no entregó ninguna venta del ${fechaVista(buena.desde)} al ${fechaVista(buena.hasta)} (${haceCuanto(buena.aplicadoEn)}). Lo más probable es que el agente esté leyendo otra base: revisa la línea «Base» en Configuración → Puente con Valery y, si no es la que se usa, reinstálalo.`;
   } else if (buena) {
     tono = "ok";
     texto = `Actualizado desde Valery ${haceCuanto(buena.aplicadoEn)}${buena.nuevos ? ` · ${buena.nuevos} renglón(es) nuevo(s)` : " · sin ventas nuevas"}.`;
