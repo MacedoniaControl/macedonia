@@ -271,6 +271,12 @@ function EstadoPuente({ empresa, estado, onCambio }: { empresa: EmpresaId; estad
           </div>
         )}
       </div>
+      {!enCamino && buena && buena.productosNuevos.length > 0 && (
+        <p className="mt-2 text-xs text-muted">
+          Se agregaron al catálogo {buena.productosNuevos.length} producto(s) nuevo(s) de Valery: {buena.productosNuevos.slice(0, 8).join(", ")}{buena.productosNuevos.length > 8 ? "…" : ""}.
+          Quedaron sin precio ni costo: cárgalos en Inventario → Productos.
+        </p>
+      )}
       {baseVieja && (
         <p className="mt-2 text-xs text-warn">
           El agente está leyendo una base de Valery cuya última venta es del {fechaVista(ultimaBase)}{estado.agente?.base ? ` (${estado.agente.base})` : ""}: no parece la que se usa hoy.
