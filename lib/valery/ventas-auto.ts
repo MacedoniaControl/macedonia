@@ -119,7 +119,7 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     const previas = fechas.length ? await notasPreviasDe(admin, empresa, restarDias(fechas[0], 60)) : [];
     const plan = planVentas(renglones, corte, previas);
 
-    let r = { importacion_id: null as number | null, nuevos: 0, repetidos: plan.movimientos.length, notas_facturadas: 0 };
+    let r = { importacion_id: null as number | null, nuevos: 0, repetidos: plan.movimientos.length, notas_facturadas: 0, productos_creados: [] as string[] | null };
     if (plan.movimientos.length || plan.notasPrevias.length) {
       const { data, error: e } = await admin.rpc("importar_ventas_puente", {
         p_solicitud: id, p_renglones: plan.movimientos.map(paraLaBase), p_notas: plan.notasPrevias,
@@ -129,7 +129,9 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     }
     await marcar({
       estado: "aplicada", aplicado_en: new Date().toISOString(), importacion_id: r.importacion_id,
-      resumen: { ...resumen, renglones: renglones.length, nuevos: r.nuevos, repetidos: r.repetidos, facturasDeNotas: plan.facturasDeNotas, notasFacturadas: r.notas_facturadas, descartadas },
+      resumen: { ...resumen, renglones: renglones.length, nuevos: r.nuevos, repetidos: r.repetidos, facturasDeNotas: plan.facturasDeNotas, notasFacturadas: r.notas_facturadas, descartadas,
+        // Los que se dieron de alta en el catálogo (migración 49), sin precio ni costo.
+        productosNuevos: r.productos_creados ?? [] },
     });
   } catch (e) {
     await marcar({ estado: "error", error: (e as Error).message.slice(0, 2000) });

@@ -83,6 +83,12 @@ Pedido del Owner: que las ventas entren solas y verlas en un apartado.
   Lo vendido a la otra empresa del grupo y el consumo interno se apartan y se
   dice cuánto fue (mismas reglas que `scripts/historico-valery.py`). Empieza en
   el corte de inventario; lo anterior está en Reportes.
+- **Productos nuevos (migración 49).** Si la venta trae un código que no está
+  en el catálogo, lo automático lo da de alta con el código y el nombre de
+  Valery, precio y costo en cero (la venta no los trae) y `creado_desde` con el
+  pedido; Ventas dice cuáles. Si existe el mismo código con otras mayúsculas,
+  NO lo crea: frena y lo dice (en Valery son productos distintos). El Excel
+  sigue frenando ante cualquier código desconocido.
 - **Apagarlo.** El interruptor de Ventas (Owner o Administrador) lo apaga por
   empresa (`valery_ajustes`). El botón sigue funcionando.
 
