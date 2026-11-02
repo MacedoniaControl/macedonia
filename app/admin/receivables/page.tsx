@@ -43,6 +43,7 @@ import { listarLiquidaciones } from "@/lib/finanzas/liquidaciones-db";
 import { Switch } from "@/components/ui/Switch";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 import { CASI_CERO } from "@/lib/ux/decimales";
+import { CarteraValery } from "@/components/valery/CarteraValery";
 
 type Cuenta = { id: number; cliente: string; doc: string; monto: number; abonado: number; venc: string };
 
@@ -108,6 +109,7 @@ function CuentasPorCobrar() {
   const [eliminarNota, setEliminarNota] = useState<CuentaDb | null>(null);
   // Cada cliente desplegado muestra sus pendientes; con el interruptor, también las pagadas.
   const [conPagadas, setConPagadas] = useState<Set<string>>(new Set());
+  const [vista, setVista] = useState<"macedonia" | "valery">("macedonia");
   // El orden de los documentos dentro de cada cliente. Por defecto, Estado ↓:
   // vencidas arriba (la más vieja primero), luego por vencer y pendientes por
   // fecha, y las pagadas al final. La cabecera ordena los clientes.
@@ -351,6 +353,26 @@ function CuentasPorCobrar() {
     nota: "Montos en USD. El saldo es el monto menos lo abonado.",
   }));
 
+  // La cartera de Valery, leída por el Puente: solo para mirar (CarteraValery).
+  // Owner y Administrador, los mismos a quienes la base les da esa lectura.
+  const pestanas = gerencia && (
+    <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Cartera">
+      {([["macedonia", "Macedonia"], ["valery", "En Valery"]] as const).map(([k, l]) => (
+        <button key={k} type="button" role="tab" aria-selected={vista === k} onClick={() => setVista(k)}
+          className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${vista === k ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>{l}</button>
+      ))}
+    </div>
+  );
+  if (gerencia && vista === "valery") {
+    return (
+      <>
+        <PageHeader title="Cuentas por Cobrar" breadcrumbs={[{ label: "Finanzas" }, { label: "Cuentas por Cobrar" }]} />
+        {pestanas}
+        <CarteraValery empresa={empresaKey} tipo="cxc" />
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
@@ -379,6 +401,7 @@ function CuentasPorCobrar() {
           </div>
         }
       />
+      {pestanas}
 
       {exito && (
         <p role="status" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok/10 px-3 py-2 text-sm text-ok">

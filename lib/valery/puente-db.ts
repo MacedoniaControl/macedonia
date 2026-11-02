@@ -11,7 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion, puedeEntrarAEmpresa } from "@/lib/auth/sesion-servidor";
 import { importarVentasValery } from "@/lib/inventory/ventas-valery-db";
-import { errorDeRango, renglonesDesdePuente, type EstadoSolicitud, type FilaVentaPuente, type TipoSolicitud } from "./puente.ts";
+import { errorDeRango, filasDeParte, renglonesDesdePuente, type EstadoSolicitud, type FilaVentaPuente, type TipoSolicitud } from "./puente.ts";
 
 export type AgentePuente = {
   creadoEn: string;
@@ -124,6 +124,48 @@ export async function resultadoPuente(id: number): Promise<{ ok: true; tipo: Tip
   const { data, error } = await sb.from("valery_resultados").select("parte, datos").eq("solicitud_id", id).order("parte");
   if (error) return { ok: false, error: error.message };
   return { ok: true, tipo: s.tipo as TipoSolicitud, filas: (data ?? []).flatMap((p) => (p.datos as Record<string, unknown>[]) ?? []) };
+}
+
+export type CarteraDeValery = {
+  agente: AgentePuente | null;
+  /** El último pedido de esta cartera, en el estado que esté (para saber si hay uno en camino). */
+  ultimo: SolicitudPuente | null;
+  /** La última lectura que llegó: sus filas y cuándo se copió la base. */
+  lectura: { id: number; terminadoEn: string | null; copiaEn: string | null; filas: unknown[] } | null;
+};
+
+/**
+ * Las cuentas por cobrar o por pagar tal como están en Valery, según la última
+ * lectura del agente. Con la sesión de quien mira: la base solo se las da al
+ * Owner y a los Administradores de esa empresa (RLS de la migración 47).
+ */
+export async function carteraDeValery(empresa: string, tipo: "cxc" | "cxp"): Promise<CarteraDeValery> {
+  const sb = await createClient();
+  const columnas = "id, tipo, parametros, estado, creado_nombre, creado_en, terminado_en, resumen, error, aplicado_en, importacion_id";
+  const [agente, { data: ultimos, error }] = await Promise.all([
+    agentePuente(empresa),
+    sb.from("valery_solicitudes").select(columnas).eq("empresa_id", empresa).eq("tipo", tipo).order("id", { ascending: false }).limit(20),
+  ]);
+  if (error) throw new Error(`No se pudieron leer los pedidos: ${error.message}`);
+  const aSolicitud = (s: NonNullable<typeof ultimos>[number]): SolicitudPuente => ({
+    id: s.id, tipo: s.tipo, parametros: (s.parametros as Record<string, unknown>) ?? {}, estado: s.estado,
+    creadoNombre: s.creado_nombre, creadoEn: s.creado_en, terminadoEn: s.terminado_en,
+    resumen: (s.resumen as Record<string, unknown>) ?? null, error: s.error, aplicadoEn: s.aplicado_en, importacionId: s.importacion_id,
+  });
+  const ultimo = ultimos?.[0] ? aSolicitud(ultimos[0]) : null;
+  const buena = (ultimos ?? []).find((s) => s.estado === "lista");
+  if (!buena) return { agente, ultimo, lectura: null };
+  const { data: partes, error: e } = await sb.from("valery_resultados").select("parte, datos").eq("solicitud_id", buena.id).order("parte");
+  if (e) throw new Error(`No se pudo leer lo que entregó el agente: ${e.message}`);
+  const resumen = (buena.resumen as Record<string, unknown> | null) ?? {};
+  return {
+    agente, ultimo,
+    lectura: {
+      id: buena.id, terminadoEn: buena.terminado_en, copiaEn: typeof resumen.copiaEn === "string" ? resumen.copiaEn : null,
+      // filasDeParte: el agente 1.0.1 entregaba una parte de una sola fila como objeto suelto.
+      filas: (partes ?? []).flatMap((p) => filasDeParte(p.datos) ?? []),
+    },
+  };
 }
 
 /**
