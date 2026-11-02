@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.2'
+$Version = '1.0.3'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -24,6 +24,17 @@ $CadaSeg = [int]$Config.cadaSeg; if ($CadaSeg -lt 5) { $CadaSeg = 15 }
 $ReusarMin = [int]$Config.reusarMin; if ($ReusarMin -lt 1) { $ReusarMin = 5 }
 $Copia = Join-Path $Raiz 'copia\valery3.fdb'
 $script:InfoCopia = @{}
+
+# Lo que el agente cuenta de sí mismo en cada vuelta. Se arma con el indexador,
+# no con `@{...} + $script:InfoCopia`: la suma de hashtables FALLA si una clave
+# está en las dos («Ya se ha agregado el elemento»), y desde la 1.0.1 la copia
+# también trae `base`. Así se cayó la instalación del 2-nov-2026.
+function Info-Agente([hashtable]$extra = @{}) {
+  $i = @{ equipo = $env:COMPUTERNAME; base = [string]$Config.base }
+  foreach ($k in $script:InfoCopia.Keys) { $i[$k] = $script:InfoCopia[$k] }
+  foreach ($k in $extra.Keys) { $i[$k] = $extra[$k] }
+  return $i
+}
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Add-Type -LiteralPath (Join-Path $Raiz 'lib\FirebirdSql.Data.FirebirdClient.dll')
@@ -185,7 +196,7 @@ function Atender($s) {
     Copiar-Base
     $filas = Filas-De ([string]$s.tipo) $s.parametros
     $n = $filas.Count; $tam = 1000; $total = [math]::Max(1, [math]::Ceiling($n / $tam))
-    $resumen = @{ filas = $n; agente = $Version; equipo = $env:COMPUTERNAME } + $script:InfoCopia
+    $resumen = Info-Agente @{ filas = $n; agente = $Version }
     if ($s.tipo -eq 'estado' -and $n -gt 0) { foreach ($k in @($filas[0].Keys)) { $resumen[$k] = $filas[0][$k] } }
     for ($p = 1; $p -le $total; $p++) {
       # Sin `$x = if (...) {...}`: PowerShell desenrolla el arreglo y una parte
@@ -214,7 +225,7 @@ if ($Prueba) {
   if ($e.ultima_venta -and ((Get-Date) - [datetime]$e.ultima_venta).TotalDays -gt 30) {
     Write-Host ("  OJO: la ultima venta de esta base es del {0}. Si en Valery se factura a diario, esta NO es la base en uso." -f $e.ultima_venta) -ForegroundColor Yellow
   }
-  $r = Llamar @{ accion = 'siguiente'; version = $Version; info = (@{ equipo = $env:COMPUTERNAME; base = [string]$Config.base } + $script:InfoCopia) }
+  $r = Llamar @{ accion = 'siguiente'; version = $Version; info = (Info-Agente) }
   Write-Host '  Conexion con Macedonia: OK'
   if ($r.solicitud) { Atender $r.solicitud }
   return
@@ -226,7 +237,7 @@ if (-not $mutex.WaitOne(0)) { Anotar 'Ya hay otro agente corriendo; este termina
 Anotar ("Agente {0} iniciado en {1}" -f $Version, $env:COMPUTERNAME)
 while ($true) {
   try {
-    $info = @{ equipo = $env:COMPUTERNAME; base = [string]$Config.base } + $script:InfoCopia
+    $info = Info-Agente
     $r = Llamar @{ accion = 'siguiente'; version = $Version; info = $info }
     if ($r.solicitud) { Atender $r.solicitud; continue }
   } catch {
