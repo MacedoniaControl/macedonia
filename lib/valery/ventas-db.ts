@@ -49,7 +49,8 @@ export type EstadoVentas = {
   corte: string | null;
   auto: boolean;
   cadaMin: number;
-  agente: { ultimoContacto: string | null } | null;
+  /** `ultimaVentaBase`: la última venta en la copia que leyó el agente (la informa desde la 1.0.1). */
+  agente: { ultimoContacto: string | null; base: string | null; ultimaVentaBase: string | null } | null;
   /** La última actualización automática (en curso, buena o con error). */
   ultima: Actualizacion | null;
   /** La última que entró bien: hasta dónde están las ventas. */
@@ -74,13 +75,17 @@ export async function estadoVentas(empresa: string): Promise<EstadoVentas> {
   const [corte, ajustes, agente, ultima, buena] = await Promise.all([
     corteDe(sb, empresa),
     ajustesVentasDe(sb, empresa),
-    sb.from("valery_agentes").select("ultimo_contacto").eq("empresa_id", empresa).is("revocado_en", null).maybeSingle(),
+    sb.from("valery_agentes").select("ultimo_contacto, info").eq("empresa_id", empresa).is("revocado_en", null).maybeSingle(),
     sb.from("valery_solicitudes").select(COLS).eq("empresa_id", empresa).eq("automatica", true).order("id", { ascending: false }).limit(1).maybeSingle(),
     sb.from("valery_solicitudes").select(COLS).eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(1).maybeSingle(),
   ]);
   return {
     gerencia, corte, auto: ajustes.auto, cadaMin: ajustes.cadaMin,
-    agente: agente.data ? { ultimoContacto: agente.data.ultimo_contacto } : null,
+    agente: agente.data ? {
+      ultimoContacto: agente.data.ultimo_contacto,
+      base: ((agente.data.info as Record<string, unknown> | null)?.base as string | undefined) ?? null,
+      ultimaVentaBase: ((agente.data.info as Record<string, unknown> | null)?.ultimaVenta as string | undefined) ?? null,
+    } : null,
     ultima: actualizacion(ultima.data as FilaSolicitud | null),
     ultimaBuena: actualizacion(buena.data as FilaSolicitud | null),
   };

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
 import { aplicarVentasAuto, programarVentasAuto } from "@/lib/valery/ventas-auto";
+import { filasDeParte } from "@/lib/valery/puente";
 
 // La puerta del agente del Puente Valery (docs/decisions/puente-valery.md).
 //
@@ -90,8 +91,9 @@ export async function POST(req: Request) {
 
     const parte = Number(cuerpo.parte), total = Number(cuerpo.total);
     if (!Number.isInteger(parte) || !Number.isInteger(total) || parte < 1 || total < 1 || parte > total || total > 10_000) return malo("Parte inválida.");
-    if (!Array.isArray(cuerpo.datos) || cuerpo.datos.length > MAX_FILAS_PARTE) return malo("Los datos tienen que ser una lista de hasta 5.000 filas.");
-    const { error: e1 } = await admin.from("valery_resultados").upsert({ solicitud_id: id, parte, datos: cuerpo.datos });
+    const datos = filasDeParte(cuerpo.datos);
+    if (!datos || datos.length > MAX_FILAS_PARTE) return malo("Los datos tienen que ser una lista de hasta 5.000 filas.");
+    const { error: e1 } = await admin.from("valery_resultados").upsert({ solicitud_id: id, parte, datos });
     if (e1) return malo(`No se pudo guardar la parte ${parte}: ${e1.message}`, 500);
     if (parte === total) {
       const { count } = await admin.from("valery_resultados").select("parte", { count: "exact", head: true }).eq("solicitud_id", id);
