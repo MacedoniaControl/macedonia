@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
+import { aplicarVentasAuto, programarVentasAuto } from "@/lib/valery/ventas-auto";
 
 // La puerta del agente del Puente Valery (docs/decisions/puente-valery.md).
 //
@@ -12,6 +13,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 // usuario. Por eso todo lo que hace aquí se comprueba a mano.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Al llegar la última parte de una actualización automática se aplica al kardex aquí mismo.
+export const maxDuration = 60;
 
 const huella = (t: string) => createHash("sha256").update(t, "utf8").digest("hex");
 const noAutorizado = () => Response.json({ ok: false, error: "No autorizado." }, { status: 401 });
@@ -55,6 +58,11 @@ export async function POST(req: Request) {
       error: "El agente tomó el pedido y no lo terminó en 15 minutos. Pídelo de nuevo.",
     }).eq("empresa_id", empresa).eq("estado", "en_proceso").lt("tomado_en", new Date(Date.now() - PERDIDO_MS).toISOString());
 
+    // Las ventas automáticas se piden aquí: el agente pregunta cada 15 s, así que
+    // no hace falta otro reloj, y si el servidor de Valery está apagado no se
+    // acumulan pedidos que nadie va a atender. Un fallo aquí no corta la vuelta.
+    try { await programarVentasAuto(admin, empresa); } catch { /* se reintenta en la próxima vuelta */ }
+
     const { data: pendiente } = await admin.from("valery_solicitudes").select("id, tipo, parametros")
       .eq("empresa_id", empresa).eq("estado", "pendiente").order("id").limit(1).maybeSingle();
     if (!pendiente) return Response.json({ ok: true, solicitud: null });
@@ -68,7 +76,7 @@ export async function POST(req: Request) {
   if (cuerpo.accion === "resultado" || cuerpo.accion === "error") {
     const id = Number(cuerpo.solicitud);
     if (!Number.isInteger(id) || id <= 0) return malo("Falta la solicitud.");
-    const { data: s } = await admin.from("valery_solicitudes").select("id, estado")
+    const { data: s } = await admin.from("valery_solicitudes").select("id, estado, tipo, automatica")
       .eq("id", id).eq("empresa_id", empresa).maybeSingle();
     if (!s) return malo("Esa solicitud no es de esta empresa.", 404);
     if (s.estado !== "en_proceso") return malo(`La solicitud ya está ${s.estado}.`, 409);
@@ -92,6 +100,8 @@ export async function POST(req: Request) {
         estado: "lista", terminado_en: new Date().toISOString(), partes: total,
         resumen: cuerpo.resumen && typeof cuerpo.resumen === "object" ? cuerpo.resumen : null,
       }).eq("id", id);
+      // La actualización automática no espera a que alguien pulse «Aplicar».
+      if (s.automatica && s.tipo === "ventas") await aplicarVentasAuto(admin, id, empresa);
     }
     return Response.json({ ok: true });
   }

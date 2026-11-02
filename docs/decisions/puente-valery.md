@@ -60,6 +60,32 @@ clave del agente. Se ejecuta **una vez en el servidor**, como administrador.
 Baja Firebird embebido y FirebirdClient de sus sitios oficiales y comprueba su
 huella antes de usarlos. Generar un instalador nuevo revoca la clave anterior.
 
+## Ventas automáticas (2026-11-02)
+
+Pedido del Owner: que las ventas entren solas y verlas en un apartado.
+
+- **Cuándo.** Cada vez que el agente pregunta (cada 15 s), el servidor mira si
+  ya pasó una hora desde la última actualización automática; si pasó, la pide.
+  No hay otro reloj: si el servidor de Valery está apagado, no se acumulan
+  pedidos. «Actualizar ahora» en Ventas pide una en el acto. Una sola en curso
+  por empresa (índice único `valery_auto_en_curso`).
+- **Qué días.** Desde dos días antes de lo último que entró bien hasta hoy,
+  nunca antes del corte ni más de 400 días (`rangoAuto`). Lo repetido no entra:
+  cada renglón tiene su clave.
+- **Cómo entra.** Cuando llega la última parte, el servidor la aplica al
+  kardex sin que nadie pulse «Aplicar»: `importar_ventas_puente`, que solo
+  puede llamar la clave de servicio y usa el mismo importador que el Excel
+  (`_importar_ventas`, migración 48). Si falla —un código que no está en el
+  catálogo, por ejemplo—, el pedido queda en «error» con el motivo y Ventas lo
+  muestra; lo anterior no cambia. Las filas crudas se borran al terminar.
+- **Dónde se ve.** Finanzas → Ventas (`/admin/revenue`, permiso `revenue`):
+  lee el kardex, así que Ventas e Inventario nunca cuentan cosas distintas.
+  Lo vendido a la otra empresa del grupo y el consumo interno se apartan y se
+  dice cuánto fue (mismas reglas que `scripts/historico-valery.py`). Empieza en
+  el corte de inventario; lo anterior está en Reportes.
+- **Apagarlo.** El interruptor de Ventas (Owner o Administrador) lo apaga por
+  empresa (`valery_ajustes`). El botón sigue funcionando.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.

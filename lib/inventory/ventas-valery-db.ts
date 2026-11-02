@@ -10,31 +10,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
-import { todasLasFilas } from "@/lib/supabase/paginar";
-import { facturasAjenas, planVentas, SERIE_FAC, type NotaPrevia, type RenglonVenta } from "./ventas-valery";
+import { corteDe, notasPreviasDe, restarDias } from "@/lib/valery/ventas-auto";
+import { facturasAjenas, paraLaBase, planVentas, SERIE_FAC, type RenglonVenta } from "./ventas-valery";
 
 /** Primer día que se puede importar (null = la empresa todavía no tiene corte). */
 export async function corteVentas(empresa: string): Promise<string | null> {
-  const sb = await createClient();
-  const { data, error } = await sb.from("cortes_inventario").select("desde").eq("empresa_id", empresa).maybeSingle();
-  if (error) throw new Error(`No se pudo leer el corte: ${error.message}`);
-  return (data?.desde as string | undefined) ?? null;
-}
-
-const restarDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) - n * 86400000).toISOString().slice(0, 10);
-
-async function notasPrevias(empresa: string, desde: string): Promise<NotaPrevia[]> {
-  const sb = await createClient();
-  type Fila = { renglon: string; fecha: string; cliente: string | null; codigo: string; cantidad: number; monto_usd: number | null; documento: string | null; facturada_con: string | null };
-  const filas = await todasLasFilas<Fila>((a, b, contar) =>
-    sb.from("movimientos_inventario")
-      .select("renglon, fecha, cliente, codigo, cantidad, monto_usd, documento, facturada_con", contar ? { count: "exact" } : undefined)
-      .eq("empresa_id", empresa).eq("tipo_doc", "NET").gte("fecha", desde).not("renglon", "is", null)
-      .order("id").range(a, b));
-  return filas.map((f) => ({
-    clave: f.renglon, fecha: f.fecha, cliente: f.cliente ?? "", codigo: f.codigo, cantidad: Number(f.cantidad),
-    ventaUsd: Number(f.monto_usd ?? 0), documento: (f.documento ?? "").replace(/^NET\s+/, ""), facturadaCon: f.facturada_con,
-  }));
+  return corteDe(await createClient(), empresa);
 }
 
 export type ResultadoImportacion =
@@ -55,18 +36,15 @@ export async function importarVentasValery(
       return { ok: false, error: `Este archivo trae facturas de ${otra} (${ajenas.slice(0, 3).join(", ")}). Impórtalo en su empresa.` };
     }
     const fechas = renglones.map((r) => r.fecha).sort();
-    const previas = fechas.length ? await notasPrevias(empresa, restarDias(fechas[0], 60)) : [];
+    const sb = await createClient();
+    const previas = fechas.length ? await notasPreviasDe(sb, empresa, restarDias(fechas[0], 60)) : [];
     const plan = planVentas(renglones, corte, previas);
     if (!plan.movimientos.length && !plan.notasPrevias.length) {
       return { ok: false, error: `No hay ventas desde el ${corte.split("-").reverse().join("-")} (el corte): lo anterior ya está en la existencia.` };
     }
-    const sb = await createClient();
     const { data, error } = await sb.rpc("importar_ventas_valery", {
       p_empresa: empresa, p_archivo: archivo, p_hash: hash,
-      p_renglones: plan.movimientos.map((m) => ({
-        renglon: m.renglon, fecha: m.fecha, direccion: m.direccion, tipo: m.tipo, documento: m.documento, cliente: m.cliente,
-        codigo: m.codigo, nombre: m.nombre, cantidad: m.cantidad, monto_usd: m.montoUsd, facturada_con: m.facturadaCon,
-      })),
+      p_renglones: plan.movimientos.map(paraLaBase),
       p_notas: plan.notasPrevias,
     });
     if (error) return { ok: false, error: error.message };

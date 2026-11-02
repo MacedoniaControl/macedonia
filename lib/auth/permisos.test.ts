@@ -99,8 +99,10 @@ describe("puedeVer", () => {
 
 describe("CLAVES_MODULO", () => {
   // 16 desde que se eliminaron Auditoria y Comisiones y bonos (26-ago-2026).
-  test("cubre las 17 secciones del menu (con el Directorio)", () => {
-    assert.equal(CLAVES_MODULO.length, 17);
+  // 18 con Ventas (revenue), que vuelve alimentada por el Puente Valery (2-nov-2026).
+  test("cubre las 18 secciones del menu (con Directorio y Ventas)", () => {
+    assert.equal(CLAVES_MODULO.length, 18);
+    assert.ok(CLAVES_MODULO.includes("revenue"));
   });
 
   test("no tiene claves repetidas", () => {

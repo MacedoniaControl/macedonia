@@ -305,6 +305,12 @@ export type PlanVentas = {
   hasta: string | null;
 };
 
+/** Un movimiento tal como lo reciben importar_ventas_valery e importar_ventas_puente. */
+export const paraLaBase = (m: MovimientoVenta) => ({
+  renglon: m.renglon, fecha: m.fecha, direccion: m.direccion, tipo: m.tipo, documento: m.documento, cliente: m.cliente,
+  codigo: m.codigo, nombre: m.nombre, cantidad: m.cantidad, monto_usd: m.montoUsd, facturada_con: m.facturadaCon,
+});
+
 /** Decide qué entra: solo desde el corte, sin las facturas de notas. */
 export function planVentas(renglones: RenglonVenta[], corte: string, previas: NotaPrevia[] = []): PlanVentas {
   const fac = notasFacturadas(renglones, previas);

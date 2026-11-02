@@ -82,6 +82,32 @@ export function errorDeRango(desde: string, hasta: string): string | null {
   return null;
 }
 
+// ---------------------------------------------------------------- ventas automáticas
+/** Cada cuánto se traen las ventas solas, si el Owner no lo cambió. */
+export const CADA_MIN_POR_DEFECTO = 60;
+
+const menosDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) - n * 86400000).toISOString().slice(0, 10);
+
+/**
+ * Qué días pedir en una actualización automática: desde dos días antes de
+ * lo último que entró bien (un documento cargado tarde en Valery todavía se
+ * alcanza) hasta hoy. Nunca antes del corte (lo anterior ya está en la
+ * existencia) ni más de 400 días de una vez. Lo que ya entró no se repite:
+ * cada renglón tiene su clave.
+ */
+export function rangoAuto(hoy: string, corte: string, ultimaHasta: string | null): { desde: string; hasta: string } {
+  const base = ultimaHasta && ultimaHasta > corte ? ultimaHasta : corte;
+  const candidatos = [menosDias(base, 2), corte, menosDias(hoy, 399)];
+  let desde = candidatos.reduce((a, b) => (b > a ? b : a));
+  if (desde > hoy) desde = hoy;
+  return { desde, hasta: hoy };
+}
+
+/** ¿Ya toca otra actualización automática? */
+export function tocaActualizar(ultimaPedida: string | null, cadaMin: number, ahora = Date.now()): boolean {
+  return !ultimaPedida || ahora - Date.parse(ultimaPedida) >= cadaMin * 60_000;
+}
+
 /** Hace cuánto habló el agente, dicho para una persona. */
 export function haceCuanto(iso: string | null, ahora = Date.now()): string {
   if (!iso) return "nunca";
