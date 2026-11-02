@@ -92,6 +92,24 @@ Pedido del Owner: que las ventas entren solas y verlas en un apartado.
 - **Apagarlo.** El interruptor de Ventas (Owner o Administrador) lo apaga por
   empresa (`valery_ajustes`). El botón sigue funcionando.
 
+## Cuentas por cobrar de Valery, para mirar (2026-11-02)
+
+Pedido del Owner: ver la CxC de Valery dentro de Cuentas por Cobrar. Pestaña
+«En Valery» (Owner y Administrador, los mismos a quienes la base les da la
+lectura): la última lectura del agente, con «Leer de Valery ahora».
+**Solo se mira; no toca la cartera de Macedonia**, porque no son lo mismo
+(comparado ese día con el agente 1.0.3):
+
+- Valery solo lleva en `V3CXC` facturas (257 con saldo, en bolívares). La
+  cartera de Macedonia son notas de entrega (447 de 448), y en Valery las NET
+  no generan cuenta por cobrar (`FACTOR_CXC = 0`, crédito 0 en todas).
+- En `V3CXP` hay 502 facturas de compra con saldo; 254 son de 2023–2025, que
+  lo más probable es que se pagaron y nunca se cerraron en Valery.
+
+Los saldos se muestran en bolívares, como los guarda Valery. El equivalente en
+dólares: el documento en dólares a la tasa del documento; el de bolívares a la
+tasa BCV de hoy, y se dice. Sin tasa de hoy, el total en dólares no se muestra.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.
