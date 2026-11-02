@@ -105,7 +105,8 @@ export async function solicitudesPuente(empresa: string, limite = 25): Promise<S
   const sb = await createClient();
   const { data, error } = await sb.from("valery_solicitudes")
     .select("id, tipo, parametros, estado, creado_nombre, creado_en, terminado_en, resumen, error, aplicado_en, importacion_id")
-    .eq("empresa_id", empresa).order("id", { ascending: false }).limit(limite);
+    // Las actualizaciones automáticas de ventas se ven en Ventas, no aquí: serían 24 al día.
+    .eq("empresa_id", empresa).eq("automatica", false).order("id", { ascending: false }).limit(limite);
   if (error) throw new Error(`No se pudieron leer los pedidos: ${error.message}`);
   return (data ?? []).map((s) => ({
     id: s.id, tipo: s.tipo, parametros: (s.parametros as Record<string, unknown>) ?? {}, estado: s.estado,

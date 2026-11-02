@@ -1,8 +1,8 @@
 // Registro de empresas — fuente única de identidad (nombre, RIF, logo, tema).
 // Lo consumen: dashboards por empresa, documentos (notas/cotizaciones) y el selector.
 // El tema real (colores de marca) se aplica con la clase CSS `theme-<id>` (ver globals.css).
-import { SUMIGASES_LOGO } from "./sumigases-logo";
-import { SUDEMATIN_LOGO } from "./sudematin-logo";
+import { SUMIGASES_LOGO } from "./sumigases-logo.ts";
+import { SUDEMATIN_LOGO } from "./sudematin-logo.ts";
 
 export type EmpresaId = "sumigases" | "sudematin";
 
@@ -23,6 +23,13 @@ export type Empresa = {
   rubros: string;
   /** Bloque secundario del encabezado (la otra empresa del grupo). Vacío = no se imprime. */
   subBloque: string;
+  /**
+   * Cómo aparece como CLIENTE en las ventas de Valery (nombre ya normalizado:
+   * mayúsculas, sin tildes ni puntuación). Sirve para no contar como venta lo
+   * que se venden entre ellas o a sí mismas. Mismos nombres que
+   * scripts/historico-valery.py, que los encontró en los exportes.
+   */
+  clienteEnValery: RegExp;
 };
 
 export const EMPRESAS: Record<EmpresaId, Empresa> = {
@@ -39,6 +46,7 @@ export const EMPRESAS: Record<EmpresaId, Empresa> = {
     rubros: "ELECTRODOS - GASES INDUSTRIALES/MEDICINALES - ROLINERAS - CORREAS - CADENAS ACOPLES - POLEAS",
     subBloque:
       "AV MIRANDA, EDIF SUDEMATIN, PISO 1 URB PARCELAMIENTO MIRANDA, SECTOR LA COPITA CUMANA · J316971414",
+    clienteEnValery: /^SUMIGASES ORIENTE/,
   },
   sudematin: {
     id: "sudematin",
@@ -55,6 +63,7 @@ export const EMPRESAS: Record<EmpresaId, Empresa> = {
     // para no imprimir texto inventado en un documento que va al cliente.
     rubros: "",
     subBloque: "",
+    clienteEnValery: /^(SUDEMATIN|SUMINISTROS? DE MATERIALES INDUSTRIALES)/,
   },
 };
 
