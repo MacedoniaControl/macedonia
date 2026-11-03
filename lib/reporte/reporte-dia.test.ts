@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claseMov, contar, limitesDelDia, movsDesdeAgente, resumirMovs } from "./reporte-dia.ts";
+import { armarSerie, claseMov, contar, cubetas, etiquetaCubeta, etiquetaPeriodo, limitesDelDia, limitesDelRango, moverPeriodo, movsDesdeAgente, puntosMovs, rangoDe, resumirMovs } from "./reporte-dia.ts";
 
 // Filas como las da el pedido «movimientos» (respaldo de Valery, 26 y 27-feb-2026).
 const fac = { cartera: "cxc", tipo: "FAC", documento: "0000001139", contraparte: "SERVICIOS Y SUMINISTROS V &amp; B, C.A", rif: "J080142489", fecha: "2026-02-26", hora: "09:31:18.0000", concepto: "Factura de Crédito No. FAC-0000001139 de SERVICIOS Y SUMINISTROS V &amp; B, C.A", moneda: "02", factor: 40.5, total: 81000, total_me: 2000, saldo: 81000 };
@@ -52,4 +52,51 @@ test("el día de Caracas en UTC (UTC-4)", () => {
 test("contar suma cantidad y dólares", () => {
   assert.deepEqual(contar([{ usd: 10 }, { usd: 2.5 }]), { n: 2, usd: 12.5 });
   assert.deepEqual(contar([]), { n: 0, usd: 0 });
+});
+
+test("períodos: día, semana de lunes a domingo, mes y año, cortados en hoy", () => {
+  const hoy = "2026-11-03";   // martes
+  assert.deepEqual(rangoDe("dia", "2026-11-01", hoy), { desde: "2026-11-01", hasta: "2026-11-01" });
+  assert.deepEqual(rangoDe("semana", hoy, hoy), { desde: "2026-11-02", hasta: "2026-11-03" });
+  assert.deepEqual(rangoDe("semana", "2026-11-01", hoy), { desde: "2026-10-26", hasta: "2026-11-01" });   // domingo: semana anterior
+  assert.deepEqual(rangoDe("mes", hoy, hoy), { desde: "2026-11-01", hasta: "2026-11-03" });
+  assert.deepEqual(rangoDe("mes", "2026-02-10", hoy), { desde: "2026-02-01", hasta: "2026-02-28" });
+  assert.deepEqual(rangoDe("mes", "2024-02-10", hoy), { desde: "2024-02-01", hasta: "2024-02-29" });     // bisiesto
+  assert.deepEqual(rangoDe("anio", hoy, hoy), { desde: "2026-01-01", hasta: "2026-11-03" });
+  assert.deepEqual(rangoDe("anio", "2025-06-30", hoy), { desde: "2025-01-01", hasta: "2025-12-31" });
+});
+
+test("moverse al período anterior y al siguiente", () => {
+  assert.equal(moverPeriodo("dia", "2026-11-01", -1), "2026-10-31");
+  assert.equal(moverPeriodo("semana", "2026-11-03", -1), "2026-10-27");
+  assert.equal(moverPeriodo("mes", "2026-03-31", -1), "2026-02-01");   // sin desbordar a marzo
+  assert.equal(moverPeriodo("mes", "2026-12-15", 1), "2027-01-01");
+  assert.equal(moverPeriodo("anio", "2026-11-03", -1), "2025-01-01");
+});
+
+test("nombres del período y de las filas del desglose", () => {
+  assert.equal(etiquetaPeriodo("dia", "2026-11-03", "2026-11-03"), "03-11-2026");
+  assert.equal(etiquetaPeriodo("semana", "2026-11-02", "2026-11-03"), "semana del 02-11-2026 al 03-11-2026");
+  assert.equal(etiquetaPeriodo("mes", "2026-11-01", "2026-11-03"), "Noviembre 2026");
+  assert.equal(etiquetaPeriodo("anio", "2026-01-01", "2026-11-03"), "2026");
+  assert.deepEqual(cubetas("dia", "2026-11-03", "2026-11-03"), []);
+  assert.deepEqual(cubetas("semana", "2026-11-02", "2026-11-04"), ["2026-11-02", "2026-11-03", "2026-11-04"]);
+  assert.deepEqual(cubetas("anio", "2026-01-01", "2026-03-10"), ["2026-01", "2026-02", "2026-03"]);
+  assert.equal(etiquetaCubeta("mes", "2026-11-03"), "mar 03-11");
+  assert.equal(etiquetaCubeta("anio", "2026-02"), "Febrero");
+  assert.deepEqual(limitesDelRango("2026-11-01", "2026-11-03"), { desde: "2026-11-01T04:00:00.000Z", hasta: "2026-11-04T04:00:00.000Z" });
+});
+
+test("el desglose suma por día o por mes; la columna que no se ve no existe", () => {
+  const ventas = [{ fecha: "2026-02-03", valor: 10 }, { fecha: "2026-02-20", valor: 5 }, { fecha: "2026-03-01", valor: 1 }];
+  const s = armarSerie("anio", "2026-01-01", "2026-03-10", { ventas, gastos: null, cobrado: [] });
+  assert.deepEqual(s.map((f) => [f.etiqueta, f.valores]), [
+    ["Enero", { ventas: 0, cobrado: 0 }],
+    ["Febrero", { ventas: 15, cobrado: 0 }],
+    ["Marzo", { ventas: 1, cobrado: 0 }],
+  ]);
+  assert.equal("gastos" in s[0].valores, false);
+  const movs = movsDesdeAgente([fac, ncr, pag, fcm]);
+  assert.deepEqual(puntosMovs(movs, "cxc", "documento"), [{ fecha: "2026-02-26", valor: 81000 }]);
+  assert.deepEqual(puntosMovs(movs, "cxp", "pago"), [{ fecha: "2026-02-27", valor: 3000 }]);
 });
