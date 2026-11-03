@@ -201,6 +201,22 @@ select (select count(*) from ventas where temporal <> 'T') as ventas,
        (select count(*) from productos_terminados_depositos) as productos
   from rdb$database
 '@
+  # Lo que se movió en CxC y CxP en un rango de días (facturas, pagos, notas,
+  # retenciones), con su hora: para el reporte del día de Macedonia.
+  movimientos = @'
+select cast('cxc' as varchar(3)) as cartera, c.tipo_documento as tipo, c.documento, c.cliente_nombre as contraparte, c.cliente_rif as rif,
+       c.fecha_emision as fecha, c.hora_emision as hora, c.concepto, c.moneda_codigo as moneda, c.factor_cambio as factor,
+       c.total_operacion as total, m.total_operacion_me as total_me, c.saldo
+  from v3cxc c left join v3cxc_me m on m.correlativo_principal = c.correlativo
+ where c.fecha_emision between cast(@desde as date) and cast(@hasta as date) and c.temporal <> 'T'
+union all
+select cast('cxp' as varchar(3)), c.tipo_documento, c.documento, c.proveedor_nombre, c.proveedor_rif,
+       c.fecha_emision, c.hora_emision, c.concepto, c.moneda_codigo, c.factor_cambio,
+       c.total_operacion, m.total_operacion_me, c.saldo
+  from v3cxp c left join v3cxp_me m on m.correlativo_principal = c.correlativo
+ where c.fecha_emision between cast(@desde as date) and cast(@hasta as date) and c.temporal <> 'T'
+ order by 6, 7
+'@
   # Solo CONTEOS por tabla, tipo y estado (ningún nombre ni monto): para saber
   # dónde guarda Valery cada cosa. En VENTAS: con_saldo = a crédito,
   # con_saldo_me = con cuenta por cobrar. En TIPOS_DOCUMENTOS: si el tipo suma
@@ -244,6 +260,9 @@ function Filas-De([string]$tipo, $parametros) {
       $f.Remove('factor'); $f.Remove('tasa_historial')
     }
     return ,$filas
+  }
+  if ($tipo -eq 'movimientos') {
+    return ,(Consultar $SQL.movimientos @{ '@desde' = [string]$parametros.desde; '@hasta' = [string]$parametros.hasta })
   }
   if ($SQL.ContainsKey($tipo)) { return ,(Consultar $SQL[$tipo]) }
   throw "Pedido desconocido: $tipo"

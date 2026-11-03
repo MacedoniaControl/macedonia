@@ -81,7 +81,7 @@ export async function estadoVentas(empresa: string): Promise<EstadoVentas> {
   const [corte, ajustes, agente, ultima, buena] = await Promise.all([
     corteDe(sb, empresa),
     ajustesVentasDe(sb, empresa),
-    sb.from("valery_agentes").select("ultimo_contacto, info").eq("empresa_id", empresa).is("revocado_en", null).maybeSingle(),
+    sb.from("valery_agentes").select("ultimo_contacto, info").eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", false).maybeSingle(),
     sb.from("valery_solicitudes").select(COLS).eq("empresa_id", empresa).eq("automatica", true).order("id", { ascending: false }).limit(1).maybeSingle(),
     sb.from("valery_solicitudes").select(COLS).eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(1).maybeSingle(),
   ]);

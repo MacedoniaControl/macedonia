@@ -37,7 +37,8 @@ export function TablePager({
         <span className="font-medium text-text">{total}</span> {etiqueta}
       </p>
 
-      <div className="flex items-center gap-2">
+      {/* flex-wrap: en 375 px, dentro de una tarjeta, «Por página» y los cuatro botones no caben en una línea. */}
+      <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-xs text-muted">
           Por página
           <select

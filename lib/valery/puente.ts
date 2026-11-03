@@ -12,7 +12,7 @@
 
 import { claveBase, type RenglonVenta, type TipoDoc } from "../inventory/ventas-valery.ts";
 
-export type TipoSolicitud = "ventas" | "cxc" | "cxp" | "existencias" | "estado" | "diagnostico";
+export type TipoSolicitud = "ventas" | "cxc" | "cxp" | "existencias" | "estado" | "diagnostico" | "movimientos";
 export type EstadoSolicitud = "pendiente" | "en_proceso" | "lista" | "error" | "aplicada" | "cancelada";
 
 export const NOMBRE_SOLICITUD: Record<TipoSolicitud, string> = {
@@ -22,6 +22,7 @@ export const NOMBRE_SOLICITUD: Record<TipoSolicitud, string> = {
   existencias: "Existencias",
   estado: "Probar conexión",
   diagnostico: "Diagnóstico",
+  movimientos: "Movimientos de CxC y CxP",
 };
 
 /** Lo que entrega el agente por cada renglón de venta (tal cual está en Valery). */

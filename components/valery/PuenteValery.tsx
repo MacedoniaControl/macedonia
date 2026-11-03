@@ -269,7 +269,7 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
         {!listo ? (
           <>
             <ol className="list-decimal space-y-2 pl-5">
-              <li>Se descarga un archivo <b>.bat</b> con la clave de esta empresa{reinstalar ? "; la clave del agente actual deja de servir" : ""}.</li>
+              <li>Se descarga un archivo <b>.bat</b> con la clave de esta empresa.{reinstalar ? " El agente actual sigue funcionando hasta que el nuevo pase su prueba en el servidor; si la instalación falla, se queda el de antes." : ""}</li>
               <li>Cópialo al <b>servidor donde está la base de Valery</b> (en Sumigases, SERVIDORSUD).</li>
               <li>Clic derecho → <b>Ejecutar como administrador</b>. Baja lo que necesita de los sitios oficiales de Firebird, prueba la conexión y queda funcionando solo.</li>
               <li><b>Bórralo después</b>: lleva la clave del agente.</li>
@@ -316,6 +316,11 @@ const COLUMNAS: Record<Exclude<TipoSolicitud, "estado">, { titulo: string; campo
     { titulo: "Tabla", campo: "tabla", tipo: "codigo" }, { titulo: "Tipo", campo: "tipo", tipo: "codigo" }, { titulo: "Temporal", campo: "temporal" },
     { titulo: "Documentos", campo: "documentos", tipo: "num" }, { titulo: "Con saldo", campo: "con_saldo", tipo: "num" },
     { titulo: "Con saldo US$", campo: "con_saldo_me", tipo: "num" }, { titulo: "Desde", campo: "desde", tipo: "fecha" }, { titulo: "Hasta", campo: "hasta", tipo: "fecha" },
+  ],
+  movimientos: [
+    { titulo: "Cartera", campo: "cartera" }, { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Hora", campo: "hora" },
+    { titulo: "Tipo", campo: "tipo" }, { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Contraparte", campo: "contraparte" },
+    { titulo: "Concepto", campo: "concepto" }, { titulo: "Total Bs", campo: "total", tipo: "num" }, { titulo: "Total US$", campo: "total_me", tipo: "num" },
   ],
   existencias: [
     { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "nombre" }, { titulo: "Depto.", campo: "departamento" },

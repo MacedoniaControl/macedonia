@@ -44,6 +44,7 @@ import { useSesion } from "@/components/auth/SesionProvider";
 import { puedeVer } from "@/lib/auth/permisos";
 import { puedeVerFinanzas, useRol } from "@/lib/ux/session";
 import { Cifra } from "@/components/ui/Cifra";
+import { ReporteDia } from "@/components/dashboard/ReporteDia";
 import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
 
 const selectClass = "sumi-campo sumi-campo--auto min-w-[9rem]";
@@ -213,6 +214,8 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           <KpiCard key={k.key} label={k.label} value={k.value} bs={k.bs} bsAproximado={!k.bsExacto} sub={k.sub} tone={k.tone} />
         ))}
       </div>
+
+      <div className="mt-4"><ReporteDia empresa={empresa} /></div>
 
       {finanzas && (
         <>

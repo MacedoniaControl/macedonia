@@ -11,8 +11,11 @@
 #    2. crea C:\MacedoniaPuente (solo SYSTEM y Administradores pueden leerla);
 #    3. baja Firebird 2.5.9 embebido y FirebirdClient de sus sitios oficiales y
 #       comprueba su huella SHA-256 antes de usarlos;
-#    4. prueba: copia la base, la lee en solo lectura y habla con Macedonia;
-#    5. deja el agente como tarea de Windows que arranca sola con el equipo.
+#    4. arma el agente nuevo aparte y lo prueba: copia la base, la lee en solo
+#       lectura y habla con Macedonia;
+#    5. solo si la prueba pasa, reemplaza al agente anterior (si lo hay);
+#    6. deja el agente como tarea de Windows que arranca sola con el equipo.
+#  Si algo falla antes del paso 5, el agente que ya estaba sigue funcionando.
 #  Que NO hace: no modifica Valery, ni su base, ni Firebird del servidor, ni
 #  abre puertos.
 # ============================================================================
@@ -81,52 +84,104 @@ $libre = (Get-PSDrive -Name 'C').Free
 if ($libre -lt ((Get-Item -LiteralPath $base).Length * 2.2)) { Mal ("Falta espacio en C: para la copia de trabajo (hace falta unas {0} MB libres)." -f [math]::Round($tam * 2.2)) }
 
 # ---------------------------------------------------------------- 2. la carpeta
+# Todo lo nuevo se arma y se prueba en $Nuevo. El agente que ya está instalado
+# NO se toca hasta que el nuevo pasa su prueba: de la 1.0.2 a la 1.0.3 el
+# instalador quitaba el viejo primero y, al fallar la prueba, el servidor se
+# quedó sin agente. Si algo falla aquí, el de antes sigue como estaba (y su
+# clave también: Macedonia la cambia recién cuando el nuevo se conecta).
 Paso "Preparando $Destino ..."
-if (Get-ScheduledTask -TaskName $Tarea -ErrorAction SilentlyContinue) {
-  Stop-ScheduledTask -TaskName $Tarea -ErrorAction SilentlyContinue
-  Unregister-ScheduledTask -TaskName $Tarea -Confirm:$false
-  Bien 'Habia un agente anterior: se detuvo y se reemplaza.'
-}
-foreach ($d in $Destino, "$Destino\fb", "$Destino\lib", "$Destino\copia", "$Destino\log", "$Destino\descargas") {
-  if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d | Out-Null }
-}
+$Nuevo = Join-Path $Destino 'nuevo'
+$habia = [bool](Get-ScheduledTask -TaskName $Tarea -ErrorAction SilentlyContinue)
+if (-not (Test-Path -LiteralPath $Destino)) { New-Item -ItemType Directory -Path $Destino | Out-Null }
 # Solo SYSTEM y los Administradores: aqui queda la clave del agente y una copia de la base.
 cmd /c icacls "$Destino" /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null
+if (Test-Path -LiteralPath $Nuevo) { Remove-Item -LiteralPath $Nuevo -Recurse -Force }
+foreach ($d in $Nuevo, "$Nuevo\fb", "$Nuevo\lib", "$Nuevo\copia", "$Nuevo\log", "$Nuevo\descargas") {
+  New-Item -ItemType Directory -Path $d | Out-Null
+}
 Bien 'Carpeta lista (acceso solo para SYSTEM y Administradores).'
+if ($habia) { Bien 'Hay un agente instalado: sigue funcionando mientras se prueba el nuevo.' }
+
+# Si algo falla de aquí en adelante, se borra lo nuevo y el de antes queda intacto.
+function Fallo([string]$t) {
+  try { if (Test-Path -LiteralPath $Nuevo) { Remove-Item -LiteralPath $Nuevo -Recurse -Force } } catch {}
+  if ($habia) { $t += ' El agente que ya estaba instalado sigue funcionando como antes.' }
+  Mal $t
+}
 
 # ---------------------------------------------------------------- 3. dependencias
 Paso 'Bajando Firebird embebido y FirebirdClient (sitios oficiales)...'
-foreach ($dep in $Deps) {
-  $f = Join-Path "$Destino\descargas" $dep.archivo
-  Invoke-WebRequest -Uri $dep.url -OutFile $f -UseBasicParsing
-  $h = (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash
-  if ($h -ne $dep.sha) { Remove-Item -LiteralPath $f -Force; Mal ("La huella de {0} no coincide ({1}). No se instala nada." -f $dep.nombre, $h) }
-  Bien ("{0}: huella correcta" -f $dep.nombre)
-}
-Expand-Archive -LiteralPath "$Destino\descargas\fb.zip" -DestinationPath "$Destino\fb" -Force
-$tmpNu = Join-Path "$Destino\descargas" 'fbclient'
-Expand-Archive -LiteralPath "$Destino\descargas\fbclient.zip" -DestinationPath $tmpNu -Force
-Copy-Item -LiteralPath (Join-Path $tmpNu 'lib\net452\FirebirdSql.Data.FirebirdClient.dll') -Destination "$Destino\lib\" -Force
-Remove-Item -LiteralPath "$Destino\descargas" -Recurse -Force
-Get-ChildItem -LiteralPath $Destino -Recurse -File | Unblock-File
-Bien 'Dependencias instaladas.'
+try {
+  foreach ($dep in $Deps) {
+    $f = Join-Path "$Nuevo\descargas" $dep.archivo
+    Invoke-WebRequest -Uri $dep.url -OutFile $f -UseBasicParsing
+    $h = (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash
+    if ($h -ne $dep.sha) { throw ("La huella de {0} no coincide ({1}). No se instala nada." -f $dep.nombre, $h) }
+    Bien ("{0}: huella correcta" -f $dep.nombre)
+  }
+  Expand-Archive -LiteralPath "$Nuevo\descargas\fb.zip" -DestinationPath "$Nuevo\fb" -Force
+  $tmpNu = Join-Path "$Nuevo\descargas" 'fbclient'
+  Expand-Archive -LiteralPath "$Nuevo\descargas\fbclient.zip" -DestinationPath $tmpNu -Force
+  Copy-Item -LiteralPath (Join-Path $tmpNu 'lib\net452\FirebirdSql.Data.FirebirdClient.dll') -Destination "$Nuevo\lib\" -Force
+  Remove-Item -LiteralPath "$Nuevo\descargas" -Recurse -Force
+  Get-ChildItem -LiteralPath $Nuevo -Recurse -File | Unblock-File
+} catch { Fallo ('No se pudieron bajar las dependencias: ' + $_.Exception.Message) }
+Bien 'Dependencias listas.'
 
-# ---------------------------------------------------------------- 4. agente y configuracion
-Paso 'Instalando el agente...'
+# ---------------------------------------------------------------- 4. agente nuevo y su prueba
+Paso 'Preparando el agente nuevo...'
 # El marcador se arma en dos partes: si apareciera entero aqui, el .bat cortaria en este lugar.
 $agente = $PuenteAgente -replace ('^\s*#' + '==AGENTE==\s*'), ''
-[IO.File]::WriteAllText("$Destino\puente.ps1", $agente, (New-Object System.Text.UTF8Encoding($true)))
+[IO.File]::WriteAllText("$Nuevo\puente.ps1", $agente, (New-Object System.Text.UTF8Encoding($true)))
 $cfg = [ordered]@{ url = $PuenteUrl; empresa = $PuenteEmpresa; token = $PuenteToken; base = $base; cadaSeg = 15; reusarMin = 5 }
-[IO.File]::WriteAllText("$Destino\config.json", ($cfg | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText("$Nuevo\config.json", ($cfg | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
 Bien 'Agente y configuracion escritos.'
 
-Paso 'Probando: copia de la base, lectura en solo lectura y conexion con Macedonia...'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$Destino\puente.ps1" -Prueba
-if ($LASTEXITCODE -ne 0) { Mal 'La prueba fallo (arriba esta el motivo). El agente no quedo instalado como tarea.' }
+Paso 'Probando el agente nuevo: copia de la base, lectura en solo lectura y conexion con Macedonia...'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$Nuevo\puente.ps1" -Prueba
+if ($LASTEXITCODE -ne 0) { Fallo 'La prueba del agente nuevo fallo (arriba esta el motivo). No se instalo.' }
+Bien 'Prueba superada: Macedonia ya usa la clave nueva.'
 
-# ---------------------------------------------------------------- 5. tarea de Windows
+# ---------------------------------------------------------------- 5. cambiar el viejo por el nuevo
+Paso 'Reemplazando el agente anterior por el nuevo...'
+if ($habia) {
+  Stop-ScheduledTask -TaskName $Tarea -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $Tarea -Confirm:$false
+  # Hasta que el proceso viejo suelte sus archivos (Firebird, FirebirdClient).
+  $hasta = (Get-Date).AddSeconds(30)
+  while ((Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+          Where-Object { $_.CommandLine -like "*$Destino\puente.ps1*" }) -and (Get-Date) -lt $hasta) { Start-Sleep -Milliseconds 500 }
+}
+# Primero lo viejo se aparta (no se borra) y después entra lo nuevo. Desde la
+# prueba, Macedonia solo acepta la clave nueva: si algo no se deja mover, la
+# tarea corre el agente nuevo desde $Nuevo, que ya está probado y completo.
+$Partes = 'fb', 'lib', 'copia', 'puente.ps1', 'config.json'
+$Anterior = Join-Path $Destino 'anterior'
+$Ejecutable = "$Destino\puente.ps1"
+try {
+  if (Test-Path -LiteralPath $Anterior) { Remove-Item -LiteralPath $Anterior -Recurse -Force }
+  New-Item -ItemType Directory -Path $Anterior | Out-Null
+  foreach ($x in $Partes) { if (Test-Path -LiteralPath (Join-Path $Destino $x)) { Move-Item -LiteralPath (Join-Path $Destino $x) -Destination (Join-Path $Anterior $x) } }
+} catch {
+  # Lo que alcanzó a moverse vuelve a su sitio; el agente nuevo corre desde su carpeta.
+  foreach ($x in $Partes) { try { if (Test-Path -LiteralPath (Join-Path $Anterior $x)) { Move-Item -LiteralPath (Join-Path $Anterior $x) -Destination (Join-Path $Destino $x) } } catch {} }
+  $Ejecutable = "$Nuevo\puente.ps1"
+  Write-Host ('   No se pudo apartar el agente anterior ({0}): el nuevo queda corriendo desde {1}.' -f $_.Exception.Message, $Nuevo) -ForegroundColor Yellow
+}
+if ($Ejecutable -eq "$Destino\puente.ps1") {
+  foreach ($x in $Partes) { Move-Item -LiteralPath (Join-Path $Nuevo $x) -Destination (Join-Path $Destino $x) }
+  if (-not (Test-Path -LiteralPath "$Destino\log")) { New-Item -ItemType Directory -Path "$Destino\log" | Out-Null }
+  Get-ChildItem -LiteralPath "$Nuevo\log" -File | ForEach-Object {
+    Add-Content -LiteralPath (Join-Path "$Destino\log" $_.Name) -Value (Get-Content -LiteralPath $_.FullName) -Encoding UTF8
+  }
+  Remove-Item -LiteralPath $Nuevo -Recurse -Force
+  try { Remove-Item -LiteralPath $Anterior -Recurse -Force } catch { Write-Host "   Quedo ${Anterior}: se puede borrar a mano." -ForegroundColor Yellow }
+}
+Bien ('Agente nuevo en su lugar: {0}' -f $Ejecutable)
+
+# ---------------------------------------------------------------- 6. tarea de Windows
 Paso 'Dejando el agente como tarea de Windows...'
-$accion = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Destino\puente.ps1`""
+$accion = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Ejecutable`""
 $disparo = New-ScheduledTaskTrigger -AtStartup
 $quien = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $ajustes = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `

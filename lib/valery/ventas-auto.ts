@@ -90,7 +90,7 @@ export async function programarVentasAuto(
     .eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(50);
   const buena = (buenas ?? []).find((b) => Number((b.resumen as { renglones?: number } | null)?.renglones ?? 0) > 0);
   const ultimaHasta = ((buena?.parametros as { hasta?: string } | null)?.hasta) ?? null;
-  const { data: agente } = await sb.from("valery_agentes").select("version").eq("empresa_id", empresa).is("revocado_en", null).maybeSingle();
+  const { data: agente } = await sb.from("valery_agentes").select("version").eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", false).maybeSingle();
   const rellenarHoras = !ajustes.horasRellenas && versionAlMenos(agente?.version, VERSION_CON_HORA);
   const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras ? null : ultimaHasta);
 

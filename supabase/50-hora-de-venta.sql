@@ -1,4 +1,4 @@
--- 50 · La hora de cada venta, y el diagnóstico del Puente
+-- 50 · La hora de cada venta, y los pedidos nuevos del Puente (diagnóstico, movimientos)
 --
 -- Pedido del Owner (2026-11-02): ver en Ventas la hora en que se hizo cada
 -- documento en Valery. El agente 1.0.4 la manda (VENTAS.HORA_EMISION); hasta
@@ -10,12 +10,43 @@
 --   · valery_ajustes.horas_rellenas: la primera actualización automática con
 --     el agente 1.0.4 pide todo desde el corte, una vez, para ponerle la hora a
 --     lo que ya había entrado (lib/valery/ventas-auto.ts).
---   · valery_solicitudes acepta el pedido «diagnostico»: solo conteos por tabla,
---     tipo y estado, para saber dónde guarda Valery cada cosa.
+--   · valery_solicitudes acepta dos pedidos nuevos: «diagnostico» (solo conteos
+--     por tabla, tipo y estado, para saber dónde guarda Valery cada cosa) y
+--     «movimientos» (lo que se movió en CxC y CxP en un rango de días, para el
+--     reporte del día del Dashboard).
+--
+--   · Reinstalar sin quedarse sin agente (lo que pasó de la 1.0.2 a la 1.0.3:
+--     generar el instalador revocaba la clave vieja y la instalación fallida
+--     ya había quitado el agente). Ahora la clave nueva nace «en espera»: la
+--     vieja sigue sirviendo hasta que el agente nuevo pasa su prueba y se
+--     conecta; en ese momento, en una sola transacción, la vieja se revoca
+--     y la nueva queda activa (valery_estrenar_agente).
 --
 -- Nunca escribe en Valery. Se puede correr más de una vez.
 
 begin;
+
+alter table public.valery_agentes add column if not exists en_espera boolean not null default false;
+-- Uno activo y, como mucho, uno en espera por empresa.
+drop index if exists public.valery_agente_activo;
+create unique index valery_agente_activo on public.valery_agentes (empresa_id) where revocado_en is null and not en_espera;
+create unique index if not exists valery_agente_en_espera on public.valery_agentes (empresa_id) where revocado_en is null and en_espera;
+
+-- La primera vez que el agente nuevo habla (al final de su prueba, después de
+-- copiar y leer la base): revoca el activo y lo deja a él en su lugar.
+create or replace function public.valery_estrenar_agente(p_id bigint)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare a public.valery_agentes%rowtype;
+begin
+  select * into a from public.valery_agentes where id = p_id and revocado_en is null for update;
+  if not found or not a.en_espera then return; end if;
+  update public.valery_agentes set revocado_en = now()
+   where empresa_id = a.empresa_id and revocado_en is null and not en_espera;
+  update public.valery_agentes set en_espera = false where id = p_id;
+end $$;
+revoke execute on function public.valery_estrenar_agente(bigint) from public, anon, authenticated;
+grant execute on function public.valery_estrenar_agente(bigint) to service_role;
 
 alter table public.movimientos_inventario add column if not exists hora time;
 comment on column public.movimientos_inventario.hora is
@@ -35,7 +66,7 @@ begin
   end loop;
 end $$;
 alter table public.valery_solicitudes add constraint valery_solicitudes_tipo_check
-  check (tipo in ('ventas', 'cxc', 'cxp', 'existencias', 'estado', 'diagnostico'));
+  check (tipo in ('ventas', 'cxc', 'cxp', 'existencias', 'estado', 'diagnostico', 'movimientos'));
 
 create or replace function public._importar_ventas(
   p_empresa text, p_archivo text, p_hash text, p_renglones jsonb, p_notas jsonb, p_usuario uuid, p_vacio_es_error boolean)
@@ -141,17 +172,22 @@ end $$;
 commit;
 
 -- ---------------------------------------------------------------- COMPROBACIÓN
--- Debe decir: hora 1, horas_rellenas 1, diagnostico 1, importador 1, solo_servidor 1.
+-- Debe decir: hora 1, horas_rellenas 1, diagnostico 1, importador 1, solo_servidor 1, en_espera 1, estrenar 1.
 select
   (select count(*) from information_schema.columns where table_schema = 'public'
     and table_name = 'movimientos_inventario' and column_name = 'hora') as hora,
   (select count(*) from information_schema.columns where table_schema = 'public'
     and table_name = 'valery_ajustes' and column_name = 'horas_rellenas') as horas_rellenas,
   -- Uno solo, y que acepte el diagnóstico.
-  (select case when count(*) = 1 and bool_and(pg_get_constraintdef(oid) like '%diagnostico%') then 1 else 0 end
+  (select case when count(*) = 1 and bool_and(pg_get_constraintdef(oid) like '%diagnostico%' and pg_get_constraintdef(oid) like '%movimientos%') then 1 else 0 end
      from pg_constraint where conrelid = 'public.valery_solicitudes'::regclass and contype = 'c'
       and pg_get_constraintdef(oid) like '%existencias%') as diagnostico,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = '_importar_ventas' and p.prosrc like '%m.hora is null%') as importador,
   (select case when not has_function_privilege('authenticated', 'public._importar_ventas(text, text, text, jsonb, jsonb, uuid, boolean)', 'execute')
-               then 1 else 0 end) as solo_servidor;
+               then 1 else 0 end) as solo_servidor,
+  (select count(*) from information_schema.columns where table_schema = 'public'
+    and table_name = 'valery_agentes' and column_name = 'en_espera') as en_espera,
+  (select case when has_function_privilege('service_role', 'public.valery_estrenar_agente(bigint)', 'execute')
+                and not has_function_privilege('authenticated', 'public.valery_estrenar_agente(bigint)', 'execute')
+               then 1 else 0 end) as estrenar;
