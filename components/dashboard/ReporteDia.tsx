@@ -181,7 +181,7 @@ function Cuerpo({ r, empresa }: { r: Reporte; empresa: string }) {
         <TablaMovs movs={v.movimientos} conFecha={r.periodo !== "dia"} exportar={r.serie.length === 0} periodo={etiquetaPeriodo(r.periodo, r.desde, r.hasta)} />
       )}
       {v?.lecturaMovimientos && (
-        <p className="mt-3 text-xs text-muted">Movimientos de Valery leídos {haceCuanto(v.lecturaMovimientos.terminadoEn)}. Montos en bolívares como los guarda Valery; en dólares, el total en dólares que guarda Valery para cada documento.</p>
+        <p className="mt-3 text-xs text-muted">Movimientos de Valery leídos {haceCuanto(v.lecturaMovimientos.terminadoEn)}. Montos en bolívares como los guarda Valery; en dólares, solo los documentos hechos en dólares, con el total que guarda Valery.</p>
       )}
     </>
   );
@@ -256,7 +256,7 @@ function ExportarMovs({ movs, periodo }: { movs: MovValery[]; periodo: string })
     columnas: [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Hora" }, { titulo: "Cartera" }, { titulo: "Tipo" }, { titulo: "Documento", tipo: "codigo" },
       { titulo: "Contraparte" }, { titulo: "Concepto" }, { titulo: "Total (Bs)", tipo: "num" }, { titulo: "Total (US$)", tipo: "usd" }],
     filas: movs.map((m) => [fechaVista(m.fecha), horaVista(m.hora), CARTERA[m.cartera], m.tipo, m.documento, m.contraparte, m.concepto, m.totalBs, m.totalUsd]),
-    nota: "Montos en bolívares como los guarda Valery; en dólares, el total en dólares que guarda Valery para cada documento.",
+    nota: "Montos en bolívares como los guarda Valery; en dólares, solo los documentos hechos en dólares, con el total que guarda Valery.",
   }));
   return null;
 }

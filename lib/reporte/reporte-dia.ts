@@ -21,7 +21,11 @@ export type MovValery = {
   concepto: string;
   moneda: "Bs" | "USD";
   totalBs: number;
-  /** El total en dólares que guarda Valery (V3CXC_ME / V3CXP_ME). Null: no lo trae. */
+  /**
+   * El total en dólares que guarda Valery (V3CXC_ME / V3CXP_ME), solo si el
+   * documento es en dólares. En los de bolívares ese campo repite el monto en
+   * bolívares (comprobado en el respaldo y en SERVIDORSUD, 3-nov-2026): null.
+   */
   totalUsd: number | null;
 };
 
@@ -36,13 +40,14 @@ export function movsDesdeAgente(crudas: unknown[]): MovValery[] {
     const cartera = texto(f.cartera).toLowerCase();
     const fecha = texto(f.fecha).slice(0, 10);
     if ((cartera !== "cxc" && cartera !== "cxp") || !texto(f.tipo) || !texto(f.documento) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) continue;
-    const me = f.total_me === null || f.total_me === undefined ? null : numero(f.total_me);
+    const moneda = texto(f.moneda) === "02" ? "USD" : "Bs";
+    const me = moneda !== "USD" || f.total_me === null || f.total_me === undefined ? null : numero(f.total_me);
     out.push({
       cartera, tipo: texto(f.tipo).toUpperCase(), documento: texto(f.documento), contraparte: texto(f.contraparte),
       fecha, hora: horaValida(f.hora),
       // Valery guarda el concepto con «&amp;» en vez de «&».
       concepto: texto(f.concepto).replace(/&amp;/g, "&"),
-      moneda: texto(f.moneda) === "02" ? "USD" : "Bs", totalBs: numero(f.total), totalUsd: me !== null && me > 0 ? me : null,
+      moneda, totalBs: numero(f.total), totalUsd: me !== null && me > 0 ? me : null,
     });
   }
   return out;
