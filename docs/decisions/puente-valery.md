@@ -143,7 +143,11 @@ tasa BCV de hoy, y se dice. Sin tasa de hoy, el total en dólares no se muestra.
   sin un nombre ni un monto: para encontrar dónde guarda Valery las notas de
   entrega a crédito antes de traer la CxC sola.
 - CxC y CxP traen también el saldo en dólares de Valery (`V3CXC_ME`,
-  `V3CXP_ME`).
+  `V3CXP_ME`). **Solo son dólares en los documentos en dólares (moneda
+  `02`)**: en los de bolívares (`01`, `00`) Valery repite ahí el monto en
+  bolívares (respaldo de marzo: 1.194 de 1.194 en CxC, 1.442 de 1.442 en CxP;
+  igual en SERVIDORSUD el 3-nov-2026). Tomarlo siempre como dólares mostró
+  «867.672,92 Bs · $867.672,92» en el reporte.
 - **Movimientos del día.** Pedido nuevo con un rango de días: lo que se hizo
   en CxC y CxP de Valery (facturas, pagos, notas de crédito, retenciones),
   con su hora. Lo usa el **Reporte del día** del Dashboard

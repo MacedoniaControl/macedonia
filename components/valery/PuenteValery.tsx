@@ -320,7 +320,9 @@ const COLUMNAS: Record<Exclude<TipoSolicitud, "estado">, { titulo: string; campo
   movimientos: [
     { titulo: "Cartera", campo: "cartera" }, { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Hora", campo: "hora" },
     { titulo: "Tipo", campo: "tipo" }, { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Contraparte", campo: "contraparte" },
-    { titulo: "Concepto", campo: "concepto" }, { titulo: "Total Bs", campo: "total", tipo: "num" }, { titulo: "Total US$", campo: "total_me", tipo: "num" },
+    { titulo: "Concepto", campo: "concepto" }, { titulo: "Moneda", campo: "moneda", tipo: "codigo" }, { titulo: "Total Bs", campo: "total", tipo: "num" },
+    // En los documentos en bolívares (moneda 01) Valery repite aquí el monto en bolívares: solo es dólares con moneda 02.
+    { titulo: "Total en su moneda", campo: "total_me", tipo: "num" },
   ],
   existencias: [
     { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "nombre" }, { titulo: "Depto.", campo: "departamento" },
