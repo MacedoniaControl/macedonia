@@ -44,16 +44,21 @@ async function gerenciaDe(empresa: string) {
 /** El agente vivo de la empresa, o null si no hay ninguno instalado. */
 export async function agentePuente(empresa: string): Promise<AgentePuente | null> {
   const sb = await createClient();
+  // El activo: uno «en espera» (instalador generado que todavía no se conectó) no cuenta.
   const { data, error } = await sb.from("valery_agentes").select("creado_en, ultimo_contacto, version, info")
-    .eq("empresa_id", empresa).is("revocado_en", null).maybeSingle();
+    .eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", false).maybeSingle();
   if (error) throw new Error(`No se pudo leer el puente: ${error.message}`);
   if (!data) return null;
   return { creadoEn: data.creado_en, ultimoContacto: data.ultimo_contacto, version: data.version, info: (data.info as Record<string, unknown>) ?? {} };
 }
 
 /**
- * Crea la clave de un agente nuevo y revoca la anterior. La clave se devuelve
- * UNA vez, para meterla en el instalador; la base guarda solo su huella.
+ * Crea la clave de un agente nuevo. La clave se devuelve UNA vez, para meterla
+ * en el instalador; la base guarda solo su huella. La anterior NO se revoca
+ * aquí: la nueva nace «en espera» y el cambio lo hace el servidor cuando el
+ * agente nuevo pasa su prueba y se conecta (migración 50). Si la instalación
+ * falla, el agente de antes sigue funcionando. Lo que ya no sirve es un
+ * instalador generado antes y sin usar: se revoca.
  */
 export async function crearAgentePuente(empresa: string): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
   const g = await gerenciaDe(empresa);
@@ -61,10 +66,11 @@ export async function crearAgentePuente(empresa: string): Promise<{ ok: true; to
   const token = `mvp_${randomBytes(32).toString("base64url")}`;
   const admin = createAdminClient();
   const ahora = new Date().toISOString();
-  const { error: e1 } = await admin.from("valery_agentes").update({ revocado_en: ahora }).eq("empresa_id", empresa).is("revocado_en", null);
-  if (e1) return { ok: false, error: `No se pudo revocar el agente anterior: ${e1.message}` };
+  const { error: e1 } = await admin.from("valery_agentes").update({ revocado_en: ahora })
+    .eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", true);
+  if (e1) return { ok: false, error: `No se pudo anular el instalador anterior: ${e1.message}` };
   const { error: e2 } = await admin.from("valery_agentes").insert({
-    empresa_id: empresa, token_hash: createHash("sha256").update(token, "utf8").digest("hex"), creado_por: g.u.id,
+    empresa_id: empresa, token_hash: createHash("sha256").update(token, "utf8").digest("hex"), creado_por: g.u.id, en_espera: true,
   });
   if (e2) return { ok: false, error: `No se pudo crear el agente: ${e2.message}` };
   return { ok: true, token };
@@ -85,9 +91,9 @@ export async function pedirAlPuente(
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const g = await gerenciaDe(empresa);
   if ("error" in g) return { ok: false, error: g.error as string };
-  if (!["ventas", "cxc", "cxp", "existencias", "estado"].includes(tipo)) return { ok: false, error: "Pedido desconocido." };
+  if (!["ventas", "cxc", "cxp", "existencias", "estado", "diagnostico", "movimientos"].includes(tipo)) return { ok: false, error: "Pedido desconocido." };
   const p: Record<string, string> = {};
-  if (tipo === "ventas") {
+  if (tipo === "ventas" || tipo === "movimientos") {
     const e = errorDeRango(parametros.desde ?? "", parametros.hasta ?? "");
     if (e) return { ok: false, error: e };
     p.desde = parametros.desde!; p.hasta = parametros.hasta!;

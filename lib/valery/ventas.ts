@@ -19,6 +19,8 @@ import { EMPRESAS, type EmpresaId } from "../ux/empresas.ts";
 /** Un renglón de venta tal como está en el kardex. */
 export type MovVenta = {
   fecha: string;
+  /** hh:mm:ss en que se hizo el documento en Valery. Null: entró por Excel o antes del agente 1.0.4. */
+  hora?: string | null;
   tipo: TipoDoc;
   /** Como lo guarda el importador: «FAC 0000001433». */
   documento: string;
@@ -29,6 +31,13 @@ export type MovVenta = {
   /** Sin signo, como en el kardex: la DEV resta por ser tipo DEV. Null = cargado sin monto. */
   montoUsd: number | null;
 };
+
+/** «15:42:07» → «3:42 p. m.», como la hora de la tasa BCV. Sin hora (entró por Excel): «—». */
+export function horaVista(h: string | null): string {
+  if (!h) return "—";
+  const [hh, mm] = h.split(":").map(Number);
+  return `${hh % 12 || 12}:${String(mm).padStart(2, "0")} ${hh < 12 ? "a. m." : "p. m."}`;
+}
 
 export type ClaseVenta = "venta" | "entre_empresas" | "consumo_propio";
 
@@ -44,6 +53,7 @@ export function claseVenta(cliente: string, empresa: EmpresaId): ClaseVenta {
 export type DocVenta = {
   clave: string;
   fecha: string;
+  hora: string | null;
   tipo: TipoDoc;
   documento: string;
   cliente: string;
@@ -94,8 +104,9 @@ export function resumirVentas(movs: MovVenta[], empresa: EmpresaId): ResumenVent
     if (m.montoUsd === null) sinMonto++;
     if (m.tipo === "DEV") devoluciones += m.montoUsd ?? 0; else bruto += m.montoUsd ?? 0;
 
-    const d = docs.get(clave) ?? { clave, fecha: m.fecha, tipo: m.tipo, documento: m.documento.replace(/^(FAC|NET|DEV)\s+/, ""), cliente: m.cliente, renglones: 0, totalUsd: 0 };
+    const d = docs.get(clave) ?? { clave, fecha: m.fecha, hora: m.hora ?? null, tipo: m.tipo, documento: m.documento.replace(/^(FAC|NET|DEV)\s+/, ""), cliente: m.cliente, renglones: 0, totalUsd: 0 };
     d.renglones++; d.totalUsd += usd;
+    if (m.hora && (!d.hora || m.hora < d.hora)) d.hora = m.hora;
     docs.set(clave, d);
 
     const p = prods.get(m.codigo) ?? { codigo: m.codigo, nombre: m.nombre, cantidad: 0, totalUsd: 0, documentos: 0, docs: new Set<string>() };

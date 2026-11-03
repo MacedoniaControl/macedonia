@@ -24,7 +24,7 @@ import {
   agentePuente, aplicarVentasPuente, cancelarPedidoPuente, crearAgentePuente, pedirAlPuente, resultadoPuente,
   revocarAgentePuente, solicitudesPuente, type AgentePuente, type SolicitudPuente,
 } from "@/lib/valery/puente-db";
-import { conectado, haceCuanto, NOMBRE_SOLICITUD, type EstadoSolicitud, type TipoSolicitud } from "@/lib/valery/puente";
+import { conectado, haceCuanto, NOMBRE_SOLICITUD, versionAlMenos, type EstadoSolicitud, type TipoSolicitud } from "@/lib/valery/puente";
 
 const hoy = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
 const haceDias = (n: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date(Date.now() - n * 86400000));
@@ -144,7 +144,12 @@ export function PuenteValery({ empresa }: { empresa: string }) {
                 {t === "estado" ? "Probar conexión" : `Traer ${NOMBRE_SOLICITUD[t].toLowerCase()}`}
               </Button>
             ))}
+            {/* Conteos por tabla, tipo y estado (ningún nombre ni monto): para saber dónde guarda Valery cada cosa. */}
+            <Button variant="secondary" disabled={!a || !!yendo || !versionAlMenos(a?.version, "1.0.4")} cargando={yendo === "diagnostico"} textoCargando="Pidiendo…" onClick={() => pedir("diagnostico")}>
+              Diagnóstico
+            </Button>
           </div>
+          {a && !versionAlMenos(a.version, "1.0.4") && <p className="text-xs text-muted">El diagnóstico necesita el agente 1.0.4 o más nuevo: reinstálalo.</p>}
           {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-xl px-3 py-2 text-sm ${msg.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>{msg.t}</p>}
         </div>
 
@@ -264,7 +269,7 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
         {!listo ? (
           <>
             <ol className="list-decimal space-y-2 pl-5">
-              <li>Se descarga un archivo <b>.bat</b> con la clave de esta empresa{reinstalar ? "; la clave del agente actual deja de servir" : ""}.</li>
+              <li>Se descarga un archivo <b>.bat</b> con la clave de esta empresa.{reinstalar ? " El agente actual sigue funcionando hasta que el nuevo pase su prueba en el servidor; si la instalación falla, se queda el de antes." : ""}</li>
               <li>Cópialo al <b>servidor donde está la base de Valery</b> (en Sumigases, SERVIDORSUD).</li>
               <li>Clic derecho → <b>Ejecutar como administrador</b>. Baja lo que necesita de los sitios oficiales de Firebird, prueba la conexión y queda funcionando solo.</li>
               <li><b>Bórralo después</b>: lleva la clave del agente.</li>
@@ -291,8 +296,8 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
 
 const COLUMNAS: Record<Exclude<TipoSolicitud, "estado">, { titulo: string; campo: string; tipo?: Columna["tipo"] }[]> = {
   ventas: [
-    { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Tipo", campo: "tipo" }, { titulo: "Documento", campo: "documento", tipo: "codigo" },
-    { titulo: "Cliente", campo: "cliente" }, { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "producto" },
+    { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Hora", campo: "hora" }, { titulo: "Tipo", campo: "tipo" },
+    { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Cliente", campo: "cliente" }, { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "producto" },
     { titulo: "Cantidad", campo: "cantidad", tipo: "num" }, { titulo: "Neto Bs", campo: "neto", tipo: "num" }, { titulo: "Tasa", campo: "tasa", tipo: "num" },
   ],
   cxc: [
@@ -304,6 +309,18 @@ const COLUMNAS: Record<Exclude<TipoSolicitud, "estado">, { titulo: string; campo
     { titulo: "Tipo", campo: "tipo" }, { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Proveedor", campo: "proveedor" },
     { titulo: "RIF", campo: "rif", tipo: "codigo" }, { titulo: "Emisión", campo: "emision", tipo: "fecha" }, { titulo: "Vence", campo: "vencimiento", tipo: "fecha" },
     { titulo: "Total Bs", campo: "total", tipo: "num" }, { titulo: "Saldo Bs", campo: "saldo", tipo: "num" },
+  ],
+  // Solo conteos. En VENTAS «Con saldo» es a crédito y «Con saldo US$», con cuenta por cobrar;
+  // en TIPOS_DOCUMENTOS son el factor del tipo en CxC y en CxP (1 suma, -1 resta).
+  diagnostico: [
+    { titulo: "Tabla", campo: "tabla", tipo: "codigo" }, { titulo: "Tipo", campo: "tipo", tipo: "codigo" }, { titulo: "Temporal", campo: "temporal" },
+    { titulo: "Documentos", campo: "documentos", tipo: "num" }, { titulo: "Con saldo", campo: "con_saldo", tipo: "num" },
+    { titulo: "Con saldo US$", campo: "con_saldo_me", tipo: "num" }, { titulo: "Desde", campo: "desde", tipo: "fecha" }, { titulo: "Hasta", campo: "hasta", tipo: "fecha" },
+  ],
+  movimientos: [
+    { titulo: "Cartera", campo: "cartera" }, { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Hora", campo: "hora" },
+    { titulo: "Tipo", campo: "tipo" }, { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Contraparte", campo: "contraparte" },
+    { titulo: "Concepto", campo: "concepto" }, { titulo: "Total Bs", campo: "total", tipo: "num" }, { titulo: "Total US$", campo: "total_me", tipo: "num" },
   ],
   existencias: [
     { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "nombre" }, { titulo: "Depto.", campo: "departamento" },

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claseVenta, resumirVentas, type MovVenta } from "./ventas.ts";
+import { claseVenta, horaVista, resumirVentas, type MovVenta } from "./ventas.ts";
 import { rangoAuto, tocaActualizar, vaciaSospechosa } from "./puente.ts";
 
 const mov = (tipo: MovVenta["tipo"], documento: string, cliente: string, codigo: string, cantidad: number, montoUsd: number | null, fecha = "2026-10-30"): MovVenta =>
@@ -71,4 +71,21 @@ test("una actualización vacía de una semana o más es sospechosa", () => {
   assert.equal(vaciaSospechosa("2026-09-24", "2026-11-02", 12), false);
   assert.equal(vaciaSospechosa("2026-09-24", "2026-11-02", null), false); // no se sabe: no se acusa
   assert.equal(vaciaSospechosa(null, "2026-11-02", 0), false);
+});
+
+test("la hora del documento: la del primer renglón; sin hora, «—»", () => {
+  const r = resumirVentas([
+    { ...mov("NET", "9486", "MENDEZ SERVICIOS C.A", "OXI6", 1, 20), hora: "15:42:09" },
+    { ...mov("NET", "9486", "MENDEZ SERVICIOS C.A", "ARG6", 1, 30), hora: "15:42:07" },
+    mov("FAC", "1649", "Luis Lunar", "OXI6", 1, 10),
+  ], "sumigases");
+  const nota = r.documentos.find((d) => d.documento.endsWith("9486"))!;
+  const fac = r.documentos.find((d) => d.documento.endsWith("1649"))!;
+  assert.equal(nota.hora, "15:42:07");
+  assert.equal(fac.hora, null);
+  assert.equal(horaVista("15:42:07"), "3:42 p. m.");
+  assert.equal(horaVista("00:05:00"), "12:05 a. m.");
+  assert.equal(horaVista("12:00:00"), "12:00 p. m.");
+  assert.equal(horaVista("09:30:00"), "9:30 a. m.");
+  assert.equal(horaVista(null), "—");
 });

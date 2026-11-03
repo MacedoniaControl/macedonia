@@ -27,7 +27,7 @@ import { fechaVista } from "@/lib/ux/tabla-export";
 import { fmtUsd } from "@/lib/ux/format";
 import type { EmpresaId } from "@/lib/ux/empresas";
 import { conectado, haceCuanto, vaciaSospechosa } from "@/lib/valery/puente";
-import { resumirVentas, type CliVenta, type DocVenta, type ProdVenta, type ResumenVentas } from "@/lib/valery/ventas";
+import { horaVista, resumirVentas, type CliVenta, type DocVenta, type ProdVenta, type ResumenVentas } from "@/lib/valery/ventas";
 import { actualizarVentasAhora, cambiarVentasAuto, estadoVentas, ventasDelPeriodo, type EstadoVentas } from "@/lib/valery/ventas-db";
 
 const hoyCaracas = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
@@ -314,26 +314,28 @@ function Vacio() {
 
 function TablaDocumentos({ filas, periodo, resumen }: { filas: DocVenta[]; periodo: string; resumen: ResumenVentas }) {
   const acc = useMemo(() => ({
-    fecha: (d: DocVenta) => d.fecha, tipo: (d: DocVenta) => d.tipo, documento: (d: DocVenta) => d.documento,
+    // La hora ordena dentro del día; sin hora (Excel) va antes que cualquiera.
+    fecha: (d: DocVenta) => `${d.fecha} ${d.hora ?? ""}`, hora: (d: DocVenta) => d.hora ?? "", tipo: (d: DocVenta) => d.tipo, documento: (d: DocVenta) => d.documento,
     cliente: (d: DocVenta) => d.cliente, renglones: (d: DocVenta) => d.renglones, total: (d: DocVenta) => d.totalUsd,
   }), []);
   const t = useTableView(filas, acc, 25);
   useExportable(() => ({
     modulo: "", seccion: "Ventas", titulo: "Ventas · Documentos",
     detalle: [`Período ${periodo}`, "Sin IVA, en dólares a la tasa de su día. La devolución resta."],
-    columnas: [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Tipo" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Cliente" }, { titulo: "Renglones", tipo: "num" }, { titulo: "Total (USD)", tipo: "usd" }],
-    filas: t.ordenadas.map((d) => [fechaVista(d.fecha), TIPO[d.tipo].t, d.documento, d.cliente, d.renglones, r2(d.totalUsd)]),
-    totales: ["", "", "", `${t.ordenadas.length} documento(s)`, "", r2(t.ordenadas.reduce((a, d) => a + d.totalUsd, 0))],
+    columnas: [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Hora" }, { titulo: "Tipo" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Cliente" }, { titulo: "Renglones", tipo: "num" }, { titulo: "Total (USD)", tipo: "usd" }],
+    filas: t.ordenadas.map((d) => [fechaVista(d.fecha), horaVista(d.hora), TIPO[d.tipo].t, d.documento, d.cliente, d.renglones, r2(d.totalUsd)]),
+    totales: ["", "", "", "", `${t.ordenadas.length} documento(s)`, "", r2(t.ordenadas.reduce((a, d) => a + d.totalUsd, 0))],
     nota: resumen.entreEmpresas.renglones || resumen.consumoPropio.renglones ? "No incluye lo vendido a la otra empresa del grupo ni el consumo interno." : undefined,
   }));
   if (!filas.length) return <Vacio />;
   return (
     <>
       <div className="sumi-scroll max-w-full overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[800px] text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-muted">
             <tr className="border-b border-border">
               <SortableTh label="Fecha" sortKey="fecha" ariaSort={t.ariaSort} onSort={t.toggleSort} />
+              <SortableTh label="Hora" sortKey="hora" ariaSort={t.ariaSort} onSort={t.toggleSort} />
               <SortableTh label="Tipo" sortKey="tipo" ariaSort={t.ariaSort} onSort={t.toggleSort} />
               <SortableTh label="Documento" sortKey="documento" ariaSort={t.ariaSort} onSort={t.toggleSort} />
               <SortableTh label="Cliente" sortKey="cliente" ariaSort={t.ariaSort} onSort={t.toggleSort} />
@@ -345,6 +347,7 @@ function TablaDocumentos({ filas, periodo, resumen }: { filas: DocVenta[]; perio
             {t.visible.map((d) => (
               <tr key={d.clave} className="hover:bg-surface-2">
                 <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums text-muted">{fechaVista(d.fecha)}</td>
+                <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums text-muted">{horaVista(d.hora)}</td>
                 <td className="py-2.5 pr-3"><StatusBadge tone={TIPO[d.tipo].tone}>{TIPO[d.tipo].t}</StatusBadge></td>
                 <td className="py-2.5 pr-3 font-mono text-xs text-muted">{d.documento}</td>
                 <td className="py-2.5 pr-3 text-text">{d.cliente || "—"}</td>

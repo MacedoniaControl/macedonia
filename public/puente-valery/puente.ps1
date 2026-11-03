@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.3'
+$Version = '1.0.4'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -56,16 +56,22 @@ function Llamar($cuerpo) {
 }
 
 # ---------------------------------------------------------------- copiar la base
-function Copiar-Base {
-  if ((Test-Path -LiteralPath $Copia) -and ((Get-Date) - (Get-Item -LiteralPath $Copia).LastWriteTime).TotalMinutes -lt $ReusarMin) {
-    return
+# esentutl /vss: Windows hace la instantánea, copia de ella y la borra
+# (Windows 8 / Server 2012 en adelante). La 1.0.3 solo tenía la de abajo, y
+# en SERVIDORSUD fallaba («No se encuentra la ruta …\vss\…»): copiaba directo.
+function Copiar-Esentutl([string]$origen, [string]$destino) {
+  $esent = if ($env:SystemRoot) { Join-Path $env:SystemRoot 'System32\esentutl.exe' } else { '' }
+  if (-not $esent -or -not (Test-Path -LiteralPath $esent)) { throw 'esentutl no esta en este Windows' }
+  # Un programa externo que escribe en stderr, con 'Stop', se vuelve excepción en PowerShell 5.
+  $salida = & { $ErrorActionPreference = 'Continue'; & $esent /y $origen /vss /d $destino 2>&1 | Out-String }
+  if ($LASTEXITCODE -ne 0) {
+    $ultima = @($salida -split "`r?`n" | Where-Object { $_.Trim() }) | Select-Object -Last 1
+    throw ('esentutl salio con {0}: {1}' -f $LASTEXITCODE, $ultima)
   }
-  $origen = [string]$Config.base
-  if (-not (Test-Path -LiteralPath $origen)) { throw "No encuentro la base de Valery en $origen." }
-  $dir = Split-Path -Parent $Copia; if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
-  $tmp = $Copia + '.tmp'
-  if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
-  $metodo = ''; $errVss = ''
+}
+
+# Instantánea por WMI y un enlace a ella (lo de la 1.0.3).
+function Copiar-Sombra([string]$origen, [string]$destino) {
   $unidad = [IO.Path]::GetPathRoot($origen)
   $enlace = Join-Path $Raiz 'vss'
   $sombra = $null
@@ -75,23 +81,43 @@ function Copiar-Base {
     $sombra = Get-WmiObject Win32_ShadowCopy | Where-Object { $_.ID -eq $r.ShadowID }
     if (Test-Path -LiteralPath $enlace) { cmd /c rmdir "$enlace" | Out-Null }
     cmd /c mklink /d "$enlace" ($sombra.DeviceObject + '\') | Out-Null
-    Copy-Item -LiteralPath (Join-Path $enlace $origen.Substring($unidad.Length)) -Destination $tmp -Force
-    $metodo = 'instantanea VSS'
-  } catch {
-    $errVss = $_.Exception.Message
+    Copy-Item -LiteralPath (Join-Path $enlace $origen.Substring($unidad.Length)) -Destination $destino -Force
   } finally {
     if (Test-Path -LiteralPath $enlace) { cmd /c rmdir "$enlace" | Out-Null }
     if ($sombra) { try { $sombra.Delete() } catch {} }
   }
-  if (-not $metodo) {
-    try { Copy-Item -LiteralPath $origen -Destination $tmp -Force; $metodo = 'copia directa' }
-    catch { throw ("No se pudo copiar la base. VSS: {0} | Directa: {1}" -f $errVss, $_.Exception.Message) }
+}
+
+function Copiar-Base {
+  if ((Test-Path -LiteralPath $Copia) -and ((Get-Date) - (Get-Item -LiteralPath $Copia).LastWriteTime).TotalMinutes -lt $ReusarMin) {
+    return
   }
+  $origen = [string]$Config.base
+  if (-not (Test-Path -LiteralPath $origen)) { throw "No encuentro la base de Valery en $origen." }
+  $dir = Split-Path -Parent $Copia; if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
+  $tmp = $Copia + '.tmp'
+  # Tres maneras, de la mejor a la peor. Las dos primeras copian de una
+  # instantánea (VSS): la base entera tal como estaba en un segundo, aunque
+  # Valery esté guardando. La directa puede agarrar una página a medio escribir.
+  $metodo = ''; $fallas = @()
+  foreach ($m in @(
+      @{ nombre = 'instantanea VSS (esentutl)'; copiar = { param($o, $d) Copiar-Esentutl $o $d } },
+      @{ nombre = 'instantanea VSS'; copiar = { param($o, $d) Copiar-Sombra $o $d } },
+      @{ nombre = 'copia directa'; copiar = { param($o, $d) Copy-Item -LiteralPath $o -Destination $d -Force } })) {
+    if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
+    try {
+      & $m.copiar $origen $tmp
+      if (-not (Test-Path -LiteralPath $tmp)) { throw 'no dejo la copia' }
+      $metodo = $m.nombre; break
+    } catch { $fallas += ('{0}: {1}' -f $m.nombre, $_.Exception.Message) }
+  }
+  if (-not $metodo) { throw ('No se pudo copiar la base. ' + ($fallas -join ' | ')) }
   Move-Item -LiteralPath $tmp -Destination $Copia -Force
   (Get-Item -LiteralPath $Copia).LastWriteTime = Get-Date
   $o = Get-Item -LiteralPath $origen
   $script:InfoCopia = @{ metodoCopia = $metodo; copiaEn = (Get-Date).ToString('s'); baseModificada = $o.LastWriteTime.ToString('s'); baseMB = [math]::Round($o.Length / 1MB, 1) }
-  if ($errVss) { $script:InfoCopia.avisoVss = $errVss }
+  # Solo si no hubo instantánea: así el panel dice por qué.
+  if ($metodo -eq 'copia directa') { $script:InfoCopia.avisoVss = ($fallas -join ' | ') }
   # Para que el panel muestre que base se lee: una base vieja se delata por su ultima venta.
   $script:InfoCopia.base = $origen
   try { $script:InfoCopia.ultimaVenta = [string](Consultar "select max(fecha_emision) as u from ventas where temporal <> 'T'")[0].u } catch {}
@@ -131,7 +157,7 @@ function Consultar([string]$sql, [hashtable]$parametros = @{}) {
 
 $SQL = @{
   ventas = @'
-select v.fecha_emision as fecha, v.tipo_documento as tipo, v.documento, v.cliente_nombre as cliente,
+select v.fecha_emision as fecha, v.hora_emision as hora, v.tipo_documento as tipo, v.documento, v.cliente_nombre as cliente,
        d.producto_codigo as codigo, d.producto_nombre as producto, d.cantidad, d.total_neto as neto,
        v.factor_cambio as factor,
        (select first 1 h.factor_cambio from moneda_historial h
@@ -146,15 +172,17 @@ select v.fecha_emision as fecha, v.tipo_documento as tipo, v.documento, v.client
   cxc = @'
 select c.tipo_documento as tipo, c.documento, c.cliente_codigo, c.cliente_nombre as cliente, c.cliente_rif as rif,
        c.fecha_emision as emision, c.fecha_vencimiento as vencimiento, c.moneda_codigo as moneda, c.factor_cambio as factor,
-       c.total_operacion as total, c.saldo, c.vendedor_codigo as vendedor
-  from v3cxc c where c.saldo > 0.005 and c.temporal <> 'T'
+       c.total_operacion as total, c.saldo, m.saldo_me, c.vendedor_codigo as vendedor
+  from v3cxc c left join v3cxc_me m on m.correlativo_principal = c.correlativo
+ where c.saldo > 0.005 and c.temporal <> 'T'
  order by c.cliente_nombre, c.fecha_emision
 '@
   cxp = @'
 select c.tipo_documento as tipo, c.documento, c.numero_control, c.proveedor_codigo, c.proveedor_nombre as proveedor, c.proveedor_rif as rif,
        c.fecha_emision as emision, c.fecha_vencimiento as vencimiento, c.moneda_codigo as moneda, c.factor_cambio as factor,
-       c.total_operacion as total, c.saldo
-  from v3cxp c where c.saldo > 0.005 and c.temporal <> 'T'
+       c.total_operacion as total, c.saldo, m.saldo_me
+  from v3cxp c left join v3cxp_me m on m.correlativo_principal = c.correlativo
+ where c.saldo > 0.005 and c.temporal <> 'T'
  order by c.proveedor_nombre, c.fecha_emision
 '@
   existencias = @'
@@ -173,6 +201,53 @@ select (select count(*) from ventas where temporal <> 'T') as ventas,
        (select count(*) from productos_terminados_depositos) as productos
   from rdb$database
 '@
+  # Lo que se movió en CxC y CxP en un rango de días (facturas, pagos, notas,
+  # retenciones), con su hora: para el reporte del día de Macedonia.
+  movimientos = @'
+select cast('cxc' as varchar(3)) as cartera, c.tipo_documento as tipo, c.documento, c.cliente_nombre as contraparte, c.cliente_rif as rif,
+       c.fecha_emision as fecha, c.hora_emision as hora, c.concepto, c.moneda_codigo as moneda, c.factor_cambio as factor,
+       c.total_operacion as total, m.total_operacion_me as total_me, c.saldo
+  from v3cxc c left join v3cxc_me m on m.correlativo_principal = c.correlativo
+ where c.fecha_emision between cast(@desde as date) and cast(@hasta as date) and c.temporal <> 'T'
+union all
+select cast('cxp' as varchar(3)), c.tipo_documento, c.documento, c.proveedor_nombre, c.proveedor_rif,
+       c.fecha_emision, c.hora_emision, c.concepto, c.moneda_codigo, c.factor_cambio,
+       c.total_operacion, m.total_operacion_me, c.saldo
+  from v3cxp c left join v3cxp_me m on m.correlativo_principal = c.correlativo
+ where c.fecha_emision between cast(@desde as date) and cast(@hasta as date) and c.temporal <> 'T'
+ order by 6, 7
+'@
+  # Solo CONTEOS por tabla, tipo y estado (ningún nombre ni monto): para saber
+  # dónde guarda Valery cada cosa. En VENTAS: con_saldo = a crédito,
+  # con_saldo_me = con cuenta por cobrar. En TIPOS_DOCUMENTOS: si el tipo suma
+  # a CxC (con_saldo) y a CxP (con_saldo_me): 1 suma, -1 resta, 0 no cuenta.
+  diagnostico = @'
+select cast('V3CXC' as varchar(20)) as tabla, c.tipo_documento as tipo, c.temporal, count(*) as documentos,
+       sum(case when c.saldo > 0.005 then 1 else 0 end) as con_saldo,
+       sum(case when m.saldo_me > 0.005 then 1 else 0 end) as con_saldo_me,
+       min(c.fecha_emision) as desde, max(c.fecha_emision) as hasta
+  from v3cxc c left join v3cxc_me m on m.correlativo_principal = c.correlativo group by 2, 3
+union all
+select cast('V3CXP' as varchar(20)), c.tipo_documento, c.temporal, count(*),
+       sum(case when c.saldo > 0.005 then 1 else 0 end), sum(case when m.saldo_me > 0.005 then 1 else 0 end),
+       min(c.fecha_emision), max(c.fecha_emision)
+  from v3cxp c left join v3cxp_me m on m.correlativo_principal = c.correlativo group by 2, 3
+union all
+select cast('HCXC' as varchar(20)), tipo_documento, temporal, count(*), sum(case when saldo > 0.005 then 1 else 0 end), 0,
+       min(fecha_emision), max(fecha_emision) from hcxc group by 2, 3
+union all
+select cast('HCXP' as varchar(20)), tipo_documento, temporal, count(*), sum(case when saldo > 0.005 then 1 else 0 end), 0,
+       min(fecha_emision), max(fecha_emision) from hcxp group by 2, 3
+union all
+select cast('VENTAS' as varchar(20)), tipo_documento, temporal, count(*),
+       sum(case when credito > 0.005 then 1 else 0 end),
+       sum(case when correlativo_cxc is not null and correlativo_cxc <> 0 then 1 else 0 end),
+       min(fecha_emision), max(fecha_emision) from ventas group by 2, 3
+union all
+select cast('TIPOS_DOCUMENTOS' as varchar(20)), codigo_tipo_documento, cast(null as char(1)), 1,
+       cast(factor_cxc as integer), cast(factor_cxp as integer), cast(null as date), cast(null as date)
+  from tipos_documentos where factor_cxc <> 0 or factor_cxp <> 0 or codigo_tipo_documento in ('NET', 'NE', 'NDE')
+'@
 }
 
 function Filas-De([string]$tipo, $parametros) {
@@ -185,6 +260,9 @@ function Filas-De([string]$tipo, $parametros) {
       $f.Remove('factor'); $f.Remove('tasa_historial')
     }
     return ,$filas
+  }
+  if ($tipo -eq 'movimientos') {
+    return ,(Consultar $SQL.movimientos @{ '@desde' = [string]$parametros.desde; '@hasta' = [string]$parametros.hasta })
   }
   if ($SQL.ContainsKey($tipo)) { return ,(Consultar $SQL[$tipo]) }
   throw "Pedido desconocido: $tipo"

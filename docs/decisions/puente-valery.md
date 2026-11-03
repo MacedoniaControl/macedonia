@@ -58,7 +58,23 @@ Desde el panel (Configuración → Puente con Valery) el Owner o un Administrado
 genera el instalador: un `.bat` con la dirección de Macedonia, la empresa y la
 clave del agente. Se ejecuta **una vez en el servidor**, como administrador.
 Baja Firebird embebido y FirebirdClient de sus sitios oficiales y comprueba su
-huella antes de usarlos. Generar un instalador nuevo revoca la clave anterior.
+huella antes de usarlos.
+
+**Reinstalar no deja el servidor sin agente** (desde la migración 50; de la
+1.0.2 a la 1.0.3 pasó: el instalador quitaba el agente viejo antes de probar
+el nuevo, la prueba falló y el servidor se quedó sin ninguno):
+
+- La clave nueva nace «en espera». La vieja sigue sirviendo hasta que el
+  agente nuevo pasa su prueba (copia y lee la base) y habla con Macedonia: en
+  ese momento, en una transacción, la vieja se revoca y la nueva queda activa
+  (`valery_estrenar_agente`). Generar otro instalador anula solo el que estaba
+  en espera sin usar.
+- El instalador arma y prueba el agente nuevo en `C:\MacedoniaPuente\nuevo`
+  sin tocar el que corre. Si falla la descarga o la prueba, borra lo nuevo y
+  el anterior sigue como estaba. Solo con la prueba superada detiene el viejo,
+  lo aparta a `anterior` y pone el nuevo en su lugar; si el viejo no se deja
+  apartar, la tarea corre el nuevo desde `nuevo` (ya probado y con la clave
+  buena).
 
 ## Ventas automáticas (2026-11-02)
 
@@ -109,6 +125,34 @@ lectura): la última lectura del agente, con «Leer de Valery ahora».
 Los saldos se muestran en bolívares, como los guarda Valery. El equivalente en
 dólares: el documento en dólares a la tasa del documento; el de bolívares a la
 tasa BCV de hoy, y se dice. Sin tasa de hoy, el total en dólares no se muestra.
+
+## Agente 1.0.4 (2026-11-02)
+
+- **Hora de cada venta.** El agente manda `VENTAS.HORA_EMISION`; Macedonia la
+  guarda en `movimientos_inventario.hora` (migración 50) y Ventas la muestra.
+  Lo que entró por Excel no la trae: «—». La primera actualización automática
+  con un agente 1.0.4 pide todo desde el corte, una vez, y el importador le
+  pone la hora a lo que ya estaba (solo llena; nunca cambia una hora puesta).
+- **Copia con instantánea.** La 1.0.3 fallaba al copiar por VSS en
+  SERVIDORSUD y copiaba directo. Ahora prueba primero `esentutl /y … /vss`
+  (Windows hace la instantánea y copia de ella), luego la instantánea por WMI
+  de antes, y solo al final la copia directa; si llega ahí, el panel dice por
+  qué fallaron las otras dos.
+- **Diagnóstico.** Pedido nuevo que devuelve solo conteos por tabla, tipo de
+  documento y estado (V3CXC, V3CXP, HCXC, HCXP, VENTAS, TIPOS_DOCUMENTOS),
+  sin un nombre ni un monto: para encontrar dónde guarda Valery las notas de
+  entrega a crédito antes de traer la CxC sola.
+- CxC y CxP traen también el saldo en dólares de Valery (`V3CXC_ME`,
+  `V3CXP_ME`).
+- **Movimientos del día.** Pedido nuevo con un rango de días: lo que se hizo
+  en CxC y CxP de Valery (facturas, pagos, notas de crédito, retenciones),
+  con su hora. Lo usa el **Reporte del día** del Dashboard
+  (`components/dashboard/ReporteDia.tsx`), que junta además las ventas, las
+  cuentas de Macedonia (cuentas nuevas, abonos, liquidaciones) y la operación
+  (notas, cotizaciones, cilindros, gastos, conteos). Cada parte solo para
+  quien ve esa sección; lo de Valery, Owner y Administradores. Se pide solo al
+  abrir el reporte si no hay lectura de ese día o la de hoy tiene más de una
+  hora, y con «Leer de Valery»; nunca dos pedidos iguales en camino.
 
 ## Lo que el puente nunca hace
 

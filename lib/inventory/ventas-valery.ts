@@ -43,6 +43,8 @@ export type RenglonVenta = {
   /** Fila de Excel (para los mensajes). */
   fila: number;
   fecha: string;          // aaaa-mm-dd
+  /** hh:mm:ss: la trae el Puente desde el agente 1.0.4; el Excel no la trae. */
+  hora?: string | null;
   tipo: TipoDoc;
   documento: string;      // 0000001433
   cliente: string;
@@ -287,7 +289,7 @@ export function notasFacturadas(renglones: RenglonVenta[], previas: NotaPrevia[]
 
 // ---------------------------------------------------------------- lo que se importa
 export type MovimientoVenta = {
-  renglon: string; fecha: string; direccion: "entrada" | "salida"; tipo: TipoDoc; documento: string;
+  renglon: string; fecha: string; hora?: string | null; direccion: "entrada" | "salida"; tipo: TipoDoc; documento: string;
   cliente: string; codigo: string; nombre: string; cantidad: number; montoUsd: number;
   /** En una NET: la factura que la factura. */
   facturadaCon: string | null;
@@ -307,7 +309,7 @@ export type PlanVentas = {
 
 /** Un movimiento tal como lo reciben importar_ventas_valery e importar_ventas_puente. */
 export const paraLaBase = (m: MovimientoVenta) => ({
-  renglon: m.renglon, fecha: m.fecha, direccion: m.direccion, tipo: m.tipo, documento: m.documento, cliente: m.cliente,
+  renglon: m.renglon, fecha: m.fecha, hora: m.hora ?? null, direccion: m.direccion, tipo: m.tipo, documento: m.documento, cliente: m.cliente,
   codigo: m.codigo, nombre: m.nombre, cantidad: m.cantidad, monto_usd: m.montoUsd, facturada_con: m.facturadaCon,
 });
 
@@ -321,7 +323,7 @@ export function planVentas(renglones: RenglonVenta[], corte: string, previas: No
     if (r.fecha < corte) { antesDelCorte++; continue; }
     if (fac.facturas.has(r.clave)) { facturasDeNotas++; continue; }
     movimientos.push({
-      renglon: r.clave, fecha: r.fecha, direccion: r.tipo === "DEV" ? "entrada" : "salida", tipo: r.tipo,
+      renglon: r.clave, fecha: r.fecha, hora: r.hora ?? null, direccion: r.tipo === "DEV" ? "entrada" : "salida", tipo: r.tipo,
       documento: `${r.tipo} ${r.documento}`, cliente: r.cliente, codigo: r.codigo, nombre: r.producto || r.codigo,
       cantidad: r.cantidad, montoUsd: aMonto(Math.abs(r.ventaUsd)),
       facturadaCon: r.tipo === "NET" ? fac.notas.get(r.clave) ?? null : null,

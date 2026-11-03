@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   if (token.length < 32 || token.length > 200) return noAutorizado();
 
   const admin = createAdminClient();
-  const { data: agente } = await admin.from("valery_agentes").select("id, empresa_id, info")
+  const { data: agente } = await admin.from("valery_agentes").select("id, empresa_id, info, en_espera")
     .eq("token_hash", huella(token)).is("revocado_en", null).maybeSingle();
   if (!agente) return noAutorizado();
   const empresa = agente.empresa_id as string;
@@ -47,6 +47,12 @@ export async function POST(req: Request) {
   try { cuerpo = (await req.json()) as Cuerpo; } catch { return malo("El cuerpo no es JSON."); }
 
   if (cuerpo.accion === "siguiente") {
+    // Un agente recién instalado habla por primera vez al final de su prueba
+    // (ya copió y leyó la base): ahí reemplaza al anterior, no antes.
+    if (agente.en_espera) {
+      const { error } = await admin.rpc("valery_estrenar_agente", { p_id: agente.id });
+      if (error) return malo(`No se pudo activar el agente nuevo: ${error.message}`, 500);
+    }
     const info = cuerpo.info && typeof cuerpo.info === "object" ? cuerpo.info : {};
     await admin.from("valery_agentes").update({
       ultimo_contacto: new Date().toISOString(),

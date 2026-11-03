@@ -17,15 +17,15 @@ import type { MovVenta } from "./ventas.ts";
 /** Los renglones de venta del kardex entre dos fechas (inclusive). */
 export async function ventasDelPeriodo(empresa: string, desde: string, hasta: string): Promise<MovVenta[]> {
   const sb = await createClient();
-  type Fila = { fecha: string; tipo_doc: TipoDoc; documento: string | null; cliente: string | null; codigo: string; nombre: string; cantidad: number; monto_usd: number | null };
+  type Fila = { fecha: string; hora: string | null; tipo_doc: TipoDoc; documento: string | null; cliente: string | null; codigo: string; nombre: string; cantidad: number; monto_usd: number | null };
   const filas = await todasLasFilas<Fila>((a, b, contar) =>
     sb.from("movimientos_inventario")
-      .select("fecha, tipo_doc, documento, cliente, codigo, nombre, cantidad, monto_usd", contar ? { count: "exact" } : undefined)
+      .select("fecha, hora, tipo_doc, documento, cliente, codigo, nombre, cantidad, monto_usd", contar ? { count: "exact" } : undefined)
       .eq("empresa_id", empresa).eq("origen", "venta").in("tipo_doc", ["FAC", "NET", "DEV"])
       .gte("fecha", desde).lte("fecha", hasta)
       .order("id").range(a, b));
   return filas.map((f) => ({
-    fecha: f.fecha, tipo: f.tipo_doc, documento: f.documento ?? "", cliente: f.cliente ?? "", codigo: f.codigo, nombre: f.nombre,
+    fecha: f.fecha, hora: f.hora, tipo: f.tipo_doc, documento: f.documento ?? "", cliente: f.cliente ?? "", codigo: f.codigo, nombre: f.nombre,
     cantidad: Number(f.cantidad), montoUsd: f.monto_usd === null ? null : Number(f.monto_usd),
   }));
 }
@@ -81,7 +81,7 @@ export async function estadoVentas(empresa: string): Promise<EstadoVentas> {
   const [corte, ajustes, agente, ultima, buena] = await Promise.all([
     corteDe(sb, empresa),
     ajustesVentasDe(sb, empresa),
-    sb.from("valery_agentes").select("ultimo_contacto, info").eq("empresa_id", empresa).is("revocado_en", null).maybeSingle(),
+    sb.from("valery_agentes").select("ultimo_contacto, info").eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", false).maybeSingle(),
     sb.from("valery_solicitudes").select(COLS).eq("empresa_id", empresa).eq("automatica", true).order("id", { ascending: false }).limit(1).maybeSingle(),
     sb.from("valery_solicitudes").select(COLS).eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(1).maybeSingle(),
   ]);

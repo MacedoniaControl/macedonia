@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COLUMNAS_VENTAS, leerVentas, type Celda } from "../inventory/ventas-valery.ts";
-import { conectado, errorDeRango, filasDeParte, haceCuanto, renglonesDesdePuente, type FilaVentaPuente } from "./puente.ts";
+import { paraLaBase, planVentas } from "../inventory/ventas-valery.ts";
+import { conectado, errorDeRango, filasDeParte, haceCuanto, horaValida, renglonesDesdePuente, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
 
 // El mismo documento, como lo exporta Valery a Excel (formato completo) y como
 // lo lee el agente de la base. Casos reales de febrero de 2026: neto con
@@ -77,4 +78,32 @@ test("una parte sin filas o de una sola fila también es una lista", () => {
   assert.deepEqual(filasDeParte([{ codigo: "OXI6" }, { codigo: "ARG6" }]), [{ codigo: "OXI6" }, { codigo: "ARG6" }]);
   assert.equal(filasDeParte("hola"), null);
   assert.equal(filasDeParte(5), null);
+});
+
+test("la hora del documento: se normaliza y, si no sirve, queda en null", () => {
+  assert.equal(horaValida("17:13:55"), "17:13:55");
+  assert.equal(horaValida("17:13:55.0000"), "17:13:55");   // como la da Firebird
+  assert.equal(horaValida("9:05"), "09:05:00");
+  for (const malo of [null, undefined, "", "25:00:00", "12:60", "mañana", 1713]) assert.equal(horaValida(malo), null);
+});
+
+test("la hora viaja del agente a la base; sin hora (agente viejo) va null", () => {
+  const base: FilaVentaPuente = { fecha: "2026-11-02", tipo: "NET", documento: "0000009486", cliente: "MENDEZ", codigo: "OXI6", producto: "OXIGENO", cantidad: 1, neto: 1000, tasa: 250 };
+  const { renglones } = renglonesDesdePuente([{ ...base, hora: "15:42:07.0000" }, { ...base, documento: "0000009487" }]);
+  assert.equal(renglones[0].hora, "15:42:07");
+  assert.equal(renglones[1].hora, null);
+  // La hora no entra en la clave: el mismo renglón con y sin hora es el mismo renglón.
+  assert.equal(renglonesDesdePuente([base]).renglones[0].clave, renglonesDesdePuente([{ ...base, hora: "15:42:07" }]).renglones[0].clave);
+  const filas = planVentas(renglones, "2026-09-24").movimientos.map(paraLaBase);
+  assert.equal(filas[0].hora, "15:42:07");
+  assert.equal(filas[1].hora, null);
+});
+
+test("versiones del agente: se comparan por número, no como texto", () => {
+  assert.equal(versionAlMenos("1.0.4", "1.0.4"), true);
+  assert.equal(versionAlMenos("1.0.10", "1.0.4"), true);
+  assert.equal(versionAlMenos("1.1", "1.0.4"), true);
+  assert.equal(versionAlMenos("1.0.3", "1.0.4"), false);
+  assert.equal(versionAlMenos(null, "1.0.4"), false);
+  assert.equal(versionAlMenos("raro", "1.0.4"), false);
 });

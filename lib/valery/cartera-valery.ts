@@ -24,6 +24,8 @@ export type DocValery = {
   factor: number;          // la tasa del documento (1 si es en bolívares)
   totalBs: number;
   saldoBs: number;
+  /** El saldo en dólares que guarda Valery (V3CXC_ME), desde el agente 1.0.4. Null: no vino. */
+  saldoMe: number | null;
   numeroControl: string;   // solo por pagar
 };
 
@@ -51,7 +53,8 @@ export function docsDesdeAgente(tipo: TipoCartera, crudas: unknown[]): { docs: D
       clave: n > 1 ? `${base}|${n}` : base,
       tipo: tipoDoc, documento, contraparte, rif: texto(f.rif), emision, vencimiento: fecha(f.vencimiento),
       moneda: texto(f.moneda) === "02" ? "USD" : "Bs", factor: numero(f.factor) || 1,
-      totalBs: numero(f.total), saldoBs, numeroControl: texto(f.numero_control),
+      totalBs: numero(f.total), saldoBs, saldoMe: f.saldo_me === null || f.saldo_me === undefined ? null : numero(f.saldo_me),
+      numeroControl: texto(f.numero_control),
     });
   }
   return { docs, descartadas };
@@ -59,6 +62,8 @@ export function docsDesdeAgente(tipo: TipoCartera, crudas: unknown[]): { docs: D
 
 /** El saldo en dólares y de dónde sale la tasa. null = no hay tasa con qué convertirlo. */
 export function saldoUsd(d: DocValery, tasaHoy: number | null): { usd: number; de: "documento" | "hoy" } | null {
+  // Documento en dólares: el saldo en dólares de Valery si vino (1.0.4); si no, el de bolívares a la tasa del documento.
+  if (d.moneda === "USD" && d.saldoMe !== null && d.saldoMe > 0) return { usd: d.saldoMe, de: "documento" };
   if (d.moneda === "USD" && d.factor > 1) return { usd: d.saldoBs / d.factor, de: "documento" };
   if (tasaHoy && tasaHoy > 0) return { usd: d.saldoBs / tasaHoy, de: "hoy" };
   return null;
