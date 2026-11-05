@@ -38,6 +38,8 @@ export type MovVenta = {
   montoUsd: number | null;
   /** FAC: cobra notas de entrega ya registradas (viene de ventas_facturas_notas, no del kardex). */
   deNotas?: boolean;
+  /** FAC que cobra notas: cuáles y cómo están en Cuentas por Cobrar (lo pone `marcarNotas`). */
+  cobra?: NotaCobrada[];
   /** NET: la factura que la cobró, «FAC 0000001652». */
   facturadaCon?: string | null;
   /** NET: qué es (lo pone `marcarNotas`). Sin marca, una venta como cualquiera. */
@@ -52,17 +54,36 @@ export type MovVenta = {
 export type EstadoNota = "facturada" | "a_credito" | "credito_cobrado";
 
 /**
+ * Una nota que cobró una factura. `cxc`: saldada (liquidada o en cero en
+ * Cuentas por Cobrar), por_liquidar (sigue abierta allá: la factura la cobró,
+ * falta liquidarla) o null (nunca estuvo en la cartera).
+ */
+export type NotaCobrada = { numero: string; cxc: "saldada" | "por_liquidar" | null };
+
+/** «NET 0000009215» → «9215». Sin el «NET »: numeroDocumento prueba «NE» antes que «NET» y daría «T0000009215». */
+const numeroNota = (documento: string) => numeroDocumento(documento.replace(/^NET\s+/, ""));
+
+/**
  * Marca cada nota de entrega: si la cobró una factura de `facturas` (solo las
  * que existen: una nota cuya factura no se ha traído todavía sigue sumando,
  * para no perder la venta) y si está en Cuentas por Cobrar (`enCxc`: número
- * de la NE → si ya se cobró).
+ * de la NE → si ya se cobró). Y a cada factura que cobra notas, cuáles
+ * (`notasDe`: «FAC 0000001653» → sus «NET …») y cómo está cada una en la cartera.
  */
-export function marcarNotas(movs: MovVenta[], facturas: Set<string>, enCxc: Map<string, boolean>): MovVenta[] {
+export function marcarNotas(movs: MovVenta[], facturas: Set<string>, enCxc: Map<string, boolean>, notasDe: Map<string, string[]> = new Map()): MovVenta[] {
   return movs.map((m) => {
+    if (m.tipo === "FAC" && m.deNotas) {
+      const cobra = [...new Set((notasDe.get(m.documento) ?? []).map(numeroNota))]
+        .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
+        .map((numero): NotaCobrada => {
+          const c = enCxc.get(numero);
+          return { numero, cxc: c === undefined ? null : c ? "saldada" : "por_liquidar" };
+        });
+      return { ...m, cobra };
+    }
     if (m.tipo !== "NET") return m;
     if (m.facturadaCon && facturas.has(m.facturadaCon)) return { ...m, nota: "facturada" };
-    // Sin el «NET »: numeroDocumento prueba «NE» antes que «NET» y daría «T0000009300».
-    const cobrada = enCxc.get(numeroDocumento(m.documento.replace(/^NET\s+/, "")));
+    const cobrada = enCxc.get(numeroNota(m.documento));
     return cobrada === undefined ? m : { ...m, nota: cobrada ? "credito_cobrado" : "a_credito" };
   });
 }
@@ -105,6 +126,8 @@ export type DocVenta = {
   facturadaCon: string | null;
   /** FAC que cobra notas de entrega. */
   deNotas: boolean;
+  /** Y cuáles, con su estado en Cuentas por Cobrar. */
+  cobra: NotaCobrada[];
 };
 
 export type ProdVenta = { codigo: string; nombre: string; cantidad: number; totalUsd: number; documentos: number };
@@ -155,7 +178,7 @@ export function resumirVentas(movs: MovVenta[], empresa: EmpresaId): ResumenVent
     const cuenta = nota !== "facturada" && nota !== "a_credito";
     const d = docs.get(clave) ?? {
       clave, fecha: m.fecha, hora: m.hora ?? null, tipo: m.tipo, documento: m.documento.replace(/^(FAC|NET|DEV)\s+/, ""), cliente: m.cliente,
-      renglones: 0, totalUsd: 0, cuenta, nota, facturadaCon: m.facturadaCon ?? null, deNotas: !!m.deNotas,
+      renglones: 0, totalUsd: 0, cuenta, nota, facturadaCon: m.facturadaCon ?? null, deNotas: !!m.deNotas, cobra: m.cobra ?? [],
     };
     d.renglones++; d.totalUsd += usd;
     if (m.hora && (!d.hora || m.hora < d.hora)) d.hora = m.hora;

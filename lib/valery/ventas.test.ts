@@ -132,3 +132,22 @@ test("la nota en Cuentas por Cobrar sin cobrar es a crédito; cobrada, suma", ()
   assert.equal(r.ventas, 3);
   assert.equal(nombreValery("V &amp; B, C.A"), "V & B, C.A");
 });
+
+test("la factura dice qué notas cobró y cómo está cada una en Cuentas por Cobrar", () => {
+  const vb = "SERVICIOS Y SUMINISTROS V &amp; B, C.A";
+  const notasDe = new Map([
+    // La NET 9200 tiene dos renglones: es una sola nota.
+    ["FAC 0000001652", ["NET 0000009200", "NET 0000009095", "NET 0000009200"]],
+    ["FAC 0000001653", ["NET 0000009215"]],
+  ]);
+  const enCxc = new Map([["9095", true], ["9200", false]]);
+  const r = resumirVentas(marcarNotas([
+    { ...mov("FAC", "0000001652", vb, "ARG6", 2, 240, "2026-11-03"), deNotas: true },
+    { ...mov("FAC", "0000001653", vb, "010203", 1, 215, "2026-11-03"), deNotas: true },
+    mov("FAC", "0000001654", vb, "0200-2230", 2, 28, "2026-11-03"),
+  ], new Set(), enCxc, notasDe), "sumigases");
+  const de = (doc: string) => r.documentos.find((d) => d.documento === doc)!.cobra;
+  assert.deepEqual(de("0000001652"), [{ numero: "9095", cxc: "saldada" }, { numero: "9200", cxc: "por_liquidar" }]);
+  assert.deepEqual(de("0000001653"), [{ numero: "9215", cxc: null }]);   // nunca estuvo en la cartera
+  assert.deepEqual(de("0000001654"), []);
+});

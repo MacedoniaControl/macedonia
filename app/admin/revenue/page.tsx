@@ -374,13 +374,20 @@ function Vacio() {
   return <EmptyState icon="sales" title="Sin ventas" message="No hay ventas que mostrar con este período y esta búsqueda." />;
 }
 
-/** Lo que es cada documento, si no es una venta sin más. */
-function estadoDoc(d: DocVenta): { t: string; tone: Tone } | null {
-  if (d.nota === "facturada") return { t: `Facturada · FAC ${d.facturadaCon?.replace(/^FAC\s+0*/, "") ?? ""}`, tone: "muted" };
-  if (d.nota === "a_credito") return { t: "A crédito", tone: "warn" };
-  if (d.nota === "credito_cobrado") return { t: "Crédito cobrado", tone: "ok" };
-  if (d.deNotas) return { t: "Cobra notas", tone: "info" };
-  return null;
+/**
+ * Lo que es cada documento, si no es una venta sin más. La factura que cobra
+ * notas dice cuáles y cómo está cada una en Cuentas por Cobrar: «Saldada»
+ * (liquidada allá) o «Por liquidar» (la factura la cobró, pero en la cartera
+ * sigue abierta). Una nota que nunca estuvo en la cartera va sin estado.
+ */
+function estadoDoc(d: DocVenta): { t: string; tone: Tone }[] {
+  if (d.nota === "facturada") return [{ t: `Facturada · FAC ${d.facturadaCon?.replace(/^FAC\s+0*/, "") ?? ""}`, tone: "muted" }];
+  if (d.nota === "a_credito") return [{ t: "A crédito", tone: "warn" }];
+  if (d.nota === "credito_cobrado") return [{ t: "Crédito cobrado", tone: "ok" }];
+  if (d.deNotas && !d.cobra.length) return [{ t: "Factura de notas", tone: "info" }];
+  return d.cobra.map((n) => n.cxc === "saldada" ? { t: `NET ${n.numero} · Saldada`, tone: "ok" }
+    : n.cxc === "por_liquidar" ? { t: `NET ${n.numero} · Por liquidar`, tone: "warn" }
+    : { t: `NET ${n.numero}`, tone: "info" });
 }
 
 const capsula = "sumi-pulsable inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border-strong px-3 text-xs font-medium text-text hover:bg-surface-2";
@@ -397,7 +404,7 @@ function TablaDocumentos({ filas, periodo, resumen, onPasar }: { filas: DocVenta
     detalle: [`Período ${periodo}`, "Sin IVA, en dólares a la tasa de su día. La devolución resta."],
     columnas: [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Hora" }, { titulo: "Tipo" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Cliente" }, { titulo: "Estado" },
       { titulo: "Renglones", tipo: "num" }, { titulo: "Total (USD)", tipo: "usd" }],
-    filas: t.ordenadas.map((d) => [fechaVista(d.fecha), horaVista(d.hora), TIPO[d.tipo].t, d.documento, nombreValery(d.cliente), estadoDoc(d)?.t ?? "", d.renglones, r2(d.totalUsd)]),
+    filas: t.ordenadas.map((d) => [fechaVista(d.fecha), horaVista(d.hora), TIPO[d.tipo].t, d.documento, nombreValery(d.cliente), estadoDoc(d).map((e) => e.t).join(", "), d.renglones, r2(d.totalUsd)]),
     // El total es lo vendido: sin las notas facturadas ni las que están a crédito.
     totales: ["", "", "", "", `${t.ordenadas.length} documento(s)`, "", "", r2(t.ordenadas.filter((d) => d.cuenta).reduce((a, d) => a + d.totalUsd, 0))],
     nota: [
@@ -425,7 +432,7 @@ function TablaDocumentos({ filas, periodo, resumen, onPasar }: { filas: DocVenta
           </thead>
           <tbody className="divide-y divide-border">
             {t.visible.map((d) => {
-              const e = estadoDoc(d);
+              const es = estadoDoc(d);
               return (
               <tr key={d.clave} className="hover:bg-surface-2">
                 <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums text-muted">{fechaVista(d.fecha)}</td>
@@ -433,7 +440,11 @@ function TablaDocumentos({ filas, periodo, resumen, onPasar }: { filas: DocVenta
                 <td className="py-2.5 pr-3"><StatusBadge tone={TIPO[d.tipo].tone}>{TIPO[d.tipo].t}</StatusBadge></td>
                 <td className="py-2.5 pr-3 font-mono text-xs text-muted">
                   {d.documento}
-                  {e && <span className="mt-1 block font-sans"><StatusBadge tone={e.tone}>{e.t}</StatusBadge></span>}
+                  {es.length > 0 && (
+                    <span className="mt-1 flex flex-wrap gap-1 font-sans">
+                      {es.map((e) => <StatusBadge key={e.t} tone={e.tone}>{e.t}</StatusBadge>)}
+                    </span>
+                  )}
                 </td>
                 <td className="py-2.5 pr-3 text-text">{nombreValery(d.cliente) || "—"}</td>
                 <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{d.renglones}</td>
