@@ -379,15 +379,25 @@ function Vacio() {
  * notas dice cuáles y cómo está cada una en Cuentas por Cobrar: «Saldada»
  * (liquidada allá) o «Por liquidar» (la factura la cobró, pero en la cartera
  * sigue abierta). Una nota que nunca estuvo en la cartera va sin estado.
+ *
+ * Con las devoluciones, igual: la DEV dice qué devuelve y cómo quedó
+ * («NET 9511 · Devuelta» o «· Devuelta en parte»), y esa nota o factura dice
+ * por cuál («Devuelta · DEV 752»). Una nota de antes del corte va sin estado.
  */
 function estadoDoc(d: DocVenta): { t: string; tone: Tone }[] {
-  if (d.nota === "facturada") return [{ t: `Facturada · FAC ${d.facturadaCon?.replace(/^FAC\s+0*/, "") ?? ""}`, tone: "muted" }];
-  if (d.nota === "a_credito") return [{ t: "A crédito", tone: "warn" }];
-  if (d.nota === "credito_cobrado") return [{ t: "Crédito cobrado", tone: "ok" }];
-  if (d.deNotas && !d.cobra.length) return [{ t: "Factura de notas", tone: "info" }];
-  return d.cobra.map((n) => n.cxc === "saldada" ? { t: `NET ${n.numero} · Saldada`, tone: "ok" }
+  const devuelta: { t: string; tone: Tone }[] = d.devuelta
+    ? [{ t: `${d.devuelta.parcial ? "Devuelta en parte" : "Devuelta"} · DEV ${d.devuelta.devs.join(", ")}`, tone: "navy" }] : [];
+  if (d.tipo === "DEV") return d.devuelve.map((r) => ({
+    t: `${r.documento.replace(/^(FAC|NET)\s+0*/, "$1 ")}${r.estado ? ` · ${r.estado === "parcial" ? "Devuelta en parte" : "Devuelta"}` : ""}`,
+    tone: r.estado ? "navy" : "info",
+  }));
+  if (d.nota === "facturada") return [{ t: `Facturada · FAC ${d.facturadaCon?.replace(/^FAC\s+0*/, "") ?? ""}`, tone: "muted" }, ...devuelta];
+  if (d.nota === "a_credito") return [{ t: "A crédito", tone: "warn" }, ...devuelta];
+  if (d.nota === "credito_cobrado") return [{ t: "Crédito cobrado", tone: "ok" }, ...devuelta];
+  if (d.deNotas && !d.cobra.length) return [{ t: "Factura de notas", tone: "info" }, ...devuelta];
+  return [...d.cobra.map((n): { t: string; tone: Tone } => n.cxc === "saldada" ? { t: `NET ${n.numero} · Saldada`, tone: "ok" }
     : n.cxc === "por_liquidar" ? { t: `NET ${n.numero} · Por liquidar`, tone: "warn" }
-    : { t: `NET ${n.numero}`, tone: "info" });
+    : { t: `NET ${n.numero}`, tone: "info" }), ...devuelta];
 }
 
 const capsula = "sumi-pulsable inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border-strong px-3 text-xs font-medium text-text hover:bg-surface-2";
@@ -452,7 +462,8 @@ function TablaDocumentos({ filas, periodo, resumen, onPasar }: { filas: DocVenta
                   title={d.cuenta ? undefined : "No suma: " + (d.nota === "a_credito" ? "está a crédito" : "cuenta su factura")}>{fmtUsd(d.totalUsd)}</td>
                 {onPasar && (
                   <td className="py-1.5 pl-3 text-right">
-                    {d.tipo === "NET" && d.nota === null && (
+                    {/* Una nota devuelta toda no tiene nada que cobrar. */}
+                    {d.tipo === "NET" && d.nota === null && !(d.devuelta && !d.devuelta.parcial) && (
                       <button type="button" className={capsula} title={`Pasar la nota ${d.documento} a Cuentas por Cobrar: deja de sumar como venta hasta que se cobre`}
                         onClick={() => onPasar(d)}>A CxC</button>
                     )}

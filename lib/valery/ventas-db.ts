@@ -12,12 +12,13 @@ import { todasLasFilas } from "@/lib/supabase/paginar";
 import type { TipoDoc } from "@/lib/inventory/ventas-valery";
 import { ajustesVentasDe, corteDe, programarVentasAuto } from "./ventas-auto";
 import type { EstadoSolicitud } from "./puente.ts";
-import { marcarNotas, type MovVenta } from "./ventas.ts";
+import { estadoDevoluciones, marcarDevoluciones, marcarNotas, type MovVenta, type RenglonDevuelto, type RenglonVendido } from "./ventas.ts";
 
 /**
  * Los renglones de venta entre dos fechas (inclusive): los del kardex y las
  * facturas que cobran notas (ventas_facturas_notas, migración 51), con cada
- * nota marcada (lib/valery/ventas.ts → marcarNotas).
+ * nota marcada (lib/valery/ventas.ts → marcarNotas) y cada devolución con lo
+ * que devuelve (marcarDevoluciones).
  */
 export async function ventasDelPeriodo(empresa: string, desde: string, hasta: string): Promise<MovVenta[]> {
   const sb = await createClient();
@@ -48,8 +49,55 @@ export async function ventasDelPeriodo(empresa: string, desde: string, hasta: st
       cantidad: Number(f.cantidad), montoUsd: f.monto_usd === null ? null : Number(f.monto_usd), deNotas: true,
     })),
   ];
-  const [facturas, notasDe] = await Promise.all([facturasRegistradas(sb, empresa, movs), notasDeFacturas(sb, empresa, deNotas.map((f) => f.documento))]);
-  return marcarNotas(movs, facturas, enCxc, notasDe);
+  const [facturas, notasDe, dev] = await Promise.all([
+    facturasRegistradas(sb, empresa, movs), notasDeFacturas(sb, empresa, deNotas.map((f) => f.documento)), devolucionesDe(sb, empresa, movs),
+  ]);
+  return marcarDevoluciones(marcarNotas(movs, facturas, enCxc, notasDe), dev.devuelveDe, dev.estado);
+}
+
+/**
+ * Las devoluciones de lo que se ve, de cualquier fecha: qué devuelve cada DEV
+ * del período, y qué DEV devolvieron cada nota o factura (las del período y
+ * las que nombran sus DEV, para saber si se devolvieron toda o en parte).
+ * Sin la migración 52 no hay columna «devuelve»: ninguna marca.
+ */
+async function devolucionesDe(sb: Sb, empresa: string, movs: MovVenta[]) {
+  const vacio = { devuelveDe: new Map<string, string[]>(), estado: new Map() as ReturnType<typeof estadoDevoluciones> };
+  const devsDelPeriodo = [...new Set(movs.filter((m) => m.tipo === "DEV").map((m) => m.documento))];
+  const devuelveDe = new Map<string, string[]>();
+  try {
+    for (let i = 0; i < devsDelPeriodo.length; i += 100) {
+      const filas = await todasLasFilas<{ documento: string; devuelve: string }>((a, b, contar) =>
+        sb.from("movimientos_inventario").select("documento, devuelve", contar ? { count: "exact" } : undefined)
+          .eq("empresa_id", empresa).eq("tipo_doc", "DEV").in("documento", devsDelPeriodo.slice(i, i + 100)).not("devuelve", "is", null)
+          .order("id").range(a, b));
+      for (const f of filas) devuelveDe.set(f.documento, [...(devuelveDe.get(f.documento) ?? []), f.devuelve]);
+    }
+    const vendidas = [...new Set([...movs.filter((m) => m.tipo !== "DEV").map((m) => m.documento), ...[...devuelveDe.values()].flat()])];
+    const enPeriodo = new Set(movs.map((m) => m.documento));
+    const devueltos: RenglonDevuelto[] = [];
+    const vendidos: RenglonVendido[] = [];
+    for (let i = 0; i < vendidas.length; i += 100) {
+      const lote = vendidas.slice(i, i + 100);
+      const fuera = lote.filter((x) => !enPeriodo.has(x));
+      const [d, v] = await Promise.all([
+        todasLasFilas<RenglonDevuelto>((a, b, contar) =>
+          sb.from("movimientos_inventario").select("documento, devuelve, codigo, cantidad", contar ? { count: "exact" } : undefined)
+            .eq("empresa_id", empresa).eq("tipo_doc", "DEV").in("devuelve", lote).order("id").range(a, b)),
+        // Lo vendido de las nombradas que no están en el período (las del período ya están en `movs`).
+        fuera.length ? todasLasFilas<RenglonVendido>((a, b, contar) =>
+          sb.from("movimientos_inventario").select("documento, codigo, cantidad", contar ? { count: "exact" } : undefined)
+            .eq("empresa_id", empresa).in("tipo_doc", ["NET", "FAC"]).in("documento", fuera)
+            .order("id").range(a, b)) : Promise.resolve([] as RenglonVendido[]),
+      ]);
+      devueltos.push(...d.map((r) => ({ ...r, cantidad: Number(r.cantidad) })));
+      vendidos.push(...v.map((r) => ({ ...r, cantidad: Number(r.cantidad) })));
+    }
+    for (const m of movs) if (m.tipo !== "DEV") vendidos.push({ documento: m.documento, codigo: m.codigo, cantidad: m.cantidad });
+    return { devuelveDe, estado: estadoDevoluciones(vendidos, devueltos) };
+  } catch {
+    return vacio;
+  }
 }
 
 /** Qué notas cobró cada factura de notas («FAC …» → sus «NET …»), de cualquier fecha. */

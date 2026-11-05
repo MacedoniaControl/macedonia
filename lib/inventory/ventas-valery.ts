@@ -59,6 +59,8 @@ export type RenglonVenta = {
   ventaUsd: number;
   /** Identifica el renglón entre archivos: el mismo renglón exportado dos veces no se importa dos veces. */
   clave: string;
+  /** DEV: la nota o factura que devuelve («NET 0000009511»). La trae el Puente desde el agente 1.0.5; el Excel no. */
+  devuelve?: string | null;
 };
 
 export type LecturaVentas = {
@@ -302,6 +304,8 @@ export type MovimientoVenta = {
   cliente: string; codigo: string; nombre: string; cantidad: number; montoUsd: number;
   /** En una NET: la factura que la factura. */
   facturadaCon: string | null;
+  /** En una DEV: la nota o factura que devuelve. */
+  devuelve?: string | null;
 };
 
 export type PlanVentas = {
@@ -322,6 +326,7 @@ export type PlanVentas = {
 export const paraLaBase = (m: MovimientoVenta) => ({
   renglon: m.renglon, fecha: m.fecha, hora: m.hora ?? null, direccion: m.direccion, tipo: m.tipo, documento: m.documento, cliente: m.cliente,
   codigo: m.codigo, nombre: m.nombre, cantidad: m.cantidad, monto_usd: m.montoUsd, facturada_con: m.facturadaCon,
+  devuelve: m.devuelve ?? null,
 });
 /** El renglón de una factura de notas: va a ventas_facturas_notas, no al kardex. */
 const deNotasParaLaBase = (m: MovimientoVenta) => ({ ...paraLaBase(m), de_notas: true });
@@ -350,6 +355,7 @@ export function planVentas(renglones: RenglonVenta[], corte: string, previas: No
       documento: `${r.tipo} ${r.documento}`, cliente: r.cliente, codigo: r.codigo, nombre: r.producto || r.codigo,
       cantidad: r.cantidad, montoUsd: aMonto(Math.abs(r.ventaUsd)),
       facturadaCon: r.tipo === "NET" ? fac.notas.get(r.clave) ?? null : null,
+      devuelve: r.tipo === "DEV" ? r.devuelve ?? null : null,
     };
     (fac.facturas.has(r.clave) ? facturasNotas : movimientos).push(m);
   }

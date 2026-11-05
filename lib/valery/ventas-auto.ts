@@ -45,14 +45,16 @@ export async function notasPreviasDe(sb: SupabaseClient, empresa: string, desde:
  * `facturasRellenas` null: la migración 51 no se ha corrido (no hay dónde
  * guardar las facturas de notas).
  */
-export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean; facturasRellenas: boolean | null }> {
+export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean; facturasRellenas: boolean | null; devolucionesRellenas: boolean | null }> {
   const { data } = await sb.from("valery_ajustes").select("ventas_auto, cada_min").eq("empresa_id", empresa).maybeSingle();
   // Aparte: si la migración 50 o la 51 no se han corrido, la columna no existe y no debe apagar lo demás.
   const { data: h } = await sb.from("valery_ajustes").select("horas_rellenas").eq("empresa_id", empresa).maybeSingle();
   const { data: f, error: ef } = await sb.from("valery_ajustes").select("facturas_rellenas").eq("empresa_id", empresa).maybeSingle();
+  const { data: d, error: ed } = await sb.from("valery_ajustes").select("devoluciones_rellenas").eq("empresa_id", empresa).maybeSingle();
   return {
     auto: data?.ventas_auto ?? true, cadaMin: data?.cada_min ?? CADA_MIN_POR_DEFECTO, horasRellenas: h?.horas_rellenas ?? false,
     facturasRellenas: ef ? null : (f?.facturas_rellenas ?? false),
+    devolucionesRellenas: ed ? null : (d?.devoluciones_rellenas ?? false),
   };
 }
 
@@ -63,6 +65,13 @@ export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Prom
  * estaba (migración 50). Al aplicarla bien, `horas_rellenas` queda en true.
  */
 export const VERSION_CON_HORA = "1.0.4";
+
+/**
+ * Lo mismo con lo que devuelve cada DEV (agente 1.0.5, migración 52): la
+ * primera actualización con ese agente pide todo desde el corte, una vez, y el
+ * importador se lo pone a las devoluciones que ya estaban.
+ */
+export const VERSION_CON_DEVOLUCION = "1.0.5";
 
 export type Programacion =
   | { ok: true; id: number; desde: string; hasta: string }
@@ -103,11 +112,15 @@ export async function programarVentasAuto(
   // Las facturas de notas que pasaron antes de la migración 51 no están en
   // ninguna parte: una vez, todo desde el corte para traerlas.
   const rellenarFacturas = ajustes.facturasRellenas === false;
-  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras || rellenarFacturas ? null : ultimaHasta);
+  const rellenarDevoluciones = ajustes.devolucionesRellenas === false && versionAlMenos(agente?.version, VERSION_CON_DEVOLUCION);
+  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras || rellenarFacturas || rellenarDevoluciones ? null : ultimaHasta);
 
   const { data, error } = await sb.from("valery_solicitudes").insert({
     empresa_id: empresa, tipo: "ventas", automatica: true,
-    parametros: { ...rango, ...(rellenarHoras ? { rellenarHoras: true } : {}), ...(rellenarFacturas ? { rellenarFacturas: true } : {}) },
+    parametros: {
+      ...rango, ...(rellenarHoras ? { rellenarHoras: true } : {}), ...(rellenarFacturas ? { rellenarFacturas: true } : {}),
+      ...(rellenarDevoluciones ? { rellenarDevoluciones: true } : {}),
+    },
     creado_por: usuario?.id ?? null, creado_nombre: usuario?.nombre ?? "Automático",
   }).select("id").single();
   if (error?.code === "23505") return { ok: false, motivo: "en_curso", mensaje: "Ya se están trayendo las ventas." };
@@ -126,7 +139,7 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
   const marcar = (campos: Record<string, unknown>) => admin.from("valery_solicitudes").update(campos).eq("id", id);
   const { data: s } = await admin.from("valery_solicitudes").select("resumen, parametros").eq("id", id).maybeSingle();
   const resumen = (s?.resumen as Record<string, unknown> | null) ?? {};
-  const parametros = (s?.parametros as { rellenarHoras?: boolean; rellenarFacturas?: boolean } | null) ?? {};
+  const parametros = (s?.parametros as { rellenarHoras?: boolean; rellenarFacturas?: boolean; rellenarDevoluciones?: boolean } | null) ?? {};
   try {
     const { data: partes, error } = await admin.from("valery_resultados").select("datos").eq("solicitud_id", id).order("parte");
     if (error) throw new Error(`No se pudo leer lo que entregó el agente: ${error.message}`);
@@ -143,7 +156,8 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     const fechas = renglones.map((r) => r.fecha).sort();
     const previas = fechas.length ? await notasPreviasDe(admin, empresa, restarDias(fechas[0], 60)) : [];
     const plan = planVentas(renglones, corte, previas);
-    const conFacturas = (await ajustesVentasDe(admin, empresa)).facturasRellenas !== null;
+    const ajustes = await ajustesVentasDe(admin, empresa);
+    const conFacturas = ajustes.facturasRellenas !== null;
     const aLaBase = renglonesParaLaBase(plan, conFacturas);
 
     let r = { importacion_id: null as number | null, nuevos: 0, repetidos: aLaBase.length, notas_facturadas: 0, productos_creados: [] as string[] | null };
@@ -167,6 +181,10 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     // Y las facturas de notas de antes, igual: una sola vez.
     if (parametros.rellenarFacturas && conFacturas) {
       await admin.from("valery_ajustes").upsert({ empresa_id: empresa, facturas_rellenas: true }, { onConflict: "empresa_id" });
+    }
+    // Y lo que devuelve cada DEV de antes: solo si lo entregó un agente que lo manda y la base tiene dónde guardarlo.
+    if (parametros.rellenarDevoluciones && ajustes.devolucionesRellenas !== null && versionAlMenos(String(resumen.agente ?? ""), VERSION_CON_DEVOLUCION)) {
+      await admin.from("valery_ajustes").upsert({ empresa_id: empresa, devoluciones_rellenas: true }, { onConflict: "empresa_id" });
     }
   } catch (e) {
     await marcar({ estado: "error", error: (e as Error).message.slice(0, 2000) });

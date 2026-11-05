@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.4'
+$Version = '1.0.5'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -163,7 +163,13 @@ select v.fecha_emision as fecha, v.hora_emision as hora, v.tipo_documento as tip
        (select first 1 h.factor_cambio from moneda_historial h
          where h.moneda_codigo = '02'
            and h.fecha_hora <= cast(v.fecha_emision || ' ' || coalesce(v.hora_emision, '23:59:59') as timestamp)
-         order by h.fecha_hora desc) as tasa_historial
+         order by h.fecha_hora desc) as tasa_historial,
+       -- La devolucion: que nota o factura devuelve este renglon (VENTAS_DETALLES_REL_CANT).
+       case when v.tipo_documento = 'DEV' then
+         (select first 1 trim(r.tipo_documento_relacionado) || ' ' || trim(x.documento)
+            from ventas_detalles_rel_cant r join ventas x on x.correlativo = r.correlativo_relacionado
+           where r.correlativo_principal = v.correlativo and r.numero_linea_principal = d.numero_linea)
+       end as devuelve
   from ventas v join ventas_detalles d on d.correlativo_principal = v.correlativo
  where v.fecha_emision between cast(@desde as date) and cast(@hasta as date)
    and v.tipo_documento in ('FAC', 'NET', 'DEV') and v.temporal <> 'T'

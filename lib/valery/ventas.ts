@@ -13,7 +13,9 @@
 //       – ya la cobró una factura que está aquí: suma la factura, no la nota;
 //       – está en Cuentas por Cobrar y no se ha cobrado: es a crédito. Cuando se
 //         cobra (o se factura), cuenta;
-//   · la DEV resta;
+//   · la DEV resta. Dice qué nota o factura devuelve, y esa dice que fue
+//     devuelta (toda o en parte): marcarDevoluciones. Solo es una marca: lo
+//     vendido no cambia;
 //   · lo que la empresa le vende a la otra del grupo, o a sí misma (consumo
 //     interno), NO es venta: se aparta y se dice cuánto fue.
 
@@ -44,7 +46,72 @@ export type MovVenta = {
   facturadaCon?: string | null;
   /** NET: qué es (lo pone `marcarNotas`). Sin marca, una venta como cualquiera. */
   nota?: EstadoNota;
+  /** DEV: lo que devuelve y cómo quedó (lo pone `marcarDevoluciones`). */
+  devuelve?: Devuelto[];
+  /** NET o FAC: las devoluciones que la devolvieron (lo pone `marcarDevoluciones`). */
+  devuelta?: Devuelta | null;
 };
+
+/**
+ * Lo que devuelve una DEV: «NET 0000009511» y si esa nota quedó devuelta toda
+ * («total»), en parte, o null si no está en Macedonia (es de antes del corte).
+ */
+export type Devuelto = { documento: string; estado: "total" | "parcial" | null };
+
+/** Una nota o factura devuelta: por cuáles DEV («752») y si fue toda o en parte. */
+export type Devuelta = { devs: string[]; parcial: boolean };
+
+/** Un renglón de una DEV con lo que devuelve, de cualquier fecha. */
+export type RenglonDevuelto = { documento: string; devuelve: string; codigo: string; cantidad: number };
+/** Un renglón de lo vendido (NET o FAC), de cualquier fecha. */
+export type RenglonVendido = { documento: string; codigo: string; cantidad: number };
+
+const sinCeros = (documento: string) => documento.replace(/^(FAC|NET|DEV)\s+0*/, "") || "0";
+
+/**
+ * Cómo quedó cada nota o factura devuelta. Toda: cada código vendido volvió
+ * completo (los códigos distinguen mayúsculas, como en Valery). En parte: falta
+ * algo. Una nota que no está en `vendidos` no tiene con qué compararse: queda
+ * fuera (su DEV la nombra sin estado).
+ */
+export function estadoDevoluciones(vendidos: RenglonVendido[], devueltos: RenglonDevuelto[]): Map<string, Devuelta> {
+  const sumar = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) ?? 0) + n);
+  const vendido = new Map<string, Map<string, number>>();
+  for (const v of vendidos) sumar(vendido.get(v.documento) ?? vendido.set(v.documento, new Map()).get(v.documento)!, v.codigo, v.cantidad);
+  const devuelto = new Map<string, { devs: Set<string>; por: Map<string, number> }>();
+  for (const d of devueltos) {
+    if (!vendido.has(d.devuelve)) continue;
+    const e = devuelto.get(d.devuelve) ?? devuelto.set(d.devuelve, { devs: new Set(), por: new Map() }).get(d.devuelve)!;
+    e.devs.add(sinCeros(d.documento));
+    sumar(e.por, d.codigo, d.cantidad);
+  }
+  const estado = new Map<string, Devuelta>();
+  for (const [doc, e] of devuelto) {
+    const parcial = [...vendido.get(doc)!].some(([codigo, cant]) => (e.por.get(codigo) ?? 0) < cant - 1e-9);
+    estado.set(doc, { devs: [...e.devs].sort((a, b) => Number(a) - Number(b) || a.localeCompare(b)), parcial });
+  }
+  return estado;
+}
+
+/**
+ * Marca cada DEV con lo que devuelve (`devuelveDe`: «DEV …» → sus «NET …») y
+ * cada nota o factura devuelta con sus DEV (`estado`, de estadoDevoluciones).
+ */
+export function marcarDevoluciones(movs: MovVenta[], devuelveDe: Map<string, string[]>, estado: Map<string, Devuelta>): MovVenta[] {
+  return movs.map((m) => {
+    if (m.tipo === "DEV") {
+      const refs = devuelveDe.get(m.documento);
+      if (!refs?.length) return m;
+      const devuelve = [...new Set(refs)].sort().map((documento): Devuelto => {
+        const e = estado.get(documento);
+        return { documento, estado: e ? (e.parcial ? "parcial" : "total") : null };
+      });
+      return { ...m, devuelve };
+    }
+    const e = estado.get(m.documento);
+    return e ? { ...m, devuelta: e } : m;
+  });
+}
 
 /**
  * facturada: la cobró una factura que está registrada (suma la factura).
@@ -128,6 +195,10 @@ export type DocVenta = {
   deNotas: boolean;
   /** Y cuáles, con su estado en Cuentas por Cobrar. */
   cobra: NotaCobrada[];
+  /** DEV: lo que devuelve. */
+  devuelve: Devuelto[];
+  /** NET o FAC devuelta: por cuáles DEV. */
+  devuelta: Devuelta | null;
 };
 
 export type ProdVenta = { codigo: string; nombre: string; cantidad: number; totalUsd: number; documentos: number };
@@ -179,6 +250,7 @@ export function resumirVentas(movs: MovVenta[], empresa: EmpresaId): ResumenVent
     const d = docs.get(clave) ?? {
       clave, fecha: m.fecha, hora: m.hora ?? null, tipo: m.tipo, documento: m.documento.replace(/^(FAC|NET|DEV)\s+/, ""), cliente: m.cliente,
       renglones: 0, totalUsd: 0, cuenta, nota, facturadaCon: m.facturadaCon ?? null, deNotas: !!m.deNotas, cobra: m.cobra ?? [],
+      devuelve: m.devuelve ?? [], devuelta: m.devuelta ?? null,
     };
     d.renglones++; d.totalUsd += usd;
     if (m.hora && (!d.hora || m.hora < d.hora)) d.hora = m.hora;
