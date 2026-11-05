@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claseVenta, horaVista, marcarNotas, nombreValery, resumirVentas, type MovVenta } from "./ventas.ts";
+import { claseVenta, estadoDevoluciones, horaVista, marcarDevoluciones, marcarNotas, nombreValery, resumirVentas, type MovVenta } from "./ventas.ts";
 import { rangoAuto, tocaActualizar, vaciaSospechosa } from "./puente.ts";
 
 const mov = (tipo: MovVenta["tipo"], documento: string, cliente: string, codigo: string, cantidad: number, montoUsd: number | null, fecha = "2026-10-30"): MovVenta =>
@@ -150,4 +150,47 @@ test("la factura dice qué notas cobró y cómo está cada una en Cuentas por Co
   assert.deepEqual(de("0000001652"), [{ numero: "9095", cxc: "saldada" }, { numero: "9200", cxc: "por_liquidar" }]);
   assert.deepEqual(de("0000001653"), [{ numero: "9215", cxc: null }]);   // nunca estuvo en la cartera
   assert.deepEqual(de("0000001654"), []);
+});
+
+test("la devolución dice qué nota devuelve, y la nota que fue devuelta, toda o en parte", () => {
+  const mc = "METAL CINCO C A (METAL CINCO, C.A.)";
+  const movs = [
+    // NET 9511 devuelta toda por la DEV 752 (4-nov-2026, como en Valery).
+    mov("NET", "0000009511", mc, "E309332", 2, 70, "2026-11-04"),
+    mov("NET", "0000009511", mc, "2001705", 20, 6, "2026-11-04"),
+    mov("DEV", "0000000752", mc, "E309332", 2, 70, "2026-11-04"),
+    mov("DEV", "0000000752", mc, "2001705", 20, 6, "2026-11-04"),
+    // NET 9600: dos DEV, y aun así falta un cilindro (y «6x8AT» no es «6X8AT»).
+    mov("NET", "0000009600", mc, "6X8AT", 3, 30),
+    mov("NET", "0000009600", mc, "OXI6", 1, 20),
+    mov("DEV", "0000000760", mc, "6x8AT", 3, 30),
+    mov("DEV", "0000000761", mc, "OXI6", 1, 20),
+    // DEV de una nota de antes del corte: no está aquí.
+    mov("DEV", "0000000700", mc, "OXI6", 1, 20),
+    mov("NET", "0000009700", mc, "OXI6", 1, 20),
+  ];
+  const devuelveDe = new Map([
+    ["DEV 0000000752", ["NET 0000009511", "NET 0000009511"]], ["DEV 0000000760", ["NET 0000009600"]],
+    ["DEV 0000000761", ["NET 0000009600"]], ["DEV 0000000700", ["NET 0000008000"]],
+  ]);
+  const devueltos = movs.filter((m) => m.tipo === "DEV").map((m) => ({ documento: m.documento, devuelve: devuelveDe.get(m.documento)![0], codigo: m.codigo, cantidad: m.cantidad }));
+  const vendidos = movs.filter((m) => m.tipo !== "DEV").map((m) => ({ documento: m.documento, codigo: m.codigo, cantidad: m.cantidad }));
+  const estado = estadoDevoluciones(vendidos, devueltos);
+  assert.deepEqual(estado.get("NET 0000009511"), { devs: ["752"], parcial: false });
+  assert.deepEqual(estado.get("NET 0000009600"), { devs: ["760", "761"], parcial: true });
+  assert.equal(estado.has("NET 0000008000"), false);
+  assert.equal(estado.has("NET 0000009700"), false);
+
+  const antes = resumirVentas(movs, "sumigases");
+  const r = resumirVentas(marcarDevoluciones(movs, devuelveDe, estado), "sumigases");
+  const doc = (tipo: string, n: string) => r.documentos.find((d) => d.tipo === tipo && d.documento === n)!;
+  assert.deepEqual(doc("DEV", "0000000752").devuelve, [{ documento: "NET 0000009511", estado: "total" }]);
+  assert.deepEqual(doc("DEV", "0000000760").devuelve, [{ documento: "NET 0000009600", estado: "parcial" }]);
+  assert.deepEqual(doc("DEV", "0000000700").devuelve, [{ documento: "NET 0000008000", estado: null }]);
+  assert.deepEqual(doc("NET", "0000009511").devuelta, { devs: ["752"], parcial: false });
+  assert.deepEqual(doc("NET", "0000009600").devuelta, { devs: ["760", "761"], parcial: true });
+  assert.equal(doc("NET", "0000009700").devuelta, null);
+  // Solo es una marca: lo vendido no cambia.
+  assert.equal(r.netoUsd, antes.netoUsd);
+  assert.equal(r.devolucionesUsd, antes.devolucionesUsd);
 });

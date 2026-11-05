@@ -37,6 +37,7 @@ export type FilaVentaPuente = {
   cantidad: number;
   neto: number;         // Bs, como lo guarda Valery (la DEV en positivo)
   tasa: number;         // Bs por dólar
+  devuelve?: string | null; // DEV: «NET 0000009511», lo que devuelve (desde el agente 1.0.5)
 };
 
 const TIPOS: readonly TipoDoc[] = ["FAC", "NET", "DEV"];
@@ -70,9 +71,19 @@ export function renglonesDesdePuente(filas: FilaVentaPuente[]): { renglones: Ren
       fila: i + 1, fecha: f.fecha, hora: horaValida(f.hora), tipo, documento, cliente: String(f.cliente ?? "").trim(), codigo,
       producto: String(f.producto ?? "").trim(), cantidad, netoBs, tasa,
       ventaUsd: tasa > 0 ? netoBs / tasa : 0, clave: `V|${base}|${n}`,
+      devuelve: tipo === "DEV" ? referenciaValida(f.devuelve) : null,
     });
   });
   return { renglones, descartadas };
+}
+
+/**
+ * Lo que devuelve una DEV, como lo manda el agente: «NET 0000009511» o
+ * «FAC 0000001140». Otra cosa: null (no se adivina a qué nota pertenece).
+ */
+export function referenciaValida(v: unknown): string | null {
+  const m = /^(NET|FAC)\s+(\d+)$/.exec(String(v ?? "").trim());
+  return m ? `${m[1]} ${m[2]}` : null;
 }
 
 /** «17:13:55», «17:13:55.0000» o «9:05» → «17:13:55» / «09:05:00». Otra cosa: null (no se inventa una hora). */

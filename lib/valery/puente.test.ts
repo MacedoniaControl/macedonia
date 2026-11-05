@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COLUMNAS_VENTAS, leerVentas, type Celda } from "../inventory/ventas-valery.ts";
 import { paraLaBase, planVentas } from "../inventory/ventas-valery.ts";
-import { conectado, errorDeRango, filasDeParte, haceCuanto, horaValida, renglonesDesdePuente, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
+import { conectado, errorDeRango, filasDeParte, haceCuanto, horaValida, referenciaValida, renglonesDesdePuente, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
 
 // El mismo documento, como lo exporta Valery a Excel (formato completo) y como
 // lo lee el agente de la base. Casos reales de febrero de 2026: neto con
@@ -97,6 +97,18 @@ test("la hora viaja del agente a la base; sin hora (agente viejo) va null", () =
   const filas = planVentas(renglones, "2026-09-24").movimientos.map(paraLaBase);
   assert.equal(filas[0].hora, "15:42:07");
   assert.equal(filas[1].hora, null);
+});
+
+test("lo que devuelve la DEV viaja del agente a la base; solo en la DEV, y nunca adivinado", () => {
+  assert.equal(referenciaValida("NET 0000009511"), "NET 0000009511");
+  assert.equal(referenciaValida(" FAC  0000001140 "), "FAC 0000001140");
+  for (const malo of [null, undefined, "", "NET", "NET-0000009511", "DEV 0000000752", "NET 95A1", 9511]) assert.equal(referenciaValida(malo), null);
+  const dev: FilaVentaPuente = { fecha: "2026-11-04", tipo: "DEV", documento: "0000000752", cliente: "METAL CINCO", codigo: "E309332", producto: "E309332", cantidad: 2, neto: 17500, tasa: 250, devuelve: "NET 0000009511" };
+  const { renglones } = renglonesDesdePuente([dev, { ...dev, devuelve: null }, { ...dev, tipo: "NET", documento: "0000009511" }]);
+  assert.deepEqual(renglones.map((r) => r.devuelve), ["NET 0000009511", null, null]);   // una NET no devuelve nada
+  // No entra en la clave: la DEV que ya estaba es el mismo renglón y se le llena.
+  assert.equal(renglones[0].clave, renglones[1].clave.replace(/\|2$/, "|1"));
+  assert.deepEqual(planVentas(renglones, "2026-09-24").movimientos.map(paraLaBase).map((f) => f.devuelve), ["NET 0000009511", null, null]);
 });
 
 test("versiones del agente: se comparan por número, no como texto", () => {

@@ -183,6 +183,30 @@ tasa BCV de hoy, y se dice. Sin tasa de hoy, el total en dólares no se muestra.
   abrir el reporte si no hay lectura de ese día o la de hoy tiene más de una
   hora, y con «Leer de Valery»; nunca dos pedidos iguales en camino.
 
+## Agente 1.0.5: la devolución dice qué nota devuelve (2026-11-05, migración 52)
+
+Pedido del Owner con la Nota de Crédito 752 en la mano («Referencia:
+NET-0000009511»): la nota devuelta tiene que decirlo, como la factura dice
+qué notas cobró.
+
+- Valery guarda el enlace **renglón por renglón** en
+  `VENTAS_DETALLES_REL_CANT` (`correlativo_principal` + `numero_linea_principal`
+  → `correlativo_relacionado`, `tipo_documento_relacionado`). En la copia de
+  marzo lo tienen 137 de 138 devoluciones desde junio de 2025, a NET y a FAC.
+  `VENTAS_FACTURA_RELACIONADA` casi no se usa (1 DEV).
+- El agente 1.0.5 manda en cada renglón de una DEV `devuelve`
+  («NET 0000009511»). Macedonia lo guarda en `movimientos_inventario.devuelve`.
+  La primera actualización con un agente 1.0.5 pide todo desde el corte, una
+  vez (`valery_ajustes.devoluciones_rellenas`), y el importador se lo pone a
+  las DEV que ya estaban: solo llena, nunca cambia.
+- En Ventas: la DEV muestra «NET 9511 · Devuelta» (o «· Devuelta en parte»), y
+  la nota «Devuelta · DEV 752». En parte = algún código vendido no volvió
+  completo, sumando todas sus DEV (los códigos distinguen mayúsculas). Una
+  nota de antes del corte no está en Macedonia: su DEV la nombra sin estado.
+  Una nota devuelta toda no muestra «A CxC».
+- **Solo es una marca**: lo vendido no cambia (la DEV ya restaba).
+- Sin el agente 1.0.5 o sin la migración 52, todo sigue como antes, sin marcas.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.
