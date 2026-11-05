@@ -48,7 +48,22 @@ export async function ventasDelPeriodo(empresa: string, desde: string, hasta: st
       cantidad: Number(f.cantidad), montoUsd: f.monto_usd === null ? null : Number(f.monto_usd), deNotas: true,
     })),
   ];
-  return marcarNotas(movs, await facturasRegistradas(sb, empresa, movs), enCxc);
+  const [facturas, notasDe] = await Promise.all([facturasRegistradas(sb, empresa, movs), notasDeFacturas(sb, empresa, deNotas.map((f) => f.documento))]);
+  return marcarNotas(movs, facturas, enCxc, notasDe);
+}
+
+/** Qué notas cobró cada factura de notas («FAC …» → sus «NET …»), de cualquier fecha. */
+async function notasDeFacturas(sb: Sb, empresa: string, facturas: string[]): Promise<Map<string, string[]>> {
+  const buscadas = [...new Set(facturas)];
+  const de = new Map<string, string[]>();
+  for (let i = 0; i < buscadas.length; i += 100) {
+    const filas = await todasLasFilas<{ documento: string | null; facturada_con: string }>((a, b, contar) =>
+      sb.from("movimientos_inventario").select("documento, facturada_con", contar ? { count: "exact" } : undefined)
+        .eq("empresa_id", empresa).eq("tipo_doc", "NET").in("facturada_con", buscadas.slice(i, i + 100))
+        .order("id").range(a, b)).catch(() => []);
+    for (const f of filas) if (f.documento) de.set(f.facturada_con, [...(de.get(f.facturada_con) ?? []), f.documento]);
+  }
+  return de;
 }
 
 type Sb = Awaited<ReturnType<typeof createClient>>;
