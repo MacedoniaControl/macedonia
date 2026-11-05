@@ -142,3 +142,13 @@ test("el cliente se compara sin tildes, sin C.A. y sin el alias", () => {
   assert.equal(clienteNormal("Cliente Ñandú, C.A. (ÑANDÚ)"), "CLIENTE NANDU");
   assert.equal(clienteNormal("VENCEMENT. C.A"), clienteNormal("Vencement, C.A."));
 });
+
+test("una nota de antes del 1.0.6 en otra unidad: la factura la reconoce con la cantidad que trae ahora el agente", () => {
+  // En la base quedó con 20 «UND» (sin convertir); el agente la trae ahora en cajas de 20: 1.
+  const previa = { clave: "V|nota-und", fecha: "2026-09-24", cliente: "CLIENTE X, C.A.", codigo: "8145P95", cantidad: 20, ventaUsd: 10, documento: "9001", facturadaCon: null };
+  const nota = r({ fecha: "2026-09-24", tipo: "NET", documento: "9001", codigo: "8145P95", cantidad: 1, ventaUsd: 10, clave: "V|nota-und" });
+  const f = r({ fecha: "2026-09-24", tipo: "FAC", documento: "1501", codigo: "8145P95", cantidad: 1, ventaUsd: 10 });
+  const p = planVentas([nota, f], "2026-09-24", [previa]);
+  assert.deepEqual(p.notasPrevias, [{ renglon: "V|nota-und", factura: "FAC 1501" }]);
+  assert.equal(p.facturasDeNotas, 1);
+});

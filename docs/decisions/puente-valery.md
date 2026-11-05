@@ -207,6 +207,61 @@ qué notas cobró.
 - **Solo es una marca**: lo vendido no cambia (la DEV ya restaba).
 - Sin el agente 1.0.5 o sin la migración 52, todo sigue como antes, sin marcas.
 
+## Agente 1.0.6: el inventario sigue al de Valery (2026-11-05, migración 53)
+
+Pedido del Owner: «compara y después cierra la brecha». Comparadas ese día,
+de 2.216 productos de Sumigases 609 no coincidían, casi todos con menos en
+Macedonia (2702PD-500: −590 contra 663).
+
+**Por qué.** Desde el corte (24-09) al kardex solo entraban las ventas.
+Faltaba lo demás que mueve la existencia en Valery, y las ventas en otra
+unidad entraban sin convertir.
+
+**Lo que se encontró en la copia de marzo:**
+- **Compras** (`V3COMPRAS` y sus detalles):
+  - la recepción (RCM) suma;
+  - la factura de compra (FCM) suma solo lo que no viene de una recepción: se
+    resta la cantidad enlazada en `V3COMPRAS_DETALLES_REL_CANT`;
+  - la devolución de compra (DCM) resta;
+  - la orden de compra (ODC) no mueve nada.
+- **Operaciones de inventario** (`V3OPERACIONES_INVENT`):
+  - la carga (CRG) suma y la descarga (DSC) resta;
+  - el ajuste (AJS) mueve cargada − descargada. Guarda también la existencia
+    de antes y la de después;
+  - el traslado (TRS) solo cambia de depósito.
+- **Qué mueve la existencia.** Cada documento dice si se aplicó a la
+  existencia (`*_ESTADOS.EXIST_ACTUAL_ACTUALIZADA`). Las ventas dicen además
+  si están anuladas (`VENTAS_ESTADOS.ANULADO`).
+- **Unidades.** La existencia va en la **unidad principal**. Un renglón puede ir
+  en la secundaria (`TIPO_UNIDAD`, `FACTOR_UNIDAD` y, en ventas,
+  `TIPO_UNIDAD_APLICADA` = S):
+  - tipo 1, secundaria mayor: se multiplica. 5 «CAJA» de 50 del 2001912 son 250;
+  - tipo 2, secundaria menor: se divide. 1.200 «UND» del 8145P95, que va en
+    cajas de 20, son 60 cajas.
+  Antes, Macedonia descontaba esos 1.200 tal cual.
+- **Verificación.** Entre un ajuste y el siguiente de cada producto, estas
+  reglas explican la existencia de antes que guarda Valery en 1.608 de 1.671
+  tramos (96,2 %). Los demás son diferencias redondas que ningún documento de
+  estas tablas explica.
+
+**Lo que hace el agente 1.0.6:**
+- En el pedido de ventas, cada renglón trae su unidad y si está anulado.
+- Además trae las compras y operaciones aplicadas, sin montos: el costo de
+  compra no sale del servidor.
+- Macedonia lleva todo a la unidad principal. La clave del renglón sigue
+  siendo la cantidad tal como la escribió Valery: es el mismo renglón, y se le
+  corrige la cantidad.
+- Las compras entran con origen `compra`. Cargas, descargas y ajustes entran
+  con origen `ajuste` («Ajuste Valery» en Movimientos): no se revierten a mano.
+- La primera actualización con un agente 1.0.6 pide todo desde el corte, una
+  vez (`valery_ajustes.inventario_relleno`).
+
+**Inventario → Contra Valery** (Owner y Administrador): «Leer de Valery» trae
+la existencia por depósito y la compara, código por código (las mayúsculas
+cuentan), con la del kardex. Cada diferencia dice cuánto movieron los conteos
+físicos de Macedonia desde el corte; el resto queda «sin explicar». No cambia
+ningún número: Valery es la fuente y la diferencia se explica o se cuenta.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.
