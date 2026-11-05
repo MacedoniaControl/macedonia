@@ -13,7 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { todasLasFilas } from "@/lib/supabase/paginar";
-import { facturasAjenas, paraLaBase, planVentas, SERIE_FAC, type NotaPrevia } from "@/lib/inventory/ventas-valery";
+import { facturasAjenas, planVentas, renglonesParaLaBase, SERIE_FAC, type NotaPrevia } from "@/lib/inventory/ventas-valery";
 import { CADA_MIN_POR_DEFECTO, rangoAuto, renglonesDesdePuente, tocaActualizar, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
 
 export const restarDias = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) - n * 86400000).toISOString().slice(0, 10);
@@ -40,12 +40,20 @@ export async function notasPreviasDe(sb: SupabaseClient, empresa: string, desde:
   }));
 }
 
-/** Si la empresa trae sus ventas sola y cada cuánto. Sin fila: encendido, cada hora. */
-export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean }> {
+/**
+ * Si la empresa trae sus ventas sola y cada cuánto. Sin fila: encendido, cada hora.
+ * `facturasRellenas` null: la migración 51 no se ha corrido (no hay dónde
+ * guardar las facturas de notas).
+ */
+export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean; facturasRellenas: boolean | null }> {
   const { data } = await sb.from("valery_ajustes").select("ventas_auto, cada_min").eq("empresa_id", empresa).maybeSingle();
-  // Aparte: si la migración 50 no se ha corrido, la columna no existe y no debe apagar lo demás.
+  // Aparte: si la migración 50 o la 51 no se han corrido, la columna no existe y no debe apagar lo demás.
   const { data: h } = await sb.from("valery_ajustes").select("horas_rellenas").eq("empresa_id", empresa).maybeSingle();
-  return { auto: data?.ventas_auto ?? true, cadaMin: data?.cada_min ?? CADA_MIN_POR_DEFECTO, horasRellenas: h?.horas_rellenas ?? false };
+  const { data: f, error: ef } = await sb.from("valery_ajustes").select("facturas_rellenas").eq("empresa_id", empresa).maybeSingle();
+  return {
+    auto: data?.ventas_auto ?? true, cadaMin: data?.cada_min ?? CADA_MIN_POR_DEFECTO, horasRellenas: h?.horas_rellenas ?? false,
+    facturasRellenas: ef ? null : (f?.facturas_rellenas ?? false),
+  };
 }
 
 /**
@@ -92,10 +100,14 @@ export async function programarVentasAuto(
   const ultimaHasta = ((buena?.parametros as { hasta?: string } | null)?.hasta) ?? null;
   const { data: agente } = await sb.from("valery_agentes").select("version").eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", false).maybeSingle();
   const rellenarHoras = !ajustes.horasRellenas && versionAlMenos(agente?.version, VERSION_CON_HORA);
-  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras ? null : ultimaHasta);
+  // Las facturas de notas que pasaron antes de la migración 51 no están en
+  // ninguna parte: una vez, todo desde el corte para traerlas.
+  const rellenarFacturas = ajustes.facturasRellenas === false;
+  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras || rellenarFacturas ? null : ultimaHasta);
 
   const { data, error } = await sb.from("valery_solicitudes").insert({
-    empresa_id: empresa, tipo: "ventas", parametros: rellenarHoras ? { ...rango, rellenarHoras: true } : rango, automatica: true,
+    empresa_id: empresa, tipo: "ventas", automatica: true,
+    parametros: { ...rango, ...(rellenarHoras ? { rellenarHoras: true } : {}), ...(rellenarFacturas ? { rellenarFacturas: true } : {}) },
     creado_por: usuario?.id ?? null, creado_nombre: usuario?.nombre ?? "Automático",
   }).select("id").single();
   if (error?.code === "23505") return { ok: false, motivo: "en_curso", mensaje: "Ya se están trayendo las ventas." };
@@ -114,7 +126,7 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
   const marcar = (campos: Record<string, unknown>) => admin.from("valery_solicitudes").update(campos).eq("id", id);
   const { data: s } = await admin.from("valery_solicitudes").select("resumen, parametros").eq("id", id).maybeSingle();
   const resumen = (s?.resumen as Record<string, unknown> | null) ?? {};
-  const parametros = (s?.parametros as { rellenarHoras?: boolean } | null) ?? {};
+  const parametros = (s?.parametros as { rellenarHoras?: boolean; rellenarFacturas?: boolean } | null) ?? {};
   try {
     const { data: partes, error } = await admin.from("valery_resultados").select("datos").eq("solicitud_id", id).order("parte");
     if (error) throw new Error(`No se pudo leer lo que entregó el agente: ${error.message}`);
@@ -131,11 +143,13 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     const fechas = renglones.map((r) => r.fecha).sort();
     const previas = fechas.length ? await notasPreviasDe(admin, empresa, restarDias(fechas[0], 60)) : [];
     const plan = planVentas(renglones, corte, previas);
+    const conFacturas = (await ajustesVentasDe(admin, empresa)).facturasRellenas !== null;
+    const aLaBase = renglonesParaLaBase(plan, conFacturas);
 
-    let r = { importacion_id: null as number | null, nuevos: 0, repetidos: plan.movimientos.length, notas_facturadas: 0, productos_creados: [] as string[] | null };
-    if (plan.movimientos.length || plan.notasPrevias.length) {
+    let r = { importacion_id: null as number | null, nuevos: 0, repetidos: aLaBase.length, notas_facturadas: 0, productos_creados: [] as string[] | null };
+    if (aLaBase.length || plan.notasPrevias.length) {
       const { data, error: e } = await admin.rpc("importar_ventas_puente", {
-        p_solicitud: id, p_renglones: plan.movimientos.map(paraLaBase), p_notas: plan.notasPrevias,
+        p_solicitud: id, p_renglones: aLaBase, p_notas: plan.notasPrevias,
       });
       if (e) throw new Error(e.message);
       r = (Array.isArray(data) ? data[0] : data) as typeof r;
@@ -149,6 +163,10 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     // Las horas de lo anterior ya se pusieron: no se vuelve a pedir todo desde el corte.
     if (parametros.rellenarHoras && versionAlMenos(String(resumen.agente ?? ""), VERSION_CON_HORA)) {
       await admin.from("valery_ajustes").upsert({ empresa_id: empresa, horas_rellenas: true }, { onConflict: "empresa_id" });
+    }
+    // Y las facturas de notas de antes, igual: una sola vez.
+    if (parametros.rellenarFacturas && conFacturas) {
+      await admin.from("valery_ajustes").upsert({ empresa_id: empresa, facturas_rellenas: true }, { onConflict: "empresa_id" });
     }
   } catch (e) {
     await marcar({ estado: "error", error: (e as Error).message.slice(0, 2000) });

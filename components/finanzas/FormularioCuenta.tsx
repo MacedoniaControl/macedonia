@@ -37,6 +37,7 @@ export function FormularioCuenta({
   onCreada,
   onCerrar,
   anexo,
+  inicial,
   vendedores = [],
 }: {
   tipo: TipoCuenta;
@@ -49,16 +50,18 @@ export function FormularioCuenta({
    * guarda con su prefijo y no se deja repetir uno que el cliente ya tiene.
    */
   anexo?: { contraparte: string; documentos: string[]; deuda: number; vendedor?: string | null };
+  /** Lo que ya se sabe del documento (una nota de entrega de Valery desde Ventas): se puede corregir. */
+  inicial?: { documento: string; monto: number; emitida: string };
   /** Por cobrar: los vendedores externos conocidos, para elegir de quién es la cuenta. */
   vendedores?: string[];
 }) {
   const quien = tipo === "cobrar" ? "Cliente" : "Proveedor";
-  const [f, setF] = useState({ contraparte: anexo?.contraparte ?? "", documento: "", emitida: hoy(), vence: hoy(), nota: "" });
+  const [f, setF] = useState({ contraparte: anexo?.contraparte ?? "", documento: inicial?.documento ?? "", emitida: inicial?.emitida ?? hoy(), vence: hoy(), nota: "" });
   // Al anexar a un cliente lo común es una nota de entrega sin IVA; a un
   // proveedor, su factura con IVA y retención (como «Nueva cuenta»).
   const notaSinIva = !!anexo && tipo === "cobrar";
   const [clase, setClase] = useState<ClaseCuenta>(notaSinIva ? "nota_entrega" : "factura");
-  const [montoTxt, setMontoTxt] = useState("");
+  const [montoTxt, setMontoTxt] = useState(inicial ? inicial.monto.toFixed(2).replace(".", ",") : "");
   const [conIva, setConIva] = useState(!notaSinIva);
   const [retiene, setRetiene] = useState(!notaSinIva);
   const [imagen, setImagen] = useState<File | null>(null);

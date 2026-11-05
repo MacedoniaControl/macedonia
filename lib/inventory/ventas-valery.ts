@@ -13,6 +13,8 @@
 //   · DEV (devolución) → ENTRADA (vuelve la mercancía);
 //   · una FAC que factura una NET ya descontada NO vuelve a descontar (Valery
 //     exporta las dos). Mismas reglas que el histórico (scripts/historico-valery.py).
+//     Sus renglones van aparte (ventas_facturas_notas, migración 51): la
+//     factura es la venta, pero la mercancía ya salió con la nota.
 //
 // Esto es la parte pura (sin base): leer, validar y decidir. La escribe
 // lib/inventory/ventas-valery-db.ts, y la base lo vuelve a comprobar
@@ -242,13 +244,20 @@ export function notasFacturadas(renglones: RenglonVenta[], previas: NotaPrevia[]
   const libre = (n: Nota, factura: string) => !usadas.has(n.clave) && (!n.libreDe || n.libreDe === factura);
   const facDoc = (r: RenglonVenta) => `FAC ${r.documento}`;
   const k = (x: { cliente: string; codigo: string; cantidad: number }) => `${x.cliente}|${x.codigo}|${x.cantidad}`;
+  // Primero la nota que ya tiene esta misma factura: volver a leer un rango
+  // largo (el relleno desde el corte) tiene que dar lo mismo que la primera vez,
+  // no marcar otra nota igual del cliente.
+  const candidatas = (x: { cliente: string; codigo: string; cantidad: number }, factura: string) => {
+    const ns = porClave.get(k({ ...x, cliente: clienteNormal(x.cliente) })) ?? [];
+    return [...ns.filter((n) => n.libreDe === factura), ...ns.filter((n) => n.libreDe !== factura)];
+  };
   const porClave = new Map<string, Nota[]>();
   for (const n of notas) { const kk = k(n); porClave.set(kk, [...(porClave.get(kk) ?? []), n]); }
   const facs = renglones.filter((r) => r.tipo === "FAC");
 
   // 1. El mismo día, renglón por renglón.
   for (const f of facs) {
-    const c = (porClave.get(k({ ...f, cliente: clienteNormal(f.cliente) })) ?? [])
+    const c = candidatas(f, facDoc(f))
       .find((n) => n.fecha === f.fecha && libre(n, facDoc(f)) && Math.abs(n.ventaUsd - f.ventaUsd) <= 0.01 * Math.abs(n.ventaUsd) + 0.05);
     if (c) { usadas.set(c.clave, facDoc(f)); facturas.add(f.clave); }
   }
@@ -267,7 +276,7 @@ export function notasFacturadas(renglones: RenglonVenta[], previas: NotaPrevia[]
     const tomadas: Nota[] = [];
     let todas = true;
     for (const x of ls) {
-      const c = (porClave.get(k({ ...x, cliente: clienteNormal(x.cliente) })) ?? []).find((n) => {
+      const c = candidatas(x, doc).find((n) => {
         const d = dias(n.fecha, x.fecha);
         return libre(n, doc) && !tomadas.includes(n) && d >= 1 && d <= tope
           && Math.abs(n.ventaUsd - x.ventaUsd) <= tol * Math.abs(n.ventaUsd) + 0.5
@@ -301,6 +310,8 @@ export type PlanVentas = {
   notasPrevias: { renglon: string; factura: string }[];
   /** Facturas que no descuentan porque facturan una nota. */
   facturasDeNotas: number;
+  /** Sus renglones: son venta, pero no tocan la existencia (van a ventas_facturas_notas). */
+  facturasNotas: MovimientoVenta[];
   /** Renglones anteriores al corte: ya están en la existencia de Valery. */
   antesDelCorte: number;
   desde: string | null;
@@ -312,25 +323,41 @@ export const paraLaBase = (m: MovimientoVenta) => ({
   renglon: m.renglon, fecha: m.fecha, hora: m.hora ?? null, direccion: m.direccion, tipo: m.tipo, documento: m.documento, cliente: m.cliente,
   codigo: m.codigo, nombre: m.nombre, cantidad: m.cantidad, monto_usd: m.montoUsd, facturada_con: m.facturadaCon,
 });
+/** El renglón de una factura de notas: va a ventas_facturas_notas, no al kardex. */
+const deNotasParaLaBase = (m: MovimientoVenta) => ({ ...paraLaBase(m), de_notas: true });
 
-/** Decide qué entra: solo desde el corte, sin las facturas de notas. */
+/**
+ * Todo lo que va a la base. Las facturas de notas solo si la base ya tiene
+ * dónde ponerlas (migración 51): una base vieja no conoce «de_notas» y las
+ * metería al kardex, descontando la mercancía dos veces.
+ */
+export const renglonesParaLaBase = (plan: PlanVentas, conFacturasNotas: boolean) => [
+  ...plan.movimientos.map(paraLaBase),
+  ...(conFacturasNotas ? plan.facturasNotas.map(deNotasParaLaBase) : []),
+];
+
+/** Decide qué entra: solo desde el corte; las facturas de notas, aparte (no descuentan). */
 export function planVentas(renglones: RenglonVenta[], corte: string, previas: NotaPrevia[] = []): PlanVentas {
   const fac = notasFacturadas(renglones, previas);
   const enBase = new Set(previas.map((p) => p.clave));
   const movimientos: MovimientoVenta[] = [];
-  let antesDelCorte = 0, facturasDeNotas = 0;
+  const facturasNotas: MovimientoVenta[] = [];
+  let antesDelCorte = 0;
   for (const r of renglones) {
     if (r.fecha < corte) { antesDelCorte++; continue; }
-    if (fac.facturas.has(r.clave)) { facturasDeNotas++; continue; }
-    movimientos.push({
+    const m: MovimientoVenta = {
       renglon: r.clave, fecha: r.fecha, hora: r.hora ?? null, direccion: r.tipo === "DEV" ? "entrada" : "salida", tipo: r.tipo,
       documento: `${r.tipo} ${r.documento}`, cliente: r.cliente, codigo: r.codigo, nombre: r.producto || r.codigo,
       cantidad: r.cantidad, montoUsd: aMonto(Math.abs(r.ventaUsd)),
       facturadaCon: r.tipo === "NET" ? fac.notas.get(r.clave) ?? null : null,
-    });
+    };
+    (fac.facturas.has(r.clave) ? facturasNotas : movimientos).push(m);
   }
   // Las notas que ya están en la base se marcan allá (si vienen también en el archivo, su renglón no se vuelve a insertar).
   const notasPrevias = [...fac.notas].filter(([nota]) => enBase.has(nota)).map(([renglon, factura]) => ({ renglon, factura }));
   const fechas = movimientos.map((m) => m.fecha).sort();
-  return { movimientos, notasPrevias, facturasDeNotas, antesDelCorte, desde: fechas[0] ?? null, hasta: fechas[fechas.length - 1] ?? null };
+  return {
+    movimientos, notasPrevias, facturasDeNotas: facturasNotas.length, facturasNotas, antesDelCorte,
+    desde: fechas[0] ?? null, hasta: fechas[fechas.length - 1] ?? null,
+  };
 }
