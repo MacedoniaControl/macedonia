@@ -10,8 +10,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
-import { corteDe, notasPreviasDe, restarDias } from "@/lib/valery/ventas-auto";
-import { facturasAjenas, paraLaBase, planVentas, SERIE_FAC, type RenglonVenta } from "./ventas-valery";
+import { ajustesVentasDe, corteDe, notasPreviasDe, restarDias } from "@/lib/valery/ventas-auto";
+import { facturasAjenas, planVentas, renglonesParaLaBase, SERIE_FAC, type RenglonVenta } from "./ventas-valery";
 
 /** Primer día que se puede importar (null = la empresa todavía no tiene corte). */
 export async function corteVentas(empresa: string): Promise<string | null> {
@@ -39,12 +39,13 @@ export async function importarVentasValery(
     const sb = await createClient();
     const previas = fechas.length ? await notasPreviasDe(sb, empresa, restarDias(fechas[0], 60)) : [];
     const plan = planVentas(renglones, corte, previas);
-    if (!plan.movimientos.length && !plan.notasPrevias.length) {
+    const aLaBase = renglonesParaLaBase(plan, (await ajustesVentasDe(sb, empresa)).facturasRellenas !== null);
+    if (!aLaBase.length && !plan.notasPrevias.length) {
       return { ok: false, error: `No hay ventas desde el ${corte.split("-").reverse().join("-")} (el corte): lo anterior ya está en la existencia.` };
     }
     const { data, error } = await sb.rpc("importar_ventas_valery", {
       p_empresa: empresa, p_archivo: archivo, p_hash: hash,
-      p_renglones: plan.movimientos.map(paraLaBase),
+      p_renglones: aLaBase,
       p_notas: plan.notasPrevias,
     });
     if (error) return { ok: false, error: error.message };

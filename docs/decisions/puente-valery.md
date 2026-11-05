@@ -108,6 +108,31 @@ Pedido del Owner: que las ventas entren solas y verlas en un apartado.
 - **Apagarlo.** El interruptor de Ventas (Owner o Administrador) lo apaga por
   empresa (`valery_ajustes`). El botón sigue funcionando.
 
+## Toda factura es venta; la nota a crédito, no (2026-11-04, migración 51)
+
+Pedido del Owner al ver que la FAC 1652 y la 1653 no salían en Ventas. No se
+perdieron: el importador las reconoció como facturas de notas ya importadas
+(1652 → NET 9095 del 30-09 y NET 9200 del 08-10; 1653 → NET 9215 del 09-10,
+notas a crédito de V&B) y, para no descontar la mercancía dos veces, no las
+guardaba en ninguna parte. La venta quedaba el día de la nota.
+
+- **La factura es la venta.** Sus renglones van a `ventas_facturas_notas` (no
+  al kardex: la existencia no cambia) y Ventas la cuenta en su fecha. Las notas
+  que cobró se listan como «Facturada · FAC …» y dejan de sumar. Una nota cuya
+  factura todavía no está registrada sigue sumando: no se pierde la venta.
+- **Las de antes.** La primera actualización automática después de la
+  migración pide todo desde el corte, una vez (`facturas_rellenas`), y trae
+  las facturas de notas que ya habían pasado. Releer da lo mismo: el
+  emparejador prefiere la nota que ya tenía esa factura.
+- **Nota a crédito.** Una NET cuyo número está en Cuentas por Cobrar
+  («NE-9095») y no se ha cobrado es «A crédito»: no suma en Vendido y tiene su
+  tarjeta. Cobrada (liquidada o en cero), suma. La cápsula «A CxC» de Ventas la
+  anexa a la deuda de su cliente con su número, fecha y monto (quien maneja la
+  cartera). Quien ve Ventas sin ver la cartera recibe de
+  `ventas_notas_en_cxc` solo el número y si se cobró.
+- De paso: una nota ya marcada no se vuelve a marcar en cada actualización
+  (dejaba una importación vacía cada hora).
+
 ## Cuentas por cobrar de Valery, para mirar (2026-11-02)
 
 Pedido del Owner: ver la CxC de Valery dentro de Cuentas por Cobrar. Pestaña

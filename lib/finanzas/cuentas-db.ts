@@ -11,6 +11,7 @@ import { retencionDe, claseDeDocumento, revisarDesglose } from "./retencion.ts";
 import type { ClaseCuenta, Revision } from "./retencion.ts";
 import { aMonto, CASI_CERO } from "../ux/decimales.ts";
 import { fmtUsd } from "../ux/format.ts";
+import { clienteNormal } from "../inventory/ventas-valery.ts";
 // Las constantes NO se reexportan desde aqui: este archivo es "use server" y
 // solo admite exportar funciones asincronas. Quien las necesite importa
 // directamente de ./retencion.
@@ -710,6 +711,30 @@ export async function vendedorDelCliente(empresa: string, cliente: string): Prom
   const { data } = await createAdminClient().from("cliente_vendedor").select("vendedor_externo")
     .eq("empresa_id", empresa).eq("cliente_clave", clave).maybeSingle();
   return (data?.vendedor_externo as string | undefined) ?? null;
+}
+
+/**
+ * El cliente de una nota de entrega de Valery en la cartera por cobrar, para
+ * pasarla a Cuentas por Cobrar desde Ventas: su nombre tal como ya está en la
+ * cartera (Valery lo escribe con «&amp;», con el alias entre paréntesis…), lo
+ * que debe hoy y sus documentos (para no anexar dos veces el mismo número).
+ * Si todavía no está en la cartera: el nombre de Valery, sin deuda.
+ */
+export async function clienteEnCartera(empresa: string, cliente: string):
+  Promise<{ ok: true; contraparte: string; deuda: number; documentos: string[]; vendedor: string | null } | { ok: false; error: string }> {
+  const u = await getUsuarioSesion();
+  if (!u || !puedeEntrarAEmpresa(u, empresa) || !sesionPuede(u, "receivables")) return { ok: false, error: "Pasar notas a Cuentas por Cobrar lo hace quien maneja la cartera." };
+  const nombre = cliente.replace(/&amp;/g, "&").trim();
+  const buscado = clienteNormal(nombre);
+  const suyas = buscado ? (await listarCuentas(empresa, "cobrar")).filter((c) => clienteNormal(c.contraparte) === buscado) : [];
+  // El nombre que más se repite en su cartera: así la nota cae en su misma fila.
+  const veces = new Map<string, number>();
+  for (const c of suyas) veces.set(c.contraparte.trim(), (veces.get(c.contraparte.trim()) ?? 0) + 1);
+  const contraparte = [...veces].sort((a, b) => b[1] - a[1])[0]?.[0] ?? nombre;
+  return {
+    ok: true, contraparte, deuda: aMonto(suyas.reduce((a, c) => a + c.saldo, 0)), documentos: suyas.map((c) => c.documento),
+    vendedor: await vendedorDelCliente(empresa, contraparte),
+  };
 }
 
 // ---------------------------------------------------------------- eliminar (migración 38)

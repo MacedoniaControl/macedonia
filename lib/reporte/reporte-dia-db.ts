@@ -154,7 +154,7 @@ async function ventasDe(empresa: EmpresaId, desde: string, hasta: string): Promi
   const r = resumirVentas(movs, empresa);
   const porDia = new Map<string, MovVenta[]>();
   for (const m of movs) porDia.set(m.fecha, [...(porDia.get(m.fecha) ?? []), m]);
-  const horas = r.documentos.map((d) => d.hora).filter((h): h is string => !!h).sort();
+  const horas = r.documentos.filter((d) => d.cuenta).map((d) => d.hora).filter((h): h is string => !!h).sort();
   return {
     netoUsd: r.netoUsd, devolucionesUsd: r.devolucionesUsd, ventas: r.ventas, clientes: r.clientes,
     masVendidos: [...r.productos].sort((a, b) => b.totalUsd - a.totalUsd).slice(0, 3).map((p) => p.nombre),

@@ -7,6 +7,10 @@
 // Inventario. Las reglas para contarlas están en lib/valery/ventas.ts.
 // Hubo un /admin/sales con datos inventados que se borró (cc154aa); este no
 // muestra nada que no venga de Valery.
+//
+// Una nota de entrega a crédito no es venta todavía: desde aquí se pasa a
+// Cuentas por Cobrar (cápsula «A CxC») y deja de sumar hasta que se cobra o se
+// factura.
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -18,6 +22,10 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Switch } from "@/components/ui/Switch";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Modal } from "@/components/ui/Modal";
+import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
+import { clienteEnCartera } from "@/lib/finanzas/cuentas-db";
+import { fmtUsdCentavos } from "@/lib/ux/format";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { TablePager } from "@/components/ui/TablePager";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
@@ -27,7 +35,7 @@ import { fechaVista } from "@/lib/ux/tabla-export";
 import { fmtUsd } from "@/lib/ux/format";
 import type { EmpresaId } from "@/lib/ux/empresas";
 import { conectado, haceCuanto, vaciaSospechosa } from "@/lib/valery/puente";
-import { horaVista, resumirVentas, type CliVenta, type DocVenta, type ProdVenta, type ResumenVentas } from "@/lib/valery/ventas";
+import { horaVista, nombreValery, resumirVentas, type CliVenta, type DocVenta, type ProdVenta, type ResumenVentas } from "@/lib/valery/ventas";
 import { actualizarVentasAhora, cambiarVentasAuto, estadoVentas, ventasDelPeriodo, type EstadoVentas } from "@/lib/valery/ventas-db";
 
 const hoyCaracas = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
@@ -67,6 +75,9 @@ function Ventas() {
   const { desde, hasta } = periodo === "otro" ? otro : PERIODOS.find((p) => p.id === periodo)!.rango(hoyCaracas());
   const [vista, setVista] = useState<Vista>("documentos");
   const [buscar, setBuscar] = useState("");
+  // La nota que se está pasando a Cuentas por Cobrar, y lo que pasó al hacerlo.
+  const [pasar, setPasar] = useState<DocVenta | null>(null);
+  const [exito, setExito] = useState("");
 
   // El estado del puente se mira seguido mientras se traen ventas, y cada
   // minuto si no: así la pantalla se entera sola de la actualización de la hora.
@@ -157,15 +168,25 @@ function Ventas() {
           actions={<Button variant="secondary" onClick={() => setReintento((n) => n + 1)}>Reintentar</Button>} />
       ) : (
         <>
-          <div className="mb-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard label="Vendido" accent value={resumen ? fmtUsd(resumen.netoUsd) : "—"} sub="Facturas y notas, menos devoluciones" />
+          <div className="mb-2 grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <StatCard label="Vendido" accent value={resumen ? fmtUsd(resumen.netoUsd) : "—"} sub="Facturas y notas, menos devoluciones y lo que está a crédito" />
             <StatCard label="Ventas" value={resumen ? resumen.ventas.toLocaleString("es-VE") : "—"}
               sub={resumen ? `${resumen.clientes.toLocaleString("es-VE")} cliente(s)` : undefined} />
             <StatCard label="Ticket promedio" value={resumen ? (resumen.ventas ? fmtUsd(resumen.brutoUsd / resumen.ventas) : "—") : "—"} sub="Por factura o nota" />
             <StatCard label="Devoluciones" value={resumen ? fmtUsd(resumen.devolucionesUsd) : "—"}
               sub={resumen ? `${resumen.documentos.filter((d) => d.tipo === "DEV").length} documento(s)` : undefined} />
+            <div className="col-span-2 lg:col-span-1">
+              <StatCard label="A crédito" value={resumen ? fmtUsd(resumen.aCredito.totalUsd) : "—"}
+                sub={resumen ? `${resumen.aCredito.documentos} nota(s) en Cuentas por Cobrar sin cobrar` : undefined} />
+            </div>
           </div>
           <NotaDelResumen resumen={resumen} periodo={periodoTexto} corte={antesDelCorte ? estado!.corte : null} />
+          {exito && (
+            <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ok/10 px-3 py-2 text-sm text-ok" role="status">
+              <span>{exito}</span>
+              <button type="button" className="min-h-11 text-xs underline-offset-2 hover:underline" onClick={() => setExito("")}>Cerrar</button>
+            </p>
+          )}
 
           <SectionCard
             title={vista === "documentos" ? "Documentos" : vista === "productos" ? "Por producto" : "Por cliente"}
@@ -188,7 +209,8 @@ function Ventas() {
                 {Array.from({ length: 6 }, (_, i) => <span key={i} className="sumi-skeleton block h-9 w-full" />)}
               </div>
             ) : vista === "documentos" ? (
-              <TablaDocumentos filas={docs} periodo={periodoTexto} resumen={resumen} />
+              <TablaDocumentos filas={docs} periodo={periodoTexto} resumen={resumen}
+                onPasar={estado?.puedeCxc ? (d) => { setExito(""); setPasar(d); } : undefined} />
             ) : vista === "productos" ? (
               <TablaProductos filas={prods} periodo={periodoTexto} />
             ) : (
@@ -197,7 +219,46 @@ function Ventas() {
           </SectionCard>
         </>
       )}
+
+      {pasar && (
+        <Modal titulo="Pasar a Cuentas por Cobrar" onCerrar={() => setPasar(null)}>
+          <PasarACxc empresa={empresa} nota={pasar} onCerrar={() => setPasar(null)}
+            onHecho={(t) => { setExito(t); setReintento((n) => n + 1); }} />
+        </Modal>
+      )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------- nota a crédito
+/**
+ * Una nota de entrega de Valery que no se cobró: se anexa a la deuda de su
+ * cliente en Cuentas por Cobrar, con su número, su fecha y su monto (que se
+ * pueden corregir). Desde ese momento Ventas la cuenta «a crédito».
+ */
+function PasarACxc({ empresa, nota, onCerrar, onHecho }: { empresa: EmpresaId; nota: DocVenta; onCerrar: () => void; onHecho: (texto: string) => void }) {
+  const [cliente, setCliente] = useState<Awaited<ReturnType<typeof clienteEnCartera>> | null>(null);
+  useEffect(() => {
+    let vigente = true;
+    clienteEnCartera(empresa, nota.cliente)
+      .then((r) => { if (vigente) setCliente(r); })
+      .catch((e) => { if (vigente) setCliente({ ok: false, error: (e as Error).message }); });
+    return () => { vigente = false; };
+  }, [empresa, nota.cliente]);
+  if (!cliente) return <span className="sumi-skeleton block h-40 w-full rounded-xl" aria-busy="true" />;
+  if (!cliente.ok) return <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{cliente.error}</p>;
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">
+        Nota de entrega <b className="font-mono text-text">{nota.documento}</b> del {fechaVista(nota.fecha)} en Valery, por {fmtUsdCentavos(nota.totalUsd)} (sin IVA).
+        Al anexarla deja de contarse como venta hasta que se cobre o se facture.
+      </p>
+      <FormularioCuenta tipo="cobrar" empresa={empresa}
+        anexo={{ contraparte: cliente.contraparte, deuda: cliente.deuda, documentos: cliente.documentos, vendedor: cliente.vendedor }}
+        inicial={{ documento: nota.documento.replace(/^0+(?=\d)/, ""), monto: Math.round(nota.totalUsd * 100) / 100, emitida: nota.fecha }}
+        onCreada={(c) => { if (c) onHecho(`${c.documento} quedó en Cuentas por Cobrar de ${cliente.contraparte} por ${fmtUsdCentavos(c.monto)}: ya no suma como venta hasta que se cobre o se facture.`); }}
+        onCerrar={onCerrar} />
+    </div>
   );
 }
 
@@ -295,6 +356,7 @@ function NotaDelResumen({ resumen, periodo, corte }: { resumen: ResumenVentas | 
     ...(resumen.entreEmpresas.renglones ? [`${fmtUsd(resumen.entreEmpresas.totalUsd)} vendidos a la otra empresa del grupo (${resumen.entreEmpresas.documentos} documento(s))`] : []),
     ...(resumen.consumoPropio.renglones ? [`${fmtUsd(resumen.consumoPropio.totalUsd)} de consumo interno (${resumen.consumoPropio.documentos} documento(s))`] : []),
     ...(resumen.sinMonto ? [`${resumen.sinMonto} renglón(es) sin monto en dólares`] : []),
+    ...(resumen.facturadas.documentos ? [`${fmtUsd(resumen.facturadas.totalUsd)} en ${resumen.facturadas.documentos} nota(s) que ya cobró su factura (cuenta la factura)`] : []),
   ];
   return (
     <div className="mb-4 space-y-1 text-xs text-muted">
@@ -312,7 +374,18 @@ function Vacio() {
   return <EmptyState icon="sales" title="Sin ventas" message="No hay ventas que mostrar con este período y esta búsqueda." />;
 }
 
-function TablaDocumentos({ filas, periodo, resumen }: { filas: DocVenta[]; periodo: string; resumen: ResumenVentas }) {
+/** Lo que es cada documento, si no es una venta sin más. */
+function estadoDoc(d: DocVenta): { t: string; tone: Tone } | null {
+  if (d.nota === "facturada") return { t: `Facturada · FAC ${d.facturadaCon?.replace(/^FAC\s+0*/, "") ?? ""}`, tone: "muted" };
+  if (d.nota === "a_credito") return { t: "A crédito", tone: "warn" };
+  if (d.nota === "credito_cobrado") return { t: "Crédito cobrado", tone: "ok" };
+  if (d.deNotas) return { t: "Cobra notas", tone: "info" };
+  return null;
+}
+
+const capsula = "sumi-pulsable inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border-strong px-3 text-xs font-medium text-text hover:bg-surface-2";
+
+function TablaDocumentos({ filas, periodo, resumen, onPasar }: { filas: DocVenta[]; periodo: string; resumen: ResumenVentas; onPasar?: (d: DocVenta) => void }) {
   const acc = useMemo(() => ({
     // La hora ordena dentro del día; sin hora (Excel) va antes que cualquiera.
     fecha: (d: DocVenta) => `${d.fecha} ${d.hora ?? ""}`, hora: (d: DocVenta) => d.hora ?? "", tipo: (d: DocVenta) => d.tipo, documento: (d: DocVenta) => d.documento,
@@ -322,16 +395,21 @@ function TablaDocumentos({ filas, periodo, resumen }: { filas: DocVenta[]; perio
   useExportable(() => ({
     modulo: "", seccion: "Ventas", titulo: "Ventas · Documentos",
     detalle: [`Período ${periodo}`, "Sin IVA, en dólares a la tasa de su día. La devolución resta."],
-    columnas: [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Hora" }, { titulo: "Tipo" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Cliente" }, { titulo: "Renglones", tipo: "num" }, { titulo: "Total (USD)", tipo: "usd" }],
-    filas: t.ordenadas.map((d) => [fechaVista(d.fecha), horaVista(d.hora), TIPO[d.tipo].t, d.documento, d.cliente, d.renglones, r2(d.totalUsd)]),
-    totales: ["", "", "", "", `${t.ordenadas.length} documento(s)`, "", r2(t.ordenadas.reduce((a, d) => a + d.totalUsd, 0))],
-    nota: resumen.entreEmpresas.renglones || resumen.consumoPropio.renglones ? "No incluye lo vendido a la otra empresa del grupo ni el consumo interno." : undefined,
+    columnas: [{ titulo: "Fecha", tipo: "fecha" }, { titulo: "Hora" }, { titulo: "Tipo" }, { titulo: "Documento", tipo: "codigo" }, { titulo: "Cliente" }, { titulo: "Estado" },
+      { titulo: "Renglones", tipo: "num" }, { titulo: "Total (USD)", tipo: "usd" }],
+    filas: t.ordenadas.map((d) => [fechaVista(d.fecha), horaVista(d.hora), TIPO[d.tipo].t, d.documento, nombreValery(d.cliente), estadoDoc(d)?.t ?? "", d.renglones, r2(d.totalUsd)]),
+    // El total es lo vendido: sin las notas facturadas ni las que están a crédito.
+    totales: ["", "", "", "", `${t.ordenadas.length} documento(s)`, "", "", r2(t.ordenadas.filter((d) => d.cuenta).reduce((a, d) => a + d.totalUsd, 0))],
+    nota: [
+      ...(resumen.entreEmpresas.renglones || resumen.consumoPropio.renglones ? ["No incluye lo vendido a la otra empresa del grupo ni el consumo interno."] : []),
+      ...(resumen.facturadas.documentos || resumen.aCredito.documentos ? ["Las notas «Facturada» y «A crédito» se listan pero no suman al total."] : []),
+    ].join(" ") || undefined,
   }));
   if (!filas.length) return <Vacio />;
   return (
     <>
       <div className="sumi-scroll max-w-full overflow-x-auto">
-        <table className="w-full min-w-[800px] text-left text-sm">
+        <table className="w-full min-w-[920px] text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-muted">
             <tr className="border-b border-border">
               <SortableTh label="Fecha" sortKey="fecha" ariaSort={t.ariaSort} onSort={t.toggleSort} />
@@ -341,20 +419,37 @@ function TablaDocumentos({ filas, periodo, resumen }: { filas: DocVenta[]; perio
               <SortableTh label="Cliente" sortKey="cliente" ariaSort={t.ariaSort} onSort={t.toggleSort} />
               <SortableTh label="Renglones" sortKey="renglones" align="right" ariaSort={t.ariaSort} onSort={t.toggleSort} />
               <SortableTh label="Total" sortKey="total" align="right" ariaSort={t.ariaSort} onSort={t.toggleSort} />
+              {/* Sin un «sr-only» adentro: es absoluto, se sale del scroll de la tabla y ensancha la página en el móvil. */}
+              {onPasar && <th className="py-2 pl-3 font-medium" aria-label="Acción" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {t.visible.map((d) => (
+            {t.visible.map((d) => {
+              const e = estadoDoc(d);
+              return (
               <tr key={d.clave} className="hover:bg-surface-2">
                 <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums text-muted">{fechaVista(d.fecha)}</td>
                 <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums text-muted">{horaVista(d.hora)}</td>
                 <td className="py-2.5 pr-3"><StatusBadge tone={TIPO[d.tipo].tone}>{TIPO[d.tipo].t}</StatusBadge></td>
-                <td className="py-2.5 pr-3 font-mono text-xs text-muted">{d.documento}</td>
-                <td className="py-2.5 pr-3 text-text">{d.cliente || "—"}</td>
+                <td className="py-2.5 pr-3 font-mono text-xs text-muted">
+                  {d.documento}
+                  {e && <span className="mt-1 block font-sans"><StatusBadge tone={e.tone}>{e.t}</StatusBadge></span>}
+                </td>
+                <td className="py-2.5 pr-3 text-text">{nombreValery(d.cliente) || "—"}</td>
                 <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{d.renglones}</td>
-                <td className={`py-2.5 text-right font-medium tabular-nums ${d.totalUsd < 0 ? "text-warn" : "text-text"}`}>{fmtUsd(d.totalUsd)}</td>
+                <td className={`py-2.5 text-right font-medium tabular-nums ${!d.cuenta ? "text-muted line-through decoration-1" : d.totalUsd < 0 ? "text-warn" : "text-text"}`}
+                  title={d.cuenta ? undefined : "No suma: " + (d.nota === "a_credito" ? "está a crédito" : "cuenta su factura")}>{fmtUsd(d.totalUsd)}</td>
+                {onPasar && (
+                  <td className="py-1.5 pl-3 text-right">
+                    {d.tipo === "NET" && d.nota === null && (
+                      <button type="button" className={capsula} title={`Pasar la nota ${d.documento} a Cuentas por Cobrar: deja de sumar como venta hasta que se cobre`}
+                        onClick={() => onPasar(d)}>A CxC</button>
+                    )}
+                  </td>
+                )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { leerXls } from "../ux/xls.ts";
 import {
   COLUMNAS_VENTAS, clienteNormal, errorDeVentas, facturasAjenas, formatoDe, leerVentas, notasFacturadas, planVentas,
-  type RenglonVenta,
+  renglonesParaLaBase, type RenglonVenta,
 } from "./ventas-valery.ts";
 
 const xls = (n: string) => {
@@ -112,6 +112,24 @@ test("plan: salidas, entradas, nada antes del corte", () => {
   const q = planVentas(l.renglones, "2026-09-25");
   assert.equal(q.facturasDeNotas, 1);
   assert.equal(q.movimientos.find((m) => m.tipo === "NET")?.facturadaCon, "FAC 0000001501");
+  // Esa factura es la venta: sus renglones van aparte, sin tocar la existencia.
+  assert.deepEqual(q.facturasNotas.map((m) => `${m.documento} ${m.codigo}`), ["FAC 0000001501 PRB-OXI"]);
+  const base = renglonesParaLaBase(q, true);
+  assert.deepEqual(base.filter((b) => "de_notas" in b).map((b) => b.documento), ["FAC 0000001501"]);
+  assert.equal(base.length, q.movimientos.length + 1);
+  // Sin la migración 51 no se mandan: la base vieja las metería al kardex.
+  assert.equal(renglonesParaLaBase(q, false).length, q.movimientos.length);
+  assert.equal(renglonesParaLaBase(q, false).some((b) => "de_notas" in b), false);
+});
+
+test("releer un rango largo marca la misma nota que la primera vez, no otra igual del cliente", () => {
+  const nota = { fecha: "2026-09-24", cliente: "CLIENTE X, C.A.", codigo: "A", cantidad: 1, ventaUsd: 10, facturadaCon: null };
+  const libre = { ...nota, clave: "V|libre", documento: "9001" };
+  const marcada = { ...nota, clave: "V|marcada", documento: "9002", facturadaCon: "FAC 1501" };
+  const f = r({ fecha: "2026-09-26", tipo: "FAC", documento: "1501", codigo: "A", ventaUsd: 10 });
+  const p = planVentas([f], "2026-09-24", [libre, marcada]);
+  assert.equal(p.facturasNotas.length, 1);
+  assert.deepEqual(p.notasPrevias, [{ renglon: "V|marcada", factura: "FAC 1501" }]);
 });
 
 test("facturas de la otra empresa: el archivo está en la carpeta equivocada", () => {

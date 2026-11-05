@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claseVenta, horaVista, resumirVentas, type MovVenta } from "./ventas.ts";
+import { claseVenta, horaVista, marcarNotas, nombreValery, resumirVentas, type MovVenta } from "./ventas.ts";
 import { rangoAuto, tocaActualizar, vaciaSospechosa } from "./puente.ts";
 
 const mov = (tipo: MovVenta["tipo"], documento: string, cliente: string, codigo: string, cantidad: number, montoUsd: number | null, fecha = "2026-10-30"): MovVenta =>
@@ -88,4 +88,47 @@ test("la hora del documento: la del primer renglón; sin hora, «—»", () => {
   assert.equal(horaVista("12:00:00"), "12:00 p. m.");
   assert.equal(horaVista("09:30:00"), "9:30 a. m.");
   assert.equal(horaVista(null), "—");
+});
+
+test("toda factura es venta: la que cobra notas suma y sus notas no (caso FAC 1652 de V&B)", () => {
+  const vb = "SERVICIOS Y SUMINISTROS V &amp; B, C.A";
+  const movs = marcarNotas([
+    { ...mov("NET", "0000009095", vb, "ARG6", 2, 240, "2026-09-30"), facturadaCon: "FAC 0000001652" },
+    { ...mov("NET", "0000009200", vb, "E30918", 12, 360, "2026-10-08"), facturadaCon: "FAC 0000001652" },
+    { ...mov("FAC", "0000001652", vb, "ARG6", 2, 240, "2026-11-03"), deNotas: true },
+    { ...mov("FAC", "0000001652", vb, "E30918", 12, 360, "2026-11-03"), deNotas: true },
+    // Su factura todavía no se trajo (el relleno no ha corrido): la nota sigue sumando.
+    { ...mov("NET", "0000009400", "ISMESOL C.A", "OXI6", 1, 50), facturadaCon: "FAC 0000001700" },
+  ], new Set(["FAC 0000001652"]), new Map());
+  const r = resumirVentas(movs, "sumigases");
+  assert.equal(r.brutoUsd, 650);   // 600 de la factura + 50 de la nota sin factura traída; las dos notas facturadas no
+  assert.equal(r.ventas, 2);
+  assert.deepEqual(r.facturadas, { renglones: 2, documentos: 2, totalUsd: 600 });
+  const fac = r.documentos.find((d) => d.documento === "0000001652")!;
+  assert.equal(fac.deNotas, true);
+  assert.equal(fac.cuenta, true);
+  const n = r.documentos.find((d) => d.documento === "0000009095")!;
+  assert.equal(n.nota, "facturada");
+  assert.equal(n.facturadaCon, "FAC 0000001652");
+  assert.equal(n.cuenta, false);
+  // Productos y clientes: solo lo que suma (sin contar dos veces el ARG6).
+  assert.equal(r.productos.find((p) => p.codigo === "ARG6")!.totalUsd, 240);
+  assert.equal(r.porCliente.find((c) => c.cliente === vb)!.totalUsd, 600);
+});
+
+test("la nota en Cuentas por Cobrar sin cobrar es a crédito; cobrada, suma", () => {
+  const enCxc = new Map([["9300", false], ["9301", true]]);
+  const r = resumirVentas(marcarNotas([
+    mov("NET", "0000009300", "ISMESOL C.A", "OXI6", 1, 100),
+    mov("NET", "0000009301", "ISMESOL C.A", "OXI6", 1, 30),
+    mov("NET", "0000009302", "ISMESOL C.A", "OXI6", 1, 7),
+    mov("FAC", "0000009300", "ISMESOL C.A", "OXI6", 1, 5),   // una FAC con el mismo número no es la nota
+  ], new Set(), enCxc), "sumigases");
+  assert.equal(r.brutoUsd, 42);
+  assert.deepEqual(r.aCredito, { renglones: 1, documentos: 1, totalUsd: 100 });
+  assert.deepEqual(r.documentos.map((d) => [d.tipo, d.documento, d.nota, d.cuenta]), [
+    ["NET", "0000009300", "a_credito", false], ["NET", "0000009301", "credito_cobrado", true],
+    ["NET", "0000009302", null, true], ["FAC", "0000009300", null, true]]);
+  assert.equal(r.ventas, 3);
+  assert.equal(nombreValery("V &amp; B, C.A"), "V & B, C.A");
 });

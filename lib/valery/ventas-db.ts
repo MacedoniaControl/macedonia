@@ -7,27 +7,70 @@
 // Excel—, así que el apartado y el inventario nunca cuentan cosas distintas.
 
 import { createClient } from "@/lib/supabase/server";
-import { getUsuarioSesion, puedeEntrarAEmpresa } from "@/lib/auth/sesion-servidor";
+import { getUsuarioSesion, puedeEntrarAEmpresa, sesionPuede } from "@/lib/auth/sesion-servidor";
 import { todasLasFilas } from "@/lib/supabase/paginar";
 import type { TipoDoc } from "@/lib/inventory/ventas-valery";
 import { ajustesVentasDe, corteDe, programarVentasAuto } from "./ventas-auto";
 import type { EstadoSolicitud } from "./puente.ts";
-import type { MovVenta } from "./ventas.ts";
+import { marcarNotas, type MovVenta } from "./ventas.ts";
 
-/** Los renglones de venta del kardex entre dos fechas (inclusive). */
+/**
+ * Los renglones de venta entre dos fechas (inclusive): los del kardex y las
+ * facturas que cobran notas (ventas_facturas_notas, migración 51), con cada
+ * nota marcada (lib/valery/ventas.ts → marcarNotas).
+ */
 export async function ventasDelPeriodo(empresa: string, desde: string, hasta: string): Promise<MovVenta[]> {
   const sb = await createClient();
-  type Fila = { fecha: string; hora: string | null; tipo_doc: TipoDoc; documento: string | null; cliente: string | null; codigo: string; nombre: string; cantidad: number; monto_usd: number | null };
-  const filas = await todasLasFilas<Fila>((a, b, contar) =>
-    sb.from("movimientos_inventario")
-      .select("fecha, hora, tipo_doc, documento, cliente, codigo, nombre, cantidad, monto_usd", contar ? { count: "exact" } : undefined)
-      .eq("empresa_id", empresa).eq("origen", "venta").in("tipo_doc", ["FAC", "NET", "DEV"])
-      .gte("fecha", desde).lte("fecha", hasta)
-      .order("id").range(a, b));
-  return filas.map((f) => ({
-    fecha: f.fecha, hora: f.hora, tipo: f.tipo_doc, documento: f.documento ?? "", cliente: f.cliente ?? "", codigo: f.codigo, nombre: f.nombre,
-    cantidad: Number(f.cantidad), montoUsd: f.monto_usd === null ? null : Number(f.monto_usd),
-  }));
+  type Fila = { fecha: string; hora: string | null; tipo_doc: TipoDoc; documento: string | null; cliente: string | null; codigo: string; nombre: string; cantidad: number; monto_usd: number | null; facturada_con: string | null };
+  type FilaFac = { fecha: string; hora: string | null; documento: string; cliente: string | null; codigo: string; nombre: string; cantidad: number; monto_usd: number | null };
+  const [filas, deNotas, enCxc] = await Promise.all([
+    todasLasFilas<Fila>((a, b, contar) =>
+      sb.from("movimientos_inventario")
+        .select("fecha, hora, tipo_doc, documento, cliente, codigo, nombre, cantidad, monto_usd, facturada_con", contar ? { count: "exact" } : undefined)
+        .eq("empresa_id", empresa).eq("origen", "venta").in("tipo_doc", ["FAC", "NET", "DEV"])
+        .gte("fecha", desde).lte("fecha", hasta)
+        .order("id").range(a, b)),
+    // Sin la migración 51 la tabla no existe: no hay facturas de notas que sumar.
+    todasLasFilas<FilaFac>((a, b, contar) =>
+      sb.from("ventas_facturas_notas")
+        .select("fecha, hora, documento, cliente, codigo, nombre, cantidad, monto_usd", contar ? { count: "exact" } : undefined)
+        .eq("empresa_id", empresa).gte("fecha", desde).lte("fecha", hasta)
+        .order("id").range(a, b)).catch(() => [] as FilaFac[]),
+    notasEnCxc(sb, empresa),
+  ]);
+  const movs: MovVenta[] = [
+    ...filas.map((f) => ({
+      fecha: f.fecha, hora: f.hora, tipo: f.tipo_doc, documento: f.documento ?? "", cliente: f.cliente ?? "", codigo: f.codigo, nombre: f.nombre,
+      cantidad: Number(f.cantidad), montoUsd: f.monto_usd === null ? null : Number(f.monto_usd), facturadaCon: f.facturada_con,
+    })),
+    ...deNotas.map((f) => ({
+      fecha: f.fecha, hora: f.hora, tipo: "FAC" as const, documento: f.documento, cliente: f.cliente ?? "", codigo: f.codigo, nombre: f.nombre,
+      cantidad: Number(f.cantidad), montoUsd: f.monto_usd === null ? null : Number(f.monto_usd), deNotas: true,
+    })),
+  ];
+  return marcarNotas(movs, await facturasRegistradas(sb, empresa, movs), enCxc);
+}
+
+type Sb = Awaited<ReturnType<typeof createClient>>;
+
+/** De las facturas que cobraron las notas del período, las que están registradas (pueden ser de otro período). */
+async function facturasRegistradas(sb: Sb, empresa: string, movs: MovVenta[]): Promise<Set<string>> {
+  const buscadas = [...new Set(movs.map((m) => m.facturadaCon).filter((f): f is string => !!f))];
+  const hay = new Set<string>();
+  for (let i = 0; i < buscadas.length; i += 100) {
+    const { data, error } = await sb.from("ventas_facturas_notas").select("documento")
+      .eq("empresa_id", empresa).in("documento", buscadas.slice(i, i + 100));
+    if (error) return new Set();
+    for (const f of data ?? []) hay.add(f.documento as string);
+  }
+  return hay;
+}
+
+/** Número de cada nota de entrega en Cuentas por Cobrar → si ya se cobró. Sin la migración 51: ninguna. */
+async function notasEnCxc(sb: Sb, empresa: string): Promise<Map<string, boolean>> {
+  const { data, error } = await sb.rpc("ventas_notas_en_cxc", { p_empresa: empresa });
+  if (error) return new Map();
+  return new Map(((data ?? []) as { numero: string; cobrada: boolean }[]).map((n) => [n.numero, n.cobrada]));
 }
 
 export type Actualizacion = {
@@ -50,6 +93,8 @@ export type Actualizacion = {
 export type EstadoVentas = {
   /** Owner o Administrador: puede actualizar y encender o apagar lo automático. */
   gerencia: boolean;
+  /** Puede pasar una nota de entrega a Cuentas por Cobrar (permiso de la cartera). */
+  puedeCxc: boolean;
   corte: string | null;
   auto: boolean;
   cadaMin: number;
@@ -77,6 +122,7 @@ const actualizacion = (s: FilaSolicitud | null): Actualizacion | null => s && ({
 export async function estadoVentas(empresa: string): Promise<EstadoVentas> {
   const u = await getUsuarioSesion();
   const gerencia = !!u && (u.rol === "owner" || u.rol === "admin") && puedeEntrarAEmpresa(u, empresa);
+  const puedeCxc = !!u && puedeEntrarAEmpresa(u, empresa) && sesionPuede(u, "receivables");
   const sb = await createClient();
   const [corte, ajustes, agente, ultima, buena] = await Promise.all([
     corteDe(sb, empresa),
@@ -86,7 +132,7 @@ export async function estadoVentas(empresa: string): Promise<EstadoVentas> {
     sb.from("valery_solicitudes").select(COLS).eq("empresa_id", empresa).eq("automatica", true).eq("estado", "aplicada").order("id", { ascending: false }).limit(1).maybeSingle(),
   ]);
   return {
-    gerencia, corte, auto: ajustes.auto, cadaMin: ajustes.cadaMin,
+    gerencia, puedeCxc, corte, auto: ajustes.auto, cadaMin: ajustes.cadaMin,
     agente: agente.data ? {
       ultimoContacto: agente.data.ultimo_contacto,
       base: ((agente.data.info as Record<string, unknown> | null)?.base as string | undefined) ?? null,
