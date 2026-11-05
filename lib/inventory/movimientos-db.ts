@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion } from "@/lib/auth/sesion-servidor";
 
 export type Direccion = "entrada" | "salida";
-export type OrigenMov = "venta" | "compra" | "manual";
+export type OrigenMov = "venta" | "compra" | "ajuste" | "manual";
 
 export type MovimientoNuevo = {
   direccion: Direccion;

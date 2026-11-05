@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COLUMNAS_VENTAS, leerVentas, type Celda } from "../inventory/ventas-valery.ts";
 import { paraLaBase, planVentas } from "../inventory/ventas-valery.ts";
-import { conectado, errorDeRango, filasDeParte, haceCuanto, horaValida, referenciaValida, renglonesDesdePuente, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
+import { cantidadPrincipal, conectado, errorDeRango, filasDeParte, haceCuanto, horaValida, inventarioParaLaBase, referenciaValida, renglonesDesdePuente, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
 
 // El mismo documento, como lo exporta Valery a Excel (formato completo) y como
 // lo lee el agente de la base. Casos reales de febrero de 2026: neto con
@@ -118,4 +118,47 @@ test("versiones del agente: se comparan por número, no como texto", () => {
   assert.equal(versionAlMenos("1.0.3", "1.0.4"), false);
   assert.equal(versionAlMenos(null, "1.0.4"), false);
   assert.equal(versionAlMenos("raro", "1.0.4"), false);
+});
+
+test("la cantidad va a la unidad principal: se divide la secundaria menor y se multiplica la mayor", () => {
+  assert.equal(cantidadPrincipal(1200, "2", 20, "S"), 60);    // 8145P95: cajas de 20, se vendieron 1.200 «UND»
+  assert.equal(cantidadPrincipal(5, "1", 50, "S"), 250);      // 2001912: en unidades, se vendieron 5 «CAJA» de 50
+  assert.equal(cantidadPrincipal(5, "1", 50, "P"), 5);        // se aplicó la principal: tal cual
+  assert.equal(cantidadPrincipal(7, "2", 1, "S"), 7);         // factor 1: nada que convertir
+  assert.equal(cantidadPrincipal(7, "0", 30, "S"), 7);
+  assert.equal(cantidadPrincipal(250, "2", 50), 5);           // ajuste de 250 «UND» de una caja de 50 (sin tua: no es venta)
+  assert.equal(cantidadPrincipal(20, "1", 100), 2000);
+  // Agente viejo: no manda la unidad, la cantidad no cambia.
+  assert.equal(cantidadPrincipal(1200, undefined, undefined, "P"), 1200);
+});
+
+test("las ventas: la cantidad en la principal y la clave con la de Valery; lo anulado no entra", () => {
+  const base: FilaVentaPuente = { fecha: "2026-11-01", tipo: "FAC", documento: "0000001700", cliente: "X", codigo: "8145P95", producto: "P", cantidad: 1200, neto: 5000, tasa: 250 };
+  const { renglones, anuladas } = renglonesDesdePuente([
+    { ...base, tu: "2", tua: "S", fu: 20 },
+    { ...base, documento: "0000001701", tu: "2", tua: "S", fu: 20, anulado: "T" },
+  ]);
+  assert.equal(renglones.length, 1);
+  assert.equal(anuladas, 1);
+  assert.equal(renglones[0].cantidad, 60);
+  // El mismo renglón que ya entró sin unidad (agente 1.0.5): la misma clave, para corregirlo y no duplicarlo.
+  assert.equal(renglones[0].clave, renglonesDesdePuente([base]).renglones[0].clave);
+});
+
+test("compras, cargas, descargas y ajustes de Valery: con signo, en la principal y desde el corte", () => {
+  const f = (p: Partial<FilaVentaPuente>): FilaVentaPuente => ({ fecha: "2026-10-01", tipo: "RCM", documento: "0000000900", cliente: "PROVEEDOR", codigo: "8145P95", producto: "P", cantidad: 24, neto: 0, tasa: 0, tu: "0", fu: 1, ...p });
+  const { inventario, renglones, descartadas } = renglonesDesdePuente([
+    f({}), f({ tipo: "DCM", cantidad: 2 }), f({ tipo: "AJS", cantidad: -250, tu: "2", fu: 50 }), f({ tipo: "CRG", cantidad: 3 }),
+    f({ tipo: "DSC", cantidad: 1 }), f({ tipo: "FCM", cantidad: 0 }), f({ tipo: "AJS", cantidad: 0 }),
+    f({ tipo: "RCM", fecha: "2026-09-20", cantidad: 5 }),
+  ]);
+  assert.equal(renglones.length, 0);
+  assert.equal(descartadas, 2);   // la factura que solo factura una recepción y el ajuste que no cambió nada
+  assert.deepEqual(inventario.map((r) => [r.tipo, r.cantidad]), [["RCM", 24], ["DCM", -2], ["AJS", -5], ["CRG", 3], ["DSC", -1], ["RCM", 5]]);
+  assert.equal(new Set(inventario.map((r) => r.clave)).size, inventario.length);
+  const base = inventarioParaLaBase(inventario, "2026-09-24");
+  assert.equal(base.length, 5);   // la recepción de antes del corte ya está en la existencia
+  assert.deepEqual(base.map((r) => [r.documento, r.direccion, r.cantidad]),
+    [["RCM 0000000900", "entrada", 24], ["DCM 0000000900", "salida", 2], ["AJS 0000000900", "salida", 5], ["CRG 0000000900", "entrada", 3], ["DSC 0000000900", "salida", 1]]);
+  assert.ok(base.every((r) => r.monto_usd === null));   // el costo de compra no se trae
 });

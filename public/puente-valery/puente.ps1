@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.5'
+$Version = '1.0.6'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -159,6 +159,9 @@ $SQL = @{
   ventas = @'
 select v.fecha_emision as fecha, v.hora_emision as hora, v.tipo_documento as tipo, v.documento, v.cliente_nombre as cliente,
        d.producto_codigo as codigo, d.producto_nombre as producto, d.cantidad, d.total_neto as neto,
+       -- La unidad del renglon: la existencia de Valery va en la principal (1.0.6).
+       d.tipo_unidad as tu, d.tipo_unidad_aplicada as tua, d.factor_unidad as fu,
+       (select first 1 e.anulado from ventas_estados e where e.correlativo_principal = v.correlativo) as anulado,
        v.factor_cambio as factor,
        (select first 1 h.factor_cambio from moneda_historial h
          where h.moneda_codigo = '02'
@@ -174,6 +177,34 @@ select v.fecha_emision as fecha, v.hora_emision as hora, v.tipo_documento as tip
  where v.fecha_emision between cast(@desde as date) and cast(@hasta as date)
    and v.tipo_documento in ('FAC', 'NET', 'DEV') and v.temporal <> 'T'
  order by v.correlativo, d.numero_linea
+'@
+  # Lo que mueve la existencia en Valery fuera de las ventas (1.0.6): compras
+  # (recepcion, factura que no viene de una recepcion, devolucion de compra) y
+  # operaciones de inventario (carga, descarga, ajuste). Solo los documentos
+  # que Valery marco como aplicados a la existencia. Sin montos: el costo de
+  # compra no sale del servidor.
+  inventario = @'
+select c.fecha_emision as fecha, cast(c.hora_emision as varchar(20)) as hora, c.tipo_documento as tipo, c.documento,
+       cast(c.proveedor_nombre as varchar(200)) as cliente, d.producto_codigo as codigo, cast(d.producto_nombre as varchar(200)) as producto,
+       cast(case when c.tipo_documento = 'FCM' then
+         d.cantidad - coalesce((select sum(r.cantidad) from v3compras_detalles_rel_cant r
+                                 where r.correlativo_principal = d.correlativo_principal and r.numero_linea_principal = d.numero_linea), 0)
+         else d.cantidad end as double precision) as cantidad,
+       d.tipo_unidad as tu, d.factor_unidad as fu
+  from v3compras c join v3compras_detalles d on d.correlativo_principal = c.correlativo
+  join v3compras_estados e on e.correlativo_principal = c.correlativo
+ where c.fecha_emision between cast(@desde as date) and cast(@hasta as date) and c.temporal <> 'T'
+   and c.tipo_documento in ('RCM', 'FCM', 'DCM') and e.exist_actual_actualizada = 'T'
+union all
+select o.fecha_emision, cast(o.hora_emision as varchar(20)), o.tipo_documento, o.documento,
+       cast(o.descripcion as varchar(200)), d.producto_codigo, cast(d.producto_nombre as varchar(200)),
+       cast(case when o.tipo_documento = 'AJS' then coalesce(d.cantidad_cargada, 0) - coalesce(d.cantidad_descargada, 0)
+                 else d.cantidad end as double precision),
+       d.tipo_unidad, d.factor_unidad
+  from v3operaciones_invent o join v3operaciones_invent_detalles d on d.correlativo_principal = o.correlativo
+  join v3operaciones_invent_estados e on e.correlativo_principal = o.correlativo
+ where o.fecha_emision between cast(@desde as date) and cast(@hasta as date) and o.temporal <> 'T'
+   and o.tipo_documento in ('CRG', 'DSC', 'AJS') and e.exist_actual_actualizada = 'T'
 '@
   cxc = @'
 select c.tipo_documento as tipo, c.documento, c.cliente_codigo, c.cliente_nombre as cliente, c.cliente_rif as rif,
@@ -264,6 +295,11 @@ function Filas-De([string]$tipo, $parametros) {
       $fx = [double]($f.factor); $th = if ($null -ne $f.tasa_historial) { [double]$f.tasa_historial } else { 0 }
       $f.tasa = if ($fx -gt 1.0001) { $fx } else { $th }
       $f.Remove('factor'); $f.Remove('tasa_historial')
+    }
+    # Y lo que mueve la existencia fuera de las ventas, en el mismo pedido: se aplica junto.
+    foreach ($f in (Consultar $SQL.inventario @{ '@desde' = [string]$parametros.desde; '@hasta' = [string]$parametros.hasta })) {
+      $f.neto = 0; $f.tasa = 0
+      $filas.Add($f)
     }
     return ,$filas
   }

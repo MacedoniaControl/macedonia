@@ -12,10 +12,11 @@ import { MasterInventario } from "./MasterInventario";
 import { ConteoFisico } from "./conteo/ConteoFisico";
 import { CatalogoProductos } from "@/app/admin/products/CatalogoProductos";
 import { MovimientosPanel } from "./MovimientosPanel";
+import { CompararValery } from "./CompararValery";
 
 const inputClass = "sumi-campo sumi-campo--con-icono";
 
-type Tab = "master" | "conteo" | "movimientos" | "productos";
+type Tab = "master" | "conteo" | "movimientos" | "productos" | "valery";
 
 // El boton "Descargar" de la cabecera baja la pestaña que este abierta: cada
 // una declara su tabla adentro de este proveedor.
@@ -45,7 +46,7 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
   const { rol } = useRol();
   const gerencia = esGerencia(rol);
   const cuenta = puedeContar(rol);
-  const permitidas: Tab[] = ["master", "productos", ...(cuenta ? ["conteo" as const] : []), ...(gerencia ? ["movimientos" as const] : [])];
+  const permitidas: Tab[] = ["master", "productos", ...(cuenta ? ["conteo" as const] : []), ...(gerencia ? ["movimientos" as const, "valery" as const] : [])];
   const tab: Tab = permitidas.includes(tabElegida) ? tabElegida : "master";
   const [recargaMaster, setRecargaMaster] = useState(0);
   // «Iniciar Conteo» desde el Master: lleva a Conteo con la ventana ya abierta.
@@ -77,6 +78,8 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
           ["productos", "Productos y Catálogo"],
           ["conteo", "Conteo"],
           ["movimientos", "Movimientos"],
+          // Owner y Administrador: lo de Valery, como todo lo del Puente.
+          ["valery", "Contra Valery"],
         ] as [Tab, string][]).filter(([id]) => permitidas.includes(id)).map(([id, label]) => (
           <button key={id} onClick={() => irA(id)}
             className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>
@@ -100,6 +103,9 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
       {tab === "productos" && <CatalogoProductos embebido />}
 
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
+
+      {/* Macedonia contra la existencia de Valery (pedido del 05-11-2026). */}
+      {tab === "valery" && <CompararValery empresa={empresa} filtro={q} />}
 
       {/* El conteo fisico: planilla, historial y actas. */}
       {tab === "conteo" && <ConteoFisico empresa={empresa} gerencia={gerencia} inicial={inicial} iniciarAlEntrar={iniciar} onCerrado={() => setRecargaMaster((n) => n + 1)} />}

@@ -31,6 +31,9 @@ const hoyISO = () => new Date().toISOString().slice(0, 10);
 
 type Filtro = "todos" | "entrada" | "salida";
 
+// «Ajuste Valery»: cargas, descargas y ajustes que trae el Puente (migración 53). No se revierten aquí.
+const NOMBRE_ORIGEN: Record<string, string> = { compra: "Compra", venta: "Venta", ajuste: "Ajuste Valery", manual: "Manual" };
+
 const ORDEN: Record<string, string> = { fecha: "fecha", codigo: "código", nombre: "producto", cantidad: "cantidad", origen: "origen" };
 
 export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }) {
@@ -93,7 +96,7 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
       ],
       filas: t.ordenadas.map((m) => [
         fechaVista(m.fecha), m.codigo, m.nombre, m.direccion === "entrada" ? m.cantidad : -m.cantidad,
-        m.origen === "compra" ? "Compra" : m.origen === "venta" ? "Venta" : "Manual", m.motivo || m.documento || null, m.usuario || null,
+        NOMBRE_ORIGEN[m.origen] ?? "Manual", m.motivo || m.documento || null, m.usuario || null,
       ]),
       totales: ["", "", `Neto · ${t.ordenadas.length.toLocaleString("es-VE")} movimientos`, r2(neto), "", "", ""],
       nota: "Cantidad con signo: + entra al inventario, − sale.",
@@ -207,8 +210,8 @@ export function MovimientosPanel({ empresa = "sumigases" }: { empresa?: string }
                         {m.direccion === "entrada" ? "+" : "−"}{m.cantidad}
                       </td>
                       <td className="py-2.5 pr-3">
-                        <StatusBadge tone={m.origen === "compra" ? "ok" : m.origen === "venta" ? "info" : "muted"}>
-                          {m.origen === "compra" ? "Compra" : m.origen === "venta" ? "Venta" : "Manual"}
+                        <StatusBadge tone={m.origen === "compra" ? "ok" : m.origen === "venta" ? "info" : m.origen === "ajuste" ? "navy" : "muted"}>
+                          {NOMBRE_ORIGEN[m.origen] ?? "Manual"}
                         </StatusBadge>
                       </td>
                       <td className="py-2.5 pr-3 text-xs text-muted">{m.motivo || m.documento || "—"}</td>

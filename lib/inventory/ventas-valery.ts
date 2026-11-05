@@ -238,7 +238,9 @@ export function notasFacturadas(renglones: RenglonVenta[], previas: NotaPrevia[]
   // con la marca que tiene en la base.
   const unicas = new Map<string, Nota>();
   for (const r of renglones) if (r.tipo === "NET") unicas.set(r.clave, { ...r, cliente: clienteNormal(r.cliente) });
-  for (const p of previas) unicas.set(p.clave, { ...p, cliente: clienteNormal(p.cliente), libreDe: p.facturadaCon });
+  // La cantidad, la que trae ahora el agente si la trae: en la base puede estar todavía en
+  // la unidad secundaria (antes del agente 1.0.6) y no se compararía con la de la factura.
+  for (const p of previas) unicas.set(p.clave, { ...p, cantidad: unicas.get(p.clave)?.cantidad ?? p.cantidad, cliente: clienteNormal(p.cliente), libreDe: p.facturadaCon });
   const notas = [...unicas.values()];
   const usadas = new Map<string, string>();
   const facturas = new Set<string>();
