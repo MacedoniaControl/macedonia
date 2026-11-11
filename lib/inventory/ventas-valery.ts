@@ -61,6 +61,10 @@ export type RenglonVenta = {
   clave: string;
   /** DEV: la nota o factura que devuelve («NET 0000009511»). La trae el Puente desde el agente 1.0.5; el Excel no. */
   devuelve?: string | null;
+  /** FAC, desde el agente 1.0.7: Valery dice que viene de una nota de entrega (no descuenta). */
+  deNotasValery?: boolean;
+  /** Y de cuál («NET 0000009095»), si lo dice. */
+  notaValery?: string | null;
 };
 
 export type LecturaVentas = {
@@ -232,6 +236,27 @@ const dias = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) 
  *      · y ninguna de esas notas se devolvió antes de facturar.
  * `previas` son las notas ya importadas: una factura nueva puede facturar una nota vieja.
  */
+/**
+ * Con el agente 1.0.7 no se adivina: Valery dice qué renglón de factura viene
+ * de una nota y de cuál. La nota (del archivo o de la base) queda marcada con
+ * esa factura; la factura no descuenta.
+ */
+export function notasFacturadasSegunValery(renglones: RenglonVenta[], previas: NotaPrevia[] = []): Facturacion {
+  const facturas = new Set<string>();
+  const notas = new Map<string, string>();
+  const porDocumento = new Map<string, string[]>();
+  const agregar = (documento: string, clave: string) => porDocumento.set(documento, [...(porDocumento.get(documento) ?? []), clave]);
+  for (const r of renglones) if (r.tipo === "NET") agregar(r.documento, r.clave);
+  for (const p of previas) if (!porDocumento.get(p.documento)?.includes(p.clave)) agregar(p.documento, p.clave);
+  for (const f of renglones) {
+    if (f.tipo !== "FAC" || !f.deNotasValery) continue;
+    facturas.add(f.clave);
+    const nota = f.notaValery?.replace(/^NET\s+/, "");
+    for (const clave of (nota && porDocumento.get(nota)) || []) if (!notas.has(clave)) notas.set(clave, `FAC ${f.documento}`);
+  }
+  return { facturas, notas };
+}
+
 export function notasFacturadas(renglones: RenglonVenta[], previas: NotaPrevia[] = []): Facturacion {
   type Nota = { clave: string; fecha: string; cliente: string; codigo: string; cantidad: number; ventaUsd: number; documento: string; libreDe?: string | null };
   // Una nota que ya se importó y vuelve a venir en el archivo es la misma: una sola vez,
@@ -345,7 +370,9 @@ export const renglonesParaLaBase = (plan: PlanVentas, conFacturasNotas: boolean)
 
 /** Decide qué entra: solo desde el corte; las facturas de notas, aparte (no descuentan). */
 export function planVentas(renglones: RenglonVenta[], corte: string, previas: NotaPrevia[] = []): PlanVentas {
-  const fac = notasFacturadas(renglones, previas);
+  // Si el agente dice qué factura viene de una nota (1.0.7), eso; si no (Excel, agente viejo), se reconoce.
+  const fac = renglones.some((r) => r.tipo === "FAC" && r.deNotasValery !== undefined)
+    ? notasFacturadasSegunValery(renglones, previas) : notasFacturadas(renglones, previas);
   const enBase = new Set(previas.map((p) => p.clave));
   const movimientos: MovimientoVenta[] = [];
   const facturasNotas: MovimientoVenta[] = [];

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COLUMNAS_VENTAS, leerVentas, type Celda } from "../inventory/ventas-valery.ts";
 import { paraLaBase, planVentas } from "../inventory/ventas-valery.ts";
-import { cantidadPrincipal, conectado, errorDeRango, filasDeParte, haceCuanto, horaValida, inventarioParaLaBase, referenciaValida, renglonesDesdePuente, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
+import { cantidadPrincipal, conectado, deNotasSegunValery, errorDeRango, filasDeParte, haceCuanto, horaValida, inventarioParaLaBase, referenciaValida, renglonesDesdePuente, versionAlMenos, type FilaVentaPuente } from "./puente.ts";
 
 // El mismo documento, como lo exporta Valery a Excel (formato completo) y como
 // lo lee el agente de la base. Casos reales de febrero de 2026: neto con
@@ -157,8 +157,23 @@ test("compras, cargas, descargas y ajustes de Valery: con signo, en la principal
   assert.deepEqual(inventario.map((r) => [r.tipo, r.cantidad]), [["RCM", 24], ["DCM", -2], ["AJS", -5], ["CRG", 3], ["DSC", -1], ["RCM", 5]]);
   assert.equal(new Set(inventario.map((r) => r.clave)).size, inventario.length);
   const base = inventarioParaLaBase(inventario, "2026-09-24");
-  assert.equal(base.length, 5);   // la recepción de antes del corte ya está en la existencia
+  // La recepción de antes del corte ya está en la existencia; el ajuste de Valery no entra: los conteos son de Macedonia.
+  assert.equal(base.length, 4);
   assert.deepEqual(base.map((r) => [r.documento, r.direccion, r.cantidad]),
-    [["RCM 0000000900", "entrada", 24], ["DCM 0000000900", "salida", 2], ["AJS 0000000900", "salida", 5], ["CRG 0000000900", "entrada", 3], ["DSC 0000000900", "salida", 1]]);
+    [["RCM 0000000900", "entrada", 24], ["DCM 0000000900", "salida", 2], ["CRG 0000000900", "entrada", 3], ["DSC 0000000900", "salida", 1]]);
   assert.ok(base.every((r) => r.monto_usd === null));   // el costo de compra no se trae
+});
+
+test("1.0.7: Valery dice qué renglón de factura viene de una nota y de cuál; sin el dato, nada cambia", () => {
+  assert.deepEqual(deNotasSegunValery({ mueve: "F", rel: 200, cobra_nota: "NET 0000009300" }), { deNotasValery: true, notaValery: "NET 0000009300" });
+  assert.deepEqual(deNotasSegunValery({ mueve: "T", rel: 5, cobra_nota: "NET 0000009301" }), { deNotasValery: true, notaValery: "NET 0000009301" });
+  assert.deepEqual(deNotasSegunValery({ mueve: "T", rel: 0, cobra_nota: null }), { deNotasValery: false, notaValery: null });
+  assert.deepEqual(deNotasSegunValery({ mueve: "F", rel: 0, cobra_nota: null }), { deNotasValery: true, notaValery: null });   // Valery no la aplicó
+  const fac: FilaVentaPuente = { fecha: "2026-10-14", tipo: "FAC", documento: "0000001596", cliente: "X", codigo: "BRGXL", producto: "P", cantidad: 200, neto: 1000, tasa: 200 };
+  const [con, sin, net] = renglonesDesdePuente([
+    { ...fac, mueve: "F", rel: 200, cobra_nota: "NET 0000009300" }, fac, { ...fac, tipo: "NET", documento: "0000009300", mueve: "T" },
+  ]).renglones;
+  assert.equal(con.deNotasValery, true);
+  assert.equal(sin.deNotasValery, undefined);   // agente viejo: se sigue reconociendo como antes
+  assert.equal(net.deNotasValery, undefined);   // solo las facturas
 });

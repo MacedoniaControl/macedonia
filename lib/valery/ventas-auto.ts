@@ -45,18 +45,20 @@ export async function notasPreviasDe(sb: SupabaseClient, empresa: string, desde:
  * `facturasRellenas` null: la migración 51 no se ha corrido (no hay dónde
  * guardar las facturas de notas).
  */
-export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean; facturasRellenas: boolean | null; devolucionesRellenas: boolean | null; inventarioRelleno: boolean | null }> {
+export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean; facturasRellenas: boolean | null; devolucionesRellenas: boolean | null; inventarioRelleno: boolean | null; notasSegunValery: boolean | null }> {
   const { data } = await sb.from("valery_ajustes").select("ventas_auto, cada_min").eq("empresa_id", empresa).maybeSingle();
   // Aparte: si la migración 50 o la 51 no se han corrido, la columna no existe y no debe apagar lo demás.
   const { data: h } = await sb.from("valery_ajustes").select("horas_rellenas").eq("empresa_id", empresa).maybeSingle();
   const { data: f, error: ef } = await sb.from("valery_ajustes").select("facturas_rellenas").eq("empresa_id", empresa).maybeSingle();
   const { data: d, error: ed } = await sb.from("valery_ajustes").select("devoluciones_rellenas").eq("empresa_id", empresa).maybeSingle();
   const { data: iv, error: ei } = await sb.from("valery_ajustes").select("inventario_relleno").eq("empresa_id", empresa).maybeSingle();
+  const { data: nv, error: en } = await sb.from("valery_ajustes").select("notas_segun_valery").eq("empresa_id", empresa).maybeSingle();
   return {
     auto: data?.ventas_auto ?? true, cadaMin: data?.cada_min ?? CADA_MIN_POR_DEFECTO, horasRellenas: h?.horas_rellenas ?? false,
     facturasRellenas: ef ? null : (f?.facturas_rellenas ?? false),
     devolucionesRellenas: ed ? null : (d?.devoluciones_rellenas ?? false),
     inventarioRelleno: ei ? null : (iv?.inventario_relleno ?? false),
+    notasSegunValery: en ? null : (nv?.notas_segun_valery ?? false),
   };
 }
 
@@ -83,6 +85,15 @@ export const VERSION_CON_DEVOLUCION = "1.0.5";
  * ventas que se habían hecho en otra unidad.
  */
 export const VERSION_CON_INVENTARIO = "1.0.6";
+
+/**
+ * Desde el agente 1.0.7 (migración 54) Valery dice qué renglón de factura viene
+ * de una nota de entrega y de cuál: no se adivina. La primera actualización con
+ * ese agente pide todo desde el corte, una vez, y reacomoda lo que ya estaba:
+ * la factura que descontaba sin deber pasa a «factura de notas», y al revés;
+ * cada nota queda con la factura que Valery dice.
+ */
+export const VERSION_CON_NOTAS = "1.0.7";
 
 export type Programacion =
   | { ok: true; id: number; desde: string; hasta: string }
@@ -125,13 +136,15 @@ export async function programarVentasAuto(
   const rellenarFacturas = ajustes.facturasRellenas === false;
   const rellenarDevoluciones = ajustes.devolucionesRellenas === false && versionAlMenos(agente?.version, VERSION_CON_DEVOLUCION);
   const rellenarInventario = ajustes.inventarioRelleno === false && versionAlMenos(agente?.version, VERSION_CON_INVENTARIO);
-  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras || rellenarFacturas || rellenarDevoluciones || rellenarInventario ? null : ultimaHasta);
+  const rellenarNotas = ajustes.notasSegunValery === false && versionAlMenos(agente?.version, VERSION_CON_NOTAS);
+  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras || rellenarFacturas || rellenarDevoluciones || rellenarInventario || rellenarNotas ? null : ultimaHasta);
 
   const { data, error } = await sb.from("valery_solicitudes").insert({
     empresa_id: empresa, tipo: "ventas", automatica: true,
     parametros: {
       ...rango, ...(rellenarHoras ? { rellenarHoras: true } : {}), ...(rellenarFacturas ? { rellenarFacturas: true } : {}),
       ...(rellenarDevoluciones ? { rellenarDevoluciones: true } : {}), ...(rellenarInventario ? { rellenarInventario: true } : {}),
+      ...(rellenarNotas ? { rellenarNotas: true } : {}),
     },
     creado_por: usuario?.id ?? null, creado_nombre: usuario?.nombre ?? "Automático",
   }).select("id").single();
@@ -151,7 +164,7 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
   const marcar = (campos: Record<string, unknown>) => admin.from("valery_solicitudes").update(campos).eq("id", id);
   const { data: s } = await admin.from("valery_solicitudes").select("resumen, parametros").eq("id", id).maybeSingle();
   const resumen = (s?.resumen as Record<string, unknown> | null) ?? {};
-  const parametros = (s?.parametros as { rellenarHoras?: boolean; rellenarFacturas?: boolean; rellenarDevoluciones?: boolean; rellenarInventario?: boolean } | null) ?? {};
+  const parametros = (s?.parametros as { rellenarHoras?: boolean; rellenarFacturas?: boolean; rellenarDevoluciones?: boolean; rellenarInventario?: boolean; rellenarNotas?: boolean } | null) ?? {};
   try {
     const { data: partes, error } = await admin.from("valery_resultados").select("datos").eq("solicitud_id", id).order("parte");
     if (error) throw new Error(`No se pudo leer lo que entregó el agente: ${error.message}`);
@@ -173,9 +186,14 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     // Con el agente 1.0.6 la cantidad ya viene en la unidad principal: se corrige la que
     // estaba en otra unidad. Con uno más viejo no (vendría cruda y desharía la corrección).
     const conUnidad = ajustes.inventarioRelleno !== null && versionAlMenos(String(resumen.agente ?? ""), VERSION_CON_INVENTARIO);
+    // Con el agente 1.0.7 lo que dice Valery manda: se reacomoda la factura que estaba del
+    // otro lado y la nota toma la factura de Valery (migración 54).
+    const segunValery = ajustes.notasSegunValery !== null && versionAlMenos(String(resumen.agente ?? ""), VERSION_CON_NOTAS);
     // Sin la migración 53 la base no sabe qué es una compra o un ajuste: no se mandan.
     const aLaBase = [
-      ...renglonesParaLaBase(plan, conFacturas).map((r) => (conUnidad ? { ...r, corrige_cantidad: true } : r)),
+      ...renglonesParaLaBase(plan, conFacturas).map((r) => ({
+        ...r, ...(conUnidad ? { corrige_cantidad: true } : {}), ...(segunValery && (r.tipo === "FAC" || r.tipo === "NET") ? { reclasifica: true } : {}),
+      })),
       ...(ajustes.inventarioRelleno !== null ? inventarioParaLaBase(inventario, corte) : []),
     ];
 
@@ -208,6 +226,10 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     // Y el inventario y las unidades desde el corte, igual: una vez, con un agente que los manda.
     if (parametros.rellenarInventario && conUnidad) {
       await admin.from("valery_ajustes").upsert({ empresa_id: empresa, inventario_relleno: true }, { onConflict: "empresa_id" });
+    }
+    // Y las facturas de notas según Valery, desde el corte: una vez.
+    if (parametros.rellenarNotas && segunValery) {
+      await admin.from("valery_ajustes").upsert({ empresa_id: empresa, notas_segun_valery: true }, { onConflict: "empresa_id" });
     }
   } catch (e) {
     await marcar({ estado: "error", error: (e as Error).message.slice(0, 2000) });

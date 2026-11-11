@@ -46,6 +46,9 @@ export type FilaVentaPuente = {
   tua?: string | null;      // en ventas: P = se aplicó la principal, S = la secundaria
   fu?: number | null;       // cuántas de la principal (1) o de la secundaria (2) hay en la otra
   anulado?: string | null;  // T = anulado en Valery
+  mueve?: string | null;    // T = Valery lo aplicó a la existencia (desde el 1.0.7)
+  rel?: number | null;      // FAC: cuánto del renglón viene de una nota de entrega
+  cobra_nota?: string | null; // FAC: «NET 0000009095», la nota de la que viene
 };
 
 /**
@@ -145,9 +148,24 @@ export function renglonesDesdePuente(filas: FilaVentaPuente[]): { renglones: Ren
       producto: String(f.producto ?? "").trim(), cantidad: redondear(cantidadPrincipal(cantidad, f.tu, f.fu, f.tua ?? "P")), netoBs, tasa,
       ventaUsd: tasa > 0 ? netoBs / tasa : 0, clave: `V|${base}|${n}`,
       devuelve: tipo === "DEV" ? referenciaValida(f.devuelve) : null,
+      ...(tipo === "FAC" && f.mueve !== undefined ? deNotasSegunValery(f) : {}),
     });
   });
   return { renglones, inventario, descartadas, anuladas };
+}
+
+/**
+ * Desde el agente 1.0.7, Valery dice qué renglón de factura viene de una nota
+ * de entrega: el que tiene cantidad enlazada a una NET (VENTAS_DETALLES_REL_CANT)
+ * o el de una factura que no se aplicó a la existencia. Ese no descuenta: la
+ * mercancía salió con la nota. Verificado con la copia de marzo de 2026: de
+ * los renglones de factura que Valery no aplicó, todos están enlazados a su
+ * nota (1.807 de 1.807), y ninguno queda enlazado a medias.
+ */
+export function deNotasSegunValery(f: Pick<FilaVentaPuente, "mueve" | "rel" | "cobra_nota">): { deNotasValery: boolean; notaValery: string | null } {
+  const enlazado = Number(f.rel) > 0;
+  const noMovio = String(f.mueve ?? "").trim().toUpperCase() === "F";
+  return { deNotasValery: enlazado || noMovio, notaValery: enlazado ? referenciaValida(f.cobra_nota) : null };
 }
 
 /**
@@ -163,9 +181,15 @@ export function referenciaValida(v: unknown): string | null {
  * Los movimientos de inventario que van al kardex: solo desde el corte (lo
  * anterior ya está en la existencia que se alineó con Valery). Sin monto: el
  * costo de compra no se trae.
+ *
+ * Los ajustes de Valery (AJS) no: el inventario de Macedonia es el maestro y su
+ * existencia real la ponen los conteos de Macedonia (pedido del usuario,
+ * 11-11-2026). Cuando contaban y lo cargaban también en Valery, el mismo
+ * conteo entraba dos veces (63 productos). Cargas y descargas sí entran: son
+ * mercancía que entra o sale.
  */
 export function inventarioParaLaBase(inventario: RenglonInventario[], corte: string) {
-  return inventario.filter((r) => r.fecha >= corte).map((r) => ({
+  return inventario.filter((r) => r.fecha >= corte && r.tipo !== "AJS").map((r) => ({
     renglon: r.clave, fecha: r.fecha, hora: r.hora, direccion: r.cantidad > 0 ? "entrada" : "salida", tipo: r.tipo,
     documento: `${r.tipo} ${r.documento}`, cliente: r.contraparte, codigo: r.codigo, nombre: r.producto || r.codigo,
     cantidad: Math.abs(r.cantidad), monto_usd: null, facturada_con: null,
