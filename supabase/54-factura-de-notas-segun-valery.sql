@@ -19,12 +19,21 @@
 --     factura que dice Valery.
 --   · valery_ajustes.notas_segun_valery: la primera actualización con un
 --     agente 1.0.7 pide todo desde el corte, una vez.
+--   · Los ajustes de Valery (AJS) dejan de aplicarse al inventario de
+--     Macedonia (pedido del usuario, 11-11-2026): el inventario de Macedonia
+--     es el maestro y su existencia real la ponen sus conteos. Cuando el mismo
+--     conteo se cargaba también en Valery, entraba dos veces. Se BORRAN los
+--     AJS que ya entraron desde el agente 1.0.6 (origen 'ajuste', tipo AJS) y
+--     el importador ignora los que lleguen. Cargas y descargas siguen.
 --
 -- Nunca escribe en Valery. Se puede correr más de una vez.
 
 begin;
 
 alter table public.valery_ajustes add column if not exists notas_segun_valery boolean not null default false;
+
+-- Los ajustes de Valery que ya entraron (agente 1.0.6) salen del inventario.
+delete from public.movimientos_inventario where origen = 'ajuste' and tipo_doc = 'AJS';
 
 create or replace function public._importar_ventas(
   p_empresa text, p_archivo text, p_hash text, p_renglones jsonb, p_notas jsonb, p_usuario uuid, p_vacio_es_error boolean)
@@ -115,6 +124,8 @@ begin
          r.documento, v_id, p_usuario, r.renglon, r.tipo, r.cliente, r.monto_usd, r.facturada_con, r.devuelve
     from _r r
    where not r.de_notas
+     -- Los ajustes de Valery no: los conteos de Macedonia ponen la existencia real.
+     and r.tipo <> 'AJS'
   on conflict (empresa_id, renglon) where renglon is not null do nothing;
   get diagnostics v_nuevos = row_count;
 
@@ -201,7 +212,7 @@ revoke execute on function public._importar_ventas(text, text, text, jsonb, json
 commit;
 
 -- ---------------------------------------------------------------- COMPROBACIÓN
--- Debe decir: ajuste 1, notas 1, importador 1, solo_servidor 1.
+-- Debe decir: ajuste 1, notas 1, importador 1, solo_servidor 1, ajs_en_kardex 0.
 select
   (select count(*) from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'origen_mov' and e.enumlabel = 'ajuste') as ajuste,
   (select count(*) from information_schema.columns where table_schema = 'public'
@@ -209,4 +220,5 @@ select
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = '_importar_ventas' and p.prosrc like '%reclasifica%') as importador,
   (select case when not has_function_privilege('authenticated', 'public._importar_ventas(text, text, text, jsonb, jsonb, uuid, boolean)', 'execute')
-               then 1 else 0 end) as solo_servidor;
+               then 1 else 0 end) as solo_servidor,
+  (select count(*) from public.movimientos_inventario where origen = 'ajuste' and tipo_doc = 'AJS') as ajs_en_kardex;

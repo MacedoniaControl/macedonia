@@ -157,9 +157,10 @@ test("compras, cargas, descargas y ajustes de Valery: con signo, en la principal
   assert.deepEqual(inventario.map((r) => [r.tipo, r.cantidad]), [["RCM", 24], ["DCM", -2], ["AJS", -5], ["CRG", 3], ["DSC", -1], ["RCM", 5]]);
   assert.equal(new Set(inventario.map((r) => r.clave)).size, inventario.length);
   const base = inventarioParaLaBase(inventario, "2026-09-24");
-  assert.equal(base.length, 5);   // la recepción de antes del corte ya está en la existencia
+  // La recepción de antes del corte ya está en la existencia; el ajuste de Valery no entra: los conteos son de Macedonia.
+  assert.equal(base.length, 4);
   assert.deepEqual(base.map((r) => [r.documento, r.direccion, r.cantidad]),
-    [["RCM 0000000900", "entrada", 24], ["DCM 0000000900", "salida", 2], ["AJS 0000000900", "salida", 5], ["CRG 0000000900", "entrada", 3], ["DSC 0000000900", "salida", 1]]);
+    [["RCM 0000000900", "entrada", 24], ["DCM 0000000900", "salida", 2], ["CRG 0000000900", "entrada", 3], ["DSC 0000000900", "salida", 1]]);
   assert.ok(base.every((r) => r.monto_usd === null));   // el costo de compra no se trae
 });
 

@@ -299,6 +299,13 @@ descuentan y el resto de la factura sí.
   - la que Valery sí descontó vuelve al kardex;
   - cada nota toma la factura que dice Valery.
 
+**Los ajustes de Valery (AJS) ya no entran** (pedido del usuario, 11-11-2026).
+El inventario de Macedonia es el maestro y su existencia real la ponen los
+conteos de Macedonia. Cuando un conteo se cargaba también en Valery, el mismo
+ajuste entraba dos veces: lo tenían 63 productos. La migración 54 borra los AJS
+que ya habían entrado con el 1.0.6 y el importador ignora los que lleguen. Las
+cargas y descargas siguen entrando.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.
