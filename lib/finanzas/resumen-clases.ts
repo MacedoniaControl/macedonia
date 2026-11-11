@@ -38,16 +38,17 @@ export function resumenDe(cs: CuentaPagar[]) {
     vencido: abiertas.filter((c) => c.dias < 0).reduce((a, c) => a + deuda(c), 0),
     alerta: abiertas.filter((c) => c.dias >= 0 && c.dias <= 7).reduce((a, c) => a + deuda(c), 0),
     vencidas: abiertas.filter((c) => c.dias < 0).length,
-    proveedores: new Set(cs.map((c) => clave(c.contraparte))).size,
-    cuentas: cs.length,
+    // A quién y cuántas se deben: las pagadas y las cerradas no (decían «180 cuentas» con 58 por pagar).
+    proveedores: new Set(abiertas.map((c) => clave(c.contraparte))).size,
+    cuentas: abiertas.length,
   };
 }
 
-/** Un segmento por grupo de clase que tenga cuentas, en el orden de las pestañas. */
+/** Un segmento por grupo de clase que tenga cuentas por pagar, en el orden de las pestañas. */
 export function porClase(cs: CuentaPagar[]): SegmentoClase[] {
   const total = cs.reduce((a, c) => a + deuda(c), 0);
   const grupos = new Map<ClaseCuenta, CuentaPagar[]>();
-  for (const c of cs) { const g = grupoDeClase(c.clase); grupos.set(g, [...(grupos.get(g) ?? []), c]); }
+  for (const c of cs.filter((x) => deuda(x) > 0)) { const g = grupoDeClase(c.clase); grupos.set(g, [...(grupos.get(g) ?? []), c]); }
   return [...grupos.entries()]
     .sort((a, b) => (ORDEN.indexOf(a[0]) + 1 || 99) - (ORDEN.indexOf(b[0]) + 1 || 99))
     .map(([id, g]) => {
