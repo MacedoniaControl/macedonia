@@ -152,3 +152,17 @@ test("una nota de antes del 1.0.6 en otra unidad: la factura la reconoce con la 
   assert.deepEqual(p.notasPrevias, [{ renglon: "V|nota-und", factura: "FAC 1501" }]);
   assert.equal(p.facturasDeNotas, 1);
 });
+
+test("con el agente 1.0.7 no se adivina: la factura que Valery enlaza a una nota no descuenta y la nota toma esa factura", () => {
+  // La FAC 1596 no se parece a la nota (otro monto, 4 días después): antes se escapaba y descontaba otra vez.
+  const nota = r({ fecha: "2026-10-10", tipo: "NET", documento: "9300", codigo: "BRGXL", cantidad: 200, ventaUsd: 30 });
+  const previa = { clave: "V|net-vieja", fecha: "2026-10-01", cliente: "OTRO", codigo: "OXI6", cantidad: 1, ventaUsd: 5, documento: "9200", facturadaCon: null };
+  const fac = r({ fecha: "2026-10-14", tipo: "FAC", documento: "1596", codigo: "BRGXL", cantidad: 200, ventaUsd: 55, deNotasValery: true, notaValery: "NET 9300" });
+  const fac2 = r({ fecha: "2026-10-14", tipo: "FAC", documento: "1597", codigo: "OXI6", cantidad: 1, ventaUsd: 99, deNotasValery: true, notaValery: "NET 9200" });
+  const suelta = r({ fecha: "2026-10-14", tipo: "FAC", documento: "1598", codigo: "BRGXL", cantidad: 200, ventaUsd: 30, deNotasValery: false, notaValery: null });
+  const p = planVentas([nota, fac, fac2, suelta], "2026-09-24", [previa]);
+  assert.deepEqual(p.facturasNotas.map((m) => m.documento).sort(), ["FAC 1596", "FAC 1597"]);
+  // La 1598 se parece a la nota (mismo cliente, código, cantidad y monto) pero Valery dice que descontó: descuenta.
+  assert.deepEqual(p.movimientos.map((m) => [m.documento, m.facturadaCon]), [["NET 9300", "FAC 1596"], ["FAC 1598", null]]);
+  assert.deepEqual(p.notasPrevias, [{ renglon: "V|net-vieja", factura: "FAC 1597" }]);
+});

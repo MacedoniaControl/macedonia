@@ -262,6 +262,43 @@ cuentan), con la del kardex. Cada diferencia dice cuánto movieron los conteos
 físicos de Macedonia desde el corte; el resto queda «sin explicar». No cambia
 ningún número: Valery es la fuente y la diferencia se explica o se cuenta.
 
+## Agente 1.0.7: la factura de notas, según Valery (2026-11-11, migración 54)
+
+**El problema.** Comprobando el 1.0.6 quedaban 511 productos distintos:
+- 266 eran códigos que Valery ya no tiene, en negativo en Macedonia por el
+  historial anterior al corte;
+- de los 245 restantes, 141 solo tenían ventas desde el corte, y facturas que
+  Macedonia descontaba y Valery no. Por ejemplo, la FAC 1596 descontó 200 BRGXL
+  y Valery no se movió.
+
+**La causa.** Macedonia adivinaba qué factura cobra una nota de entrega
+comparando cliente, código, cantidad y monto (`notasFacturadas`). Cuando no la
+reconocía, la factura descontaba otra vez.
+
+**Lo que dice Valery:**
+- `VENTAS_ESTADOS.EXIST_ACTUAL_ACTUALIZADA`: si el documento se aplicó a la
+  existencia;
+- `VENTAS_DETALLES_REL_CANT`: qué renglón de la factura viene de qué nota.
+
+En la copia de marzo, los 1.807 renglones de factura que Valery no aplicó
+están todos enlazados a su nota; ninguno queda enlazado a medias. Hay además
+182 renglones enlazados en facturas que sí se aplicaron: esos renglones no
+descuentan y el resto de la factura sí.
+
+**Lo que hace el agente 1.0.7:**
+- Cada renglón de factura trae `mueve`, `rel` (cuánto viene de una nota) y
+  `cobra_nota` («NET …»).
+- Con eso Macedonia no adivina (`notasFacturadasSegunValery`): el renglón
+  enlazado, o el de una factura que Valery no aplicó, es «factura de notas» y
+  no descuenta. La nota queda con esa factura.
+- Sin el dato (Excel, agente viejo) se sigue reconociendo como antes.
+- La primera actualización con un agente 1.0.7 pide todo desde el corte, una
+  vez (`valery_ajustes.notas_segun_valery`), y reacomoda lo que ya estaba:
+  - la factura que descontaba sin deber sale del kardex y queda en
+    `ventas_facturas_notas` (sigue siendo venta);
+  - la que Valery sí descontó vuelve al kardex;
+  - cada nota toma la factura que dice Valery.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.

@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.6'
+$Version = '1.0.7'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -162,6 +162,18 @@ select v.fecha_emision as fecha, v.hora_emision as hora, v.tipo_documento as tip
        -- La unidad del renglon: la existencia de Valery va en la principal (1.0.6).
        d.tipo_unidad as tu, d.tipo_unidad_aplicada as tua, d.factor_unidad as fu,
        (select first 1 e.anulado from ventas_estados e where e.correlativo_principal = v.correlativo) as anulado,
+       -- Si Valery aplico el documento a la existencia, y en una FAC, cuanto del
+       -- renglon viene de una nota de entrega y cual (1.0.7): eso no descuenta.
+       (select first 1 e.exist_actual_actualizada from ventas_estados e where e.correlativo_principal = v.correlativo) as mueve,
+       case when v.tipo_documento = 'FAC' then
+         coalesce((select sum(r.cantidad) from ventas_detalles_rel_cant r
+                    where r.correlativo_principal = v.correlativo and r.numero_linea_principal = d.numero_linea
+                      and r.tipo_documento_relacionado = 'NET'), 0)
+       end as rel,
+       case when v.tipo_documento = 'FAC' then
+         (select first 1 'NET ' || trim(x.documento) from ventas_detalles_rel_cant r join ventas x on x.correlativo = r.correlativo_relacionado
+           where r.correlativo_principal = v.correlativo and r.numero_linea_principal = d.numero_linea and r.tipo_documento_relacionado = 'NET')
+       end as cobra_nota,
        v.factor_cambio as factor,
        (select first 1 h.factor_cambio from moneda_historial h
          where h.moneda_codigo = '02'
