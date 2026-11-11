@@ -74,7 +74,7 @@ export function SaldosCilindros({
   function empezar() {
     // Se arranca con lo registrado: el técnico solo cambia lo que no cuadra.
     const base = Object.fromEntries(aContar.map((g) => [g, { lleno: cant(g, "lleno"), vacio: cant(g, "vacio") }]));
-    setVisto(base); setContado(structuredClone(base)); setMotivo(""); setMsg(null); setContando(true);
+    setVisto(base); setContado(Object.fromEntries(Object.entries(base).map(([g, v]) => [g, { ...v }]))); setMotivo(""); setMsg(null); setContando(true);
   }
   const lineas = aContar.filter((g) => visto[g]).map((g) => ({ gas: g, contado: contado[g], visto: visto[g] }));
   const dif = diferencias(renglonesDe(lineas));

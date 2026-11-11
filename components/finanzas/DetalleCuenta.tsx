@@ -21,6 +21,7 @@ import {
   detalleCuenta, abonarConComprobante, liquidarCuenta, urlComprobante,
   type CuentaDetalle,
 } from "@/lib/finanzas/cuentas-db";
+import { abrirEnPestana } from "@/lib/ux/abrir-pestana";
 
 const campo = "sumi-campo";
 const lbl = "mb-1 block text-xs font-medium text-muted";
@@ -77,9 +78,8 @@ export function DetalleCuenta({
   }
 
   async function verComprobante(ruta: string) {
-    const url = await urlComprobante(ruta);
     // Enlace firmado de cinco minutos: el bucket es privado a proposito.
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    await abrirEnPestana(() => urlComprobante(ruta));
   }
 
   return (

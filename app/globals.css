@@ -102,6 +102,12 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  /* En iPhone, 100vh es la pantalla con las barras de Safari escondidas: sobra
+   * un pedazo y la página se desplaza sin motivo. dvh es lo que se ve. */
+  min-height: 100dvh;
+  /* Safari en iPhone agranda la letra sola al girar el teléfono. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body), "Segoe UI", system-ui, sans-serif;
@@ -228,7 +234,25 @@ h1, h2, h3 {
  * al enfocarlo. En pantallas chicas se sube el tamaño para evitarlo. */
 @media (max-width: 767px) {
   .sumi-campo { font-size: 1rem; }
+  /* Y cualquier otro campo (los que todavía llevan text-sm propio): sin esto,
+   * tocar el filtro de fechas o un selector acerca la pantalla en iPhone. Va
+   * fuera de las capas de Tailwind a propósito: así gana a text-sm. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea { font-size: 1rem; }
 }
+
+/* Las fechas en Safari de iPhone: sin esto el campo se dibuja con su propio
+ * estilo, el texto va centrado y se sale del ancho de la columna. */
+input[type="date"],
+input[type="month"],
+input[type="datetime-local"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-inline-size: 0;
+}
+input::-webkit-date-and-time-value { text-align: start; }
 
 .sumi-campo:focus-visible,
 .sumi-campo:focus {

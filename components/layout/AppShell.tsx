@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const empresa = m && isEmpresaId(m[1]) ? m[1] : null;
 
   return (
-    <div className={`min-h-screen bg-bg ${empresa ? `theme-${empresa}` : ""}`}>
+    <div className={`min-h-dvh bg-bg ${empresa ? `theme-${empresa}` : ""}`}>
       <Sidebar empresa={empresa} open={sidebarOpen} onClose={() => setSidebarOpen(false)} permisos={permisos} esOwner={esOwner} />
       <div className="lg:pl-64">
         <Header onMenu={() => setSidebarOpen(true)} />
