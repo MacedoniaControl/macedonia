@@ -11,6 +11,7 @@ import { findNavItem } from "@/lib/ux/nav";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { alertasDe, marcarRevisada, type Alerta } from "@/lib/ux/alertas-db";
 import { fetchBcvRate, useBcvRate } from "@/lib/ux/bcv-rate";
+import { fetchUsdtRate, useUsdtRate } from "@/lib/ux/usdt-rate";
 import { fmtTasa } from "@/lib/ux/format";
 
 export function Header({ onMenu }: { onMenu: () => void }) {
@@ -25,6 +26,18 @@ export function Header({ onMenu }: { onMenu: () => void }) {
     setBcvLoading(false);
     if (!r.ok) alert(`No se pudo obtener el dólar del BCV.\n${r.error ?? ""}`);
   }
+
+  // La tasa USDT (usdt.com.ve, referencia P2P), junto a la del BCV: pedido del usuario, 11-11-2026.
+  const [usdtLoading, setUsdtLoading] = useState(false);
+  async function usdtPrice() {
+    setUsdtLoading(true);
+    const r = await fetchUsdtRate();
+    setUsdtLoading(false);
+    if (!r.ok) alert(`No se pudo obtener la tasa USDT.\n${r.error ?? ""}`);
+  }
+  const usdt = useUsdtRate();
+  const viejaUsdt = !!usdt?.vieja;
+  const bs2 = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const bcv = useBcvRate();
   const viejaBcv = !!bcv && Date.now() - new Date(bcv.fetchedAt).getTime() > 90 * 60_000;
@@ -44,7 +57,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const totalBadge = alertas.length;
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-1.5 border-b border-border bg-surface/90 px-3 backdrop-blur sm:gap-2 sm:px-4">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-1 border-b border-border bg-surface/90 px-2 backdrop-blur sm:gap-2 sm:px-4">
       <button
         type="button"
         onClick={onMenu}
@@ -64,22 +77,26 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         disabled={bcvLoading}
         aria-label="Consultar ahora el dólar BCV"
         title="Se actualiza sola cada 30 minutos. Toca para consultar ya."
-        className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border-strong bg-surface px-3 text-sm font-medium text-text transition hover:bg-surface-2 disabled:opacity-60"
+        className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border-strong bg-surface px-2 text-sm font-medium text-text transition hover:bg-surface-2 disabled:opacity-60 sm:px-3"
       >
-        <Icon name="dollar" size={16} />
-        {bcvLoading ? "Consultando…" : (
+        <span className="hidden xl:inline-flex"><Icon name="dollar" size={16} /></span>
+        {bcvLoading ? "…" : (
           <>
-            {/* En el teléfono se muestra la CIFRA, no la palabra: es el dato que
-                se necesita, y ahorra el espacio que hacía falta para lo demás. */}
-            <span className="tabular-nums sm:hidden">{bcv ? fmtTasa(bcv.tasa) : "Tasa"}</span>
-            <span className="hidden sm:inline">Tasa BCV</span>
+            {/* En teléfono y tablet se muestra la CIFRA, no la palabra: es el dato que
+                se necesita. Con la etiqueta encima, para que quepa junto a la USDT; el
+                recuadro con la fecha valor y la hora, desde pantalla ancha. */}
+            <span className="flex flex-col items-start leading-none xl:hidden">
+              <span className="text-[10px] font-semibold text-muted">BCV</span>
+              <span className="tabular-nums">{bcv ? fmtTasa(bcv.tasa) : "—"}</span>
+            </span>
+            <span className="hidden xl:inline">Tasa BCV</span>
           </>
         )}
       </button>
 
       {/* Precio del dólar BCV, siempre visible junto al botón */}
       <div
-        className="ml-2 hidden min-w-[9.5rem] shrink-0 rounded-xl border border-border bg-surface-2 px-3 py-1 leading-tight sm:block"
+        className="ml-2 hidden min-w-[9.5rem] shrink-0 rounded-xl border border-border bg-surface-2 px-3 py-1 leading-tight xl:block"
         aria-live="polite"
       >
         {bcv ? (
@@ -103,6 +120,34 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           </>
         )}
       </div>
+
+      {/* Tasa USDT: el botón consulta ya; la cifra va dentro (en pantalla ancha, además, la hora). */}
+      <button
+        type="button"
+        onClick={usdtPrice}
+        disabled={usdtLoading}
+        aria-label="Consultar ahora la tasa USDT"
+        title={usdt
+          ? `USDT en usdt.com.ve (referencia P2P de Binance y Bybit)${usdt.compra ? ` · compra ${bs2(usdt.compra)}` : ""}${usdt.venta ? ` · venta ${bs2(usdt.venta)}` : ""} · se actualiza sola cada 30 minutos`
+          : "Tasa USDT de usdt.com.ve. Toca para consultar."}
+        className="inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-xl border border-border-strong bg-surface px-2 text-sm font-medium text-text transition hover:bg-surface-2 disabled:opacity-60 sm:px-3"
+      >
+        {usdtLoading ? "…" : (
+          // En el teléfono, la etiqueta encima de la cifra; en pantalla ancha, al lado.
+          <span className="flex flex-col items-start leading-none sm:flex-row sm:items-center sm:gap-1.5 sm:leading-normal">
+            <span className="text-[10px] font-semibold text-muted sm:text-xs">USDT</span>
+            <span className="tabular-nums">{usdt ? bs2(usdt.tasa) : "—"}</span>
+          </span>
+        )}
+      </button>
+      <p className={`hidden shrink-0 text-[10px] leading-tight xl:block ${viejaUsdt ? "font-medium text-warn" : "text-muted"}`}>
+        {usdt ? (
+          <>
+            {viejaUsdt ? "Sin actualizar desde" : "Leída"}<br />
+            {new Date(usdt.leidaEn).toLocaleString("es-VE", viejaUsdt ? { dateStyle: "short", timeStyle: "short" } : { timeStyle: "short" })}
+          </>
+        ) : "Pulsa “USDT”"}
+      </p>
 
       <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
         <CompanySelector />

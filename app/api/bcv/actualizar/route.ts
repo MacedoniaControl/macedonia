@@ -1,9 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
 import { actualizarDesdeBcv } from "@/lib/bcv/actualizar";
+import { actualizarDesdeUsdt } from "@/lib/usdt/actualizar";
 
 // La llama la base cada 30 minutos (pg_cron + pg_net, migración 30) con la
-// clave de bcv_token. Sin esa clave no hace nada: así nadie de afuera puede
+// clave de bcv_token. Trae la Tasa BCV y, desde la migración 55, la USDT. Sin esa clave no hace nada: así nadie de afuera puede
 // ponerla a consultar el BCV a cada rato.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
   if (!clave || !data?.token || !igual(clave, data.token as string)) {
     return Response.json({ ok: false, error: "No autorizado." }, { status: 401 });
   }
-  const r = await actualizarDesdeBcv(admin);
-  return Response.json(r, { status: r.ok ? 200 : 502 });
+  // Las dos a la vez; que falle una no frena la otra. El estado de la respuesta es el del BCV, como antes.
+  const [r, usdt] = await Promise.all([actualizarDesdeBcv(admin), actualizarDesdeUsdt(admin)]);
+  return Response.json({ ...r, usdt }, { status: r.ok ? 200 : 502 });
 }
