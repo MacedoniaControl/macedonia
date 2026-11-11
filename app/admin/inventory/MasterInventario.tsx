@@ -87,8 +87,13 @@ export function MasterInventario({
 
   const columnas: Columna[] = [
     { clave: "producto", titulo: "Producto" },
-    { clave: "existencia", titulo: "Existencia", derecha: true },
-    ...(r.conValery ? [{ clave: "valery", titulo: "Valery", derecha: true }, { clave: "diferencia", titulo: "Diferencia", derecha: true }] : []),
+    // Con Valery, las columnas de la comparación (pedido del usuario, 11-11-2026): lo que dice cada uno,
+    // la diferencia, lo que movieron los conteos de Macedonia y lo que queda sin explicar.
+    { clave: "existencia", titulo: r.conValery ? "Macedonia" : "Existencia", derecha: true },
+    ...(r.conValery ? [
+      { clave: "valery", titulo: "Valery", derecha: true }, { clave: "diferencia", titulo: "Diferencia", derecha: true },
+      { clave: "conteos", titulo: "Conteos", derecha: true }, { clave: "sinExplicar", titulo: "Sin explicar", derecha: true },
+    ] : []),
     { clave: "conteo", titulo: "Último conteo" },
     ...(r.conCosto ? [{ clave: "valor", titulo: "Valor", derecha: true }] : []),
   ];
@@ -97,6 +102,8 @@ export function MasterInventario({
     existencia: (f: FilaVista) => f.existencia,
     valery: (f: FilaVista) => f.enValery ?? -Infinity,
     diferencia: (f: FilaVista) => Math.abs(f.difValery ?? 0),
+    conteos: (f: FilaVista) => Math.abs(f.conteos ?? 0),
+    sinExplicar: (f: FilaVista) => Math.abs(f.sinExplicar ?? 0),
     conteo: (f: FilaVista) => (f.hace === null ? Infinity : f.hace),
     valor: (f: FilaVista) => f.valor ?? -Infinity,
   }), []);
@@ -114,17 +121,18 @@ export function MasterInventario({
     ],
     columnas: [
       { titulo: "Código", tipo: "codigo" }, { titulo: "Producto" }, { titulo: "Unidad" }, { titulo: "Existencia", tipo: "num" },
-      ...(r.conValery ? [{ titulo: "Valery", tipo: "num" as const }, { titulo: "Diferencia", tipo: "dif" as const }, { titulo: "Explicada por conteo" }] : []),
+      ...(r.conValery ? [{ titulo: "Valery", tipo: "num" as const }, { titulo: "Diferencia", tipo: "dif" as const },
+        { titulo: "Conteos en Macedonia", tipo: "dif" as const }, { titulo: "Sin explicar", tipo: "dif" as const }] : []),
       { titulo: "Contado", tipo: "num" }, { titulo: "Contado el", tipo: "fecha" },
       ...(r.conCosto ? [{ titulo: "Valor", tipo: "usd" as const }] : []),
     ],
     filas: t.ordenadas.map((f) => [
       f.codigo, f.nombre, f.unidad || null, f.existencia,
-      ...(r.conValery ? [f.enValery, f.difValery, f.porConteo ? "Sí" : null] : []),
+      ...(r.conValery ? [f.enValery, f.difValery, f.conteos, f.sinExplicar] : []),
       f.contado, fechaVista(f.fechaConteo),
       ...(r.conCosto ? [f.valor] : []),
     ]),
-    nota: "Existencia: la de Macedonia. Diferencia = Macedonia − Valery; Valery vacío = el código no está en Valery. Contado vacío = sin conteo (no es cero).",
+    nota: "Existencia: la de Macedonia. Diferencia = Macedonia − Valery; Valery vacío = el código no está en Valery. Conteos: lo que movieron los conteos de Macedonia desde el corte; Sin explicar: la diferencia que no explican. Contado vacío = sin conteo (no es cero).",
   }));
 
   if (carga.cargando) return <EstadoDatos cargando vacio={false}>{null}</EstadoDatos>;
@@ -256,8 +264,9 @@ function gridDe(n: number): string {
   return {
     3: "md:grid-cols-[minmax(0,1fr)_7rem_11rem]",
     4: "md:grid-cols-[minmax(0,1fr)_7rem_11rem_7rem]",
-    5: "md:grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_11rem]",
-    6: "md:grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_11rem_7rem]",
+    // Con Valery son cinco columnas de números: angostas, para que el producto conserve su espacio.
+    7: "md:grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_5rem_5rem_9rem] md:gap-x-2",
+    8: "md:grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_5rem_5rem_9rem_6.5rem] md:gap-x-2",
   }[n] ?? "md:grid-cols-[minmax(0,1fr)_7rem_11rem]";
 }
 
@@ -290,7 +299,7 @@ function Fila({ f, grid, conValery, conCosto }: { f: FilaVista; grid: string; co
         <p className="text-xs text-muted"><span className="font-mono">{f.codigo}</span>{f.unidad ? ` · ${f.unidad}` : ""}</p>
       </div>
       <div className="md:text-right">
-        <Etiqueta>Existencia</Etiqueta>
+        <Etiqueta>{conValery ? "Macedonia" : "Existencia"}</Etiqueta>
         <span className={`font-semibold tabular-nums ${f.existencia < 0 ? "text-warn" : "text-text"}`}>{cant(f.existencia)}</span>
       </div>
       {conValery && (
@@ -303,19 +312,24 @@ function Fila({ f, grid, conValery, conCosto }: { f: FilaVista; grid: string; co
           </div>
           <div className="md:text-right">
             <Etiqueta>Diferencia</Etiqueta>
-            {d === null || Math.abs(d) < 0.005 ? (
-              <span className="text-muted">{d === null ? "—" : "Cuadra"}</span>
-            ) : (
-              // El signo va escrito: el color solo no alcanza para quien no distingue colores.
-              <span className={`font-semibold tabular-nums ${f.porConteo ? "text-muted" : "text-warn"}`}>
-                {conSigno(d)}
-                {f.porConteo && <span className="ml-1 text-xs font-normal">· por conteo</span>}
-              </span>
-            )}
+            {d === null || Math.abs(d) < 0.005
+              ? <span className="text-muted">{d === null ? "—" : "Cuadra"}</span>
+              : <span className="font-medium tabular-nums text-text">{conSigno(d)}</span>}
+          </div>
+          <div className="md:text-right">
+            <Etiqueta>Conteos</Etiqueta>
+            <span className="tabular-nums text-muted">{f.conteos === null ? "—" : conSigno(f.conteos)}</span>
+          </div>
+          <div className="md:text-right">
+            <Etiqueta>Sin explicar</Etiqueta>
+            {/* El signo va escrito: el color solo no alcanza para quien no distingue colores. */}
+            {f.sinExplicar === null || Math.abs(f.sinExplicar) < 0.005
+              ? <span className="text-muted">{f.sinExplicar === null ? "—" : "0"}</span>
+              : <span className="font-semibold tabular-nums text-warn">{conSigno(f.sinExplicar)}</span>}
           </div>
         </>
       )}
-      <div className={conValery ? "col-span-2 md:col-span-1" : ""}>
+      <div>
         <Etiqueta>Último conteo</Etiqueta>
         {f.contado === null ? (
           // Una etiqueta, no un número: nadie lo ha contado, que no es lo mismo que cero.

@@ -51,6 +51,10 @@ test("contra Valery: lo que no explica nada primero; lo que explican los conteos
     [["2702PD-500", 356, false], ["NUEVO", -7, false], ["VIEJO", -3, false], ["8004202", -98, true]]);
   const de = (k: string) => fs.find((x) => x.codigo === k)!;
   assert.deepEqual([de("OXI6").enValery, de("OXI6").difValery], [5, 0]);
+  // Las columnas de la comparación: lo que movieron los conteos y lo que queda sin explicar.
+  assert.deepEqual([de("8004202").conteos, de("8004202").sinExplicar], [-98, 0]);
+  assert.deepEqual([de("2702PD-500").conteos, de("2702PD-500").sinExplicar], [0, 356]);
+  assert.deepEqual([de("OXI6").conteos, de("OXI6").sinExplicar], [0, 0]);
   assert.equal(de("VIEJO").enValery, null);               // Valery no tiene el código
   assert.equal(de("NUEVO").nombre, "SOLO EN VALERY");
   assert.equal(vistaInicial({ ...r, porContar: 0 }), "valery");
@@ -60,6 +64,7 @@ test("sin lectura de Valery (o sin permiso) no hay columna de Valery ni diferenc
   const fs = prepararMaster([f("A", 3, null, null, null), f("B", 9, null, null, null)], HOY);
   const r = resumirMaster(fs);
   assert.equal(r.conValery, false);
+  assert.deepEqual([fs[0].conteos, fs[0].sinExplicar], [null, null]);
   assert.equal(r.distintas, 0);
   assert.equal(r.conCosto, false);
   assert.deepEqual(filasDe(fs, "contar").map((x) => x.codigo), ["B", "A"]);   // sin costo, por existencia
