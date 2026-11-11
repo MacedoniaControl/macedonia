@@ -75,6 +75,12 @@ export function useTableView<T>(rows: T[], accessors: Accessors<T>, initialSize 
     sortKey,
     dir,
     toggleSort,
+    /** Ordenar por una columna en una dirección, de una vez (un selector, en el teléfono). Null: sin orden. */
+    ordenar: (key: string | null, d: SortDir = "asc") => {
+      setSortKey(key);
+      setDir(d);
+      setPage(0);
+    },
     ariaSort,
     desde: total === 0 ? 0 : start + 1,
     hasta: Math.min(start + size, total),

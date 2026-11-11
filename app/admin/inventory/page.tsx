@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon } from "@/components/ui/Icon";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
@@ -10,13 +11,11 @@ import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { esGerencia, puedeContar, useRol } from "@/lib/ux/session";
 import { MasterInventario } from "./MasterInventario";
 import { ConteoFisico } from "./conteo/ConteoFisico";
-import { CatalogoProductos } from "@/app/admin/products/CatalogoProductos";
 import { MovimientosPanel } from "./MovimientosPanel";
-import { CompararValery } from "./CompararValery";
 
 const inputClass = "sumi-campo sumi-campo--con-icono";
 
-type Tab = "master" | "conteo" | "movimientos" | "productos" | "valery";
+type Tab = "master" | "conteo" | "movimientos";
 
 // El boton "Descargar" de la cabecera baja la pestaña que este abierta: cada
 // una declara su tabla adentro de este proveedor.
@@ -40,13 +39,15 @@ function ConVista() {
 function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number | null } | null }) {
   // Empresa activa según la ruta (consolidado -> sumigases).
   const empresa = useEmpresaActiva();
+  // El catálogo de la misma empresa: /admin/sumigases/inventory → /admin/sumigases/products.
+  const rutaCatalogo = usePathname().replace(/\/inventory(\/.*)?$/, "/products");
   const [tabElegida, setTab] = useState<Tab>(inicial ? "conteo" : "master");
   // Movimientos: Owner y Administrador. Conteo: además el Técnico. La base lo
   // vuelve a comprobar; aca solo no se ofrece lo que no se puede abrir.
   const { rol } = useRol();
   const gerencia = esGerencia(rol);
   const cuenta = puedeContar(rol);
-  const permitidas: Tab[] = ["master", "productos", ...(cuenta ? ["conteo" as const] : []), ...(gerencia ? ["movimientos" as const, "valery" as const] : [])];
+  const permitidas: Tab[] = ["master", ...(cuenta ? ["conteo" as const] : []), ...(gerencia ? ["movimientos" as const] : [])];
   const tab: Tab = permitidas.includes(tabElegida) ? tabElegida : "master";
   const [recargaMaster, setRecargaMaster] = useState(0);
   // «Iniciar Conteo» desde el Master: lleva a Conteo con la ventana ya abierta.
@@ -64,6 +65,10 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
           <div className="flex flex-wrap items-center gap-2">
             {/* Sin «Iniciar Conteo» en la cabecera (pedido del usuario, 15-10-2026):
                 se inicia desde la pestaña Conteo o desde el Master. */}
+            {/* El catálogo (precios, costos, alta de productos) salió de las pestañas: su página, aquí a mano. */}
+            <Link href={rutaCatalogo} className="sumi-pulsable inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-surface-2">
+              <Icon name="products" size={16} /> Catálogo
+            </Link>
             <BotonDescargar empresa={empresa} />
           </div>
         }
@@ -71,15 +76,12 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
 
 
       <div className="sumi-tabs mb-4 rounded-xl border border-border bg-surface p-1">
-        {/* Orden pedido por el usuario (14-10-2026): Master, Productos y Catálogo, Conteo, Movimientos. */}
+        {/* Tres pestañas (pedido del usuario, 11-11-2026): el Master ya trae lo de Valery, y el
+            catálogo tiene su botón arriba. */}
         {([
           ["master", "Master"],
-          // Productos y catalogo pasa a subdepartamento del inventario.
-          ["productos", "Productos y Catálogo"],
           ["conteo", "Conteo"],
           ["movimientos", "Movimientos"],
-          // Owner y Administrador: lo de Valery, como todo lo del Puente.
-          ["valery", "Contra Valery"],
         ] as [Tab, string][]).filter(([id]) => permitidas.includes(id)).map(([id, label]) => (
           <button key={id} onClick={() => irA(id)}
             className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? "bg-brand-strong text-white" : "text-muted hover:bg-surface-2 hover:text-text"}`}>
@@ -89,7 +91,7 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
       </div>
 
       {/* Productos trae su propio buscador. */}
-      {tab !== "movimientos" && tab !== "conteo" && tab !== "productos" && (
+      {tab === "master" && (
         <div className="mb-3">
           <label className="relative flex max-w-md items-center">
             <span className="pointer-events-none absolute left-3 text-muted"><Icon name="search" size={16} /></span>
@@ -99,13 +101,8 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
         </div>
       )}
 
-      {/* Productos y catalogo: subdepartamento del inventario, no seccion aparte. */}
-      {tab === "productos" && <CatalogoProductos embebido />}
-
       {tab === "movimientos" && <MovimientosPanel empresa={empresa} />}
 
-      {/* Macedonia contra la existencia de Valery (pedido del 05-11-2026). */}
-      {tab === "valery" && <CompararValery empresa={empresa} filtro={q} />}
 
       {/* El conteo fisico: planilla, historial y actas. */}
       {tab === "conteo" && <ConteoFisico empresa={empresa} gerencia={gerencia} inicial={inicial} iniciarAlEntrar={iniciar} onCerrado={() => setRecargaMaster((n) => n + 1)} />}
@@ -116,7 +113,8 @@ function Inventario({ inicial }: { inicial: { vista: "historial"; abrir: number 
         <>
           {/* Valery contra lo contado a mano. Es la razon de ser del producto:
               lo que se fue sin registrarse no aparece en ningun kardex. */}
-          <MasterInventario empresa={empresa} filtro={q} recarga={recargaMaster} onContar={cuenta ? () => { setTab("conteo"); setIniciar(true); } : undefined} />
+          <MasterInventario empresa={empresa} filtro={q} recarga={recargaMaster} gerencia={gerencia}
+            onContar={cuenta ? () => { setTab("conteo"); setIniciar(true); } : undefined} />
         </>
       )}
 
