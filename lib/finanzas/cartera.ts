@@ -55,7 +55,8 @@ export function agruparPorCliente<C extends CuentaCartera>(cuentas: C[]): Client
         porClase,
         monto: cs.reduce((a, c) => a + c.monto, 0),
         abonado: cs.reduce((a, c) => a + c.abonado, 0),
-        saldo: cs.reduce((a, c) => a + c.saldo, 0),
+        // Una cuenta cerrada ya no se debe, aunque se haya cerrado con saldo pendiente.
+        saldo: cs.filter((c) => c.estado !== "liquidada").reduce((a, c) => a + c.saldo, 0),
         vencido: abiertas.filter((c) => c.dias < 0).reduce((a, c) => a + c.saldo, 0),
         masVieja: abiertas.length ? { vence: abiertas[0].vence, dias: abiertas[0].dias } : null,
       };

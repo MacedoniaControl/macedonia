@@ -35,7 +35,7 @@ import { Switch } from "@/components/ui/Switch";
 import { useRol, puedeVerFinanzas } from "@/lib/ux/session";
 import { BotonEliminar, BotonEliminarNota, EliminarCuentasDe, InterruptorEliminar, eliminarHabilitado } from "@/components/finanzas/EliminarCuentas";
 import { leerConfig } from "@/lib/config/config-db";
-import { porClase, resumenDe } from "@/lib/finanzas/resumen-clases";
+import { deuda, porClase, resumenDe } from "@/lib/finanzas/resumen-clases";
 import { TarjetaSegmento } from "@/components/finanzas/TarjetaSegmento";
 import { MarcaRevision } from "@/components/finanzas/MarcaRevision";
 import { BotonDescargar } from "@/components/ui/BotonDescargar";
@@ -286,7 +286,7 @@ function CuentasPorPagar() {
   // Todo en NETO. La retencion no se le paga al proveedor -se le entera al
   // SENIAT-, asi que la deuda con el es el total menos lo retenido. Greeg pidio
   // que el panel muestre esa cifra, que es la que hay que mover.
-  const total = conSaldo.reduce((a, c) => a + c.saldoNeto, 0);
+  const total = conSaldo.reduce((a, c) => a + deuda(c), 0);
 
   // «A Pagar» es el neto: la factura menos el IVA retenido, que va al SENIAT.
   useExportable(() => ({
@@ -323,9 +323,10 @@ function CuentasPorPagar() {
   const conExento = aRevisar.filter((c) => c.revision.atipico && c.revision.motivo === "exento");
   const exento = conExento.reduce(
     (a, c) => a + (c.revision.atipico && c.revision.motivo === "exento" ? c.revision.exento : 0), 0);
-  const vencido = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).reduce((a, c) => a + c.saldoNeto, 0);
-  const alerta = conSaldo.filter((c) => c.saldoNeto > 0 && c.d >= 0 && c.d <= 7).reduce((a, c) => a + c.saldoNeto, 0);
-  const nVenc = conSaldo.filter((c) => c.saldoNeto > 0 && c.d < 0).length;
+  // Lo que se debe: una cuenta cerrada no cuenta aunque se haya cerrado con saldo (lib/finanzas/resumen-clases.ts).
+  const vencido = conSaldo.filter((c) => deuda(c) > 0 && c.d < 0).reduce((a, c) => a + deuda(c), 0);
+  const alerta = conSaldo.filter((c) => deuda(c) > 0 && c.d >= 0 && c.d <= 7).reduce((a, c) => a + deuda(c), 0);
+  const nVenc = conSaldo.filter((c) => deuda(c) > 0 && c.d < 0).length;
   // Segmentado por clase (Facturas, Notas de Entrega…) y el consolidado, sobre TODAS las cuentas.
   const segmentos = porClase(ctas);
   const todo = resumenDe(ctas);
