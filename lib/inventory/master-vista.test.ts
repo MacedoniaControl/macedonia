@@ -1,21 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { filasDe, prepararMaster, resumirMaster, vistaInicial } from "./master-vista.ts";
+import { compararConValery } from "./comparar-valery.ts";
 
-const f = (codigo: string, valery: number, contado: number | null, fecha: string | null, costo: number | null = 2) => ({
-  codigo, nombre: `P ${codigo}`, unidad: "UND", costo, valery, contado, fechaConteo: fecha, zona: null,
-  diferencia: contado === null ? null : contado - valery,
+// `valery` en FilaMaster es la existencia del kardex de Macedonia (el nombre viene de cuando era copia de Valery).
+const f = (codigo: string, existencia: number, contado: number | null, fecha: string | null, costo: number | null = 2) => ({
+  codigo, nombre: `P ${codigo}`, unidad: "UND", costo, valery: existencia, contado, fechaConteo: fecha, zona: null,
+  diferencia: contado === null ? null : contado - existencia,
 });
 const HOY = "2026-10-13";
 
-test("nunca contado no es cero: va a «por contar», no a diferencias", () => {
+test("nunca contado no es cero: va a «por contar»; el negativo, a su pregunta", () => {
   const fs = prepararMaster([f("A", 10, null, null), f("B", 0, null, null), f("C", -5, null, null)], HOY);
   const r = resumirMaster(fs);
   assert.equal(r.porContar, 1);          // solo A: tiene existencia y nadie lo contó
-  assert.equal(r.diferencias, 0);
-  assert.equal(r.negativos, 1);          // C va a «revisar en Valery»
+  assert.equal(r.negativos, 1);
   assert.deepEqual(filasDe(fs, "contar").map((x) => x.codigo), ["A"]);
-  assert.deepEqual(filasDe(fs, "valery").map((x) => x.codigo), ["C"]);
+  assert.deepEqual(filasDe(fs, "negativo").map((x) => x.codigo), ["C"]);
 });
 
 test("por contar: primero lo nunca contado, y dentro lo que más vale; un conteo viejo vuelve a la lista", () => {
@@ -26,22 +27,42 @@ test("por contar: primero lo nunca contado, y dentro lo que más vale; un conteo
   const r = resumirMaster(fs);
   assert.equal(r.verificados, 1);        // solo RECIENTE
   assert.equal(r.conExistencia, 4);
+  assert.equal(vistaInicial(r), "contar");
 });
 
-test("diferencias en unidades y en dinero, la que más pesa primero", () => {
-  const fs = prepararMaster([f("F", 10, 7, "2026-10-12", 5), f("S", 4, 6, "2026-10-12", 1), f("OK", 3, 3, "2026-10-12")], HOY);
+test("un conteo de hace días no es un faltante: lo vendido después de contar no se marca", () => {
+  // Se contaron 50 y después se vendieron 8: la existencia es 42. Antes salía «faltan 8».
+  const r = resumirMaster(prepararMaster([f("X", 42, 50, "2026-10-10")], HOY));
+  assert.deepEqual([r.porContar, r.distintas, r.negativos], [0, 0, 0]);
+});
+
+test("contra Valery: lo que no explica nada primero; lo que explican los conteos, dicho; y lo que solo Valery tiene", () => {
+  const filas = [f("2702PD-500", 1019, null, null), f("8004202", 32, 98, "2026-10-12"), f("OXI6", 5, null, null), f("VIEJO", -3, null, null)];
+  const comp = compararConValery(
+    filas.map((x) => ({ codigo: x.codigo, existencia: x.valery })),
+    [{ codigo: "2702PD-500", existencia: 663 }, { codigo: "8004202", existencia: 130 }, { codigo: "OXI6", existencia: 5 }, { codigo: "NUEVO", existencia: 7, nombre: "SOLO EN VALERY" }],
+    new Map(), [{ codigo: "8004202", cantidad: -98 }],
+  );
+  const fs = prepararMaster(filas, HOY, comp);
   const r = resumirMaster(fs);
-  assert.deepEqual([r.diferencias, r.faltanteUnidades, r.sobranteUnidades, r.faltante, r.sobrante], [2, 3, 2, 15, 2]);
-  assert.deepEqual(filasDe(fs, "diferencias").map((x) => x.codigo), ["F", "S"]);
-  assert.equal(vistaInicial(r), "diferencias");
+  assert.equal(r.conValery, true);
+  assert.deepEqual([r.distintas, r.porConteo], [4, 1]);   // 2702PD-500, 8004202 (por conteo), VIEJO (no está en Valery), NUEVO
+  assert.deepEqual(filasDe(fs, "valery").map((x) => [x.codigo, x.difValery, x.porConteo]),
+    [["2702PD-500", 356, false], ["NUEVO", -7, false], ["VIEJO", -3, false], ["8004202", -98, true]]);
+  const de = (k: string) => fs.find((x) => x.codigo === k)!;
+  assert.deepEqual([de("OXI6").enValery, de("OXI6").difValery], [5, 0]);
+  assert.equal(de("VIEJO").enValery, null);               // Valery no tiene el código
+  assert.equal(de("NUEVO").nombre, "SOLO EN VALERY");
+  assert.equal(vistaInicial({ ...r, porContar: 0 }), "valery");
 });
 
-test("sin permiso de costos no hay montos, y se ordena por existencia", () => {
+test("sin lectura de Valery (o sin permiso) no hay columna de Valery ni diferencias", () => {
   const fs = prepararMaster([f("A", 3, null, null, null), f("B", 9, null, null, null)], HOY);
   const r = resumirMaster(fs);
+  assert.equal(r.conValery, false);
+  assert.equal(r.distintas, 0);
   assert.equal(r.conCosto, false);
-  assert.equal(r.faltante, null);
-  assert.deepEqual(filasDe(fs, "contar").map((x) => x.codigo), ["B", "A"]);
+  assert.deepEqual(filasDe(fs, "contar").map((x) => x.codigo), ["B", "A"]);   // sin costo, por existencia
 });
 
 test("una empresa sin existencia cargada ni conteos se reconoce como vacía", () => {
