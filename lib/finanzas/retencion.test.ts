@@ -310,7 +310,9 @@ describe("el panel muestra lo que hay que pagar, no el valor de cara", () => {
   const pant = fs.readFileSync("app/admin/payables/page.tsx", "utf8");
 
   test("la pantalla suma en neto, no en bruto", () => {
-    assert.match(pant, /const total = conSaldo\.reduce\(\(a, c\) => a \+ c\.saldoNeto, 0\)/);
+    // deuda(c): el neto de la cuenta, o 0 si está cerrada (lib/finanzas/resumen-clases.ts).
+    assert.match(pant, /const total = conSaldo\.reduce\(\(a, c\) => a \+ deuda\(c\), 0\)/);
+    assert.match(fs.readFileSync("lib/finanzas/resumen-clases.ts", "utf8"), /c\.estado === "liquidada" \? 0 : c\.saldoNeto/);
     assert.doesNotMatch(pant, /reduce\(\(a, c\) => a \+ c\.saldo,/);
   });
 

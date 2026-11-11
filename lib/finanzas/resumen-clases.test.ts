@@ -27,3 +27,10 @@ test("el consolidado suma los segmentos", () => {
   assert.equal(t.vencidas, s.reduce((a, x) => a + x.vencidas, 0));
   assert.equal(t.proveedores, 5);
 });
+
+test("una cuenta cerrada no suma al total a pagar aunque se haya cerrado con saldo", () => {
+  const cs = [{ ...c("factura", "STAR GAS", 100, -5), estado: "liquidada" }, { ...c("factura", "STAR GAS", 40, -5), estado: "abierta" }, c("factura", "FEBECA", 10, 3)];
+  const t = resumenDe(cs);
+  assert.deepEqual([t.total, t.vencido, t.vencidas, t.alerta], [50, 40, 1, 10]);
+  assert.equal(porClase(cs)[0].total, 50);
+});

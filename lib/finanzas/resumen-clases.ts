@@ -5,7 +5,14 @@
 
 import { grupoDeClase, type ClaseCuenta } from "./retencion.ts";
 
-type CuentaPagar = { clase: ClaseCuenta; contraparte: string; saldoNeto: number; dias: number };
+type CuentaPagar = { clase: ClaseCuenta; contraparte: string; saldoNeto: number; dias: number; estado?: string | null };
+
+/**
+ * Lo que se le debe por una cuenta. Una cuenta cerrada («liquidada») ya no se
+ * debe, aunque se haya cerrado con saldo pendiente (se negoció, se condonó, se
+ * reemplazó): sumarla inflaba el total a pagar con deuda que no existe.
+ */
+export const deuda = (c: Pick<CuentaPagar, "saldoNeto" | "estado">) => (c.estado === "liquidada" ? 0 : c.saldoNeto);
 
 export type SegmentoClase = {
   id: ClaseCuenta;
@@ -25,11 +32,11 @@ const ORDEN: ClaseCuenta[] = ["factura", "nota_entrega", "ajuste"];
 const clave = (s: string) => s.trim().replace(/\s+/g, " ").toUpperCase();
 
 export function resumenDe(cs: CuentaPagar[]) {
-  const abiertas = cs.filter((c) => c.saldoNeto > 0);
+  const abiertas = cs.filter((c) => deuda(c) > 0);
   return {
-    total: cs.reduce((a, c) => a + c.saldoNeto, 0),
-    vencido: abiertas.filter((c) => c.dias < 0).reduce((a, c) => a + c.saldoNeto, 0),
-    alerta: abiertas.filter((c) => c.dias >= 0 && c.dias <= 7).reduce((a, c) => a + c.saldoNeto, 0),
+    total: cs.reduce((a, c) => a + deuda(c), 0),
+    vencido: abiertas.filter((c) => c.dias < 0).reduce((a, c) => a + deuda(c), 0),
+    alerta: abiertas.filter((c) => c.dias >= 0 && c.dias <= 7).reduce((a, c) => a + deuda(c), 0),
     vencidas: abiertas.filter((c) => c.dias < 0).length,
     proveedores: new Set(cs.map((c) => clave(c.contraparte))).size,
     cuentas: cs.length,
@@ -38,7 +45,7 @@ export function resumenDe(cs: CuentaPagar[]) {
 
 /** Un segmento por grupo de clase que tenga cuentas, en el orden de las pestañas. */
 export function porClase(cs: CuentaPagar[]): SegmentoClase[] {
-  const total = cs.reduce((a, c) => a + c.saldoNeto, 0);
+  const total = cs.reduce((a, c) => a + deuda(c), 0);
   const grupos = new Map<ClaseCuenta, CuentaPagar[]>();
   for (const c of cs) { const g = grupoDeClase(c.clase); grupos.set(g, [...(grupos.get(g) ?? []), c]); }
   return [...grupos.entries()]

@@ -48,3 +48,10 @@ test("el buscador encuentra por nombre o por el código de la nota", async () =>
   assert.equal(buscarEnCartera(g, "9999").visible, false);
   assert.equal(buscarEnCartera(g, "  ").visible, true);
 });
+
+test("lo que debe un proveedor o cliente no incluye las cuentas cerradas con saldo", () => {
+  const g = agruparPorCliente([c(1, "STAR GAS", 100, "2026-10-01", -10, { estado: "liquidada" }), c(2, "STAR GAS", 40, "2026-10-05", -6)]);
+  assert.equal(g[0].saldo, 40);
+  assert.equal(g[0].vencido, 40);
+  assert.equal(g[0].documentos, 2);   // la cerrada se sigue viendo en la lista
+});
