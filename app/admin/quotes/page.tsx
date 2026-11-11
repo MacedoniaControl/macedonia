@@ -15,6 +15,7 @@ import { presupuestoHtml, printDoc, type DevLinea } from "@/lib/ux/doc-templates
 import { leerConfig } from "@/lib/config/config-db";
 import { NuevaCotizacion } from "./NuevaCotizacion";
 import { useRol, puedeVerRegistros, puedeVerFinanzas } from "@/lib/ux/session";
+import { abrirEnPestana } from "@/lib/ux/abrir-pestana";
 
 type Estado = "Borrador" | "Aprobada" | "Rechazada" | "Nota de entrega";
 type Cotizacion = {
@@ -109,10 +110,9 @@ export default function QuotesPage() {
     if (c.origen === "Valery" && c.ruta) return void abrirArchivo(c.ruta);
     printDoc(presupuestoHtml({ correlativo: c.correlativo, fechaEmision: c.fechaEmision, fechaVenc: c.fechaVenc, razonSocial: c.razonSocial, rif: c.rif, direccion: c.direccion, telefonos: c.telefonos, lineas: c.lineas, moneda: c.moneda, nota: c.nota }, empresaKey));
   }
+  // En iPhone, Safari no deja abrir la pestaña después de esperar el enlace: abrirEnPestana.
   async function abrirArchivo(ruta: string) {
-    const url = await urlDeArchivo(ruta);
-    if (url) window.open(url, "_blank");
-    else setAvisoSubida("No se pudo abrir el archivo.");
+    if (!(await abrirEnPestana(() => urlDeArchivo(ruta)))) setAvisoSubida("No se pudo abrir el archivo.");
   }
   async function onUpload(files: FileList | null) {
     if (!files?.length) return;

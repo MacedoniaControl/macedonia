@@ -13,11 +13,11 @@ export async function CentroDeControl() {
   // Con los meses cerrados a mano en Matrices, igual que el resto de las pantallas.
   const cargados = await listarMesesCargados();
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <main className="relative min-h-dvh overflow-hidden">
       {/* Fondo: halo naranja (Sumigases) a la izquierda + azul (Sudematin) a la derecha */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(48rem_26rem_at_-8%_-6%,rgba(234,106,30,0.16),transparent),radial-gradient(48rem_26rem_at_108%_-6%,rgba(42,42,140,0.20),transparent)]" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
+      <div className="relative mx-auto flex min-h-dvh max-w-6xl flex-col px-6 py-10">
         <header className="flex items-center justify-between">
           <span className="flex items-center gap-2.5">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-bold text-white">M</span>

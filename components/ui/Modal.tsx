@@ -25,7 +25,8 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+      // overscroll-contain: en iPhone, el «overflow: hidden» del body no frena el fondo; esto sí.
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/50 p-4 sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label={titulo}
@@ -39,7 +40,7 @@ export function Modal({
             <Icon name="close" size={18} />
           </button>
         </header>
-        <div className="max-h-[75vh] overflow-y-auto p-4">{children}</div>
+        <div className="max-h-[75dvh] overflow-y-auto overscroll-contain p-4">{children}</div>
       </div>
     </div>
   );

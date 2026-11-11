@@ -17,6 +17,7 @@ import { anularLiquidacion, editarLiquidacion, listarLiquidaciones, restablecerL
 import { urlComprobante } from "@/lib/finanzas/cuentas-db";
 import { fmtUsd } from "@/lib/ux/format";
 import { fechaVista } from "@/lib/ux/tabla-export";
+import { abrirEnPestana } from "@/lib/ux/abrir-pestana";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("es-VE", { timeZone: "America/Caracas", day: "2-digit", month: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -137,8 +138,8 @@ function Detalle({ l, gerencia, onCambio, onAbrirCuenta, enfocarMotivo = false }
 
   async function ver() {
     if (!l.imagenRuta) return;
-    const url = await urlComprobante(l.imagenRuta);
-    if (url) window.open(url, "_blank", "noopener"); else setError("No se pudo abrir el comprobante.");
+    const ruta = l.imagenRuta;
+    if (!(await abrirEnPestana(() => urlComprobante(ruta)))) setError("No se pudo abrir el comprobante.");
   }
   async function anular() {
     setAnulando(true); setError(null);

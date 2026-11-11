@@ -19,6 +19,7 @@ import { useRol, puedeVerRegistros } from "@/lib/ux/session";
 import { NuevaNotaEntrega } from "./NuevaNotaEntrega";
 import { NuevaDevolucion } from "./NuevaDevolucion";
 import { registrarCilindrosDeNota } from "@/lib/cilindros/cilindros-db";
+import { abrirEnPestana } from "@/lib/ux/abrir-pestana";
 
 type Tipo = "entrega" | "devolucion";
 type Doc = {
@@ -137,10 +138,9 @@ export default function DeliveryNotesPage() {
 
   // Abre el PDF con un enlace temporal: el bucket es privado porque son
   // documentos comerciales con nombres de clientes y montos.
+  // En iPhone, Safari no deja abrir la pestaña después de esperar el enlace: abrirEnPestana.
   async function abrirArchivo(ruta: string) {
-    const url = await urlDeArchivo(ruta);
-    if (url) window.open(url, "_blank");
-    else setAvisoSubida("No se pudo abrir el archivo.");
+    if (!(await abrirEnPestana(() => urlDeArchivo(ruta)))) setAvisoSubida("No se pudo abrir el archivo.");
   }
 
   return (
