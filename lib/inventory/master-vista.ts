@@ -47,6 +47,10 @@ export type FilaVista = Omit<FilaMaster, "valery" | "diferencia"> & {
   enValery: number | null;
   /** Macedonia menos Valery (null sin lectura). */
   difValery: number | null;
+  /** Lo que movieron los conteos de Macedonia desde el corte (null sin lectura). */
+  conteos: number | null;
+  /** La diferencia con Valery que no explican los conteos (null sin lectura). */
+  sinExplicar: number | null;
   /** La diferencia con Valery es lo que movieron los conteos de Macedonia desde el corte. */
   porConteo: boolean;
 };
@@ -93,6 +97,8 @@ export function prepararMaster(filas: FilaMaster[], hoy: string, comparacion: Co
       enValery: comparacion ? (c ? c.valery : null) : null,
       // Sin la fila en la comparación es que los dos están en cero.
       difValery: comparacion ? (c ? c.diferencia : 0) : null,
+      conteos: comparacion ? (c ? c.conteos : 0) : null,
+      sinExplicar: comparacion ? (c ? c.sinExplicar : 0) : null,
       porConteo: !!c && Math.abs(c.diferencia) >= MARGEN && Math.abs(c.sinExplicar) < MARGEN,
     };
   });
@@ -102,6 +108,7 @@ export function prepararMaster(filas: FilaMaster[], hoy: string, comparacion: Co
     vistas.push({
       codigo: c.codigo, nombre: c.nombre, unidad: "", costo: null, contado: null, fechaConteo: null, zona: null,
       existencia: c.macedonia, hace: null, viejo: false, valor: null, enValery: c.valery, difValery: c.diferencia,
+      conteos: c.conteos, sinExplicar: c.sinExplicar,
       porConteo: Math.abs(c.diferencia) >= MARGEN && Math.abs(c.sinExplicar) < MARGEN,
     });
   }
