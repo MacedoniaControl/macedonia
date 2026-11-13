@@ -9,9 +9,19 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { getUsuarioSesion, puedeEntrarAEmpresa } from "@/lib/auth/sesion-servidor";
+import { getUsuarioSesion, puedeEntrarAEmpresa, sesionPuede } from "@/lib/auth/sesion-servidor";
 import { importarVentasValery } from "@/lib/inventory/ventas-valery-db";
-import { errorDeRango, filasDeParte, renglonesDesdePuente, type EstadoSolicitud, type FilaVentaPuente, type TipoSolicitud } from "./puente.ts";
+import {
+  errorDeRango, filasDeParte, renglonesDesdePuente, TIPOS_CON_COSTO, TIPOS_CON_RANGO, TIPOS_SOLICITUD,
+  type EstadoSolicitud, type FilaVentaPuente, type TipoSolicitud,
+} from "./puente.ts";
+import { mesesCompletos, mesesDesdeValery, type MesValery } from "./cierre-valery.ts";
+import { mesesPorCerrar } from "@/lib/ux/historico-meses";
+import { guardarMesCargado } from "@/lib/ux/historico-meses-db";
+import { HISTORY } from "@/lib/ux/history-data";
+import { isEmpresaId } from "@/lib/ux/empresas";
+
+const SIN_COSTOS = "Esta lectura trae costos de Valery: la ve quien tiene el permiso «Ver costos».";
 
 export type AgentePuente = {
   creadoEn: string;
@@ -91,9 +101,10 @@ export async function pedirAlPuente(
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const g = await gerenciaDe(empresa);
   if ("error" in g) return { ok: false, error: g.error as string };
-  if (!["ventas", "cxc", "cxp", "existencias", "estado", "diagnostico", "movimientos"].includes(tipo)) return { ok: false, error: "Pedido desconocido." };
+  if (!TIPOS_SOLICITUD.includes(tipo)) return { ok: false, error: "Pedido desconocido." };
+  if (TIPOS_CON_COSTO.includes(tipo) && !sesionPuede(g.u, "ver_costos")) return { ok: false, error: SIN_COSTOS };
   const p: Record<string, string> = {};
-  if (tipo === "ventas" || tipo === "movimientos") {
+  if (TIPOS_CON_RANGO.includes(tipo)) {
     const e = errorDeRango(parametros.desde ?? "", parametros.hasta ?? "");
     if (e) return { ok: false, error: e };
     p.desde = parametros.desde!; p.hasta = parametros.hasta!;
@@ -127,6 +138,11 @@ export async function resultadoPuente(id: number): Promise<{ ok: true; tipo: Tip
   const { data: s } = await sb.from("valery_solicitudes").select("tipo, estado").eq("id", id).maybeSingle();
   if (!s) return { ok: false, error: "No existe ese pedido." };
   if (s.estado !== "lista" && s.estado !== "aplicada") return { ok: false, error: "Ese pedido todavía no tiene resultado." };
+  // La base ya no se los da (migración 57); se dice por qué en vez de mostrar una lista vacía.
+  if (TIPOS_CON_COSTO.includes(s.tipo as TipoSolicitud)) {
+    const u = await getUsuarioSesion();
+    if (!u || !sesionPuede(u, "ver_costos")) return { ok: false, error: SIN_COSTOS };
+  }
   const { data, error } = await sb.from("valery_resultados").select("parte, datos").eq("solicitud_id", id).order("parte");
   if (error) return { ok: false, error: error.message };
   return { ok: true, tipo: s.tipo as TipoSolicitud, filas: (data ?? []).flatMap((p) => (p.datos as Record<string, unknown>[]) ?? []) };
@@ -207,4 +223,45 @@ export async function cancelarPedidoPuente(id: number): Promise<{ ok: boolean; e
   const sb = await createClient();
   const { error } = await sb.rpc("valery_marcar_solicitud", { p_id: id, p_estado: "cancelada" });
   return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/**
+ * Cierra meses del histórico con lo que trajo un pedido «cierre» (agente
+ * 1.0.8): ventas y costo de cada renglón, y compras, en los dólares de Valery
+ * (lib/valery/cierre-valery.ts). Solo los meses que el pedido cubre enteros y
+ * que todavía se pueden cerrar: terminados y posteriores al último mes del
+ * histórico de Valery. Un mes ya cerrado se corrige con lo nuevo.
+ */
+export async function cerrarMesesDesdeValery(id: number): Promise<
+  { ok: true; cerrados: MesValery[]; fuera: string[] } | { ok: false; error: string }
+> {
+  const sb = await createClient();
+  const { data: s } = await sb.from("valery_solicitudes").select("empresa_id, tipo, estado, parametros").eq("id", id).maybeSingle();
+  if (!s) return { ok: false, error: "No existe ese pedido." };
+  if (s.tipo !== "cierre") return { ok: false, error: "Solo un pedido «Cierre de mes» cierra meses." };
+  const g = await gerenciaDe(s.empresa_id);
+  if ("error" in g) return { ok: false, error: g.error as string };
+  if (!isEmpresaId(s.empresa_id)) return { ok: false, error: "Empresa desconocida." };
+  const r = await resultadoPuente(id);
+  if (!r.ok) return r;
+  const p = (s.parametros as { desde?: string; hasta?: string }) ?? {};
+  const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
+  const cerrables = new Set(mesesPorCerrar(HISTORY[s.empresa_id].meta.hasta, hoy));
+  const enteros = mesesCompletos(p.desde ?? "", p.hasta ?? "");
+  const meses = mesesDesdeValery(r.filas, s.empresa_id).filter((m) => enteros.includes(m.ym));
+  const cerrados: MesValery[] = [], fuera: string[] = [];
+  for (const m of meses) {
+    if (!cerrables.has(m.ym)) { fuera.push(m.ym); continue; }
+    const nota = `Leído de Valery por el Puente (pedido ${id}): ${m.renglones} renglones de venta con su costo y ${m.compras} compras, en los dólares de Valery.`
+      + (m.facturasDeNotas ? ` Facturas de notas ya contadas: $${m.facturasDeNotas.toLocaleString("es-VE")}.` : "")
+      + (m.sinMonto ? ` ${m.sinMonto} fila(s) sin monto en dólares no se contaron.` : "");
+    const g2 = await guardarMesCargado({
+      empresa: s.empresa_id, ym: m.ym, venta: m.venta, costo: m.costo, compra: Math.max(0, m.compra),
+      ventaBs: m.ventaBs, costoBs: m.costoBs, compraBs: Math.max(0, m.compraBs), nota,
+    });
+    if (!g2.ok) return { ok: false, error: `${m.ym}: ${g2.error}` };
+    cerrados.push(m);
+  }
+  if (cerrados.length && s.estado === "lista") await sb.rpc("valery_marcar_solicitud", { p_id: id, p_estado: "aplicada" });
+  return { ok: true, cerrados, fuera };
 }

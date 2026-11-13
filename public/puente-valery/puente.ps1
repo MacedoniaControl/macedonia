@@ -16,7 +16,7 @@
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.7'
+$Version = '1.0.8'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
@@ -297,6 +297,144 @@ select cast('TIPOS_DOCUMENTOS' as varchar(20)), codigo_tipo_documento, cast(null
        cast(factor_cxc as integer), cast(factor_cxp as integer), cast(null as date), cast(null as date)
   from tipos_documentos where factor_cxc <> 0 or factor_cxp <> 0 or codigo_tipo_documento in ('NET', 'NE', 'NDE')
 '@
+  # 1.0.8: cada renglon de venta con su costo, en los dolares de Valery (las tablas *_RM,
+  # moneda 02, las mismas del reporte «Reexpresado»), su vendedor y su comision.
+  # El costo lo elige Valery segun su tipo de contribuyente (CALC_TOTAL_COSTO_TIPO_CONTRI).
+  # de_notas: cuanto del renglon de una FAC viene de una nota de entrega (ya contada).
+  rentabilidad = @'
+select v.fecha_emision as fecha, v.tipo_documento as tipo, v.documento, v.cliente_codigo, v.cliente_nombre as cliente,
+       d.numero_linea as linea, d.producto_codigo as codigo, d.producto_nombre as producto, d.cantidad,
+       rm.total_neto_rm as neto_usd,
+       (select c.r_total_costo from calc_total_costo_tipo_contri(rm.total_costo_rm, rm.total_costo_imp_rm) c) as costo_usd,
+       d.total_neto as neto_bs,
+       (select c.r_total_costo from calc_total_costo_tipo_contri(d.total_costo, d.total_costo_imp) c) as costo_bs,
+       rm.total_comision_vendedor_rm as comision_usd,
+       coalesce(nullif(trim(d.vendedor_codigo), ''), v.vendedor_codigo) as vendedor,
+       (select first 1 e.anulado from ventas_estados e where e.correlativo_principal = v.correlativo) as anulado,
+       case when v.tipo_documento = 'FAC' then
+         coalesce((select sum(r.cantidad) from ventas_detalles_rel_cant r
+                    where r.correlativo_principal = v.correlativo and r.numero_linea_principal = d.numero_linea
+                      and r.tipo_documento_relacionado = 'NET'), 0)
+       end as de_notas
+  from ventas v join ventas_detalles d on d.correlativo_principal = v.correlativo
+  left join ventas_detalles_rm rm on rm.correlativo_principal = d.correlativo_principal and rm.numero_linea = d.numero_linea and rm.moneda_codigo = '02'
+ where v.fecha_emision between cast(@desde as date) and cast(@hasta as date)
+   and v.tipo_documento in ('FAC', 'NET', 'DEV') and v.temporal <> 'T'
+ order by v.correlativo, d.numero_linea
+'@
+  # 1.0.8: compras con sus montos, por fecha de registro (como el resumen mensual de
+  # Valery). Neto = total - IVA - IGTF. facturada: la recepcion que ya tiene su factura.
+  # Y las notas de credito y debito de proveedores (CxP).
+  compras = @'
+select c.fecha_registro as fecha, c.fecha_emision as emision, c.tipo_documento as tipo, c.documento, c.proveedor_codigo, cast(c.proveedor_nombre as varchar(200)) as proveedor,
+       cast(c.proveedor_rif as varchar(30)) as rif,
+       cast(rm.total_operacion_rm - rm.total_impuesto_rm - coalesce(rm.total_igtf_rm, 0) as double precision) as neto_usd,
+       cast(rm.total_impuesto_rm as double precision) as iva_usd, cast(c.total_operacion - c.total_impuesto - coalesce(c.total_igtf, 0) as double precision) as neto_bs,
+       cast(case when c.tipo_documento = 'RCM' and (
+              exists (select 1 from v3compras_detalles_rel_cant r where r.correlativo_relacionado = c.correlativo)
+           or exists (select 1 from v3compras f where f.tipo_documento = 'FCM' and f.temporal <> 'T'
+                       and f.proveedor_codigo = c.proveedor_codigo and trim(f.documento) = trim(c.documento))) then 'T' else 'F' end as char(1)) as facturada
+  from v3compras c left join v3compras_rm rm on rm.correlativo_principal = c.correlativo and rm.moneda_codigo = '02'
+ where c.fecha_registro between cast(@desde as date) and cast(@hasta as date) and c.temporal <> 'T'
+   and c.tipo_documento in ('RCM', 'FCM', 'DCM')
+union all
+select x.fecha_registro, x.fecha_emision, x.tipo_documento, x.documento, x.proveedor_codigo, cast(x.proveedor_nombre as varchar(200)), cast(x.proveedor_rif as varchar(30)),
+       cast(xr.total_neto_rm as double precision), cast(xr.impuesto_rm as double precision), cast(x.total_neto as double precision), cast('F' as char(1))
+  from v3cxp x left join v3cxp_rm xr on xr.correlativo_principal = x.correlativo and xr.moneda_codigo = '02'
+ where x.fecha_registro between cast(@desde as date) and cast(@hasta as date) and x.temporal <> 'T'
+   and x.tipo_documento in ('NCR', 'NDB')
+'@
+  # 1.0.8: el catalogo con costos, los cuatro precios y los minimos y maximos.
+  catalogo = @'
+select p.codigo_producto as codigo, cast(p.nombre as varchar(200)) as nombre, p.departamento_codigo as departamento, pt.marca, pt.unidad,
+       p.estatus, cast(pt.costo_unitario as double precision) as costo, cast(pt.costo_promedio as double precision) as costo_promedio,
+       cast(pt.costo_reposicion as double precision) as costo_reposicion,
+       cast(pt.precio_maximo as double precision) as precio_maximo, cast(pt.precio_oferta as double precision) as precio_oferta,
+       cast(pt.precio_mayor as double precision) as precio_mayor, cast(pt.precio_minimo as double precision) as precio_minimo,
+       cast(pt.existencia_minima as double precision) as existencia_minima, cast(pt.existencia_maxima as double precision) as existencia_maxima,
+       cast(pt.existencia_punto_pedido as double precision) as punto_pedido,
+       pt.ultima_factura_compra, pt.fecha_modificado
+  from productos p join productos_terminados pt on pt.codigo_producto = p.codigo_producto
+ order by p.codigo_producto
+'@
+  # 1.0.8: los vendedores y su porcentaje de comision.
+  vendedores = @'
+select codigo, cast(nombre as varchar(120)) as nombre, estatus, cast(telefonos as varchar(80)) as telefonos, cast(correo_electronico as varchar(120)) as correo,
+       cast(p_comision_ventas_precio_maximo as double precision) as comision_venta, cast(p_comision_cobro_general as double precision) as comision_cobro,
+       cast(p_comision_utilidad as double precision) as comision_utilidad
+  from vendedores order by codigo
+'@
+  # 1.0.8: la ficha de cada cliente (RIF, direccion, limite y dias de credito, vendedor).
+  clientes = @'
+select codigo, cast(nombre as varchar(200)) as nombre, cast(rif as varchar(30)) as rif, cast(direccion as varchar(300)) as direccion, cast(ciudad as varchar(80)) as ciudad,
+       cast(estado as varchar(80)) as estado, cast(telefonos as varchar(80)) as telefonos, cast(correo_electronico as varchar(120)) as correo,
+       cast(contacto as varchar(120)) as contacto, cast(limite_credito as double precision) as limite_credito, dias_credito,
+       vendedor_codigo as vendedor, zona_venta_codigo as zona, tipo_cliente, contribuyente_especial, estatus, fecha_inicio
+  from clientes order by codigo
+'@
+  # 1.0.8: la ficha de cada proveedor.
+  proveedores = @'
+select codigo, cast(nombre as varchar(200)) as nombre, cast(rif as varchar(30)) as rif, cast(direccion as varchar(300)) as direccion, cast(ciudad as varchar(80)) as ciudad,
+       cast(telefonos as varchar(80)) as telefonos, cast(correo_electronico as varchar(120)) as correo, cast(contacto as varchar(120)) as contacto,
+       dias_credito, cast(limite_credito as double precision) as limite_credito, tipo_persona, contribuyente_especial, estatus
+  from proveedores order by codigo
+'@
+  # 1.0.8: como se cobro cada cosa (forma de pago, moneda, banco). Sin numeros de
+  # tarjeta, cuenta ni cedula del titular.
+  caja = @'
+select cast('cobro' as varchar(10)) as origen, c.fecha_emision as fecha, cast(c.hora_emision as varchar(20)) as hora, c.modulo, c.tipo_documento as tipo,
+       c.documento, c.tipo_documento_rel as tipo_rel, c.cliente_codigo as contraparte_codigo,
+       cast((select first 1 k.nombre from clientes k where k.codigo = c.cliente_codigo) as varchar(200)) as contraparte,
+       cast(d.forma_pago_nombre as varchar(60)) as forma, d.tipo_formapago as forma_tipo, cast(d.monto as double precision) as monto,
+       cast(d.monto_me as double precision) as monto_me, d.moneda_codigo as moneda, cast(c.factor_cambio as double precision) as factor, d.banco_codigo as banco
+  from caja c join caja_detalles d on d.correlativo_principal = c.correlativo
+ where c.fecha_emision between cast(@desde as date) and cast(@hasta as date) and c.temporal <> 'T'
+ order by c.fecha_emision, c.hora_emision
+'@
+  # 1.0.8: como se le pago a cada proveedor (desglose del pago en CxP).
+  pagos = @'
+select x.fecha_emision as fecha, cast(x.hora_emision as varchar(20)) as hora, x.tipo_documento as tipo, x.documento,
+       x.proveedor_codigo, cast(x.proveedor_nombre as varchar(200)) as proveedor, x.moneda_codigo as moneda, cast(x.factor_cambio as double precision) as factor,
+       cast(p.efectivo as double precision) as efectivo, cast(p.transferencia as double precision) as transferencia, cast(p.cheque as double precision) as cheque,
+       cast(p.deposito_bancario as double precision) as deposito, cast(p.divisas as double precision) as divisas, cast(p.pagomovil as double precision) as pagomovil,
+       cast(p.tarjeta_debito + p.tarjeta_credito as double precision) as tarjeta, cast(p.nota_credito + p.anticipo as double precision) as compensado,
+       cast(p.total_cancelado as double precision) as total, cast(x.concepto as varchar(300)) as concepto
+  from v3cxp x join v3cxp_desglose_pago p on p.correlativo_principal = x.correlativo
+ where x.fecha_emision between cast(@desde as date) and cast(@hasta as date) and x.temporal <> 'T'
+ order by x.fecha_emision, x.hora_emision
+'@
+  # 1.0.8: comprobantes de retencion de IVA e ISLR, de proveedores y de clientes.
+  retenciones = @'
+select cast('proveedor' as varchar(10)) as lado, cast('IVA' as varchar(5)) as impuesto, r.fecha_emision as fecha, r.documento, r.proveedor_codigo as contraparte_codigo,
+       cast(r.proveedor_nombre as varchar(200)) as contraparte, cast(r.proveedor_rif as varchar(30)) as rif, cast(null as varchar(30)) as documento_origen,
+       cast(r.total_base_imponible as double precision) as base, cast(r.total_impuesto as double precision) as impuesto_monto, cast(r.total_retencion_iva as double precision) as retencion
+  from v3proveedores_ret_iva r where r.fecha_emision between cast(@desde as date) and cast(@hasta as date) and r.temporal <> 'T'
+union all
+select 'proveedor', 'ISLR', r.fecha_emision, r.documento, r.proveedor_codigo, cast(r.proveedor_nombre as varchar(200)), cast(r.proveedor_rif as varchar(30)), cast(r.documento_rel as varchar(30)),
+       cast(r.base_imponible as double precision), cast(r.iva as double precision), cast(r.retencion as double precision)
+  from v3proveedores_ret_islr r where r.fecha_emision between cast(@desde as date) and cast(@hasta as date) and r.temporal <> 'T'
+union all
+select 'cliente', 'IVA', r.fecha_emision, r.documento, r.cliente_codigo, cast(r.cliente_nombre as varchar(200)), cast(r.cliente_rif as varchar(30)), cast(r.documento_origen as varchar(30)),
+       cast(r.total_base_imponible as double precision), cast(r.total_impuesto as double precision), cast(r.total_retencion as double precision)
+  from v3clientes_ret_iva r where r.fecha_emision between cast(@desde as date) and cast(@hasta as date) and r.temporal <> 'T'
+union all
+select 'cliente', 'ISLR', r.fecha_emision, r.documento, r.clientes_codigo, cast(r.clientes_nombre as varchar(200)), cast(r.clientes_rif as varchar(30)), cast(r.documento_origen as varchar(30)),
+       cast(r.total_base_imponible as double precision), cast(r.total_impuesto as double precision), cast(r.total_retencion as double precision)
+  from v3clientes_ret_islr r where r.fecha_emision between cast(@desde as date) and cast(@hasta as date) and r.temporal <> 'T'
+'@
+  # 1.0.8: movimientos de banco y el saldo de cada cuenta. De la cuenta, solo los
+  # ultimos cuatro digitos.
+  bancos = @'
+select cast('movimiento' as varchar(12)) as clase, m.fecha_emision as fecha, m.tipo, cast(m.numero as varchar(40)) as numero,
+       cast(right(trim(m.cuenta_numero), 4) as varchar(4)) as cuenta, cast(m.beneficiario_nombre as varchar(200)) as beneficiario,
+       cast(m.descripcion as varchar(300)) as descripcion, cast(m.debito as double precision) as debito, cast(m.credito as double precision) as credito,
+       cast(null as double precision) as saldo, cast(null as varchar(80)) as banco
+  from v3_movimientos_bancos m where m.fecha_emision between cast(@desde as date) and cast(@hasta as date) and m.temporal <> 'T'
+union all
+select 'cuenta', cast(null as date), cast(null as varchar(10)), cast(null as varchar(40)), cast(right(trim(b.numero), 4) as varchar(4)), cast(null as varchar(200)),
+       cast(b.descripcion as varchar(300)), cast(b.total_debitos as double precision), cast(b.total_creditos as double precision), cast(b.total_saldo as double precision), cast(b.banco as varchar(80))
+  from cuentas_bancarias b
+'@
 }
 
 function Filas-De([string]$tipo, $parametros) {
@@ -315,8 +453,22 @@ function Filas-De([string]$tipo, $parametros) {
     }
     return ,$filas
   }
-  if ($tipo -eq 'movimientos') {
-    return ,(Consultar $SQL.movimientos @{ '@desde' = [string]$parametros.desde; '@hasta' = [string]$parametros.hasta })
+  $rango = @{ '@desde' = [string]$parametros.desde; '@hasta' = [string]$parametros.hasta }
+  # 1.0.8: para cerrar un mes, las ventas con su costo y las compras, en un solo pedido.
+  if ($tipo -eq 'cierre') {
+    $filas = New-Object System.Collections.Generic.List[object]
+    foreach ($f in (Consultar $SQL.rentabilidad $rango)) { $f.origen = 'venta'; $filas.Add($f) }
+    foreach ($f in (Consultar $SQL.compras $rango)) { $f.origen = 'compra'; $filas.Add($f) }
+    return ,$filas
+  }
+  # 1.0.8: lo cobrado (caja) y lo pagado a proveedores, juntos.
+  if ($tipo -eq 'caja') {
+    $filas = Consultar $SQL.caja $rango
+    foreach ($f in (Consultar $SQL.pagos $rango)) { $f.origen = 'pago'; $filas.Add($f) }
+    return ,$filas
+  }
+  if (@('movimientos', 'rentabilidad', 'compras', 'retenciones', 'bancos') -contains $tipo) {
+    return ,(Consultar $SQL[$tipo] $rango)
   }
   if ($SQL.ContainsKey($tipo)) { return ,(Consultar $SQL[$tipo]) }
   throw "Pedido desconocido: $tipo"
