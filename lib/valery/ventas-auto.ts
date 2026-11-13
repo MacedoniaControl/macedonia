@@ -45,7 +45,7 @@ export async function notasPreviasDe(sb: SupabaseClient, empresa: string, desde:
  * `facturasRellenas` null: la migración 51 no se ha corrido (no hay dónde
  * guardar las facturas de notas).
  */
-export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean; facturasRellenas: boolean | null; devolucionesRellenas: boolean | null; inventarioRelleno: boolean | null; notasSegunValery: boolean | null }> {
+export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Promise<{ auto: boolean; cadaMin: number; horasRellenas: boolean; facturasRellenas: boolean | null; devolucionesRellenas: boolean | null; inventarioRelleno: boolean | null; notasSegunValery: boolean | null; ajustesValeryRellenos: boolean | null }> {
   const { data } = await sb.from("valery_ajustes").select("ventas_auto, cada_min").eq("empresa_id", empresa).maybeSingle();
   // Aparte: si la migración 50 o la 51 no se han corrido, la columna no existe y no debe apagar lo demás.
   const { data: h } = await sb.from("valery_ajustes").select("horas_rellenas").eq("empresa_id", empresa).maybeSingle();
@@ -53,12 +53,14 @@ export async function ajustesVentasDe(sb: SupabaseClient, empresa: string): Prom
   const { data: d, error: ed } = await sb.from("valery_ajustes").select("devoluciones_rellenas").eq("empresa_id", empresa).maybeSingle();
   const { data: iv, error: ei } = await sb.from("valery_ajustes").select("inventario_relleno").eq("empresa_id", empresa).maybeSingle();
   const { data: nv, error: en } = await sb.from("valery_ajustes").select("notas_segun_valery").eq("empresa_id", empresa).maybeSingle();
+  const { data: av, error: ea } = await sb.from("valery_ajustes").select("ajustes_valery_rellenos").eq("empresa_id", empresa).maybeSingle();
   return {
     auto: data?.ventas_auto ?? true, cadaMin: data?.cada_min ?? CADA_MIN_POR_DEFECTO, horasRellenas: h?.horas_rellenas ?? false,
     facturasRellenas: ef ? null : (f?.facturas_rellenas ?? false),
     devolucionesRellenas: ed ? null : (d?.devoluciones_rellenas ?? false),
     inventarioRelleno: ei ? null : (iv?.inventario_relleno ?? false),
     notasSegunValery: en ? null : (nv?.notas_segun_valery ?? false),
+    ajustesValeryRellenos: ea ? null : (av?.ajustes_valery_rellenos ?? false),
   };
 }
 
@@ -137,14 +139,17 @@ export async function programarVentasAuto(
   const rellenarDevoluciones = ajustes.devolucionesRellenas === false && versionAlMenos(agente?.version, VERSION_CON_DEVOLUCION);
   const rellenarInventario = ajustes.inventarioRelleno === false && versionAlMenos(agente?.version, VERSION_CON_INVENTARIO);
   const rellenarNotas = ajustes.notasSegunValery === false && versionAlMenos(agente?.version, VERSION_CON_NOTAS);
-  const rango = rangoAuto(hoyCaracas(), corte, rellenarHoras || rellenarFacturas || rellenarDevoluciones || rellenarInventario || rellenarNotas ? null : ultimaHasta);
+  // Los ajustes de Valery que la 54 dejó fuera y la 56 deja entrar donde Macedonia no contó: una vez, desde el corte.
+  const rellenarAjustes = ajustes.ajustesValeryRellenos === false && versionAlMenos(agente?.version, VERSION_CON_INVENTARIO);
+  const rango = rangoAuto(hoyCaracas(), corte,
+    rellenarHoras || rellenarFacturas || rellenarDevoluciones || rellenarInventario || rellenarNotas || rellenarAjustes ? null : ultimaHasta);
 
   const { data, error } = await sb.from("valery_solicitudes").insert({
     empresa_id: empresa, tipo: "ventas", automatica: true,
     parametros: {
       ...rango, ...(rellenarHoras ? { rellenarHoras: true } : {}), ...(rellenarFacturas ? { rellenarFacturas: true } : {}),
       ...(rellenarDevoluciones ? { rellenarDevoluciones: true } : {}), ...(rellenarInventario ? { rellenarInventario: true } : {}),
-      ...(rellenarNotas ? { rellenarNotas: true } : {}),
+      ...(rellenarNotas ? { rellenarNotas: true } : {}), ...(rellenarAjustes ? { rellenarAjustes: true } : {}),
     },
     creado_por: usuario?.id ?? null, creado_nombre: usuario?.nombre ?? "Automático",
   }).select("id").single();
@@ -164,7 +169,7 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
   const marcar = (campos: Record<string, unknown>) => admin.from("valery_solicitudes").update(campos).eq("id", id);
   const { data: s } = await admin.from("valery_solicitudes").select("resumen, parametros").eq("id", id).maybeSingle();
   const resumen = (s?.resumen as Record<string, unknown> | null) ?? {};
-  const parametros = (s?.parametros as { rellenarHoras?: boolean; rellenarFacturas?: boolean; rellenarDevoluciones?: boolean; rellenarInventario?: boolean; rellenarNotas?: boolean } | null) ?? {};
+  const parametros = (s?.parametros as { rellenarHoras?: boolean; rellenarFacturas?: boolean; rellenarDevoluciones?: boolean; rellenarInventario?: boolean; rellenarNotas?: boolean; rellenarAjustes?: boolean } | null) ?? {};
   try {
     const { data: partes, error } = await admin.from("valery_resultados").select("datos").eq("solicitud_id", id).order("parte");
     if (error) throw new Error(`No se pudo leer lo que entregó el agente: ${error.message}`);
@@ -230,6 +235,10 @@ export async function aplicarVentasAuto(admin: SupabaseClient, id: number, empre
     // Y las facturas de notas según Valery, desde el corte: una vez.
     if (parametros.rellenarNotas && segunValery) {
       await admin.from("valery_ajustes").upsert({ empresa_id: empresa, notas_segun_valery: true }, { onConflict: "empresa_id" });
+    }
+    // Y los ajustes de Valery desde el corte (migración 56), igual: una vez.
+    if (parametros.rellenarAjustes && ajustes.ajustesValeryRellenos !== null && conUnidad) {
+      await admin.from("valery_ajustes").upsert({ empresa_id: empresa, ajustes_valery_rellenos: true }, { onConflict: "empresa_id" });
     }
   } catch (e) {
     await marcar({ estado: "error", error: (e as Error).message.slice(0, 2000) });

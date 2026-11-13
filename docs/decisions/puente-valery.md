@@ -299,12 +299,19 @@ descuentan y el resto de la factura sí.
   - la que Valery sí descontó vuelve al kardex;
   - cada nota toma la factura que dice Valery.
 
-**Los ajustes de Valery (AJS) ya no entran** (pedido del usuario, 11-11-2026).
-El inventario de Macedonia es el maestro y su existencia real la ponen los
-conteos de Macedonia. Cuando un conteo se cargaba también en Valery, el mismo
-ajuste entraba dos veces: lo tenían 63 productos. La migración 54 borra los AJS
-que ya habían entrado con el 1.0.6 y el importador ignora los que lleguen. Las
-cargas y descargas siguen entrando.
+**Los ajustes de Valery (AJS) entran solo donde Macedonia no ha contado**
+(migración 56, pedido del usuario, 13-11-2026).
+- La 54 los había dejado fuera del todo: cuando un conteo se cargaba también en
+  Valery, el mismo ajuste entraba dos veces (63 productos).
+- Revisando el 13-11 las 88 diferencias que quedaban, 66 eran esos ajustes, y
+  en 37 de esos productos Macedonia nunca los había contado: su existencia quedó
+  mal, 7 en negativo (el E7018532L en −290 con Valery en 140).
+- Ahora un AJS entra si ese producto no tiene un conteo de Macedonia («CF-…»)
+  desde el corte. Donde Macedonia contó, manda su conteo. La primera
+  actualización después de la 56 pide todo desde el corte, una vez
+  (`valery_ajustes.ajustes_valery_rellenos`).
+- Los productos contados en los dos sistemas con resultados distintos siguen
+  apareciendo como diferencia: es real, los dos conteos no coinciden.
 
 ## Lo que el puente nunca hace
 
