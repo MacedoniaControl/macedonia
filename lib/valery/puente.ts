@@ -182,14 +182,13 @@ export function referenciaValida(v: unknown): string | null {
  * anterior ya está en la existencia que se alineó con Valery). Sin monto: el
  * costo de compra no se trae.
  *
- * Los ajustes de Valery (AJS) no: el inventario de Macedonia es el maestro y su
- * existencia real la ponen los conteos de Macedonia (pedido del usuario,
- * 11-11-2026). Cuando contaban y lo cargaban también en Valery, el mismo
- * conteo entraba dos veces (63 productos). Cargas y descargas sí entran: son
- * mercancía que entra o sale.
+ * Los ajustes de Valery (AJS) también van, y la base decide (migración 56):
+ * entran solo si Macedonia no ha contado ese producto desde el corte. Donde
+ * contó, manda su conteo; donde no, el ajuste de Valery es lo único que
+ * corrige la existencia (pedido del usuario, 13-11-2026).
  */
 export function inventarioParaLaBase(inventario: RenglonInventario[], corte: string) {
-  return inventario.filter((r) => r.fecha >= corte && r.tipo !== "AJS").map((r) => ({
+  return inventario.filter((r) => r.fecha >= corte).map((r) => ({
     renglon: r.clave, fecha: r.fecha, hora: r.hora, direccion: r.cantidad > 0 ? "entrada" : "salida", tipo: r.tipo,
     documento: `${r.tipo} ${r.documento}`, cliente: r.contraparte, codigo: r.codigo, nombre: r.producto || r.codigo,
     cantidad: Math.abs(r.cantidad), monto_usd: null, facturada_con: null,
