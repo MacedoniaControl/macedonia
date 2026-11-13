@@ -12,9 +12,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getUsuarioSesion, sesionPuede } from "@/lib/auth/sesion-servidor";
 import { listarCuentas } from "@/lib/finanzas/cuentas-db";
 import { listarOrdenes } from "@/lib/compras/compras-db";
+import { ventasDelPeriodo } from "@/lib/valery/ventas-db";
+import { resumirVentas } from "@/lib/valery/ventas";
+import { isEmpresaId } from "@/lib/ux/empresas";
 
 export type ResumenOperativo = {
-  ventasHoy: { usd: number; notas: number } | null;
+  /**
+   * Lo vendido hoy. «valery»: lo que facturó Valery (lo trae el Puente cada
+   * hora), igual que «Vendido» en Ventas. «macedonia»: las notas de entrega
+   * emitidas en Macedonia, para quien no puede ver Ventas.
+   */
+  ventasHoy: { usd: number; documentos: number; fuente: "valery" | "macedonia" } | null;
   cobrar: { usd: number; documentos: number; vencido: number } | null;
   pagar: { usd: number; proveedores: number; vencido: number } | null;
   negativos: { productos: number } | null;
@@ -36,13 +44,21 @@ export async function resumenOperativo(empresa: string): Promise<ResumenOperativ
   const puede = (clave: string) => sesionPuede(u, clave);
 
   const [ventasHoy, cobrar, pagar, negativos, compras] = await Promise.all([
-    // Ventas de hoy: las notas de entrega emitidas en Macedonia. Las ventas de
-    // Valery llegan por importación, no en el día.
-    parte(puede("delivery-notes"), async () => {
+    // Ventas de hoy: las de Valery (pedido del usuario, 11-11-2026), con las
+    // mismas reglas que «Vendido» en Ventas (facturas y notas, menos
+    // devoluciones, sin lo que está a crédito ni lo del grupo). Quien no ve
+    // Ventas no puede leerlas (RLS): para él, las notas de entrega de Macedonia,
+    // en vez de un cero que no es cierto.
+    parte(puede("revenue") || puede("delivery-notes"), async () => {
+      const hoy = hoyCaracas();
+      if (puede("revenue") && isEmpresaId(empresa)) {
+        const r = resumirVentas(await ventasDelPeriodo(empresa, hoy, hoy), empresa);
+        return { usd: r.netoUsd, documentos: r.ventas, fuente: "valery" as const };
+      }
       const { data, error } = await sb.from("documentos").select("total_usd").eq("empresa_id", empresa)
-        .eq("tipo", "nota_entrega").eq("fecha", hoyCaracas());
+        .eq("tipo", "nota_entrega").eq("fecha", hoy);
       if (error) throw error;
-      return { usd: (data ?? []).reduce((a, d) => a + Number(d.total_usd ?? 0), 0), notas: data?.length ?? 0 };
+      return { usd: (data ?? []).reduce((a, d) => a + Number(d.total_usd ?? 0), 0), documentos: data?.length ?? 0, fuente: "macedonia" as const };
     }),
     parte(puede("receivables"), async () => {
       const c = (await listarCuentas(empresa, "cobrar")).filter((x) => x.estado !== "liquidada" && x.saldo > 0);
