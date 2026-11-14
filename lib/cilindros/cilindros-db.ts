@@ -299,9 +299,8 @@ export type ConteoRampa = {
 };
 
 /**
- * Guarda un conteo de la Rampa: cada diferencia entra al parque al momento.
- * Queda por verificar: el Owner o un Administrador lo verifica o lo rechaza en
- * el Historial (rechazarlo deshace el ajuste).
+ * Guarda un conteo de la Rampa: cada diferencia entra al parque al momento y
+ * el conteo queda verificado, sin que nadie autorice (migración 46).
  * Lo pueden guardar Owner, Administrador y Técnico (registrar_conteo_cilindros).
  */
 export async function contarRampa(

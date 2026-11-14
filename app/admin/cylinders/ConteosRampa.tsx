@@ -1,9 +1,9 @@
 "use client";
 
-// Conteos de la Rampa, en el Historial: el Técnico cuenta y la Rampa cambia al
-// momento; el Owner o un Administrador lo verifica o lo rechaza. Rechazar
-// deshace el ajuste. La base lo vuelve a comprobar (migración 31): esconder
-// los botones es comodidad, no seguridad.
+// Conteos de la Rampa, en el Historial: quien cuenta guarda y la Rampa cambia
+// al momento. Desde la migración 46 (15-10-2026) el conteo queda verificado
+// solo, sin que nadie autorice. Verificar o rechazar solo aparece para un
+// conteo de antes que quedó pendiente; la base lo vuelve a comprobar.
 
 import { useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -17,7 +17,7 @@ import { conSigno, diferencias, ETIQUETA_RAMPA } from "@/lib/cilindros/rampa";
 
 const ESTADO: Record<ConteoRampa["estado"], { t: string; tone: Tone }> = {
   pendiente: { t: "Por verificar", tone: "warn" },
-  aprobado: { t: "Verificado", tone: "ok" },
+  aprobado: { t: "Ajustado", tone: "ok" },
   rechazado: { t: "Rechazado", tone: "danger" },
 };
 
@@ -39,7 +39,7 @@ export function ConteosRampa({ empresa, recarga, onCambio }: { empresa: string; 
       title="Conteos de Rampa"
       description={pendientes
         ? "Hay un conteo por verificar. La Rampa ya cambió al contarse: verifícalo o recházalo (rechazar lo deshace)."
-        : "Lo que se contó en el galpón y qué se decidió. Cada conteo ajusta la Rampa al guardarse."}
+        : "Lo que se contó en el galpón. Cada conteo ajusta la Rampa al guardarse, sin otra aprobación."}
     >
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
         {lista.map((c) => (
