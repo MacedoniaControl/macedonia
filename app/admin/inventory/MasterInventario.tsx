@@ -28,6 +28,7 @@ import { useExportable } from "@/lib/ux/exportar";
 import { fechaVista } from "@/lib/ux/tabla-export";
 import { fmtUsd } from "@/lib/ux/format";
 import { hoyISO } from "@/lib/ux/rango";
+import { InsightsInventario } from "./InsightsInventario";
 
 const cant = (n: number) => n.toLocaleString("es-VE", { maximumFractionDigits: 3 });
 const conSigno = (n: number) => (Math.abs(n) < 0.005 ? "0" : n > 0 ? `+${cant(n)}` : `−${cant(-n)}`);
@@ -172,6 +173,9 @@ export function MasterInventario({
         </div>
       </div>
       {(errorValery || falloValery) && <p className="text-sm text-danger" role="alert">{errorValery ?? `La última lectura de Valery falló: ${falloValery}`}</p>}
+
+      {/* Cómo se mueve: lo que se vende, rota, se acaba o no se mueve (pedido del usuario, 14-11-2026). */}
+      <InsightsInventario empresa={empresa} recarga={recarga} />
 
       {/* Las tres preguntas */}
       <div role="tablist" aria-label="Qué mirar del inventario" className={`grid gap-3 ${gerencia ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
