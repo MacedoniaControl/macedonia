@@ -16,7 +16,10 @@
 
 import { claveBase, type RenglonVenta, type TipoDoc } from "../inventory/ventas-valery.ts";
 
-export type TipoSolicitud = "ventas" | "cxc" | "cxp" | "existencias" | "estado" | "diagnostico" | "movimientos";
+export type TipoSolicitud =
+  | "ventas" | "cxc" | "cxp" | "existencias" | "estado" | "diagnostico" | "movimientos"
+  // Agente 1.0.8: «que el agente vea todo» (pedido del usuario, 13-11-2026).
+  | "cierre" | "rentabilidad" | "compras" | "catalogo" | "vendedores" | "clientes" | "proveedores" | "caja" | "retenciones" | "bancos";
 export type EstadoSolicitud = "pendiente" | "en_proceso" | "lista" | "error" | "aplicada" | "cancelada";
 
 export const NOMBRE_SOLICITUD: Record<TipoSolicitud, string> = {
@@ -27,6 +30,36 @@ export const NOMBRE_SOLICITUD: Record<TipoSolicitud, string> = {
   estado: "Probar conexión",
   diagnostico: "Diagnóstico",
   movimientos: "Movimientos de CxC y CxP",
+  cierre: "Cierre de mes",
+  rentabilidad: "Ventas con costo",
+  compras: "Compras",
+  catalogo: "Catálogo con costos y precios",
+  vendedores: "Vendedores",
+  clientes: "Clientes",
+  proveedores: "Proveedores",
+  caja: "Cobros y pagos",
+  retenciones: "Retenciones",
+  bancos: "Bancos",
+};
+
+/** Todos los pedidos que entiende Macedonia (y la base: migración 57). */
+export const TIPOS_SOLICITUD = Object.keys(NOMBRE_SOLICITUD) as TipoSolicitud[];
+
+/** Los que se piden con un rango de fechas. */
+export const TIPOS_CON_RANGO: readonly TipoSolicitud[] = ["ventas", "movimientos", "cierre", "rentabilidad", "compras", "caja", "retenciones", "bancos"];
+
+/**
+ * Los que traen costos de Valery. La base solo se los da a quien tiene
+ * `ver_costos` (regla 5: el costo de compra está protegido), además de ser
+ * Owner o Administrador de la empresa.
+ */
+export const TIPOS_CON_COSTO: readonly TipoSolicitud[] = ["cierre", "rentabilidad", "compras", "catalogo"];
+
+/** Desde qué versión del agente existe cada pedido. */
+export const VERSION_DE: Partial<Record<TipoSolicitud, string>> = {
+  diagnostico: "1.0.4",
+  cierre: "1.0.8", rentabilidad: "1.0.8", compras: "1.0.8", catalogo: "1.0.8", vendedores: "1.0.8",
+  clientes: "1.0.8", proveedores: "1.0.8", caja: "1.0.8", retenciones: "1.0.8", bancos: "1.0.8",
 };
 
 /** Lo que entrega el agente por cada renglón de venta (tal cual está en Valery). */
