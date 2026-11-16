@@ -51,12 +51,12 @@ export function FormularioCuenta({
    */
   anexo?: { contraparte: string; documentos: string[]; deuda: number; vendedor?: string | null };
   /** Lo que ya se sabe del documento (una nota de entrega de Valery desde Ventas): se puede corregir. */
-  inicial?: { documento: string; monto: number; emitida: string };
+  inicial?: { documento: string; monto: number; emitida: string; nota?: string };
   /** Por cobrar: los vendedores externos conocidos, para elegir de quién es la cuenta. */
   vendedores?: string[];
 }) {
   const quien = tipo === "cobrar" ? "Cliente" : "Proveedor";
-  const [f, setF] = useState({ contraparte: anexo?.contraparte ?? "", documento: inicial?.documento ?? "", emitida: inicial?.emitida ?? hoy(), vence: hoy(), nota: "" });
+  const [f, setF] = useState({ contraparte: anexo?.contraparte ?? "", documento: inicial?.documento ?? "", emitida: inicial?.emitida ?? hoy(), vence: hoy(), nota: inicial?.nota ?? "" });
   // Al anexar a un cliente lo común es una nota de entrega sin IVA; a un
   // proveedor, su factura con IVA y retención (como «Nueva cuenta»).
   const notaSinIva = !!anexo && tipo === "cobrar";

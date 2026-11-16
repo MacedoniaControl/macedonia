@@ -12,6 +12,7 @@ import type { ClaseCuenta, Revision } from "./retencion.ts";
 import { aMonto, CASI_CERO } from "../ux/decimales.ts";
 import { fmtUsd } from "../ux/format.ts";
 import { clienteNormal } from "../inventory/ventas-valery.ts";
+import { clienteRecordado, clientesParecidos } from "./cliente-parecido.ts";
 // Las constantes NO se reexportan desde aqui: este archivo es "use server" y
 // solo admite exportar funciones asincronas. Quien las necesite importa
 // directamente de ./retencion.
@@ -715,25 +716,61 @@ export async function vendedorDelCliente(empresa: string, cliente: string): Prom
 
 /**
  * El cliente de una nota de entrega de Valery en la cartera por cobrar, para
- * pasarla a Cuentas por Cobrar desde Ventas: su nombre tal como ya está en la
- * cartera (Valery lo escribe con «&amp;», con el alias entre paréntesis…), lo
- * que debe hoy y sus documentos (para no anexar dos veces el mismo número).
- * Si todavía no está en la cartera: el nombre de Valery, sin deuda.
+ * pasarla a Cuentas por Cobrar desde Ventas (lib/finanzas/cliente-parecido.ts):
+ *   · si ya se eligió antes a qué cliente va ese nombre de Valery, ese;
+ *   · si el nombre coincide (sin signos ni «C.A.»), el nombre tal como está en
+ *     la cartera (el que más se repite);
+ *   · si no, `contraparte` es null y van los parecidos para que la persona
+ *     elija (nunca se adivina). `elegido` es lo que eligió: un cliente de la
+ *     cartera, o el nombre de Valery para abrirlo nuevo.
+ * Con lo que debe hoy y sus documentos (para no anexar dos veces el mismo número).
  */
-export async function clienteEnCartera(empresa: string, cliente: string):
-  Promise<{ ok: true; contraparte: string; deuda: number; documentos: string[]; vendedor: string | null } | { ok: false; error: string }> {
+export async function clienteEnCartera(empresa: string, cliente: string, elegido?: string): Promise<
+  | {
+      ok: true; nombreValery: string; contraparte: string | null; como: "recordado" | "mismo_nombre" | "elegido" | "elegir";
+      deuda: number; documentos: string[]; vendedor: string | null;
+      parecidos: { contraparte: string; deuda: number }[]; clientes: string[];
+    }
+  | { ok: false; error: string }
+> {
   const u = await getUsuarioSesion();
   if (!u || !puedeEntrarAEmpresa(u, empresa) || !sesionPuede(u, "receivables")) return { ok: false, error: "Pasar notas a Cuentas por Cobrar lo hace quien maneja la cartera." };
   const nombre = cliente.replace(/&amp;/g, "&").trim();
-  const buscado = clienteNormal(nombre);
-  const suyas = buscado ? (await listarCuentas(empresa, "cobrar")).filter((c) => clienteNormal(c.contraparte) === buscado) : [];
-  // El nombre que más se repite en su cartera: así la nota cae en su misma fila.
-  const veces = new Map<string, number>();
-  for (const c of suyas) veces.set(c.contraparte.trim(), (veces.get(c.contraparte.trim()) ?? 0) + 1);
-  const contraparte = [...veces].sort((a, b) => b[1] - a[1])[0]?.[0] ?? nombre;
+  const cuentas = await listarCuentas(empresa, "cobrar");
+  // Un cliente = sus cuentas con el mismo nombre (sin signos ni «C.A.»); se muestra con el nombre que más se repite.
+  const grupos = new Map<string, { veces: Map<string, number>; cuentas: Cuenta[] }>();
+  for (const c of cuentas) {
+    const k = clienteNormal(c.contraparte);
+    if (!k) continue;
+    const g = grupos.get(k) ?? { veces: new Map<string, number>(), cuentas: [] as Cuenta[] };
+    g.veces.set(c.contraparte.trim(), (g.veces.get(c.contraparte.trim()) ?? 0) + 1);
+    g.cuentas.push(c);
+    grupos.set(k, g);
+  }
+  const nombreDe = (k: string) => [...grupos.get(k)!.veces].sort((a, b) => b[1] - a[1])[0][0];
+  const deudaDe = (k: string) => aMonto(grupos.get(k)!.cuentas.reduce((a, c) => a + c.saldo, 0));
+  const clientes = [...grupos.keys()].map(nombreDe).sort((a, b) => a.localeCompare(b, "es"));
+
+  const recordado = clienteRecordado(nombre, cuentas.map((c) => ({ contraparte: c.contraparte, nota: c.nota, creada: String(c.id).padStart(12, "0") })));
+  let como: "recordado" | "mismo_nombre" | "elegido" | "elegir";
+  let clave: string | null;
+  if (elegido !== undefined) { como = "elegido"; clave = clienteNormal(elegido); }
+  else if (recordado && grupos.has(clienteNormal(recordado))) { como = "recordado"; clave = clienteNormal(recordado); }
+  else if (grupos.has(clienteNormal(nombre))) { como = "mismo_nombre"; clave = clienteNormal(nombre); }
+  else { como = "elegir"; clave = null; }
+
+  const parecidos = como === "elegir"
+    ? clientesParecidos(nombre, clientes).slice(0, 5).map((p) => ({ contraparte: p.contraparte, deuda: deudaDe(clienteNormal(p.contraparte)) }))
+    : [];
+  const enCartera = clave !== null && grupos.has(clave);
+  // Elegir «cliente nuevo» es el nombre de Valery, sin deuda.
+  const contraparte = clave === null ? null : enCartera ? nombreDe(clave) : (elegido ?? nombre).trim();
   return {
-    ok: true, contraparte, deuda: aMonto(suyas.reduce((a, c) => a + c.saldo, 0)), documentos: suyas.map((c) => c.documento),
-    vendedor: await vendedorDelCliente(empresa, contraparte),
+    ok: true, nombreValery: nombre, contraparte, como,
+    deuda: enCartera ? deudaDe(clave!) : 0,
+    documentos: enCartera ? grupos.get(clave!)!.cuentas.map((c) => c.documento) : [],
+    vendedor: contraparte ? await vendedorDelCliente(empresa, contraparte) : null,
+    parecidos, clientes,
   };
 }
 
