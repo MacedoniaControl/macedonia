@@ -313,6 +313,62 @@ descuentan y el resto de la factura sí.
 - Los productos contados en los dos sistemas con resultados distintos siguen
   apareciendo como diferencia: es real, los dos conteos no coinciden.
 
+## Agente 1.0.8: el agente ve todo (2026-11-13, migración 57)
+
+Pedido del usuario: «quiero que el agente vea todo». Diez lecturas nuevas,
+probadas contra la copia de Valery de marzo de 2026:
+
+| Pedido | Qué trae | Rango |
+|---|---|---|
+| `rentabilidad` | cada renglón de venta con su costo, vendedor y comisión, en los dólares de Valery | sí |
+| `compras` | compras (RCM, FCM, DCM) y notas de crédito y débito de proveedores, con sus montos | sí |
+| `cierre` | `rentabilidad` + `compras` en un pedido, para cerrar meses del histórico | sí |
+| `catalogo` | costos, los cuatro precios y mínimos y máximos de cada producto | no |
+| `vendedores`, `clientes`, `proveedores` | las fichas (RIF, dirección, límite y días de crédito…) | no |
+| `caja` | cómo se cobró (CAJA) y cómo se pagó a proveedores (desglose de CxP) | sí |
+| `retenciones` | comprobantes de IVA e ISLR, de proveedores y de clientes | sí |
+| `bancos` | movimientos de banco y saldo de cada cuenta (solo sus 4 últimos dígitos) | sí |
+
+**Los dólares de Valery.** Cada documento tiene su equivalente en las tablas
+`*_RM` (`VENTAS_DETALLES_RM`, `V3COMPRAS_RM`, `V3CXP_RM`), las del reporte
+«Reexpresado», a la tasa que Valery tenía ese día. Hay **dos filas por
+documento**: moneda 02 (dólares) y 06 (otra referencia, montos ínfimos). Sin
+filtrar por moneda 02 el join duplica todo. El costo lo elige Valery según su
+tipo de contribuyente (`CALC_TOTAL_COSTO_TIPO_CONTRI`), igual que su reporte.
+
+**Cerrar un mes desde Valery** (`lib/valery/cierre-valery.ts`). En el panel
+del Puente, «Traer para cerrar» pide un `cierre` de los meses que le faltan al
+histórico; cuando llega, «Cerrar meses» los guarda en `historico_meses`
+(migración 45), y desde ahí cuentan en Dashboard, ROI, Reportes y Matrices.
+- Venta y costo: FAC y NET suman, DEV resta, sin IVA. Lo anulado no cuenta. Lo
+  del grupo y el consumo propio no son venta (`claseVenta`).
+- La parte de una FAC que factura una nota de entrega ya se contó con la nota:
+  Valery dice cuánto de cada renglón viene de una nota
+  (`VENTAS_DETALLES_REL_CANT`) y se descuenta.
+- Compras por fecha de registro, como el resumen mensual de Valery. La
+  recepción que ya tiene su factura cuenta una vez. DCM y NCR restan.
+- Probado con enero y febrero de 2026 contra el histórico de Excel. Enero da
+  casi lo mismo (venta −0,8 %, utilidad +0,4 %). Febrero no: ese mes se
+  facturaron notas de junio, julio y diciembre de 2025, y el script de Excel,
+  que adivinaba la nota de una factura buscando hasta 60 días atrás, las contó
+  dos veces. Las compras de enero y febrero juntas dan lo mismo (±1 %), pero
+  repartidas distinto entre los dos meses (fecha de registro contra la del
+  libro).
+
+**Costos protegidos (regla 5).** `cierre`, `rentabilidad`, `compras` y
+`catalogo` traen costos: la base solo deja pedirlos y verlos a quien, además
+de Owner o Administrador de la empresa, tiene `ver_costos`
+(`valery_tipo_con_costo`, migración 57). Probado con una base de prueba,
+también rota a propósito.
+
+**Lo que Valery no tiene (marzo de 2026).** Los mínimos y máximos están en cero
+en todos los productos, los movimientos de banco están vacíos y el desglose de
+pago de CxC también (los cobros están en CAJA). El agente los lee igual: si
+empiezan a cargarse en Valery, aparecen.
+
+**Sudematin** no tiene agente: hay que instalarlo en su servidor de Valery
+desde el panel del Puente de Sudematin.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.

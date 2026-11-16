@@ -6,11 +6,14 @@
 //   · instala el agente en el servidor de Valery (genera un instalador con la
 //     clave de esta empresa) y ve si está conectado;
 //   · le pide datos: ventas de un rango, CxC, CxP, existencias o una prueba;
+//     desde el agente 1.0.8, todo lo demás: ventas con costo, compras,
+//     catálogo, fichas, cobros y pagos, retenciones, bancos, y el cierre de
+//     meses del histórico;
 //   · ve lo que trajo, lo descarga y, en las ventas, lo aplica al kardex con el
 //     mismo importador que los Excel.
 // El agente nunca escribe en Valery: lee una copia de su base.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatusBadge, type Tone } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/Button";
@@ -21,10 +24,28 @@ import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { useCarga } from "@/lib/ux/use-carga";
 import { fechaVista, type Celda, type Columna } from "@/lib/ux/tabla-export";
 import {
-  agentePuente, aplicarVentasPuente, cancelarPedidoPuente, crearAgentePuente, pedirAlPuente, resultadoPuente,
+  agentePuente, aplicarVentasPuente, cancelarPedidoPuente, cerrarMesesDesdeValery, crearAgentePuente, pedirAlPuente, resultadoPuente,
   revocarAgentePuente, solicitudesPuente, type AgentePuente, type SolicitudPuente,
 } from "@/lib/valery/puente-db";
-import { conectado, haceCuanto, NOMBRE_SOLICITUD, versionAlMenos, type EstadoSolicitud, type TipoSolicitud } from "@/lib/valery/puente";
+import {
+  conectado, haceCuanto, NOMBRE_SOLICITUD, TIPOS_CON_COSTO, TIPOS_CON_RANGO, VERSION_DE, versionAlMenos,
+  type EstadoSolicitud, type TipoSolicitud,
+} from "@/lib/valery/puente";
+import { useSesion } from "@/components/auth/SesionProvider";
+import { puedeVer } from "@/lib/auth/permisos";
+import { HISTORY } from "@/lib/ux/history-data";
+import { mesesPorCerrar } from "@/lib/ux/historico-meses";
+import { isEmpresaId } from "@/lib/ux/empresas";
+import { useTableView } from "@/lib/ux/use-table-view";
+import { SortableTh } from "@/components/ui/SortableTh";
+import { TablePager } from "@/components/ui/TablePager";
+
+// Lo que se pide con el rango de fechas y lo que se pide entero.
+const CON_RANGO: TipoSolicitud[] = ["rentabilidad", "compras", "caja", "retenciones", "bancos"];
+const SIN_RANGO: TipoSolicitud[] = ["cxc", "cxp", "existencias", "catalogo", "clientes", "proveedores", "vendedores"];
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const mesNombre = (ym: string) => `${MESES[Number(ym.slice(5, 7)) - 1]} de ${ym.slice(0, 4)}`;
+const finDeMes = (ym: string) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).toISOString().slice(0, 10);
 
 const hoy = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
 const haceDias = (n: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date(Date.now() - n * 86400000));
@@ -72,10 +93,17 @@ export function PuenteValery({ empresa }: { empresa: string }) {
   const vivo = conectado(a?.ultimoContacto ?? null);
   const info = (a?.info ?? {}) as Record<string, string | number | undefined>;
   const baseVieja = !!info.ultimaVenta && String(info.ultimaVenta) < haceDias(30);
+  const sesion = useSesion();
+  // Las lecturas con costos solo para quien tiene «Ver costos» (regla 5; la base lo exige igual: migración 57).
+  const veCostos = !!sesion && puedeVer(sesion.permisos, sesion.rol, "ver_costos");
+  const agenteNuevo = versionAlMenos(a?.version, "1.0.8");
+  const noSe = (t: TipoSolicitud) => !a || !!yendo || !versionAlMenos(a?.version, VERSION_DE[t] ?? "0") || (TIPOS_CON_COSTO.includes(t) && !veCostos);
+  // Los meses que faltan en el histórico de Valery (terminados y sin cerrar desde Valery).
+  const porCerrar = isEmpresaId(empresa) ? mesesPorCerrar(HISTORY[empresa].meta.hasta, hoy()) : [];
 
-  async function pedir(tipo: TipoSolicitud) {
+  async function pedir(tipo: TipoSolicitud, rango?: { desde: string; hasta: string }) {
     setMsg(null); setYendo(tipo);
-    const r = await pedirAlPuente(empresa, tipo, tipo === "ventas" ? { desde, hasta } : {});
+    const r = await pedirAlPuente(empresa, tipo, TIPOS_CON_RANGO.includes(tipo) ? (rango ?? { desde, hasta }) : {});
     setYendo(null);
     if (!r.ok) return setMsg({ ok: false, t: r.error });
     setMsg({ ok: true, t: `Pedido ${r.id} enviado. ${vivo ? "El agente lo toma en segundos." : "El agente no está conectado: lo tomará cuando se conecte."}` });
@@ -88,6 +116,16 @@ export function PuenteValery({ empresa }: { empresa: string }) {
     setYendo(null);
     if (!r.ok) return setMsg({ ok: false, t: r.error });
     setMsg({ ok: true, t: `Ventas aplicadas al kardex: ${r.nuevos} renglón(es) nuevos, ${r.repetidos} ya estaban (por Excel o por el puente)${r.facturasDeNotas ? `, ${r.facturasDeNotas} facturas de notas ya descontadas` : ""}.` });
+    setRecarga((n) => n + 1);
+  }
+
+  async function cerrar(p: SolicitudPuente) {
+    setMsg(null); setYendo(`cerrar-${p.id}`);
+    const r = await cerrarMesesDesdeValery(p.id);
+    setYendo(null);
+    if (!r.ok) return setMsg({ ok: false, t: r.error });
+    if (!r.cerrados.length) return setMsg({ ok: false, t: r.fuera.length ? `No hay meses por cerrar en ese pedido: ${r.fuera.map(mesNombre).join(", ")} ya están en el histórico de Valery.` : "Ese pedido no cubre ningún mes entero." });
+    setMsg({ ok: true, t: `Cerrado: ${r.cerrados.map((m) => `${mesNombre(m.ym)} (ventas ${num(m.venta)} US$, utilidad ${num(m.venta - m.costo)} US$)`).join(" · ")}. Ya cuentan en el Dashboard, ROI, Reportes y Matrices.` });
     setRecarga((n) => n + 1);
   }
 
@@ -132,24 +170,47 @@ export function PuenteValery({ empresa }: { empresa: string }) {
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-text">Traer de Valery</h3>
           <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border p-3">
-            <label className="block"><span className="mb-1 block text-xs font-medium text-muted">Ventas desde</span>
+            <label className="block"><span className="mb-1 block text-xs font-medium text-muted">Desde</span>
               <input type="date" className="sumi-campo w-auto" value={desde} max={hasta} onChange={(e) => setDesde(e.target.value)} /></label>
             <label className="block"><span className="mb-1 block text-xs font-medium text-muted">hasta</span>
               <input type="date" className="sumi-campo w-auto" value={hasta} min={desde} max={hoy()} onChange={(e) => setHasta(e.target.value)} /></label>
             <Button icon="sales" disabled={!a || !!yendo} cargando={yendo === "ventas"} textoCargando="Pidiendo…" onClick={() => pedir("ventas")}>Traer ventas</Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(["cxc", "cxp", "existencias", "estado"] as const).map((t) => (
-              <Button key={t} variant="secondary" disabled={!a || !!yendo} cargando={yendo === t} textoCargando="Pidiendo…" onClick={() => pedir(t)}>
-                {t === "estado" ? "Probar conexión" : `Traer ${NOMBRE_SOLICITUD[t].toLowerCase()}`}
+            {CON_RANGO.map((t) => (
+              <Button key={t} variant="secondary" disabled={noSe(t)} cargando={yendo === t} textoCargando="Pidiendo…" onClick={() => pedir(t)}>
+                {NOMBRE_SOLICITUD[t]}
               </Button>
             ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {SIN_RANGO.map((t) => (
+              <Button key={t} variant="secondary" disabled={noSe(t)} cargando={yendo === t} textoCargando="Pidiendo…" onClick={() => pedir(t)}>
+                {NOMBRE_SOLICITUD[t]}
+              </Button>
+            ))}
+            <Button variant="secondary" disabled={!a || !!yendo} cargando={yendo === "estado"} textoCargando="Pidiendo…" onClick={() => pedir("estado")}>
+              Probar conexión
+            </Button>
             {/* Conteos por tabla, tipo y estado (ningún nombre ni monto): para saber dónde guarda Valery cada cosa. */}
             <Button variant="secondary" disabled={!a || !!yendo || !versionAlMenos(a?.version, "1.0.4")} cargando={yendo === "diagnostico"} textoCargando="Pidiendo…" onClick={() => pedir("diagnostico")}>
               Diagnóstico
             </Button>
           </div>
-          {a && !versionAlMenos(a.version, "1.0.4") && <p className="text-xs text-muted">El diagnóstico necesita el agente 1.0.4 o más nuevo: reinstálalo.</p>}
+          {a && !agenteNuevo && <p className="text-xs text-muted">Ventas con costo, compras, catálogo, fichas, cobros y pagos, retenciones y bancos necesitan el agente 1.0.8 (este es el {a.version ?? "?"}): reinstálalo desde «Reinstalar».</p>}
+          {a && agenteNuevo && !veCostos && <p className="text-xs text-muted">Ventas con costo, compras y catálogo traen costos: las pide quien tiene el permiso «Ver costos».</p>}
+
+          {/* Cerrar los meses que le faltan al histórico (la «Utilidad del período» del Dashboard). */}
+          {porCerrar.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3">
+              <p className="max-w-[65ch] text-sm text-text">
+                Al histórico le falta{porCerrar.length > 1 ? "n" : ""} <b>{porCerrar.map(mesNombre).join(" y ")}</b>.
+                <span className="text-muted"> Trae de Valery las ventas con su costo y las compras de {porCerrar.length > 1 ? "esos meses" : "ese mes"}; cuando llegue, ciérralos desde «Pedidos».</span>
+              </p>
+              <Button icon="check" disabled={noSe("cierre")} cargando={yendo === "cierre"} textoCargando="Pidiendo…"
+                onClick={() => pedir("cierre", { desde: `${porCerrar[0]}-01`, hasta: finDeMes(porCerrar[porCerrar.length - 1]) })}>
+                Traer para cerrar
+              </Button>
+            </div>
+          )}
           {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-xl px-3 py-2 text-sm ${msg.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>{msg.t}</p>}
         </div>
 
@@ -164,7 +225,7 @@ export function PuenteValery({ empresa }: { empresa: string }) {
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
               {estado.pedidos.map((p) => {
                 const e = ESTADO[p.estado];
-                const rango = p.tipo === "ventas" ? ` · ${fechaVista(String(p.parametros.desde ?? ""))} a ${fechaVista(String(p.parametros.hasta ?? ""))}` : "";
+                const rango = TIPOS_CON_RANGO.includes(p.tipo) && p.parametros.desde ? ` · ${fechaVista(String(p.parametros.desde ?? ""))} a ${fechaVista(String(p.parametros.hasta ?? ""))}` : "";
                 const filas = typeof p.resumen?.filas === "number" ? p.resumen.filas : null;
                 return (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
@@ -185,6 +246,12 @@ export function PuenteValery({ empresa }: { empresa: string }) {
                           onConfirm={() => aplicar(p)}
                           trigger={(abrir) => <Button icon="check" cargando={yendo === `aplicar-${p.id}`} textoCargando="Aplicando…" disabled={!!yendo} onClick={abrir}>Aplicar al kardex</Button>} />
                       )}
+                      {p.tipo === "cierre" && (p.estado === "lista" || p.estado === "aplicada") && (
+                        <ConfirmDialog title="¿Cerrar estos meses con lo que dice Valery?" confirmLabel="Sí, cerrar" cancelLabel="No"
+                          message="Cada mes entero del pedido entra al histórico con sus ventas, su costo y sus compras, en los dólares de Valery. Lo que una factura cobra de una nota de entrega se cuenta una vez, con la nota. Un mes ya cerrado se corrige con esto."
+                          onConfirm={() => cerrar(p)}
+                          trigger={(abrir) => <Button icon="check" cargando={yendo === `cerrar-${p.id}`} textoCargando="Cerrando…" disabled={!!yendo} onClick={abrir}>{p.estado === "aplicada" ? "Cerrar otra vez" : "Cerrar meses"}</Button>} />
+                      )}
                       {p.estado === "pendiente" && (
                         <Button variant="ghost" onClick={async () => { const r = await cancelarPedidoPuente(p.id); if (!r.ok) setMsg({ ok: false, t: r.error ?? "No se pudo." }); setRecarga((n) => n + 1); }}>Cancelar</Button>
                       )}
@@ -194,7 +261,7 @@ export function PuenteValery({ empresa }: { empresa: string }) {
               })}
             </ul>
           )}
-          <p className="mt-2 text-xs text-muted">Los montos vienen como los guarda Valery, en bolívares. CxC, CxP y existencias se ven y se descargan; todavía no se escriben en Macedonia.</p>
+          <p className="mt-2 text-xs text-muted">Los montos vienen como los guarda Valery: en bolívares, salvo las columnas en US$, que son los dólares de Valery (su reporte «Reexpresado»). Lo leído se ve y se descarga; en Macedonia se escriben las ventas (al kardex) y los meses que se cierran.</p>
         </div>
       </div>
 
@@ -328,28 +395,118 @@ const COLUMNAS: Record<Exclude<TipoSolicitud, "estado">, { titulo: string; campo
     { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "nombre" }, { titulo: "Depto.", campo: "departamento" },
     { titulo: "Depósito", campo: "deposito" }, { titulo: "Existencia", campo: "existencia", tipo: "num" }, { titulo: "Comprometida", campo: "comprometida", tipo: "num" },
   ],
+  // Agente 1.0.8.
+  cierre: [
+    { titulo: "Origen", campo: "origen" }, { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Tipo", campo: "tipo" },
+    { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Cliente / proveedor", campo: "cliente_o_proveedor" },
+    { titulo: "Neto US$", campo: "neto_usd", tipo: "num" }, { titulo: "Costo US$", campo: "costo_usd", tipo: "num" },
+    { titulo: "De notas", campo: "de_notas", tipo: "num" }, { titulo: "Anulado", campo: "anulado" }, { titulo: "Facturada", campo: "facturada" },
+  ],
+  rentabilidad: [
+    { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Tipo", campo: "tipo" }, { titulo: "Documento", campo: "documento", tipo: "codigo" },
+    { titulo: "Cliente", campo: "cliente" }, { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "producto" },
+    { titulo: "Cantidad", campo: "cantidad", tipo: "num" }, { titulo: "Neto US$", campo: "neto_usd", tipo: "num" }, { titulo: "Costo US$", campo: "costo_usd", tipo: "num" },
+    { titulo: "Vendedor", campo: "vendedor", tipo: "codigo" }, { titulo: "Comisión US$", campo: "comision_usd", tipo: "num" },
+    { titulo: "De notas", campo: "de_notas", tipo: "num" }, { titulo: "Anulado", campo: "anulado" },
+  ],
+  compras: [
+    { titulo: "Registro", campo: "fecha", tipo: "fecha" }, { titulo: "Emisión", campo: "emision", tipo: "fecha" }, { titulo: "Tipo", campo: "tipo" },
+    { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Proveedor", campo: "proveedor" }, { titulo: "RIF", campo: "rif", tipo: "codigo" },
+    { titulo: "Neto US$", campo: "neto_usd", tipo: "num" }, { titulo: "IVA US$", campo: "iva_usd", tipo: "num" }, { titulo: "Neto Bs", campo: "neto_bs", tipo: "num" },
+    { titulo: "Ya facturada", campo: "facturada" },
+  ],
+  catalogo: [
+    { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Producto", campo: "nombre" }, { titulo: "Depto.", campo: "departamento" },
+    { titulo: "Costo", campo: "costo", tipo: "num" }, { titulo: "Costo promedio", campo: "costo_promedio", tipo: "num" },
+    { titulo: "Precio máximo", campo: "precio_maximo", tipo: "num" }, { titulo: "Precio oferta", campo: "precio_oferta", tipo: "num" },
+    { titulo: "Precio mayor", campo: "precio_mayor", tipo: "num" }, { titulo: "Precio mínimo", campo: "precio_minimo", tipo: "num" },
+    { titulo: "Exist. mínima", campo: "existencia_minima", tipo: "num" }, { titulo: "Exist. máxima", campo: "existencia_maxima", tipo: "num" },
+    { titulo: "Estatus", campo: "estatus" },
+  ],
+  vendedores: [
+    { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Nombre", campo: "nombre" }, { titulo: "Estatus", campo: "estatus" },
+    { titulo: "% venta", campo: "comision_venta", tipo: "num" }, { titulo: "% cobro", campo: "comision_cobro", tipo: "num" },
+    { titulo: "% utilidad", campo: "comision_utilidad", tipo: "num" }, { titulo: "Teléfonos", campo: "telefonos" }, { titulo: "Correo", campo: "correo" },
+  ],
+  clientes: [
+    { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Nombre", campo: "nombre" }, { titulo: "RIF", campo: "rif", tipo: "codigo" },
+    { titulo: "Límite de crédito", campo: "limite_credito", tipo: "num" }, { titulo: "Días de crédito", campo: "dias_credito", tipo: "num" },
+    { titulo: "Vendedor", campo: "vendedor", tipo: "codigo" }, { titulo: "Teléfonos", campo: "telefonos" }, { titulo: "Correo", campo: "correo" },
+    { titulo: "Dirección", campo: "direccion" }, { titulo: "Estatus", campo: "estatus" },
+  ],
+  proveedores: [
+    { titulo: "Código", campo: "codigo", tipo: "codigo" }, { titulo: "Nombre", campo: "nombre" }, { titulo: "RIF", campo: "rif", tipo: "codigo" },
+    { titulo: "Días de crédito", campo: "dias_credito", tipo: "num" }, { titulo: "Límite de crédito", campo: "limite_credito", tipo: "num" },
+    { titulo: "Teléfonos", campo: "telefonos" }, { titulo: "Correo", campo: "correo" }, { titulo: "Dirección", campo: "direccion" }, { titulo: "Estatus", campo: "estatus" },
+  ],
+  caja: [
+    { titulo: "Origen", campo: "origen" }, { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Tipo", campo: "tipo" },
+    { titulo: "Documento", campo: "documento", tipo: "codigo" }, { titulo: "Contraparte", campo: "contraparte_o_proveedor" },
+    { titulo: "Forma de pago", campo: "forma_o_desglose" }, { titulo: "Moneda", campo: "moneda", tipo: "codigo" },
+    { titulo: "Monto", campo: "monto_o_total", tipo: "num" }, { titulo: "Tasa", campo: "factor", tipo: "num" },
+  ],
+  retenciones: [
+    { titulo: "Lado", campo: "lado" }, { titulo: "Impuesto", campo: "impuesto" }, { titulo: "Fecha", campo: "fecha", tipo: "fecha" },
+    { titulo: "Comprobante", campo: "documento", tipo: "codigo" }, { titulo: "Contraparte", campo: "contraparte" }, { titulo: "RIF", campo: "rif", tipo: "codigo" },
+    { titulo: "Documento", campo: "documento_origen", tipo: "codigo" }, { titulo: "Base Bs", campo: "base", tipo: "num" },
+    { titulo: "Impuesto Bs", campo: "impuesto_monto", tipo: "num" }, { titulo: "Retenido Bs", campo: "retencion", tipo: "num" },
+  ],
+  bancos: [
+    { titulo: "Clase", campo: "clase" }, { titulo: "Fecha", campo: "fecha", tipo: "fecha" }, { titulo: "Tipo", campo: "tipo" },
+    { titulo: "Número", campo: "numero", tipo: "codigo" }, { titulo: "Cuenta (últimos 4)", campo: "cuenta", tipo: "codigo" }, { titulo: "Banco", campo: "banco" },
+    { titulo: "Descripción", campo: "descripcion" }, { titulo: "Débito Bs", campo: "debito", tipo: "num" }, { titulo: "Crédito Bs", campo: "credito", tipo: "num" },
+    { titulo: "Saldo Bs", campo: "saldo", tipo: "num" },
+  ],
 };
 
-const VISIBLES = 300;
+/**
+ * Algunas lecturas juntan dos clases de filas (ventas y compras en el cierre;
+ * cobros y pagos en caja): se les arma una columna común para verlas en una
+ * sola tabla.
+ */
+function unificar(tipo: TipoSolicitud, f: Record<string, unknown>): Record<string, unknown> {
+  if (tipo === "cierre") return { ...f, cliente_o_proveedor: f.cliente ?? f.proveedor ?? null };
+  if (tipo === "caja") {
+    if (f.origen === "pago") {
+      const partes = (["efectivo", "transferencia", "cheque", "deposito", "divisas", "pagomovil", "tarjeta", "compensado"] as const)
+        .filter((k) => typeof f[k] === "number" && (f[k] as number) !== 0);
+      return { ...f, contraparte_o_proveedor: f.proveedor ?? null, forma_o_desglose: partes.join(", ") || null, monto_o_total: f.total ?? null };
+    }
+    return { ...f, contraparte_o_proveedor: f.contraparte ?? f.contraparte_codigo ?? null, forma_o_desglose: f.forma ?? null, monto_o_total: f.monto ?? null };
+  }
+  return f;
+}
 
 function VerResultado({ empresa, pedido, onCerrar }: { empresa: string; pedido: SolicitudPuente; onCerrar: () => void }) {
   const r = useCarga(`puente-resultado:${pedido.id}`, () => resultadoPuente(pedido.id));
-  const datos = r.datos && r.datos.ok ? r.datos.filas : [];
+  const crudos = r.datos && r.datos.ok ? r.datos.filas : null;
+  const datos = useMemo(() => (crudos ?? []).map((f) => unificar(pedido.tipo, f)), [crudos, pedido.tipo]);
   const cols = pedido.tipo === "estado" ? null : COLUMNAS[pedido.tipo];
+  // Orden y páginas: nunca un subconjunto sin forma de llegar al resto.
+  const accesos = useMemo(() => Object.fromEntries((cols ?? []).map((c) => [c.campo, (f: Record<string, unknown>) => {
+    const v = f[c.campo];
+    return typeof v === "number" ? v : v === null || v === undefined ? "" : String(v);
+  }])), [cols]);
+  const t = useTableView(datos, accesos, 50);
 
   const suma = (campo: string) => datos.reduce((acc, f) => acc + (typeof f[campo] === "number" ? (f[campo] as number) : 0), 0);
   const resumen = pedido.tipo === "ventas" ? `${new Set(datos.map((f) => `${f.tipo}|${f.documento}`)).size} documentos · neto Bs ${num(suma("neto"))}`
     : pedido.tipo === "cxc" ? `${new Set(datos.map((f) => f.cliente_codigo)).size} clientes · saldo Bs ${num(suma("saldo"))}`
     : pedido.tipo === "cxp" ? `${new Set(datos.map((f) => f.proveedor_codigo)).size} proveedores · saldo Bs ${num(suma("saldo"))}`
-    : pedido.tipo === "existencias" ? `${datos.filter((f) => typeof f.existencia === "number" && (f.existencia as number) < 0).length} en negativo` : "";
+    : pedido.tipo === "existencias" ? `${datos.filter((f) => typeof f.existencia === "number" && (f.existencia as number) < 0).length} en negativo`
+    : pedido.tipo === "rentabilidad" ? `neto ${num(suma("neto_usd"))} US$ · costo ${num(suma("costo_usd"))} US$ (sin restar devoluciones ni notas facturadas)`
+    : pedido.tipo === "compras" ? `${new Set(datos.map((f) => f.proveedor_codigo)).size} proveedores · neto ${num(suma("neto_usd"))} US$`
+    : pedido.tipo === "cierre" ? `${datos.filter((f) => f.origen === "venta").length} renglones de venta · ${datos.filter((f) => f.origen === "compra").length} compras`
+    : pedido.tipo === "caja" ? `${datos.filter((f) => f.origen === "cobro").length} cobros · ${datos.filter((f) => f.origen === "pago").length} pagos`
+    : "";
 
   useExportable(() => (cols ? {
     seccion: `Valery ${NOMBRE_SOLICITUD[pedido.tipo]}`, modulo: "Puente Valery",
     titulo: `${NOMBRE_SOLICITUD[pedido.tipo]} leídas de Valery`,
     detalle: [`Pedido ${pedido.id}`, `Leído ${fechaHora(pedido.terminadoEn)}`, resumen].filter(Boolean),
     columnas: cols.map((c) => ({ titulo: c.titulo, tipo: c.tipo })),
-    filas: datos.map((f) => cols.map((c) => (f[c.campo] ?? null) as Celda)),
-    nota: "Datos leídos por el Puente Valery de una copia de la base de Valery. Montos en bolívares, como los guarda Valery.",
+    filas: t.ordenadas.map((f) => cols.map((c) => (f[c.campo] ?? null) as Celda)),
+    nota: "Datos leídos por el Puente Valery de una copia de la base de Valery. Montos en bolívares, como los guarda Valery, salvo las columnas en US$ (los dólares de Valery).",
   } : null));
 
   return (
@@ -373,10 +530,13 @@ function VerResultado({ empresa, pedido, onCerrar }: { empresa: string; pedido: 
           <div className="sumi-scroll max-h-[60vh] overflow-auto rounded-xl border border-border">
             <table className="w-full min-w-[720px] text-left text-xs">
               <thead className="sticky top-0 bg-surface-2 text-[11px] uppercase tracking-wide text-muted">
-                <tr>{cols.map((c) => <th key={c.campo} className={`px-3 py-2 font-medium ${c.tipo === "num" ? "text-right" : ""}`}>{c.titulo}</th>)}</tr>
+                <tr>{cols.map((c) => (
+                  <SortableTh key={c.campo} label={c.titulo} sortKey={c.campo} align={c.tipo === "num" ? "right" : "left"}
+                    ariaSort={t.ariaSort} onSort={t.toggleSort} compacto />
+                ))}</tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {datos.slice(0, VISIBLES).map((f, i) => (
+                {t.visible.map((f, i) => (
                   <tr key={i}>
                     {cols.map((c) => (
                       <td key={c.campo} className={`px-3 py-1.5 ${c.tipo === "num" ? "text-right tabular-nums" : ""} ${c.tipo === "codigo" ? "font-mono" : ""}`}>
@@ -389,7 +549,8 @@ function VerResultado({ empresa, pedido, onCerrar }: { empresa: string; pedido: 
               </tbody>
             </table>
           </div>
-          {datos.length > VISIBLES && <p className="text-xs text-muted">Se muestran las primeras {VISIBLES}. La descarga trae las {datos.length.toLocaleString("es-VE")}.</p>}
+          <TablePager desde={t.desde} hasta={t.hasta} total={t.total} page={t.page} pages={t.pages} size={t.size}
+            setPage={t.setPage} setSize={t.setSize} etiqueta="filas" />
         </div>
       )}
     </Modal>
