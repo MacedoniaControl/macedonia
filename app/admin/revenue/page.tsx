@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { FormularioCuenta } from "@/components/finanzas/FormularioCuenta";
 import { clienteEnCartera } from "@/lib/finanzas/cuentas-db";
+import { notaAlias } from "@/lib/finanzas/cliente-parecido";
 import { fmtUsdCentavos } from "@/lib/ux/format";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { TablePager } from "@/components/ui/TablePager";
@@ -237,27 +238,100 @@ function Ventas() {
  * pueden corregir). Desde ese momento Ventas la cuenta «a crédito».
  */
 function PasarACxc({ empresa, nota, onCerrar, onHecho }: { empresa: EmpresaId; nota: DocVenta; onCerrar: () => void; onHecho: (texto: string) => void }) {
+  // `elegido`: a qué cliente de la cartera va, cuando el nombre de Valery no coincide (o se cambia).
+  const [elegido, setElegido] = useState<string | undefined>(undefined);
+  const [cambiar, setCambiar] = useState(false);
   const [cliente, setCliente] = useState<Awaited<ReturnType<typeof clienteEnCartera>> | null>(null);
   useEffect(() => {
     let vigente = true;
-    clienteEnCartera(empresa, nota.cliente)
+    clienteEnCartera(empresa, nota.cliente, elegido)
       .then((r) => { if (vigente) setCliente(r); })
       .catch((e) => { if (vigente) setCliente({ ok: false, error: (e as Error).message }); });
     return () => { vigente = false; };
-  }, [empresa, nota.cliente]);
+  }, [empresa, nota.cliente, elegido]);
   if (!cliente) return <span className="sumi-skeleton block h-40 w-full rounded-xl" aria-busy="true" />;
   if (!cliente.ok) return <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{cliente.error}</p>;
+
+  const intro = (
+    <p className="text-sm text-muted">
+      Nota de entrega <b className="font-mono text-text">{nota.documento}</b> del {fechaVista(nota.fecha)} en Valery, por {fmtUsdCentavos(nota.totalUsd)} (sin IVA).
+      Al anexarla deja de contarse como venta hasta que se cobre o se facture.
+    </p>
+  );
+  // El nombre de Valery no está en la cartera, o se quiere cambiar: se elige a qué cliente va.
+  if (cliente.contraparte === null || cambiar) {
+    return (
+      <div className="space-y-3">
+        {intro}
+        <ElegirCliente nombreValery={cliente.nombreValery} parecidos={cliente.parecidos} clientes={cliente.clientes}
+          onElegir={(c) => { setCliente(null); setCambiar(false); setElegido(c); }} onCerrar={onCerrar} />
+      </div>
+    );
+  }
+  // Si va a un cliente con otro nombre, la cuenta lo recuerda para la próxima nota de ese cliente.
+  const alias = clienteNormalVista(cliente.contraparte) !== clienteNormalVista(cliente.nombreValery) ? notaAlias(cliente.nombreValery) : undefined;
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">
-        Nota de entrega <b className="font-mono text-text">{nota.documento}</b> del {fechaVista(nota.fecha)} en Valery, por {fmtUsdCentavos(nota.totalUsd)} (sin IVA).
-        Al anexarla deja de contarse como venta hasta que se cobre o se facture.
-      </p>
-      <FormularioCuenta tipo="cobrar" empresa={empresa}
+      {intro}
+      {cliente.como !== "mismo_nombre" && (
+        <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted">
+          En Valery: <b className="text-text">{cliente.nombreValery}</b>.{" "}
+          {cliente.como === "recordado" ? `Va a ${cliente.contraparte}, como las notas anteriores de este cliente.` : `Va a ${cliente.contraparte}.`}{" "}
+          <button type="button" className="font-medium text-brand underline-offset-4 hover:underline" onClick={() => setCambiar(true)}>Cambiar</button>
+        </p>
+      )}
+      <FormularioCuenta key={cliente.contraparte} tipo="cobrar" empresa={empresa}
         anexo={{ contraparte: cliente.contraparte, deuda: cliente.deuda, documentos: cliente.documentos, vendedor: cliente.vendedor }}
-        inicial={{ documento: nota.documento.replace(/^0+(?=\d)/, ""), monto: Math.round(nota.totalUsd * 100) / 100, emitida: nota.fecha }}
+        inicial={{ documento: nota.documento.replace(/^0+(?=\d)/, ""), monto: Math.round(nota.totalUsd * 100) / 100, emitida: nota.fecha, nota: alias }}
         onCreada={(c) => { if (c) onHecho(`${c.documento} quedó en Cuentas por Cobrar de ${cliente.contraparte} por ${fmtUsdCentavos(c.monto)}: ya no suma como venta hasta que se cobre o se facture.`); }}
         onCerrar={onCerrar} />
+    </div>
+  );
+}
+
+const clienteNormalVista = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\(.*\)$/, "").replace(/[^A-Z0-9]/g, "").replace(/(CA|SA|SRL)$/, "");
+
+/**
+ * El nombre de Valery no coincide con ningún cliente de la cartera: primero
+ * los parecidos, luego cualquiera de la lista, o abrirlo como cliente nuevo.
+ */
+function ElegirCliente({ nombreValery, parecidos, clientes, onElegir, onCerrar }: {
+  nombreValery: string; parecidos: { contraparte: string; deuda: number }[]; clientes: string[];
+  onElegir: (contraparte: string) => void; onCerrar: () => void;
+}) {
+  const [otro, setOtro] = useState("");
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text">
+        En Valery el cliente es <b>{nombreValery}</b>, y en Cuentas por Cobrar no hay uno con ese nombre. ¿A qué cliente va?
+      </p>
+      {parecidos.length > 0 && (
+        <ul className="space-y-2" aria-label="Clientes parecidos en la cartera">
+          {parecidos.map((p) => (
+            <li key={p.contraparte}>
+              <button type="button" onClick={() => onElegir(p.contraparte)}
+                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-left text-sm hover:border-border-strong hover:bg-surface-2">
+                <span className="min-w-0 font-medium text-text [overflow-wrap:anywhere]">{p.contraparte}</span>
+                <span className="shrink-0 text-xs tabular-nums text-muted">debe {fmtUsdCentavos(p.deuda)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="block min-w-0 flex-1">
+          <span className="mb-1 block text-xs font-medium text-muted">{parecidos.length ? "Otro cliente de la cartera" : "Un cliente de la cartera"}</span>
+          <select className="sumi-campo w-full" value={otro} onChange={(e) => setOtro(e.target.value)}>
+            <option value="">Elegir…</option>
+            {clientes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        <Button variant="secondary" disabled={!otro} onClick={() => onElegir(otro)}>Usar este</Button>
+      </div>
+      <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-3">
+        <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>
+        <Button variant="secondary" onClick={() => onElegir(nombreValery)}>Es un cliente nuevo</Button>
+      </div>
     </div>
   );
 }
