@@ -24,18 +24,18 @@ import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { useCarga } from "@/lib/ux/use-carga";
 import { fechaVista, type Celda, type Columna } from "@/lib/ux/tabla-export";
 import {
-  agentePuente, aplicarVentasPuente, cancelarPedidoPuente, cerrarMesesDesdeValery, crearAgentePuente, pedirAlPuente, resultadoPuente,
-  revocarAgentePuente, solicitudesPuente, type AgentePuente, type SolicitudPuente,
+  agenteEnEspera, agentePuente, aplicarVentasPuente, aprobarAgentePuente, cancelarPedidoPuente, cerrarMesesDesdeValery, crearAgentePuente,
+  pedirAlPuente, rechazarAgentePuente, resultadoPuente, revocarAgentePuente, solicitudesPuente, type AgentePuente, type SolicitudPuente,
 } from "@/lib/valery/puente-db";
 import {
-  conectado, haceCuanto, NOMBRE_SOLICITUD, TIPOS_CON_COSTO, TIPOS_CON_RANGO, VERSION_DE, versionAlMenos,
+  AGENTE_ULTIMO, conectado, haceCuanto, NOMBRE_SOLICITUD, TIPOS_CON_COSTO, TIPOS_CON_RANGO, VERSION_DE, versionAlMenos,
   type EstadoSolicitud, type TipoSolicitud,
 } from "@/lib/valery/puente";
 import { useSesion } from "@/components/auth/SesionProvider";
 import { puedeVer } from "@/lib/auth/permisos";
 import { HISTORY } from "@/lib/ux/history-data";
 import { mesesPorCerrar } from "@/lib/ux/historico-meses";
-import { isEmpresaId } from "@/lib/ux/empresas";
+import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { SortableTh } from "@/components/ui/SortableTh";
 import { TablePager } from "@/components/ui/TablePager";
@@ -65,12 +65,12 @@ export function PuenteValery({ empresa }: { empresa: string }) {
   // Se refresca solo, sin vaciar la pantalla: lo último leído queda a la vista
   // hasta que llega lo nuevo.
   const [recarga, setRecarga] = useState(0);
-  const [estado, setEstado] = useState<{ agente: AgentePuente | null; pedidos: SolicitudPuente[]; error: string | null; cargado: boolean }>(
-    { agente: null, pedidos: [], error: null, cargado: false });
+  const [estado, setEstado] = useState<{ agente: AgentePuente | null; espera: AgentePuente | null; pedidos: SolicitudPuente[]; error: string | null; cargado: boolean }>(
+    { agente: null, espera: null, pedidos: [], error: null, cargado: false });
   useEffect(() => {
     let vigente = true;
-    Promise.all([agentePuente(empresa), solicitudesPuente(empresa)])
-      .then(([ag, ps]) => { if (vigente) setEstado({ agente: ag, pedidos: ps, error: null, cargado: true }); })
+    Promise.all([agentePuente(empresa), agenteEnEspera(empresa), solicitudesPuente(empresa)])
+      .then(([ag, es, ps]) => { if (vigente) setEstado({ agente: ag, espera: es, pedidos: ps, error: null, cargado: true }); })
       .catch((e) => { if (vigente) setEstado((x) => ({ ...x, error: (e as Error).message, cargado: true })); });
     return () => { vigente = false; };
   }, [empresa, recarga]);
@@ -90,6 +90,9 @@ export function PuenteValery({ empresa }: { empresa: string }) {
   }, [enCamino]);
 
   const a = estado.agente;
+  const espera = estado.espera;
+  // Cada empresa su Puente (1.0.9): el nombre va en el título, en el instalador y en el archivo.
+  const nombre = isEmpresaId(empresa) ? EMPRESAS[empresa].nombreCorto : empresa;
   const vivo = conectado(a?.ultimoContacto ?? null);
   const info = (a?.info ?? {}) as Record<string, string | number | undefined>;
   const baseVieja = !!info.ultimaVenta && String(info.ultimaVenta) < haceDias(30);
@@ -130,10 +133,13 @@ export function PuenteValery({ empresa }: { empresa: string }) {
   }
 
   return (
-    <SectionCard title="Puente con Valery" className="lg:col-span-2"
-      description="Trae datos de Valery a Macedonia leyendo una copia de su base. Nunca escribe en Valery."
-      action={a ? <StatusBadge tone={vivo ? "ok" : "warn"}>{vivo ? "Conectado" : "Desconectado"}</StatusBadge> : <StatusBadge tone="muted">Sin instalar</StatusBadge>}>
+    <SectionCard title={`Puente con Valery — ${nombre}`} className="lg:col-span-2"
+      description={`Trae datos del Valery de ${nombre} a Macedonia leyendo una copia de su base. Nunca escribe en Valery.`}
+      action={a ? <StatusBadge tone={vivo ? "ok" : "warn"}>{vivo ? "Conectado" : "Desconectado"}</StatusBadge>
+        : espera ? <StatusBadge tone="warn">Por aprobar</StatusBadge> : <StatusBadge tone="muted">Sin instalar</StatusBadge>}>
       <div className="space-y-5">
+        {espera && <PorAprobar empresa={empresa} nombre={nombre} nuevo={espera} actual={a}
+          onListo={(t) => { setMsg(t); setRecarga((n) => n + 1); }} />}
         {/* Estado del agente */}
         {!estado.cargado ? (
           <p className="text-sm text-muted">Cargando…</p>
@@ -196,6 +202,7 @@ export function PuenteValery({ empresa }: { empresa: string }) {
             </Button>
           </div>
           {a && !agenteNuevo && <p className="text-xs text-muted">Ventas con costo, compras, catálogo, fichas, cobros y pagos, retenciones y bancos necesitan el agente 1.0.8 (este es el {a.version ?? "?"}): reinstálalo desde «Reinstalar».</p>}
+          {a && agenteNuevo && !versionAlMenos(a.version, AGENTE_ULTIMO) && <p className="text-xs text-muted">Hay un agente nuevo ({AGENTE_ULTIMO}): responde más rápido y queda separado por empresa. Para tenerlo, «Reinstalar» y ejecutar el instalador en el servidor de {nombre}.</p>}
           {a && agenteNuevo && !veCostos && <p className="text-xs text-muted">Ventas con costo, compras y catálogo traen costos: las pide quien tiene el permiso «Ver costos».</p>}
 
           {/* Cerrar los meses que le faltan al histórico (la «Utilidad del período» del Dashboard). */}
@@ -265,7 +272,7 @@ export function PuenteValery({ empresa }: { empresa: string }) {
         </div>
       </div>
 
-      {instalar && <Instalar empresa={empresa} reinstalar={!!a} onCerrar={() => { setInstalar(false); setRecarga((n) => n + 1); }} />}
+      {instalar && <Instalar empresa={empresa} nombre={nombre} equipo={a ? String(info.equipo ?? "") : ""} reinstalar={!!a} onCerrar={() => { setInstalar(false); setRecarga((n) => n + 1); }} />}
       {viendo && (
         <ProveedorExportar>
           <VerResultado empresa={empresa} pedido={viendo} onCerrar={() => setViendo(null)} />
@@ -277,7 +284,47 @@ export function PuenteValery({ empresa }: { empresa: string }) {
 
 // ---------------------------------------------------------------- instalar
 
-function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstalar: boolean; onCerrar: () => void }) {
+/**
+ * Un agente instalado con la clave de esta empresa que lee otra base que el de
+ * antes (o es el primero): espera a que una persona confirme que ese equipo es
+ * el servidor de Valery de esta empresa (lib/valery/puente-agentes.ts).
+ */
+function PorAprobar({ empresa, nombre, nuevo, actual, onListo }: {
+  empresa: string; nombre: string; nuevo: AgentePuente; actual: AgentePuente | null; onListo: (m: { ok: boolean; t: string }) => void;
+}) {
+  const i = nuevo.info as Record<string, string | number | undefined>;
+  const ai = (actual?.info ?? {}) as Record<string, string | number | undefined>;
+  return (
+    <div role="alert" className="space-y-3 rounded-xl border border-warn/35 bg-warn/10 px-4 py-3">
+      <div>
+        <p className="text-sm font-medium text-text">Un agente nuevo espera tu aprobación</p>
+        <p className="text-sm text-muted">
+          Se instaló con el instalador de {nombre}, pero {actual ? "lee otra base que el agente de ahora" : "es el primero de esta empresa"}.
+          Apruébalo solo si ese equipo es el servidor de Valery de {nombre}. Hasta entonces no recibe pedidos{actual ? " y el de ahora sigue funcionando" : ""}.
+        </p>
+      </div>
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+        <div><dt className="inline text-muted">Servidor: </dt><dd className="inline font-medium text-text">{i.equipo ?? "—"}</dd></div>
+        <div><dt className="inline text-muted">Agente: </dt><dd className="inline font-medium text-text">{nuevo.version ? `v${nuevo.version}` : "—"} · habló {haceCuanto(nuevo.ultimoContacto)}</dd></div>
+        <div className="min-w-0 sm:col-span-2"><dt className="inline text-muted">Base: </dt><dd className="inline break-all font-medium text-text">{i.base ?? "—"}{i.baseMB ? ` (${i.baseMB} MB)` : ""}</dd></div>
+        {i.ultimaVenta ? <div className="sm:col-span-2"><dt className="inline text-muted">Última venta en esa base: </dt><dd className="inline font-medium text-text">{fechaVista(String(i.ultimaVenta))}</dd></div> : null}
+        {actual ? <div className="min-w-0 sm:col-span-2"><dt className="inline text-muted">El de ahora: </dt><dd className="inline break-all font-medium text-text">{ai.equipo ?? "—"} · {ai.base ?? "—"}</dd></div> : null}
+      </dl>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <ConfirmDialog title="¿Rechazar el agente nuevo?" confirmLabel="Sí, rechazar" cancelLabel="No"
+          message={`Su clave deja de servir. ${actual ? "El agente de ahora sigue funcionando." : "Para conectar el Puente hay que instalarlo de nuevo en el servidor correcto."}`}
+          onConfirm={async () => { const r = await rechazarAgentePuente(empresa); onListo(r.ok ? { ok: true, t: "Agente nuevo rechazado." } : { ok: false, t: r.error ?? "No se pudo." }); }}
+          trigger={(abrir) => <Button variant="secondary" onClick={abrir}>Rechazar</Button>} />
+        <ConfirmDialog title={`¿Es el servidor de Valery de ${nombre}?`} confirmLabel={`Sí, es el de ${nombre}`} cancelLabel="No"
+          message={`${i.equipo ?? "Ese equipo"} pasa a ser el Puente de ${nombre}: lo que lea entra como datos de ${nombre}.${actual ? " El agente de ahora deja de servir." : ""}`}
+          onConfirm={async () => { const r = await aprobarAgentePuente(empresa); onListo(r.ok ? { ok: true, t: `Agente aprobado: ahora es el Puente de ${nombre}.` } : { ok: false, t: r.error ?? "No se pudo." }); }}
+          trigger={(abrir) => <Button icon="check" onClick={abrir}>Aprobar</Button>} />
+      </div>
+    </div>
+  );
+}
+
+function Instalar({ empresa, nombre, equipo, reinstalar, onCerrar }: { empresa: string; nombre: string; equipo: string; reinstalar: boolean; onCerrar: () => void }) {
   const [yendo, setYendo] = useState(false);
   const [listo, setListo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -296,7 +343,7 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
         + "$i=$c.IndexOf('#'+'==INSTALADOR=='); $j=$c.IndexOf('#'+'==AGENTE=='); $PuenteAgente=$c.Substring($j); Invoke-Expression $c.Substring($i, $j-$i)\"";
       const bat = [
         "@echo off",
-        "title Instalar Puente Valery (Macedonia)",
+        `title Puente con Valery - ${nombre} (Macedonia)`,
         "net session >nul 2>&1",
         "if errorlevel 1 (",
         "  echo Pidiendo permiso de administrador...",
@@ -304,7 +351,7 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
         "  exit /b",
         ")",
         "echo.",
-        "echo  Instalador del Puente Valery. Solo lee una COPIA de la base de Valery.",
+        `echo  Puente con Valery - ${nombre.toUpperCase()}. Solo lee una COPIA de la base de Valery.`,
         "echo.",
         comando,
         "echo.",
@@ -314,6 +361,7 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
         "#==INSTALADOR==",
         `$PuenteUrl = '${window.location.origin}'`,
         `$PuenteEmpresa = '${empresa}'`,
+        `$PuenteNombre = '${nombre}'`,
         `$PuenteToken = '${r.token}'`,
         crlf(ins),
         "#==AGENTE==",
@@ -321,7 +369,7 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
       ].join("\r\n");
       const url = URL.createObjectURL(new Blob([bat], { type: "application/octet-stream" }));
       const link = document.createElement("a");
-      link.href = url; link.download = `Instalar-Puente-Valery-${empresa}.bat`;
+      link.href = url; link.download = `Puente con Valery - ${nombre}.bat`;
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       setListo(true);
@@ -331,14 +379,15 @@ function Instalar({ empresa, reinstalar, onCerrar }: { empresa: string; reinstal
   }
 
   return (
-    <Modal titulo={reinstalar ? "Reinstalar el Puente" : "Instalar el Puente en el Servidor"} onCerrar={onCerrar}>
+    <Modal titulo={`${reinstalar ? "Reinstalar" : "Instalar"} el Puente de ${nombre}`} onCerrar={onCerrar}>
       <div className="space-y-4 text-sm text-text">
         {!listo ? (
           <>
             <ol className="list-decimal space-y-2 pl-5">
-              <li>Se descarga un archivo <b>.bat</b> con la clave de esta empresa.{reinstalar ? " El agente actual sigue funcionando hasta que el nuevo pase su prueba en el servidor; si la instalación falla, se queda el de antes." : ""}</li>
-              <li>Cópialo al <b>servidor donde está la base de Valery</b> (en Sumigases, SERVIDORSUD).</li>
-              <li>Clic derecho → <b>Ejecutar como administrador</b>. Baja lo que necesita de los sitios oficiales de Firebird, prueba la conexión y queda funcionando solo.</li>
+              <li>Se descarga <b>«Puente con Valery - {nombre}.bat»</b>, con la clave de {nombre}. Sirve solo para {nombre}.{reinstalar ? " El agente actual sigue funcionando hasta que el nuevo pase su prueba en el servidor; si la instalación falla, se queda el de antes." : ""}</li>
+              <li>Cópialo al <b>servidor donde está la base de Valery de {nombre}</b>{equipo ? <> (hoy: <b>{equipo}</b>)</> : null}.</li>
+              <li>Clic derecho → <b>Ejecutar como administrador</b>. Te pide confirmar que es el servidor de {nombre}; baja lo que necesita de los sitios oficiales de Firebird, prueba la conexión y queda funcionando solo.</li>
+              <li>Si es otro servidor u otra base que la de antes, aquí aparece para <b>aprobarlo</b>. Si esa base ya la lee el Puente de la otra empresa, no se instala.</li>
               <li><b>Bórralo después</b>: lleva la clave del agente.</li>
             </ol>
             <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted">El agente solo lee una copia de la base. No modifica Valery ni abre puertos del servidor.</p>

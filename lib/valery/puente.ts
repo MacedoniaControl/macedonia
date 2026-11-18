@@ -56,6 +56,9 @@ export const TIPOS_CON_RANGO: readonly TipoSolicitud[] = ["ventas", "movimientos
 export const TIPOS_CON_COSTO: readonly TipoSolicitud[] = ["cierre", "rentabilidad", "compras", "catalogo"];
 
 /** Desde qué versión del agente existe cada pedido. */
+/** La versión que bajan los instaladores de hoy (public/puente-valery/puente.ps1). */
+export const AGENTE_ULTIMO = "1.0.9";
+
 export const VERSION_DE: Partial<Record<TipoSolicitud, string>> = {
   diagnostico: "1.0.4",
   cierre: "1.0.8", rentabilidad: "1.0.8", compras: "1.0.8", catalogo: "1.0.8", vendedores: "1.0.8",
@@ -317,5 +320,5 @@ export function haceCuanto(iso: string | null, ahora = Date.now()): string {
   return `hace ${Math.round(s / 86400)} días`;
 }
 
-/** El agente se da por conectado si habló en los últimos 2 minutos (pregunta cada 15 s). */
+/** El agente se da por conectado si habló en los últimos 2 minutos (pregunta cada 2 a 15 s; si su clave ya no sirve, cada 5 min). */
 export const conectado = (iso: string | null, ahora = Date.now()) => !!iso && ahora - Date.parse(iso) < 120_000;

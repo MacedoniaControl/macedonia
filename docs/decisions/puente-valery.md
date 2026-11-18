@@ -369,6 +369,66 @@ empiezan a cargarse en Valery, aparecen.
 **Sudematin** no tiene agente: hay que instalarlo en su servidor de Valery
 desde el panel del Puente de Sudematin.
 
+## Agente 1.0.9: un Puente por empresa (2026-11-18, sin migración)
+
+**El incidente.** El instalador de Sumigases se ejecutó en el servidor de Valery
+de Sudematin. El agente pasó su prueba con la clave de Sumigases, Macedonia lo
+estrenó y en ese momento anuló el agente bueno de Sumigases. Se desconectó a mano
+antes de que entregara nada. La siguiente venta automática habría metido las
+ventas de Sudematin en Sumigases, y eso rompe la pared entre empresas (regla 3).
+
+**El RIF no sirve para identificar la base.** La tabla `EMPRESA` de la base de
+Sumigases trae el RIF de Sudematin, con la licencia «DEMOSTRACION, C.A.». Por eso
+la base se reconoce por el **equipo** y la **ruta** del archivo
+(`lib/valery/puente-agentes.ts`, `huellaBase`).
+
+**Cuándo se estrena un agente recién instalado** (`decidirEstreno`, en
+`app/api/valery/agente/route.ts`):
+
+1. **Se rechaza** (409) si su base es la que ya lee el agente activo de la otra
+   empresa. El instalador falla y no cambia nada.
+2. **Se estrena solo** si es la misma base que lee el agente activo de su
+   empresa. Es lo que pasa al reinstalar o actualizar en el mismo servidor.
+3. **Espera aprobación** en cualquier otro caso: primera instalación, otro
+   equipo u otra ruta. Mientras espera no recibe pedidos y el agente de antes
+   sigue funcionando. El panel de esa empresa muestra el equipo y la base, y el
+   Owner o un Administrador la aprueba o la rechaza (`aprobarAgentePuente`,
+   `rechazarAgentePuente`). Al aprobar se vuelve a aplicar la regla 1.
+
+Los agentes revocados no cuentan para la regla 1: uno revocado pudo ser justo
+el que se instaló en la empresa equivocada.
+
+**Separados por empresa:**
+
+- Cada empresa baja su propio archivo: «Puente con Valery - Sumigases.bat» o
+  «Puente con Valery - Sudematin.bat».
+- Cada una instala en su propia carpeta (`C:\MacedoniaPuente-<Empresa>`), con su
+  propia tarea («Macedonia Puente Valery - <Empresa>») y su propio candado.
+  Los agentes de las dos empresas pueden convivir en un mismo equipo.
+- El instalador muestra la empresa, el equipo y la base, y pide escribir «S»
+  antes de instalar.
+- Lo que dejaron las versiones anteriores (`C:\MacedoniaPuente` y la tarea
+  «Macedonia Puente Valery») se quita **solo si su clave ya no sirve**.
+  Para saberlo, el instalador usa la acción `estado` del agente, que responde
+  401 cuando la clave no sirve y no toca nada.
+
+**Más rápido:**
+
+- **Respuesta adaptable.** Macedonia le dice al agente cuándo volver a
+  preguntar (`esperar`): cada 2 s durante los 3 minutos siguientes a un pedido
+  y cada 10 s el resto del tiempo (antes, cada 15 s).
+- **Clave que no sirve.** Si la clave ya no sirve (401), el agente pregunta
+  cada 5 minutos.
+- **Una conexión por pedido.** Cada pedido abre la copia de la base una sola
+  vez, no una por consulta.
+- **Partes más grandes.** Entrega de a 2.500 filas (antes 1.000).
+- **JSON en C#.** El JSON se escribe en C# (`MacedoniaJson`), porque
+  `ConvertTo-Json` de PowerShell 5 era lo más lento con miles de filas. Al
+  arrancar, el agente lo prueba con una muestra; si no compila o la muestra no
+  sale idéntica, vuelve a `ConvertTo-Json`. La prueba del instalador dice cuál
+  usa. Está probado en PowerShell 7 (en un contenedor). En PowerShell 5.1 se
+  sabe con la prueba del instalador.
+
 ## Lo que el puente nunca hace
 
 - Escribir en Valery, ni conectarse a la base en uso.

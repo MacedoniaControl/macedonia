@@ -4,7 +4,11 @@
 #  Se ejecuta UNA vez, en el SERVIDOR donde esta la base de Valery, como
 #  administrador. Lo arma el panel de Macedonia con la direccion, la empresa y
 #  la clave del agente ya puestas (variables $PuenteUrl, $PuenteEmpresa,
-#  $PuenteToken y el texto del agente en $PuenteAgente).
+#  $PuenteNombre, $PuenteToken y el texto del agente en $PuenteAgente).
+#
+#  1.0.9: cada empresa tiene su instalador, su carpeta y su tarea. Antes de
+#  instalar pide confirmar que este equipo es el servidor de Valery de ESA
+#  empresa (el 18-11-2026 el de Sumigases se ejecuto en el de Sudematin).
 #
 #  Que hace:
 #    1. busca la base de Valery en este equipo;
@@ -21,8 +25,12 @@
 # ============================================================================
 
 $ErrorActionPreference = 'Stop'
-$Destino = 'C:\MacedoniaPuente'
-$Tarea = 'Macedonia Puente Valery'
+if (-not $PuenteNombre) { $PuenteNombre = $PuenteEmpresa }
+$Destino = 'C:\MacedoniaPuente-' + $PuenteNombre
+$Tarea = 'Macedonia Puente Valery - ' + $PuenteNombre
+# Lo que dejaban las versiones hasta la 1.0.8: una sola carpeta y una sola tarea.
+$Viejo = 'C:\MacedoniaPuente'
+$TareaVieja = 'Macedonia Puente Valery'
 $Deps = @(
   @{ nombre = 'Firebird 2.5.9 embebido (x64)'; url = 'https://github.com/FirebirdSQL/firebird/releases/download/R2_5_9/Firebird-2.5.9.27139-0_x64_embed.zip'
      sha = '082F2143CA801441A95E2E88D5A06E7E6083D13EF33FCFA8F216EBFA177C71FD'; archivo = 'fb.zip' },
@@ -35,7 +43,9 @@ function Bien([string]$t) { Write-Host ('   ' + $t) -ForegroundColor Green }
 function Mal([string]$t) { Write-Host ''; Write-Host ('ERROR: ' + $t) -ForegroundColor Red; Write-Host ''; exit 1 }
 
 Write-Host ''
-Write-Host ('Instalador del Puente Valery para {0}' -f $PuenteEmpresa) -ForegroundColor Yellow
+Write-Host '  ==========================================================' -ForegroundColor Yellow
+Write-Host ('    PUENTE CON VALERY - {0}' -f $PuenteNombre.ToUpper()) -ForegroundColor Yellow
+Write-Host '  ==========================================================' -ForegroundColor Yellow
 Write-Host 'Solo lee una COPIA de la base de Valery. No modifica Valery.'
 
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -80,6 +90,13 @@ if ($cand.Count -gt 1) {
 }
 $tam = [math]::Round((Get-Item -LiteralPath $base).Length / 1MB, 1)
 Bien ("Base: {0} ({1} MB)" -f $base, $tam)
+
+# Que nadie instale el agente de una empresa en el servidor de la otra.
+Write-Host ''
+Write-Host ('   Este instalador es SOLO para el Valery de {0}.' -f $PuenteNombre.ToUpper()) -ForegroundColor Yellow
+Write-Host ('   Equipo: {0}   Base: {1}' -f $env:COMPUTERNAME, $base) -ForegroundColor Yellow
+$si = Read-Host ('   Si este equipo es el servidor de Valery de {0}, escribe S y Enter' -f $PuenteNombre)
+if ($si.Trim().ToUpper() -ne 'S') { Mal 'Cancelado. No se instalo nada.' }
 $libre = (Get-PSDrive -Name 'C').Free
 if ($libre -lt ((Get-Item -LiteralPath $base).Length * 2.2)) { Mal ("Falta espacio en C: para la copia de trabajo (hace falta unas {0} MB libres)." -f [math]::Round($tam * 2.2)) }
 
@@ -133,14 +150,20 @@ Paso 'Preparando el agente nuevo...'
 # El marcador se arma en dos partes: si apareciera entero aqui, el .bat cortaria en este lugar.
 $agente = $PuenteAgente -replace ('^\s*#' + '==AGENTE==\s*'), ''
 [IO.File]::WriteAllText("$Nuevo\puente.ps1", $agente, (New-Object System.Text.UTF8Encoding($true)))
-$cfg = [ordered]@{ url = $PuenteUrl; empresa = $PuenteEmpresa; token = $PuenteToken; base = $base; cadaSeg = 15; reusarMin = 5 }
+$cfg = [ordered]@{ url = $PuenteUrl; empresa = $PuenteEmpresa; token = $PuenteToken; base = $base; cadaSeg = 10; reusarMin = 5 }
 [IO.File]::WriteAllText("$Nuevo\config.json", ($cfg | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
 Bien 'Agente y configuracion escritos.'
 
 Paso 'Probando el agente nuevo: copia de la base, lectura en solo lectura y conexion con Macedonia...'
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$Nuevo\puente.ps1" -Prueba
 if ($LASTEXITCODE -ne 0) { Fallo 'La prueba del agente nuevo fallo (arriba esta el motivo). No se instalo.' }
-Bien 'Prueba superada: Macedonia ya usa la clave nueva.'
+$quedo = ''
+try { $quedo = (Get-Content -LiteralPath "$Nuevo\prueba.txt" -Raw).Trim(); Remove-Item -LiteralPath "$Nuevo\prueba.txt" -Force } catch {}
+if ($quedo -eq 'aprobacion') {
+  Bien 'Prueba superada. Macedonia pide que una persona apruebe este agente (es otro servidor u otra base que la de antes).'
+} else {
+  Bien 'Prueba superada: Macedonia ya usa la clave nueva.'
+}
 
 # ---------------------------------------------------------------- 5. cambiar el viejo por el nuevo
 Paso 'Reemplazando el agente anterior por el nuevo...'
@@ -193,8 +216,44 @@ Start-Sleep -Seconds 3
 $estado = (Get-ScheduledTask -TaskName $Tarea).State
 Bien ("Tarea '{0}': {1}" -f $Tarea, $estado)
 
+# ---------------------------------------------------------------- 7. el agente de antes de la 1.0.9
+# Hasta la 1.0.8 habia una sola carpeta y una sola tarea en cada equipo. Se
+# quitan SOLO si Macedonia ya no reconoce su clave (respuesta 401): si sigue
+# sirviendo (es de la otra empresa, o el nuevo espera aprobacion) se deja.
+if (Get-ScheduledTask -TaskName $TareaVieja -ErrorAction SilentlyContinue) {
+  Paso 'Revisando el agente de una version anterior en este equipo...'
+  $muerto = $false; $deQuien = ''
+  try {
+    $cv = Get-Content -LiteralPath "$Viejo\config.json" -Raw | ConvertFrom-Json
+    $deQuien = [string]$cv.empresa
+    try {
+      [void](Invoke-RestMethod -Uri (($PuenteUrl).TrimEnd('/') + '/api/valery/agente') -Method Post -Headers @{ Authorization = ('Bearer ' + $cv.token) } `
+        -ContentType 'application/json' -Body '{"accion":"estado"}' -TimeoutSec 60)
+    } catch {
+      $codigo = 0; try { $codigo = [int]$_.Exception.Response.StatusCode } catch {}
+      if ($codigo -eq 401) { $muerto = $true }
+    }
+  } catch { Write-Host ('   No pude leer su configuracion ({0}): lo dejo como esta.' -f $_.Exception.Message) -ForegroundColor Yellow }
+  if ($muerto) {
+    Stop-ScheduledTask -TaskName $TareaVieja -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $TareaVieja -Confirm:$false -ErrorAction SilentlyContinue
+    $hasta = (Get-Date).AddSeconds(30)
+    while ((Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -like "*$Viejo\puente.ps1*" -or $_.CommandLine -like "*$Viejo\nuevo\puente.ps1*" }) -and (Get-Date) -lt $hasta) { Start-Sleep -Milliseconds 500 }
+    try { Remove-Item -LiteralPath $Viejo -Recurse -Force; Bien ("Quitado el agente anterior ({0}): su clave ya no servia." -f $deQuien) }
+    catch { Write-Host ("   Se quito su tarea, pero quedo la carpeta {0}: se puede borrar a mano." -f $Viejo) -ForegroundColor Yellow }
+  } elseif ($deQuien) {
+    Write-Host ('   En este equipo sigue el agente anterior de {0} y su clave sigue sirviendo: no se toca.' -f $deQuien) -ForegroundColor Yellow
+  }
+}
+
 Write-Host ''
-Write-Host 'LISTO. El Puente Valery quedo instalado y conectado.' -ForegroundColor Green
-Write-Host 'En Macedonia (Configuracion > Puente con Valery) ya deberia verse "Conectado".' -ForegroundColor Green
-Write-Host 'Registro del agente: C:\MacedoniaPuente\log' -ForegroundColor Green
+if ($quedo -eq 'aprobacion') {
+  Write-Host ('LISTO, FALTA UN PASO. El Puente de {0} quedo instalado y conectado, esperando aprobacion.' -f $PuenteNombre) -ForegroundColor Yellow
+  Write-Host ('En Macedonia: Configuracion de {0} > Puente con Valery > Aprobar.' -f $PuenteNombre) -ForegroundColor Yellow
+} else {
+  Write-Host ('LISTO. El Puente de {0} quedo instalado y conectado.' -f $PuenteNombre) -ForegroundColor Green
+  Write-Host ('En Macedonia (Configuracion de {0} > Puente con Valery) ya deberia verse "Conectado".' -f $PuenteNombre) -ForegroundColor Green
+}
+Write-Host ('Registro del agente: {0}\log' -f $Destino) -ForegroundColor Green
 Write-Host 'Este instalador tiene la clave del agente: borralo despues de usarlo.' -ForegroundColor Yellow
