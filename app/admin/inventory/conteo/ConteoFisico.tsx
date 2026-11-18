@@ -14,7 +14,7 @@
 // diferencia entraría dos veces al inventario.
 //
 // Owner y Administrador ven el detalle de cada conteo cerrado (sus actas, lo
-// contado contra el sistema, verificar o rechazar). El Técnico ve la lista: el
+// contado contra el sistema). El Técnico ve la lista: el
 // conteo es ciego, y lo que decía el sistema no es para quien cuenta.
 
 import { useState } from "react";
@@ -70,12 +70,7 @@ export function ConteoFisico({ empresa, gerencia, inicial, iniciarAlEntrar, onCe
   return (
     <div className="space-y-4">
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
-        <div className="min-w-0">
-          <h2 className="text-xl font-semibold text-text">Conteos</h2>
-          <p className="mt-1 max-w-[65ch] text-sm text-muted">
-            Los conteos que se hacen en Macedonia, del más reciente al más antiguo. Contar no cambia el inventario: las diferencias entran cuando el Owner o un Administrador verifican el conteo.
-          </p>
-        </div>
+        <h2 className="min-w-0 text-xl font-semibold text-text">Conteos</h2>
         <Button icon="plus" className="sumi-pulsable min-h-12 text-base" disabled={abiertos.cargando} onClick={pedirIniciar}>Iniciar Conteo</Button>
       </section>
 

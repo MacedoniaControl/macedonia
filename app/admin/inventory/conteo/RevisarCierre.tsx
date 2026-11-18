@@ -2,10 +2,12 @@
 
 // Revisar antes de cerrar.
 //
-// Cerrar NO cambia el inventario: asigna el numero, toma la existencia del
-// sistema en ese momento y archiva las actas. Por eso la revision muestra lo
-// que va a quedar en el acta, y frena si falta quien conto o si hay una
-// cantidad que no se entiende.
+// Cerrar asigna el número, toma la existencia del sistema en ese momento,
+// archiva las actas y, desde la migración 46 (15-10-2026), AJUSTA el
+// inventario: cada diferencia entra como movimiento, sin que nadie autorice.
+// Por eso la revisión lo dice antes de cerrar, muestra lo que va a quedar en
+// el acta, y frena si falta quién contó o si hay una cantidad que no se
+// entiende.
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
@@ -44,11 +46,11 @@ export function RevisarCierre({ conteoId, empresa, titulo, gerencia, fecha, cont
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ok/10 text-ok"><Icon name="check" size={24} /></div>
           <div>
             <p className="font-mono text-lg font-bold text-brand">{hecho.numero ?? "Cerrado"}</p>
-            <p className="mt-1 text-sm text-muted">{contados.length} renglón(es) de {titulo}. El inventario no cambió.</p>
+            <p className="mt-1 text-sm text-muted">{contados.length} renglón(es) de {titulo}. Las diferencias ya entraron al inventario.</p>
           </div>
           {!gerencia ? (
             <p className="rounded-xl bg-info/10 px-3 py-2 text-left text-sm text-info">
-              Quedó en el historial con sus actas. El Owner o un Administrador revisa las diferencias.
+              Quedó en el historial con sus actas, y el inventario ya quedó como lo contaste.
             </p>
           ) : hecho.actas ? (
             <div className="flex flex-wrap justify-center gap-2">
@@ -60,11 +62,6 @@ export function RevisarCierre({ conteoId, empresa, titulo, gerencia, fecha, cont
               El conteo quedó cerrado, pero las actas no se pudieron generar{hecho.errorActas ? `: ${hecho.errorActas}` : ""}. Se pueden volver a generar desde el historial.
             </p>
           ) : null}
-          {gerencia && (
-            <p className="rounded-xl bg-warn/10 px-3 py-2 text-left text-sm text-warn">
-              Las diferencias esperan la aprobación del Owner o de un Administrador, en el historial.
-            </p>
-          )}
           <Button className="w-full" onClick={onCerrado}>{gerencia ? "Ver en el historial" : "Listo"}</Button>
         </div>
       </Modal>
@@ -75,11 +72,11 @@ export function RevisarCierre({ conteoId, empresa, titulo, gerencia, fecha, cont
     <Modal titulo="Revisión del Conteo" onCerrar={onCerrar}>
       <div className="space-y-4">
         <p className="text-sm text-muted">{titulo} · {fecha.split("-").reverse().join("-")}</p>
-        {/* Lo que más tranquiliza va primero: cerrar no toca el inventario. */}
-        <p className="rounded-xl bg-info/10 px-3 py-2.5 text-sm text-info">
-          <b>Cerrar no cambia el inventario.</b> {gerencia
-            ? "El sistema de esta tabla es el de ahora; al cerrar se toma de nuevo y queda fijo en el acta. Las diferencias se ajustan después, solo si un Owner o Administrador las aprueba."
-            : "Lo contado queda en el acta con su número, y el Owner o un Administrador revisa las diferencias."}
+        {/* Lo que más importa va primero: cerrar ajusta el inventario, ya. */}
+        <p className="rounded-xl bg-warn/10 px-3 py-2.5 text-sm text-warn">
+          <b>Al cerrar, el inventario queda como lo contaste.</b> {gerencia
+            ? "El sistema de esta tabla es el de ahora; al cerrar se toma de nuevo, queda fijo en el acta y cada diferencia entra como movimiento, sin otra aprobación."
+            : "Cada diferencia entra como movimiento y queda en el acta con su número."}
         </p>
         <div className="grid gap-2 sm:grid-cols-3">
           <Cifra n={contados.length} t="quedan en el acta con su cantidad" c="text-ok" />
