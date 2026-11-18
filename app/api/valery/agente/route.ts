@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
 import { aplicarVentasAuto, programarVentasAuto } from "@/lib/valery/ventas-auto";
 import { filasDeParte } from "@/lib/valery/puente";
+import { decidirEstreno, esperaDelAgente } from "@/lib/valery/puente-agentes";
+import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 
 // La puerta del agente del Puente Valery (docs/decisions/puente-valery.md).
 //
@@ -28,6 +30,7 @@ const PERDIDO_MS = 15 * 60_000;
 const MAX_FILAS_PARTE = 5000;
 
 type Cuerpo =
+  | { accion: "estado" }
   | { accion: "siguiente"; version?: string; info?: Record<string, unknown> }
   | { accion: "resultado"; solicitud: number; parte: number; total: number; datos: unknown[]; resumen?: Record<string, unknown> }
   | { accion: "error"; solicitud: number; mensaje: string };
@@ -46,19 +49,42 @@ export async function POST(req: Request) {
   let cuerpo: Cuerpo;
   try { cuerpo = (await req.json()) as Cuerpo; } catch { return malo("El cuerpo no es JSON."); }
 
+  // 1.0.9: el instalador pregunta si la clave de un agente viejo de este equipo
+  // sigue sirviendo, para quitarlo solo si ya no sirve. No toca nada.
+  if (cuerpo.accion === "estado") {
+    return Response.json({ ok: true, empresa, enEspera: !!agente.en_espera });
+  }
+
   if (cuerpo.accion === "siguiente") {
+    const info = cuerpo.info && typeof cuerpo.info === "object" ? cuerpo.info : {};
+    const infoNueva = { ...((agente.info as Record<string, unknown>) ?? {}), ...info };
+    const version = typeof cuerpo.version === "string" ? cuerpo.version.slice(0, 40) : null;
     // Un agente recién instalado habla por primera vez al final de su prueba
-    // (ya copió y leyó la base): ahí reemplaza al anterior, no antes.
+    // (ya copió y leyó la base). Antes de reemplazar al anterior se mira QUÉ
+    // base lee (lib/valery/puente-agentes.ts): la de otra empresa se rechaza, y
+    // una que no es la del agente de antes espera a que una persona la apruebe.
     if (agente.en_espera) {
+      const { data: activos } = await admin.from("valery_agentes").select("empresa_id, info")
+        .is("revocado_en", null).eq("en_espera", false);
+      const propio = (activos ?? []).find((x) => x.empresa_id === empresa) ?? null;
+      const d = decidirEstreno(info, propio ? propio.info : null,
+        (activos ?? []).filter((x) => x.empresa_id !== empresa).map((x) => ({ empresa: x.empresa_id as string, info: x.info })));
+      if (d.decision === "rechazar") {
+        const de = isEmpresaId(d.empresa) ? EMPRESAS[d.empresa].nombreCorto : d.empresa;
+        const para = isEmpresaId(empresa) ? EMPRESAS[empresa].nombreCorto : empresa;
+        return malo(`Esta base de Valery es la que ya lee el Puente de ${de}. Este instalador es el de ${para}: no se instaló. `
+          + `Baja el instalador desde la configuración de ${de} si este es su servidor.`, 409);
+      }
+      if (d.decision === "aprobar") {
+        await admin.from("valery_agentes").update({ ultimo_contacto: new Date().toISOString(), version, info: { ...infoNueva, pideAprobacion: true } })
+          .eq("id", agente.id);
+        return Response.json({ ok: true, solicitud: null, espera: "aprobacion", esperar: 20 });
+      }
       const { error } = await admin.rpc("valery_estrenar_agente", { p_id: agente.id });
       if (error) return malo(`No se pudo activar el agente nuevo: ${error.message}`, 500);
     }
-    const info = cuerpo.info && typeof cuerpo.info === "object" ? cuerpo.info : {};
-    await admin.from("valery_agentes").update({
-      ultimo_contacto: new Date().toISOString(),
-      version: typeof cuerpo.version === "string" ? cuerpo.version.slice(0, 40) : null,
-      info: { ...((agente.info as Record<string, unknown>) ?? {}), ...info },
-    }).eq("id", agente.id);
+    delete infoNueva.pideAprobacion;
+    await admin.from("valery_agentes").update({ ultimo_contacto: new Date().toISOString(), version, info: infoNueva }).eq("id", agente.id);
 
     await admin.from("valery_solicitudes").update({
       estado: "error", terminado_en: new Date().toISOString(),
@@ -72,7 +98,13 @@ export async function POST(req: Request) {
 
     const { data: pendiente } = await admin.from("valery_solicitudes").select("id, tipo, parametros")
       .eq("empresa_id", empresa).eq("estado", "pendiente").order("id").limit(1).maybeSingle();
-    if (!pendiente) return Response.json({ ok: true, solicitud: null });
+    if (!pendiente) {
+      // 1.0.9: cuánto esperar antes de volver a preguntar (los de antes usan su propio reloj).
+      const { data: ultima } = await admin.from("valery_solicitudes").select("creado_en, terminado_en")
+        .eq("empresa_id", empresa).order("id", { ascending: false }).limit(1).maybeSingle();
+      const mov = [ultima?.creado_en, ultima?.terminado_en].filter(Boolean).sort().pop() as string | undefined;
+      return Response.json({ ok: true, solicitud: null, esperar: esperaDelAgente(mov) });
+    }
     // Se toma solo si sigue pendiente: dos agentes (o dos vueltas) no toman el mismo.
     const { data: tomada } = await admin.from("valery_solicitudes")
       .update({ estado: "en_proceso", tomado_en: new Date().toISOString() })

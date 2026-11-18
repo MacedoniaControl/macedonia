@@ -2,25 +2,35 @@
 #  Puente Valery - agente (Macedonia)
 #  Ver docs/decisions/puente-valery.md en el repositorio de Macedonia.
 #
-#  Vive en el servidor de Valery como tarea de Windows (SYSTEM). Cada 15 s le
-#  pregunta a Macedonia si hay algo pedido para su empresa. Si lo hay:
+#  Vive en el servidor de Valery como tarea de Windows (SYSTEM). Le pregunta a
+#  Macedonia si hay algo pedido para SU empresa (cada 10 s; cada 2 s justo
+#  despues de un pedido, porque suelen venir varios). Si lo hay:
 #    1. copia la base de Valery con una instantanea de Windows (VSS); si no se
 #       puede, intenta la copia directa. NUNCA abre la base en uso.
 #    2. abre la COPIA con Firebird embebido y transacciones de solo lectura.
 #    3. le entrega a Macedonia lo pedido, por partes, por HTTPS.
 #  Nunca escribe en Valery. No abre ningun puerto: solo conexiones de salida.
 #
-#  Uso: lo arranca la tarea "Macedonia Puente Valery".
+#  1.0.9: un agente por empresa, con su carpeta (C:\MacedoniaPuente-<Empresa>),
+#  su tarea ("Macedonia Puente Valery - <Empresa>") y su candado: los de las dos
+#  empresas pueden convivir en un mismo equipo sin pisarse. Macedonia no lo deja
+#  leer la base que ya lee el agente de la otra empresa, y uno que lee una base
+#  distinta a la de su agente anterior espera a que una persona lo apruebe
+#  (lib/valery/puente-agentes.ts).
+#
+#  Uso: lo arranca la tarea "Macedonia Puente Valery - <Empresa>".
 #       puente.ps1 -Prueba   -> copia, lee y prueba la conexion, y termina.
 # ============================================================================
 param([switch]$Prueba)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.8'
+$Version = '1.0.9'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Config = Get-Content -LiteralPath (Join-Path $Raiz 'config.json') -Raw | ConvertFrom-Json
 $Url = ($Config.url).TrimEnd('/') + '/api/valery/agente'
-$CadaSeg = [int]$Config.cadaSeg; if ($CadaSeg -lt 5) { $CadaSeg = 15 }
+$Empresa = [string]$Config.empresa
+# Lo normal es lo que diga Macedonia en cada respuesta («esperar»); esto, si no dice.
+$CadaSeg = [int]$Config.cadaSeg; if ($CadaSeg -lt 2) { $CadaSeg = 10 }
 $ReusarMin = [int]$Config.reusarMin; if ($ReusarMin -lt 1) { $ReusarMin = 5 }
 $Copia = Join-Path $Raiz 'copia\valery3.fdb'
 $script:InfoCopia = @{}
@@ -30,7 +40,7 @@ $script:InfoCopia = @{}
 # está en las dos («Ya se ha agregado el elemento»), y desde la 1.0.1 la copia
 # también trae `base`. Así se cayó la instalación del 2-nov-2026.
 function Info-Agente([hashtable]$extra = @{}) {
-  $i = @{ equipo = $env:COMPUTERNAME; base = [string]$Config.base }
+  $i = @{ equipo = $env:COMPUTERNAME; base = [string]$Config.base; empresa = $Empresa }
   foreach ($k in $script:InfoCopia.Keys) { $i[$k] = $script:InfoCopia[$k] }
   foreach ($k in $extra.Keys) { $i[$k] = $extra[$k] }
   return $i
@@ -48,8 +58,105 @@ function Anotar([string]$t) {
   } catch {}
 }
 
+# ---------------------------------------------------------------- JSON rapido (1.0.9)
+# ConvertTo-Json de PowerShell 5 es muy lento con miles de filas: era lo que mas
+# tardaba al entregar un catalogo o un cierre. Este escritor hace lo mismo en C#.
+# Si no compila o su prueba no sale identica, se sigue con ConvertTo-Json.
+$script:JsonRapido = $false
+try {
+  Add-Type -TypeDefinition @'
+using System;
+using System.Collections;
+using System.Globalization;
+using System.Management.Automation;
+using System.Text;
+public static class MacedoniaJson {
+  public static string Escribir(object o) { StringBuilder sb = new StringBuilder(); Valor(sb, o); return sb.ToString(); }
+  static void Texto(StringBuilder sb, string s) {
+    sb.Append('"');
+    foreach (char c in s) {
+      switch (c) {
+        case '"': sb.Append("\\\""); break;
+        case '\\': sb.Append("\\\\"); break;
+        case '\n': sb.Append("\\n"); break;
+        case '\r': sb.Append("\\r"); break;
+        case '\t': sb.Append("\\t"); break;
+        default:
+          if (c < ' ') sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+          else sb.Append(c);
+          break;
+      }
+    }
+    sb.Append('"');
+  }
+  static void Valor(StringBuilder sb, object o) {
+    PSObject ps = o as PSObject;
+    if (ps != null) o = ps.BaseObject;
+    if (o == null || o is DBNull) { sb.Append("null"); return; }
+    string s = o as string;
+    if (s != null) { Texto(sb, s); return; }
+    if (o is bool) { sb.Append((bool)o ? "true" : "false"); return; }
+    if (o is char || o is Guid || o is TimeSpan) { Texto(sb, o.ToString()); return; }
+    if (o is double || o is float) {
+      double d = Convert.ToDouble(o, CultureInfo.InvariantCulture);
+      if (double.IsNaN(d) || double.IsInfinity(d)) sb.Append("null"); else sb.Append(d.ToString("R", CultureInfo.InvariantCulture));
+      return;
+    }
+    if (o is decimal || o is int || o is long || o is short || o is byte || o is sbyte || o is uint || o is ulong || o is ushort) {
+      sb.Append(Convert.ToString(o, CultureInfo.InvariantCulture)); return;
+    }
+    if (o is DateTime) { Texto(sb, ((DateTime)o).ToString("s", CultureInfo.InvariantCulture)); return; }
+    IDictionary dic = o as IDictionary;
+    if (dic != null) {
+      sb.Append('{'); bool primero = true;
+      foreach (DictionaryEntry e in dic) {
+        if (!primero) sb.Append(','); primero = false;
+        Texto(sb, Convert.ToString(e.Key, CultureInfo.InvariantCulture)); sb.Append(':'); Valor(sb, e.Value);
+      }
+      sb.Append('}'); return;
+    }
+    IEnumerable lista = o as IEnumerable;
+    if (lista != null) {
+      sb.Append('['); bool primero = true;
+      foreach (object x in lista) { if (!primero) sb.Append(','); primero = false; Valor(sb, x); }
+      sb.Append(']'); return;
+    }
+    if (ps != null) {
+      sb.Append('{'); bool primero = true;
+      foreach (PSPropertyInfo pr in ps.Properties) {
+        if (!primero) sb.Append(','); primero = false;
+        Texto(sb, pr.Name); sb.Append(':'); Valor(sb, pr.Value);
+      }
+      sb.Append('}'); return;
+    }
+    Texto(sb, Convert.ToString(o, CultureInfo.InvariantCulture));
+  }
+}
+'@
+  $muestra = [ordered]@{ a = 'comillas " barra \ salto' + [char]10 + 'fin'; n = $null; d = [double]1.5; m = [decimal]'12.3400'; e = [long]7; v = $true
+                         l = @([ordered]@{ x = 'ñandú 6X8AT' }, 2) }
+  $vuelta = [MacedoniaJson]::Escribir($muestra) | ConvertFrom-Json
+  if ($vuelta.a -eq $muestra.a -and $null -eq $vuelta.n -and $vuelta.d -eq 1.5 -and $vuelta.m -eq 12.34 -and $vuelta.e -eq 7 -and $vuelta.v -eq $true -and
+      $vuelta.l[0].x -eq 'ñandú 6X8AT' -and $vuelta.l[1] -eq 2) { $script:JsonRapido = $true }
+} catch {}
+
+function A-Json($cuerpo) {
+  if ($script:JsonRapido) { return [MacedoniaJson]::Escribir($cuerpo) }
+  return ($cuerpo | ConvertTo-Json -Depth 8 -Compress)
+}
+
+# El codigo HTTP y el mensaje de Macedonia de una llamada que fallo (401, 409...).
+function Codigo-Http($err) { try { return [int]$err.Exception.Response.StatusCode } catch { return 0 } }
+function Mensaje-Http($err) {
+  if ($err.ErrorDetails -and $err.ErrorDetails.Message) {
+    try { $m = ($err.ErrorDetails.Message | ConvertFrom-Json).error; if ($m) { return [string]$m } } catch {}
+    return [string]$err.ErrorDetails.Message
+  }
+  return $err.Exception.Message
+}
+
 function Llamar($cuerpo) {
-  $json = $cuerpo | ConvertTo-Json -Depth 8 -Compress
+  $json = A-Json $cuerpo
   $bytes = [Text.Encoding]::UTF8.GetBytes($json)
   return Invoke-RestMethod -Uri $Url -Method Post -Headers @{ Authorization = ('Bearer ' + $Config.token) } `
     -ContentType 'application/json; charset=utf-8' -Body $bytes -TimeoutSec 120
@@ -125,10 +232,21 @@ function Copiar-Base {
 }
 
 # ---------------------------------------------------------------- leer la copia (solo lectura)
-function Consultar([string]$sql, [hashtable]$parametros = @{}) {
+function Nueva-Conexion {
   $cs = 'ServerType=1;ClientLibrary={0};Database={1};User=SYSDBA;Password=puente;Charset=WIN1252;Dialect=3;Pooling=false' -f (Join-Path $Raiz 'fb\fbembed.dll'), $Copia
-  $cn = New-Object FirebirdSql.Data.FirebirdClient.FbConnection($cs)
-  $cn.Open()
+  $c = New-Object FirebirdSql.Data.FirebirdClient.FbConnection($cs)
+  $c.Open()
+  return $c
+}
+# 1.0.9: un pedido abre la copia UNA vez para todas sus consultas (antes, una
+# por consulta). Se abre despues de copiar y se cierra antes de la proxima copia.
+$script:Cn = $null
+function Abrir-Copia { if (-not $script:Cn) { $script:Cn = Nueva-Conexion } }
+function Cerrar-Copia { if ($script:Cn) { try { $script:Cn.Close(); $script:Cn.Dispose() } catch {}; $script:Cn = $null } }
+
+function Consultar([string]$sql, [hashtable]$parametros = @{}) {
+  $propia = -not $script:Cn
+  if ($propia) { $cn = Nueva-Conexion } else { $cn = $script:Cn }
   try {
     $op = New-Object FirebirdSql.Data.FirebirdClient.FbTransactionOptions
     $op.TransactionBehavior = [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::Read -bor `
@@ -152,7 +270,7 @@ function Consultar([string]$sql, [hashtable]$parametros = @{}) {
     }
     $rd.Close(); $tx.Commit()
     return ,$filas
-  } finally { $cn.Close(); $cn.Dispose() }
+  } finally { if ($propia) { $cn.Close(); $cn.Dispose() } }
 }
 
 $SQL = @{
@@ -478,8 +596,11 @@ function Atender($s) {
   Anotar ("Pedido {0}: {1}" -f $s.id, $s.tipo)
   try {
     Copiar-Base
-    $filas = Filas-De ([string]$s.tipo) $s.parametros
-    $n = $filas.Count; $tam = 1000; $total = [math]::Max(1, [math]::Ceiling($n / $tam))
+    Abrir-Copia
+    try { $filas = Filas-De ([string]$s.tipo) $s.parametros } finally { Cerrar-Copia }
+    # 1.0.9: de a 2.500 filas (antes 1.000): menos viajes, y cada parte sigue
+    # muy por debajo del limite de Macedonia (5.000 filas) y de su tamano.
+    $n = $filas.Count; $tam = 2500; $total = [math]::Max(1, [math]::Ceiling($n / $tam))
     $resumen = Info-Agente @{ filas = $n; agente = $Version }
     if ($s.tipo -eq 'estado' -and $n -gt 0) { foreach ($k in @($filas[0].Keys)) { $resumen[$k] = $filas[0][$k] } }
     for ($p = 1; $p -le $total; $p++) {
@@ -493,7 +614,7 @@ function Atender($s) {
     }
     Anotar ("Pedido {0} entregado: {1} filas en {2} parte(s)" -f $s.id, $n, $total)
   } catch {
-    $m = $_.Exception.Message
+    $m = Mensaje-Http $_
     Anotar ("Pedido {0} con error: {1}" -f $s.id, $m)
     try { [void](Llamar @{ accion = 'error'; solicitud = $s.id; mensaje = $m }) } catch { Anotar ('No se pudo avisar el error: ' + $_.Exception.Message) }
   }
@@ -509,23 +630,41 @@ if ($Prueba) {
   if ($e.ultima_venta -and ((Get-Date) - [datetime]$e.ultima_venta).TotalDays -gt 30) {
     Write-Host ("  OJO: la ultima venta de esta base es del {0}. Si en Valery se factura a diario, esta NO es la base en uso." -f $e.ultima_venta) -ForegroundColor Yellow
   }
-  $r = Llamar @{ accion = 'siguiente'; version = $Version; info = (Info-Agente) }
+  Write-Host ('  Entrega rapida (JSON): {0}' -f $(if ($script:JsonRapido) { 'si' } else { 'no, se usa la de PowerShell' }))
+  try { $r = Llamar @{ accion = 'siguiente'; version = $Version; info = (Info-Agente) } }
+  catch { Write-Host ('  Macedonia no acepto este agente: ' + (Mensaje-Http $_)) -ForegroundColor Red; exit 1 }
   Write-Host '  Conexion con Macedonia: OK'
+  # El instalador lee esto para decir si quedo andando o si falta aprobarlo en el panel.
+  $quedo = if ($r.espera -eq 'aprobacion') { 'aprobacion' } else { 'activo' }
+  Set-Content -LiteralPath (Join-Path $Raiz 'prueba.txt') -Value $quedo -Encoding ASCII
   if ($r.solicitud) { Atender $r.solicitud }
   return
 }
 
 # ---------------------------------------------------------------- vuelta principal
-$mutex = New-Object System.Threading.Mutex($false, 'Global\MacedoniaPuenteValery')
-if (-not $mutex.WaitOne(0)) { Anotar 'Ya hay otro agente corriendo; este termina.'; return }
-Anotar ("Agente {0} iniciado en {1}" -f $Version, $env:COMPUTERNAME)
+# Un candado por empresa: el agente de la otra empresa en el mismo equipo no lo bloquea.
+$mutex = New-Object System.Threading.Mutex($false, ('Global\MacedoniaPuenteValery-' + $Empresa))
+if (-not $mutex.WaitOne(0)) { Anotar 'Ya hay otro agente de esta empresa corriendo; este termina.'; return }
+Anotar ("Agente {0} de {1} iniciado en {2} (JSON rapido: {3})" -f $Version, $Empresa, $env:COMPUTERNAME, $script:JsonRapido)
+$avisado = ''
 while ($true) {
+  $espera = $CadaSeg
   try {
-    $info = Info-Agente
-    $r = Llamar @{ accion = 'siguiente'; version = $Version; info = $info }
+    $r = Llamar @{ accion = 'siguiente'; version = $Version; info = (Info-Agente) }
     if ($r.solicitud) { Atender $r.solicitud; continue }
+    if ($r.esperar) { $espera = [int]$r.esperar }
+    if ($r.espera -eq 'aprobacion') {
+      if ($avisado -ne 'aprobacion') { Anotar 'Esperando que el Owner o un Administrador apruebe este agente en Macedonia.'; $avisado = 'aprobacion' }
+    } else { $avisado = '' }
   } catch {
-    Anotar ('Sin conexion con Macedonia: ' + $_.Exception.Message)
+    if ((Codigo-Http $_) -eq 401) {
+      # Desconectado o reemplazado desde el panel: no tiene sentido preguntar cada pocos segundos.
+      if ($avisado -ne '401') { Anotar 'Macedonia no reconoce la clave de este agente (se desconecto o se reemplazo). Pregunto cada 5 minutos.'; $avisado = '401' }
+      $espera = 300
+    } else {
+      Anotar ('Sin conexion con Macedonia: ' + (Mensaje-Http $_))
+    }
   }
-  Start-Sleep -Seconds $CadaSeg
+  if ($espera -lt 1) { $espera = 1 } elseif ($espera -gt 300) { $espera = 300 }
+  Start-Sleep -Seconds $espera
 }

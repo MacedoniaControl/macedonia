@@ -19,7 +19,8 @@ import { mesesCompletos, mesesDesdeValery, type MesValery } from "./cierre-valer
 import { mesesPorCerrar } from "@/lib/ux/historico-meses";
 import { guardarMesCargado } from "@/lib/ux/historico-meses-db";
 import { HISTORY } from "@/lib/ux/history-data";
-import { isEmpresaId } from "@/lib/ux/empresas";
+import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
+import { decidirEstreno } from "./puente-agentes.ts";
 
 const SIN_COSTOS = "Esta lectura trae costos de Valery: la ve quien tiene el permiso «Ver costos».";
 
@@ -84,6 +85,49 @@ export async function crearAgentePuente(empresa: string): Promise<{ ok: true; to
   });
   if (e2) return { ok: false, error: `No se pudo crear el agente: ${e2.message}` };
   return { ok: true, token };
+}
+
+/**
+ * El agente recién instalado que ya se conectó y espera que una persona lo
+ * apruebe (lib/valery/puente-agentes.ts: no lee la misma base que el de antes).
+ */
+export async function agenteEnEspera(empresa: string): Promise<AgentePuente | null> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("valery_agentes").select("creado_en, ultimo_contacto, version, info")
+    .eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", true).not("ultimo_contacto", "is", null).maybeSingle();
+  if (error) throw new Error(`No se pudo leer el puente: ${error.message}`);
+  if (!data) return null;
+  return { creadoEn: data.creado_en, ultimoContacto: data.ultimo_contacto, version: data.version, info: (data.info as Record<string, unknown>) ?? {} };
+}
+
+/**
+ * Aprueba el agente en espera: pasa a ser el de la empresa y el de antes deja
+ * de servir. Se vuelve a mirar que su base no sea la del agente de otra empresa.
+ */
+export async function aprobarAgentePuente(empresa: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await gerenciaDe(empresa);
+  if ("error" in g) return { ok: false, error: g.error as string };
+  const admin = createAdminClient();
+  const { data: nuevo } = await admin.from("valery_agentes").select("id, info")
+    .eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", true).not("ultimo_contacto", "is", null).maybeSingle();
+  if (!nuevo) return { ok: false, error: "No hay un agente nuevo esperando aprobación." };
+  const { data: otros } = await admin.from("valery_agentes").select("empresa_id, info")
+    .neq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", false);
+  const d = decidirEstreno(nuevo.info, null, (otros ?? []).map((x) => ({ empresa: x.empresa_id as string, info: x.info })));
+  if (d.decision === "rechazar") {
+    return { ok: false, error: `Ese agente lee la misma base que el Puente de ${isEmpresaId(d.empresa) ? EMPRESAS[d.empresa].nombreCorto : d.empresa}. No se aprobó.` };
+  }
+  const { error } = await admin.rpc("valery_estrenar_agente", { p_id: nuevo.id });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** Rechaza el agente en espera: su clave deja de servir y el de antes sigue. */
+export async function rechazarAgentePuente(empresa: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await gerenciaDe(empresa);
+  if ("error" in g) return { ok: false, error: g.error as string };
+  const { error } = await createAdminClient().from("valery_agentes").update({ revocado_en: new Date().toISOString() })
+    .eq("empresa_id", empresa).is("revocado_en", null).eq("en_espera", true);
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
 /** Desconecta el agente: su clave deja de servir en el acto. */
