@@ -19,6 +19,8 @@ export type BcvRate = {
   fetchedAt: string;
   error: string | null;
   proxima: TasaBcv["proxima"];
+  /** Hoy no fue día hábil del BCV: vale la ya publicada para el siguiente. */
+  adelantada: boolean;
 };
 
 const CADA = 5 * 60_000;
@@ -34,7 +36,7 @@ const oyentes = new Set<(v: BcvRate | null) => void>();
 const dos = (n: number) => Math.round(n * 1e4) / 1e4;
 const aRate = (t: TasaBcv | null): BcvRate | null =>
   t ? { tasa: dos(t.tasa), fecha: t.fechaValor, fetchedAt: t.actualizada, error: t.error,
-        proxima: t.proxima ? { ...t.proxima, tasa: dos(t.proxima.tasa) } : null } : null;
+        proxima: t.proxima ? { ...t.proxima, tasa: dos(t.proxima.tasa) } : null, adelantada: !!t.adelantada } : null;
 
 function publicar(v: BcvRate | null) {
   actual = v;
