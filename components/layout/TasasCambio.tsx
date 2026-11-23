@@ -56,6 +56,7 @@ export function TasasCambio() {
         accion="Consultar ahora el dólar BCV"
         detalle={bcv
           ? `Dólar BCV: ${fmtTasa(bcv.tasa)} Bs, vale el ${ddmm(bcv.fecha)}. Confirmada a las ${hora(bcv.fetchedAt)}.`
+            + (bcv.adelantada ? ` Hoy no es día hábil del BCV (no publicó tasa para hoy): se usa la ya publicada para el ${ddmm(bcv.fecha)}, como en Valery.` : "")
             + (bcv.proxima ? ` Ya publicada la del ${ddmm(bcv.proxima.fechaValor)}: ${fmtTasa(bcv.proxima.tasa)} Bs.` : "")
             + " Se actualiza sola cada 30 minutos; toca para consultar ya."
           : "Dólar BCV: todavía sin lectura. Toca para consultar."}
