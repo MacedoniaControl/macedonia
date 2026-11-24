@@ -89,7 +89,7 @@ export type TipoArchivo = "acta_pdf" | "acta_xlsx" | "valorizada_pdf" | "valoriz
 
 const ETIQUETA_EVENTO: Record<string, string> = {
   abierto: "Conteo abierto", articulo_nuevo: "Artículo nuevo agregado", cerrado: "Conteo cerrado",
-  acta_generada: "Acta generada", ajuste_aprobado: "Conteo verificado", ajuste_rechazado: "Conteo rechazado",
+  acta_generada: "Acta generada", ajuste_aprobado: "Inventario ajustado", ajuste_rechazado: "Conteo rechazado",
   alcance: "Cambió lo que se cuenta", editado: "Conteo corregido",
 };
 
