@@ -41,6 +41,8 @@ export type ReportePeriodo = {
     puntos: Punto[];
   } | null;
   valery: {
+    /** Hay un agente del Puente instalado para la empresa. */
+    instalado: boolean;
     /** El agente puede traer los movimientos (1.0.4 o más nuevo). */
     agenteListo: boolean;
     conectado: boolean;
@@ -192,6 +194,7 @@ async function valeryDe(empresa: string, desde: string, hasta: string): Promise<
     saldo(cxc.data), saldo(cxp.data),
   ]);
   return {
+    instalado: !!agente,
     agenteListo: versionAlMenos(agente?.version, "1.0.4"),
     conectado: conectado(agente?.ultimoContacto ?? null),
     enCurso: (curso.data ?? []).length > 0,

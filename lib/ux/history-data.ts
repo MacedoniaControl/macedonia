@@ -47,7 +47,7 @@ export type CompanyHistory = {
     /** Lo que la empresa se «vendió» a sí misma (consumo interno): no entra. */
     consumoPropio: number;
     /** Meses cerrados a mano en Matrices (no vienen de Valery), y quién los cargó. */
-    manuales?: { ym: string; por: string }[];
+    manuales?: { ym: string; por: string; valery?: boolean }[];
   };
   totals: {
     venta: number; costo: number; util: number; compra: number; margen: number; roi: number;
@@ -85,7 +85,13 @@ export function notaHistorico(h: CompanyHistory): string {
     ...(precio ? [`${precio} renglón(es) con el precio mal cargado no suman`] : []),
     ...(costo ? [`${costo} con el costo mal cargado suman a los totales pero no a los rankings`] : []),
     ...(h.meta.costosCorregidos?.length ? [`${h.meta.costosCorregidos.length} con un costo absurdo en Valery se recalcularon con el costo habitual del producto`] : []),
-    ...(h.meta.manuales?.length ? [`${h.meta.manuales.map((m) => mesLargo(m.ym)).join(", ")} ${h.meta.manuales.length === 1 ? "se cargó" : "se cargaron"} a mano en Matrices Administrativas (cierre de mes)`] : []),
+    ...(() => {
+      const leidos = (h.meta.manuales ?? []).filter((m) => m.valery), aMano = (h.meta.manuales ?? []).filter((m) => !m.valery);
+      return [
+        ...(leidos.length ? [`${leidos.length === 1 ? mesLargo(leidos[0].ym) : `${leidos.length} meses (${mesLargo(leidos[0].ym)} a ${mesLargo(leidos[leidos.length - 1].ym)})`} ${leidos.length === 1 ? "se leyó" : "se leyeron"} directo de la base de Valery con el Puente`] : []),
+        ...(aMano.length ? [`${aMano.map((m) => mesLargo(m.ym)).join(", ")} ${aMano.length === 1 ? "se cargó" : "se cargaron"} a mano en Matrices Administrativas (cierre de mes)`] : []),
+      ];
+    })(),
   ];
   return `${partes.map((p) => p[0].toUpperCase() + p.slice(1)).join(". ")}.`;
 }

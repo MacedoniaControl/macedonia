@@ -37,3 +37,26 @@ test("Valery manda: un mes que Valery ya trae no se reemplaza con el cargado a m
   assert.equal(conMesesCargados(h, [mes("2026-08", 1, 1)]), h);
   assert.equal(conMesesCargados(h, []), h);
 });
+
+test("lo leído de la base de Valery reemplaza al mes del Excel; lo cargado a mano no", () => {
+  const h = HISTORY.sumigases;
+  const excel = h.months.find((m) => m.ym === "2025-03")!;
+  const deValery = { ...mes("2025-03", 48215, 28961, 20922), nota: "Leído de Valery por el Puente (pedido 543): …" };
+  const n = conMesesCargados(h, [deValery]);
+  assert.equal(n.months.length, h.months.length, "reemplaza, no agrega");
+  assert.equal(n.months.find((m) => m.ym === "2025-03")!.venta, 48215);
+  assert.equal(n.totals.venta, h.totals.venta - excel.venta + 48215);
+  assert.equal(n.totals.util, h.totals.util - excel.util + (48215 - 28961));
+  const y25 = n.years.find((y) => y.year === 2025)!;
+  assert.equal(y25.venta, h.months.filter((m) => m.ym.startsWith("2025")).reduce((a, m) => a + m.venta, 0) - excel.venta + 48215);
+  assert.deepEqual(n.meta.manuales, [{ ym: "2025-03", por: "Saúl Navarro", valery: true }]);
+  // Cargado a mano sobre un mes que ya existe: no entra.
+  assert.equal(conMesesCargados(h, [mes("2025-03", 1, 1)]), h);
+});
+
+test("un mes leído de la base deja de estar incompleto", () => {
+  const h = HISTORY.sumigases;
+  assert.ok(h.meta.incompletos.some((m) => m.ym === "2026-07"));
+  const n = conMesesCargados(h, [{ ...mes("2026-07", 63710, 40868), nota: "Leído de Valery por el Puente (pedido 544)" }]);
+  assert.ok(!n.meta.incompletos.some((m) => m.ym === "2026-07"));
+});

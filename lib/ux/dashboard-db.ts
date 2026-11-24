@@ -22,7 +22,7 @@ export type ResumenOperativo = {
    * hora), igual que «Vendido» en Ventas. «macedonia»: las notas de entrega
    * emitidas en Macedonia, para quien no puede ver Ventas.
    */
-  ventasHoy: { usd: number; documentos: number; fuente: "valery" | "macedonia" } | null;
+  ventasHoy: { usd: number; documentos: number; fuente: "valery" | "macedonia" } | { usd: null; documentos: 0; fuente: "sin_puente" } | null;
   cobrar: { usd: number; documentos: number; vencido: number } | null;
   pagar: { usd: number; proveedores: number; vencido: number } | null;
   negativos: { productos: number } | null;
@@ -52,6 +52,12 @@ export async function resumenOperativo(empresa: string): Promise<ResumenOperativ
     parte(puede("revenue") || puede("delivery-notes"), async () => {
       const hoy = hoyCaracas();
       if (puede("revenue") && isEmpresaId(empresa)) {
+        // Sin ventas de Valery en los últimos 30 días, el Puente no está trayendo
+        // nada para esta empresa (Sudematin, sin agente): un «$0» diría que
+        // Valery no vendió, y eso no se sabe (regla 6).
+        const { count } = await sb.from("movimientos_inventario").select("id", { count: "exact", head: true })
+          .eq("empresa_id", empresa).eq("origen", "venta").gte("fecha", new Date(Date.parse(`${hoy}T12:00:00Z`) - 30 * 86400000).toISOString().slice(0, 10));
+        if (!count) return { usd: null, documentos: 0 as const, fuente: "sin_puente" as const };
         const r = resumirVentas(await ventasDelPeriodo(empresa, hoy, hoy), empresa);
         return { usd: r.netoUsd, documentos: r.ventas, fuente: "valery" as const };
       }

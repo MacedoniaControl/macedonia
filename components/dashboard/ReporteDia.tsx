@@ -123,7 +123,8 @@ function Reporte_({ empresa }: { empresa: string }) {
         )}
         <BotonDescargar empresa={empresa} />
       </div>
-      {v && !v.agenteListo && <p className="mb-3 text-xs text-warn">Los movimientos de CxC y CxP de Valery necesitan el agente 1.0.4: reinstálalo desde Configuración → Puente con Valery.</p>}
+      {v && !v.instalado && <p className="mb-3 text-xs text-warn">Esta empresa todavía no tiene el agente del Puente: las ventas y cuentas de Valery no llegan. Se instala desde Configuración → Puente con Valery.</p>}
+      {v && v.instalado && !v.agenteListo && <p className="mb-3 text-xs text-warn">Los movimientos de CxC y CxP de Valery necesitan el agente 1.0.4: reinstálalo desde Configuración → Puente con Valery.</p>}
       {v && v.agenteListo && !v.conectado && !v.enCurso && <p className="mb-3 text-xs text-warn">El agente del servidor no responde: lo de Valery se ve como estaba en su última lectura.</p>}
       {msg && <p className="mb-3 text-xs text-danger">{msg}</p>}
 

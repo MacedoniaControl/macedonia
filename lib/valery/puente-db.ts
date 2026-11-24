@@ -16,9 +16,8 @@ import {
   type EstadoSolicitud, type FilaVentaPuente, type TipoSolicitud,
 } from "./puente.ts";
 import { mesesCompletos, mesesDesdeValery, type MesValery } from "./cierre-valery.ts";
-import { mesesPorCerrar } from "@/lib/ux/historico-meses";
+import { MARCA_VALERY, ultimoMesCerrado } from "@/lib/ux/historico-meses";
 import { guardarMesCargado } from "@/lib/ux/historico-meses-db";
-import { HISTORY } from "@/lib/ux/history-data";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 import { decidirEstreno } from "./puente-agentes.ts";
 
@@ -273,8 +272,8 @@ export async function cancelarPedidoPuente(id: number): Promise<{ ok: boolean; e
  * Cierra meses del histórico con lo que trajo un pedido «cierre» (agente
  * 1.0.8): ventas y costo de cada renglón, y compras, en los dólares de Valery
  * (lib/valery/cierre-valery.ts). Solo los meses que el pedido cubre enteros y
- * que todavía se pueden cerrar: terminados y posteriores al último mes del
- * histórico de Valery. Un mes ya cerrado se corrige con lo nuevo.
+ * que ya terminaron. Lo leído de la base reemplaza al mes del histórico de los
+ * Excel (lib/ux/historico-meses.ts); un mes ya cerrado se corrige con lo nuevo.
  */
 export async function cerrarMesesDesdeValery(id: number): Promise<
   { ok: true; cerrados: MesValery[]; fuera: string[] } | { ok: false; error: string }
@@ -290,13 +289,15 @@ export async function cerrarMesesDesdeValery(id: number): Promise<
   if (!r.ok) return r;
   const p = (s.parametros as { desde?: string; hasta?: string }) ?? {};
   const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas" }).format(new Date());
-  const cerrables = new Set(mesesPorCerrar(HISTORY[s.empresa_id].meta.hasta, hoy));
+  // Cualquier mes ya terminado: lo leído de la base reemplaza al mes del Excel
+  // (lib/ux/historico-meses.ts). El mes en curso no se cierra.
+  const ultimo = ultimoMesCerrado(hoy);
   const enteros = mesesCompletos(p.desde ?? "", p.hasta ?? "");
   const meses = mesesDesdeValery(r.filas, s.empresa_id).filter((m) => enteros.includes(m.ym));
   const cerrados: MesValery[] = [], fuera: string[] = [];
   for (const m of meses) {
-    if (!cerrables.has(m.ym)) { fuera.push(m.ym); continue; }
-    const nota = `Leído de Valery por el Puente (pedido ${id}): ${m.renglones} renglones de venta con su costo y ${m.compras} compras, en los dólares de Valery.`
+    if (m.ym > ultimo) { fuera.push(m.ym); continue; }
+    const nota = `${MARCA_VALERY} por el Puente (pedido ${id}): ${m.renglones} renglones de venta con su costo y ${m.compras} compras, en los dólares de Valery.`
       + (m.facturasDeNotas ? ` Facturas de notas ya contadas: $${m.facturasDeNotas.toLocaleString("es-VE")}.` : "")
       + (m.sinMonto ? ` ${m.sinMonto} fila(s) sin monto en dólares no se contaron.` : "");
     const g2 = await guardarMesCargado({

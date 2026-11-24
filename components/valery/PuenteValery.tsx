@@ -33,8 +33,8 @@ import {
 } from "@/lib/valery/puente";
 import { useSesion } from "@/components/auth/SesionProvider";
 import { puedeVer } from "@/lib/auth/permisos";
-import { HISTORY } from "@/lib/ux/history-data";
-import { mesesPorCerrar } from "@/lib/ux/historico-meses";
+import { getHistory, HISTORY } from "@/lib/ux/history-data";
+import { mesesPorCerrar, ultimoMesCerrado } from "@/lib/ux/historico-meses";
 import { EMPRESAS, isEmpresaId } from "@/lib/ux/empresas";
 import { useTableView } from "@/lib/ux/use-table-view";
 import { SortableTh } from "@/components/ui/SortableTh";
@@ -102,7 +102,28 @@ export function PuenteValery({ empresa }: { empresa: string }) {
   const agenteNuevo = versionAlMenos(a?.version, "1.0.8");
   const noSe = (t: TipoSolicitud) => !a || !!yendo || !versionAlMenos(a?.version, VERSION_DE[t] ?? "0") || (TIPOS_CON_COSTO.includes(t) && !veCostos);
   // Los meses que faltan en el histórico de Valery (terminados y sin cerrar desde Valery).
-  const porCerrar = isEmpresaId(empresa) ? mesesPorCerrar(HISTORY[empresa].meta.hasta, hoy()) : [];
+  // Con los meses ya cerrados (getHistory los suma), no solo con los del Excel.
+  const porCerrar = isEmpresaId(empresa) ? mesesPorCerrar(getHistory(empresa).meta.hasta, hoy()) : [];
+
+  /**
+   * Todo el histórico, directo de la base de Valery (pedido del usuario,
+   * 24-11-2026): un pedido «cierre» por año (el agente acepta hasta 400 días),
+   * desde el primer mes del histórico hasta el último mes terminado.
+   */
+  async function pedirHistorico() {
+    if (!isEmpresaId(empresa)) return;
+    setMsg(null); setYendo("historico");
+    const desde = `${HISTORY[empresa].meta.desde}-01`, hasta = finDeMes(ultimoMesCerrado(hoy()));
+    const ids: number[] = [];
+    for (let y = Number(desde.slice(0, 4)); y <= Number(hasta.slice(0, 4)); y++) {
+      const r = await pedirAlPuente(empresa, "cierre", { desde: `${y}-01-01` < desde ? desde : `${y}-01-01`, hasta: `${y}-12-31` > hasta ? hasta : `${y}-12-31` });
+      if (!r.ok) { setYendo(null); return setMsg({ ok: false, t: r.error }); }
+      ids.push(r.id);
+    }
+    setYendo(null);
+    setMsg({ ok: true, t: `Pedidos ${ids.join(", ")} enviados, uno por año. Cuando estén listos, «Cerrar meses» en cada uno: cada mes reemplaza al del Excel con lo que dice la base de Valery.` });
+    setRecarga((n) => n + 1);
+  }
 
   async function pedir(tipo: TipoSolicitud, rango?: { desde: string; hasta: string }) {
     setMsg(null); setYendo(tipo);
@@ -127,7 +148,7 @@ export function PuenteValery({ empresa }: { empresa: string }) {
     const r = await cerrarMesesDesdeValery(p.id);
     setYendo(null);
     if (!r.ok) return setMsg({ ok: false, t: r.error });
-    if (!r.cerrados.length) return setMsg({ ok: false, t: r.fuera.length ? `No hay meses por cerrar en ese pedido: ${r.fuera.map(mesNombre).join(", ")} ya están en el histórico de Valery.` : "Ese pedido no cubre ningún mes entero." });
+    if (!r.cerrados.length) return setMsg({ ok: false, t: r.fuera.length ? `No hay meses por cerrar en ese pedido: ${r.fuera.map(mesNombre).join(", ")} todavía no termina${r.fuera.length > 1 ? "n" : ""}.` : "Ese pedido no cubre ningún mes entero." });
     setMsg({ ok: true, t: `Cerrado: ${r.cerrados.map((m) => `${mesNombre(m.ym)} (ventas ${num(m.venta)} US$, utilidad ${num(m.venta - m.costo)} US$)`).join(" · ")}. Ya cuentan en el Dashboard, ROI, Reportes y Matrices.` });
     setRecarga((n) => n + 1);
   }
@@ -218,6 +239,17 @@ export function PuenteValery({ empresa }: { empresa: string }) {
               </Button>
             </div>
           )}
+          {isEmpresaId(empresa) && versionAlMenos(a?.version, VERSION_DE.cierre ?? "1.0.8") && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+              <p className="max-w-[65ch] text-sm text-text">
+                Todo el histórico, directo de la base de Valery.
+                <span className="text-muted"> Desde {mesNombre(HISTORY[empresa].meta.desde)}, un pedido por año. Al cerrarlos, cada mes reemplaza al de los Excel, que contaban dos veces las facturas de notas de entrega y tenían huecos.</span>
+              </p>
+              <Button variant="secondary" icon="import" disabled={noSe("cierre")} cargando={yendo === "historico"} textoCargando="Pidiendo…" onClick={() => void pedirHistorico()}>
+                Releer el histórico
+              </Button>
+            </div>
+          )}
           {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-xl px-3 py-2 text-sm ${msg.ok ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>{msg.t}</p>}
         </div>
 
@@ -255,7 +287,7 @@ export function PuenteValery({ empresa }: { empresa: string }) {
                       )}
                       {p.tipo === "cierre" && (p.estado === "lista" || p.estado === "aplicada") && (
                         <ConfirmDialog title="¿Cerrar estos meses con lo que dice Valery?" confirmLabel="Sí, cerrar" cancelLabel="No"
-                          message="Cada mes entero del pedido entra al histórico con sus ventas, su costo y sus compras, en los dólares de Valery. Lo que una factura cobra de una nota de entrega se cuenta una vez, con la nota. Un mes ya cerrado se corrige con esto."
+                          message="Cada mes entero y terminado del pedido entra al histórico con sus ventas, su costo y sus compras, en los dólares de Valery, y reemplaza al mismo mes de los Excel. Lo que una factura cobra de una nota de entrega se cuenta una vez, con la nota. Un mes ya cerrado se corrige con esto."
                           onConfirm={() => cerrar(p)}
                           trigger={(abrir) => <Button icon="check" cargando={yendo === `cerrar-${p.id}`} textoCargando="Cerrando…" disabled={!!yendo} onClick={abrir}>{p.estado === "aplicada" ? "Cerrar otra vez" : "Cerrar meses"}</Button>} />
                       )}

@@ -23,7 +23,7 @@ export default function MatricesPage() {
   const { rol } = useRol();
   const periodos = historicoEnRango(empresa, rango);
   // Los meses cerrados a mano (no vienen de Valery) se marcan en la tabla.
-  const manuales = new Map((getHistory(empresa).meta.manuales ?? []).map((m) => [m.ym, m.por]));
+  const manuales = new Map((getHistory(empresa).meta.manuales ?? []).map((m) => [m.ym, m]));
   const rows = periodos.map((p) => ({
     m: p.etiqueta, manual: rango.agrupacion === "anio" ? null : manuales.get(p.clave) ?? null, ventas: p.venta, compras: p.compra,
     costo: p.costo, utilidad: p.util, roi: p.roi,
@@ -77,11 +77,15 @@ export default function MatricesPage() {
                 <tr key={r.m} className="hover:bg-surface-2">
                   <td className="py-2.5 pr-3 text-text">
                     {r.m}
-                    {r.manual !== null && (
-                      <span className="ml-2 rounded-full bg-info/10 px-2 py-0.5 text-[10px] font-medium text-info" title={`Cerrado a mano${r.manual ? ` por ${r.manual}` : ""}: todavía no viene de Valery`}>
+                    {r.manual !== null && (r.manual.valery ? (
+                      <span className="ml-2 rounded-full bg-ok/10 px-2 py-0.5 text-[10px] font-medium text-ok" title="Leído directo de la base de Valery con el Puente">
+                        de la base de Valery
+                      </span>
+                    ) : (
+                      <span className="ml-2 rounded-full bg-info/10 px-2 py-0.5 text-[10px] font-medium text-info" title={`Cerrado a mano${r.manual.por ? ` por ${r.manual.por}` : ""}: todavía no viene de Valery`}>
                         cierre de mes
                       </span>
-                    )}
+                    ))}
                   </td>
                   <td className="py-2.5 pr-3 text-right text-text">{fmtUsd(r.ventas)}</td>
                   <td className="py-2.5 pr-3 text-right text-muted">{fmtUsd(r.compras)}</td>
