@@ -45,7 +45,8 @@ import { puedeVer } from "@/lib/auth/permisos";
 import { puedeVerFinanzas, useRol } from "@/lib/ux/session";
 import { Cifra } from "@/components/ui/Cifra";
 import { ReporteDia } from "@/components/dashboard/ReporteDia";
-import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
+import { useEstadoHistorico } from "@/lib/ux/use-meses-cargados";
+import { EsperaHistorico } from "@/components/historico/EsperaHistorico";
 
 const selectClass = "sumi-campo sumi-campo--auto min-w-[9rem]";
 
@@ -95,8 +96,10 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
   const cil = (estado: string) => porEstado.find((c) => c.estado === estado)?.cantidad ?? 0;
 
   // El período, del histórico real de la empresa activa.
-  useMesesCargados();   // redibuja al cerrar un mes
+  // Redibuja al cerrar un mes; hasta tener los meses de la base no muestra cifras.
+  const listo = useEstadoHistorico() === "listo";
   const hist = getHistory(empresa);
+  const h = (s: string) => (listo ? s : "…");
   const periodos = historicoEnRango(empresa, f.rango);
   const t = totalesDe(periodos);
   const hastaHist = hist.meta.hasta.split("-").reverse().join("-");
@@ -127,8 +130,8 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
     ] : []),
     ...(o?.compras !== null && ve("purchases") ? [{ key: "oc", label: "Compras por Recibir", value: o?.compras ? n(o.compras.ordenes) : cargando,
       bs: null, sub: o?.compras ? `orden(es) · ${fmtUsd(o.compras.usd)} pendientes` : undefined, tone: "navy" as const }] : []),
-    ...(finanzas ? [{ key: "bg", label: "Utilidad del Período", value: fmtUsd(t.util), bs: fmtBsCorto(t.utilBs), bsExacto: true,
-      sub: `histórico de Valery, hasta ${hastaHist}`, tone: "ok" as const }] : []),
+    ...(finanzas ? [{ key: "bg", label: "Utilidad del Período", value: h(fmtUsd(t.util)), bs: listo ? fmtBsCorto(t.utilBs) : null, bsExacto: true,
+      sub: listo ? `histórico de Valery, hasta ${hastaHist}` : "leyendo el histórico", tone: "ok" as const }] : []),
   ];
 
   const empresaLabel = empresa === "sudematin" ? "Sudematin" : "Sumigases";
@@ -172,19 +175,19 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
           </div>
           <div className={`mt-3 grid gap-3 ${finanzas ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
             <div className="min-w-0">
-              <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:normal] xl:text-xl"><Cifra texto={fmtUsd(hist.totals.venta)} /></p>
-              <p className="text-[11px] tabular-nums text-muted [overflow-wrap:normal]"><Cifra texto={fmtBsCorto(hist.totals.ventaBs)} /> facturados</p>
+              <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:normal] xl:text-xl"><Cifra texto={h(fmtUsd(hist.totals.venta))} /></p>
+              {listo && <p className="text-[11px] tabular-nums text-muted [overflow-wrap:normal]"><Cifra texto={fmtBsCorto(hist.totals.ventaBs)} /> facturados</p>}
               <p className="text-xs text-muted">Ventas</p>
             </div>
             {finanzas && (
               <>
                 <div className="min-w-0">
-                  <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:normal] xl:text-xl"><Cifra texto={fmtUsd(hist.totals.util)} /></p>
-                  <p className="text-[11px] tabular-nums text-muted [overflow-wrap:normal]"><Cifra texto={fmtBsCorto(hist.totals.utilBs)} /></p>
+                  <p className="text-base font-semibold tabular-nums text-text [overflow-wrap:normal] xl:text-xl"><Cifra texto={h(fmtUsd(hist.totals.util))} /></p>
+                  {listo && <p className="text-[11px] tabular-nums text-muted [overflow-wrap:normal]"><Cifra texto={fmtBsCorto(hist.totals.utilBs)} /></p>}
                   <p className="text-xs text-muted">Utilidad</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-base font-semibold tabular-nums text-ok [overflow-wrap:normal] xl:text-xl">{hist.totals.roi.toLocaleString("es-VE")}%</p>
+                  <p className="text-base font-semibold tabular-nums text-ok [overflow-wrap:normal] xl:text-xl">{h(`${hist.totals.roi.toLocaleString("es-VE")}%`)}</p>
                   <p className="text-xs text-muted">ROI (utilidad / costo)</p>
                 </div>
               </>
@@ -223,7 +226,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
       <div className="mt-4"><ReporteDia empresa={empresa} /></div>
 
       {finanzas && (
-        <>
+        <EsperaHistorico className="mt-6">
           <div className="mt-6">
             <SectionCard
               title="Histórico de Ventas y Compras"
@@ -298,7 +301,7 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
                 ]} />
             </SectionCard>
           </div>
-        </>
+        </EsperaHistorico>
       )}
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

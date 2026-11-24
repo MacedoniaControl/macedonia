@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { fijarMesesCargados, suscribirMesesCargados, versionMesesCargados } from "./historico-meses";
+import { estadoMeses, fijarMesesCargados, suscribirMesesCargados, versionMesesCargados, type EstadoMeses } from "./historico-meses";
 import { listarMesesCargados } from "./historico-meses-db";
 
 /**
@@ -11,6 +11,11 @@ import { listarMesesCargados } from "./historico-meses-db";
  */
 export function useMesesCargados(): number {
   return useSyncExternalStore(suscribirMesesCargados, versionMesesCargados, () => 0);
+}
+
+/** «listo» cuando ya llegaron los meses de la base; antes, el histórico no se muestra. */
+export function useEstadoHistorico(): EstadoMeses {
+  return useSyncExternalStore(suscribirMesesCargados, estadoMeses, () => "cargando");
 }
 
 /** Vuelve a leer los meses cerrados desde la base (al entrar y después de guardar). */

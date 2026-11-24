@@ -26,7 +26,8 @@ import { ProveedorExportar, useExportable } from "@/lib/ux/exportar";
 import { RANGO_HISTORICO, type Rango } from "@/lib/ux/rango";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO, type Periodo } from "@/lib/ux/historico-rango";
 import { getHistory } from "@/lib/ux/history-data";
-import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
+import { useEstadoHistorico } from "@/lib/ux/use-meses-cargados";
+import { EsperaHistorico } from "@/components/historico/EsperaHistorico";
 import { useEmpresaActiva } from "@/lib/ux/use-empresa";
 import { fmtBsCorto, fmtUsd, fmtBs } from "@/lib/ux/format";
 import type { TipoColumna } from "@/lib/ux/tabla-export";
@@ -147,7 +148,8 @@ export default function ReportsPage() {
 }
 
 function Reportes() {
-  useMesesCargados();   // redibuja al cerrar un mes
+  // Redibuja al cerrar un mes; hasta tener los meses de la base no muestra ni descarga cifras.
+  const listo = useEstadoHistorico() === "listo";
   const empresa = useEmpresaActiva();
   const [rango, setRango] = useState<Rango>(RANGO_HISTORICO);
   const [selId, setSel] = useState(REPORTES[0].id);
@@ -185,7 +187,7 @@ function Reportes() {
       <PageHeader
         title="Reportes"
         breadcrumbs={[{ label: "Inteligencia" }, { label: "Reportes" }]}
-        actions={<BotonDescargar empresa={empresa} />}
+        actions={listo ? <BotonDescargar empresa={empresa} /> : undefined}
       />
 
       {/* El reporte y el período, juntos: es lo único que se elige. */}
@@ -204,6 +206,7 @@ function Reportes() {
         </div>
       </div>
 
+      <EsperaHistorico>
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {sel.cifras(t, periodos).map((c) => (
           <StatCard key={c.label} label={c.label} value={c.value} bs={c.bs ?? undefined} bsAproximado={false} sub={c.sub} accent={c.accent} />
@@ -279,6 +282,7 @@ function Reportes() {
       <p className="mt-3 text-xs text-muted">
         Margen = utilidad / ventas · ROI = utilidad / costo de lo vendido.
       </p>
+      </EsperaHistorico>
     </>
   );
 }
