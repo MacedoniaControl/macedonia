@@ -6,8 +6,13 @@
 // Dashboard, ROI, Reportes y Matrices lo cuentan igual que a los de Valery.
 //
 // Reglas:
-//   · Valery manda: un mes cargado a mano solo entra si Valery no lo trae.
-//   · Solo se cierran meses terminados, posteriores al último de Valery.
+//   · Lo leído de la BASE de Valery por el Puente (nota «Leído de Valery…»)
+//     manda sobre el histórico de los Excel: reemplaza ese mes. Pedido del
+//     usuario (24-11-2026): «todos los números desde la base de datos directo».
+//     Los Excel tenían huecos (julio de 2026 de Sumigases, sin ventas del 14 al
+//     27) que la base no tiene.
+//   · Un mes cargado a mano (formato en Matrices) solo entra si no hay otro dato.
+//   · Solo se cierran meses terminados.
 //
 // Lo de aquí es puro (para probarlo) más un almacén muy chico en memoria del
 // navegador: getHistory() lo lee y las pantallas se suscriben para redibujar
@@ -49,17 +54,27 @@ export function mesesPorCerrar(ultimoValery: string, hoy: string): string[] {
   return salida;
 }
 
-/** El histórico de Valery con los meses cargados a mano que Valery todavía no trae. */
+/** Lo que escribe el cierre desde el Puente (lib/valery/puente-db.ts) al principio de la nota. */
+export const MARCA_VALERY = "Leído de Valery";
+/** ¿El mes se leyó de la base de Valery por el Puente (y no se cargó a mano)? */
+export const esDeValery = (m: Pick<MesCargado, "nota">) => !!m.nota && m.nota.startsWith(MARCA_VALERY);
+
+/**
+ * El histórico con los meses cerrados: lo leído de la base de Valery reemplaza
+ * al mes del Excel; lo cargado a mano solo llena los meses que no hay.
+ */
 export function conMesesCargados(h: CompanyHistory, meses: MesCargado[]): CompanyHistory {
-  const deValery = new Set(h.months.map((m) => m.ym));
-  const nuevos = meses.filter((m) => !deValery.has(m.ym)).sort((a, b) => a.ym.localeCompare(b.ym));
+  const deExcel = new Set(h.months.map((m) => m.ym));
+  const nuevos = meses.filter((m) => esDeValery(m) || !deExcel.has(m.ym)).sort((a, b) => a.ym.localeCompare(b.ym));
   if (!nuevos.length) return h;
 
   const extra: HistMonth[] = nuevos.map((m) => ({
     ym: m.ym, venta: m.venta, costo: m.costo, util: m.venta - m.costo, compra: m.compra,
     ventaBs: m.ventaBs, costoBs: m.costoBs, utilBs: m.ventaBs - m.costoBs, compraBs: m.compraBs,
   }));
-  const months = [...h.months, ...extra].sort((a, b) => a.ym.localeCompare(b.ym));
+  const reemplazan = new Set(extra.map((m) => m.ym));
+  const quitados = h.months.filter((m) => reemplazan.has(m.ym));
+  const months = [...h.months.filter((m) => !reemplazan.has(m.ym)), ...extra].sort((a, b) => a.ym.localeCompare(b.ym));
 
   const suma = (ms: HistMonth[], k: keyof Omit<HistMonth, "ym">) => ms.reduce((a, m) => a + m[k], 0);
   const anios = new Map<number, HistMonth[]>();
@@ -74,20 +89,24 @@ export function conMesesCargados(h: CompanyHistory, meses: MesCargado[]): Compan
     return { year, venta, costo, util, compra, margen: margen(util, venta), roi: roi(util, costo) };
   });
 
+  // Los totales: los del Excel, menos los meses que se reemplazaron, más los nuevos.
   const t = h.totals;
-  const venta = t.venta + suma(extra, "venta"), costo = t.costo + suma(extra, "costo");
-  const util = t.util + suma(extra, "util"), compra = t.compra + suma(extra, "compra");
+  const mas = (k: keyof Omit<HistMonth, "ym">) => suma(extra, k) - suma(quitados, k);
+  const venta = t.venta + mas("venta"), costo = t.costo + mas("costo");
+  const util = t.util + mas("util"), compra = t.compra + mas("compra");
   return {
     ...h,
     meta: {
       ...h.meta,
       hasta: months[months.length - 1].ym,
-      manuales: nuevos.map((m) => ({ ym: m.ym, por: m.creadoNombre ?? "" })),
+      // Un mes leído de la base ya no tiene el hueco del Excel.
+      incompletos: h.meta.incompletos.filter((m) => !reemplazan.has(m.ym)),
+      manuales: nuevos.map((m) => ({ ym: m.ym, por: m.creadoNombre ?? "", ...(esDeValery(m) ? { valery: true } : {}) })),
     },
     totals: {
       venta, costo, util, compra, margen: margen(util, venta), roi: roi(util, costo),
-      ventaBs: t.ventaBs + suma(extra, "ventaBs"), costoBs: t.costoBs + suma(extra, "costoBs"),
-      utilBs: t.utilBs + suma(extra, "utilBs"), compraBs: t.compraBs + suma(extra, "compraBs"),
+      ventaBs: t.ventaBs + mas("ventaBs"), costoBs: t.costoBs + mas("costoBs"),
+      utilBs: t.utilBs + mas("utilBs"), compraBs: t.compraBs + mas("compraBs"),
     },
     years,
     months,

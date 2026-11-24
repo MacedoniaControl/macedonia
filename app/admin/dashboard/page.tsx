@@ -106,10 +106,12 @@ export function DashboardView({ empresaFija }: { empresaFija?: string }) {
 
   type Kpi = { key: string; label: string; value: string; bs?: string | null; bsExacto?: boolean; sub?: string; tone: "brand" | "navy" | "ok" | "warn" | "danger" | "info" };
   const kpis: Kpi[] = [
-    ...(ve("revenue") || ve("delivery-notes") ? [{ key: "vh", label: "Ventas Hoy", value: o?.ventasHoy ? fmtUsd(o.ventasHoy.usd) : cargando,
-      bs: o?.ventasHoy ? enBs(o.ventasHoy.usd, tasa) : null,
+    ...(ve("revenue") || ve("delivery-notes") ? [{ key: "vh", label: "Ventas Hoy",
+      value: o?.ventasHoy ? (o.ventasHoy.usd === null ? "—" : fmtUsd(o.ventasHoy.usd)) : cargando,
+      bs: o?.ventasHoy && o.ventasHoy.usd !== null ? enBs(o.ventasHoy.usd, tasa) : null,
       sub: o?.ventasHoy
-        ? (o.ventasHoy.fuente === "valery" ? `${n(o.ventasHoy.documentos)} factura(s) y nota(s) en Valery` : `${n(o.ventasHoy.documentos)} nota(s) de entrega en Macedonia`)
+        ? (o.ventasHoy.fuente === "sin_puente" ? "Valery no está enviando ventas: falta el agente del Puente"
+          : o.ventasHoy.fuente === "valery" ? `${n(o.ventasHoy.documentos)} factura(s) y nota(s) en Valery` : `${n(o.ventasHoy.documentos)} nota(s) de entrega en Macedonia`)
         : undefined, tone: "brand" as const }] : []),
     ...(o?.cobrar !== null && ve("receivables") ? [{ key: "cxc", label: "Cuentas por Cobrar", value: o?.cobrar ? fmtUsd(o.cobrar.usd) : cargando,
       bs: o?.cobrar ? enBs(o.cobrar.usd, tasa) : null,
