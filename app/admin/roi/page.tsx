@@ -22,6 +22,7 @@ import { getHistory } from "@/lib/ux/history-data";
 import { HistoriaBI } from "@/components/ui/HistoriaBI";
 import { historicoEnRango, totalesDe, AGRUPACIONES_HISTORICO } from "@/lib/ux/historico-rango";
 import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
+import { EsperaHistorico } from "@/components/historico/EsperaHistorico";
 
 const EMPRESAS = [
   { id: "sumigases", label: "Sumigases" },
@@ -71,6 +72,7 @@ export default function RoiPage() {
         <SelectorRango valor={rango} onCambio={setRango} agrupaciones={AGRUPACIONES_HISTORICO} />
       </div>
 
+      <EsperaHistorico>
       <SectionCard
         title={`ROI histórico real · ${label}`}
         action={<StatusBadge tone="ok">ROI del período {t.roi.toLocaleString("es-VE")}%</StatusBadge>}
@@ -142,6 +144,7 @@ export default function RoiPage() {
           </ul>
         </SectionCard>
       </div>
+      </EsperaHistorico>
     </>
   );
 }

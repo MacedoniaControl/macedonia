@@ -13,6 +13,7 @@ import { getHistory } from "@/lib/ux/history-data";
 import { puedeVerFinanzas, useRol } from "@/lib/ux/session";
 import { BotonCierreDeMes } from "@/components/historico/CierreDeMes";
 import { useMesesCargados } from "@/lib/ux/use-meses-cargados";
+import { EsperaHistorico } from "@/components/historico/EsperaHistorico";
 
 export default function MatricesPage() {
   useMesesCargados();   // redibuja al cerrar un mes
@@ -59,6 +60,7 @@ export default function MatricesPage() {
         <SelectorRango valor={rango} onCambio={setRango} agrupaciones={AGRUPACIONES_HISTORICO} />
       </div>
 
+      <EsperaHistorico>
       <SectionCard title="Matriz ROI (USD)" description={`${periodos.length} período(s) · ${rango.desde} a ${rango.hasta}`}>
         <div className="sumi-scroll max-w-full overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -108,6 +110,7 @@ export default function MatricesPage() {
           </table>
         </div>
       </SectionCard>
+      </EsperaHistorico>
     </>
   );
 }

@@ -133,3 +133,14 @@ export function suscribirMesesCargados(f: () => void) {
 }
 
 export const versionMesesCargados = () => version;
+
+// Mientras no llegan los meses leídos de la base, el histórico sería el del
+// Excel, con cifras que ya no valen: las pantallas esperan en vez de mostrarlas.
+let fallo = false;
+export type EstadoMeses = "cargando" | "listo" | "error";
+export const estadoMeses = (): EstadoMeses => (version > 0 ? "listo" : fallo ? "error" : "cargando");
+/** No se pudieron leer los meses: se dice, en vez de caer en las cifras del Excel. */
+export function marcarFalloMeses() {
+  fallo = true;
+  oyentes.forEach((f) => f());
+}
